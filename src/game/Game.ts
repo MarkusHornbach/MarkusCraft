@@ -1,18 +1,25 @@
 // Game: wires world, player, renderer and UI together and runs the fixed-step loop.
 import { Input, type PressAction } from '../input/Input';
+import { breakResult, canPlace } from '../player/interaction';
 import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
-import { applyLook, createPlayer, type PlayerState } from '../player/player';
+import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
+import { Hud } from '../ui/Hud';
+import { HOTBAR_BLOCKS } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
 import { toChunkCoord } from '../world/chunk';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain } from '../world/generation/terrain';
+import { type RayHit, raycast } from '../world/raycast';
 import { World, chunksAffectedByEdit } from '../world/World';
 import {
+  ACTION_REPEAT_MS,
   CHUNK_BUDGET_MS,
   FOV_DEFAULT,
+  HOTBAR_SLOTS,
   LOOK_RADIANS_PER_PIXEL,
   MAX_STEPS_PER_FRAME,
+  REACH,
   RENDER_DISTANCE_DEFAULT,
   SIM_DT,
   TEST_RENDER_DISTANCE,
@@ -30,6 +37,12 @@ export class Game {
   private readonly player: PlayerState;
   private readonly spawn: SpawnPoint;
   private readonly input: Input;
+  private readonly hud: Hud;
+  private readonly root: HTMLElement;
+  private selectedSlot = 1;
+  private target: RayHit | null = null;
+  /** Seconds a mouse button has been held since the last break/place action. */
+  private repeatTimer = 0;
   /** Player position before the latest simulation step, for render interpolation. */
   private readonly previous = { x: 0, y: 0, z: 0 };
   private time: number;
@@ -45,9 +58,12 @@ export class Game {
     this.time = params.time;
     this.world = new World(params.seed);
 
+    this.root = document.createElement('div');
+    this.root.className = 'game-root';
+    container.appendChild(this.root);
     const canvas = document.createElement('canvas');
     canvas.className = 'game-canvas';
-    container.appendChild(canvas);
+    this.root.appendChild(canvas);
     this.renderer = new Renderer(canvas, {
       preserveDrawingBuffer: params.test,
       pixelRatio: params.test ? 1 : null,
@@ -75,6 +91,9 @@ export class Game {
       onPress: (action) => this.handlePress(action),
     });
 
+    this.hud = new Hud(this.root, this.renderer.atlas.tiles);
+    this.hud.setSelected(this.selectedSlot, false);
+
     this.resize();
     window.addEventListener('resize', () => this.resize());
     installTestApi(this.createTestApi());
@@ -88,8 +107,8 @@ export class Game {
   private resize(): void {
     if (this.params.test) {
       // Fixed logical resolution so screenshots do not depend on the window.
-      this.renderer.canvas.style.width = `${TEST_VIEW_WIDTH}px`;
-      this.renderer.canvas.style.height = `${TEST_VIEW_HEIGHT}px`;
+      this.root.style.width = `${TEST_VIEW_WIDTH}px`;
+      this.root.style.height = `${TEST_VIEW_HEIGHT}px`;
       this.renderer.setSize(TEST_VIEW_WIDTH, TEST_VIEW_HEIGHT);
     } else {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -136,6 +155,67 @@ export class Game {
     this.rememberPosition();
     stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
+    this.repeatHeldAction();
+  }
+
+  /** Holding a mouse button repeats its action at a fixed interval. */
+  private repeatHeldAction(): void {
+    const breaking = this.input.isHeld('break');
+    const placing = this.input.isHeld('place');
+    if (!breaking && !placing) {
+      this.repeatTimer = 0;
+      return;
+    }
+    this.repeatTimer += SIM_DT;
+    // The small tolerance keeps 15 steps of 1/60 s from falling just short of 250 ms.
+    if (this.repeatTimer < ACTION_REPEAT_MS / 1000 - 1e-9) return;
+    this.repeatTimer = 0;
+    if (breaking) this.breakTarget();
+    else this.placeAtTarget();
+  }
+
+  /** Finds the block the player is looking at, within reach. */
+  private updateTarget(): void {
+    const p = this.player;
+    const [dx, dy, dz] = viewDirection(p.yaw, p.pitch);
+    this.target = raycast(
+      (x, y, z) => this.world.getBlock(x, y, z),
+      p.x,
+      eyeY(p),
+      p.z,
+      dx,
+      dy,
+      dz,
+      REACH,
+    );
+  }
+
+  private breakTarget(): void {
+    this.updateTarget();
+    const t = this.target;
+    if (!t) return;
+    const replacement = breakResult(this.world, t.x, t.y, t.z);
+    if (replacement === null) return;
+    this.setBlock(t.x, t.y, t.z, replacement);
+    this.updateTarget();
+  }
+
+  private placeAtTarget(): void {
+    this.updateTarget();
+    const t = this.target;
+    if (!t) return;
+    const x = t.x + t.face[0];
+    const y = t.y + t.face[1];
+    const z = t.z + t.face[2];
+    if (!canPlace(this.world, this.player, x, y, z)) return;
+    this.setBlock(x, y, z, HOTBAR_BLOCKS[this.selectedSlot - 1]);
+    this.updateTarget();
+  }
+
+  private selectSlot(slot: number): void {
+    // Wrap around in both directions (mouse wheel).
+    this.selectedSlot = ((((slot - 1) % HOTBAR_SLOTS) + HOTBAR_SLOTS) % HOTBAR_SLOTS) + 1;
+    this.hud.setSelected(this.selectedSlot, true);
   }
 
   private rememberPosition(): void {
@@ -160,9 +240,27 @@ export class Game {
   }
 
   private handlePress(action: PressAction): void {
-    if (action.type === 'toggleFly') {
-      this.player.mode = this.player.mode === 'fly' ? 'walk' : 'fly';
-      this.player.vy = 0;
+    switch (action.type) {
+      case 'toggleFly':
+        this.player.mode = this.player.mode === 'fly' ? 'walk' : 'fly';
+        this.player.vy = 0;
+        break;
+      case 'break':
+        this.repeatTimer = 0;
+        this.breakTarget();
+        break;
+      case 'place':
+        this.repeatTimer = 0;
+        this.placeAtTarget();
+        break;
+      case 'selectSlot':
+        this.selectSlot(action.slot);
+        break;
+      case 'cycleSlot':
+        this.selectSlot(this.selectedSlot + action.direction);
+        break;
+      case 'toggleDebug':
+        break;
     }
   }
 
@@ -182,6 +280,8 @@ export class Game {
   private draw(alpha: number): void {
     const p = this.player;
     const prev = this.previous;
+    this.updateTarget();
+    this.renderer.setHighlight(this.target);
     this.renderer.setCamera({
       x: prev.x + (p.x - prev.x) * alpha,
       y: prev.y + (p.y - prev.y) * alpha,
@@ -227,8 +327,16 @@ export class Game {
         geometries: stats.geometries,
         fov: this.renderer.fov,
       },
-      selectedSlot: 1,
-      target: null,
+      selectedSlot: this.selectedSlot,
+      target: this.target
+        ? {
+            x: this.target.x,
+            y: this.target.y,
+            z: this.target.z,
+            id: this.target.id,
+            face: this.target.face,
+          }
+        : null,
     };
   }
 
@@ -264,7 +372,10 @@ export class Game {
         new Promise<void>((resolve) => {
           this.idleWaiters.push(resolve);
         }),
-      getState: () => this.getState(),
+      getState: () => {
+        this.updateTarget();
+        return this.getState();
+      },
       setPlayer: (patch) => this.setPlayer(patch),
       look: (dx, dy) => this.applyLookPixels(dx, dy),
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),

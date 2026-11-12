@@ -7,6 +7,8 @@ import { type ChunkMaterials, createChunkMaterials } from './materials';
 import { Sky } from './Sky';
 import { type Atlas, buildAtlas } from './textures/atlas';
 
+const HIGHLIGHT_INFLATE = 0.004;
+
 export interface RenderStats {
   drawCalls: number;
   triangles: number;
@@ -50,6 +52,7 @@ export class Renderer {
   private readonly sky: Sky;
   private readonly stats: RenderStats = { drawCalls: 0, triangles: 0, geometries: 0 };
   private renderDistance = 8;
+  private readonly highlight: THREE.LineSegments;
 
   constructor(canvas: HTMLCanvasElement, options: RendererOptions) {
     this.canvas = canvas;
@@ -68,6 +71,22 @@ export class Renderer {
     this.sky = new Sky(this.scene);
     this.materials.uniforms.uFogColor.value.copy(this.sky.horizon);
     this.setRenderDistance(this.renderDistance);
+
+    // Outline of the targeted block, slightly larger than the block to avoid z-fighting.
+    const size = 1 + 2 * HIGHLIGHT_INFLATE;
+    this.highlight = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(size, size, size)),
+      new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 }),
+    );
+    this.highlight.visible = false;
+    this.highlight.renderOrder = 2;
+    this.scene.add(this.highlight);
+  }
+
+  /** Shows the outline around a block, or hides it when `block` is null. */
+  setHighlight(block: { x: number; y: number; z: number } | null): void {
+    this.highlight.visible = block !== null;
+    if (block) this.highlight.position.set(block.x + 0.5, block.y + 0.5, block.z + 0.5);
   }
 
   setSize(width: number, height: number): void {

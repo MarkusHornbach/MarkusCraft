@@ -1,26 +1,21 @@
 // Player movement and controls in the browser (plan step 8).
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { DEG, getState, openGame, setPlayer, step, surfaceY, whenIdle } from './game';
+import {
+  DEG,
+  PLATFORM_Y,
+  standOnPlatform as buildPlatform,
+  getState,
+  openGame,
+  setPlayer,
+  step,
+  surfaceY,
+  whenIdle,
+} from './game';
 
-const STONE = 3;
-const PLATFORM_Y = 110;
-
-/** Builds a stone runway high above the terrain and puts the player on it, facing -Z. */
+/** Puts the player on a stone runway and returns the start position. */
 async function standOnPlatform(page: Page): Promise<{ x: number; z: number }> {
-  const { player } = await getState(page);
-  const px = Math.floor(player.x);
-  const pz = Math.floor(player.z);
-  await page.evaluate(
-    ([x0, y, z0, id]) => {
-      for (let z = z0 - 12; z <= z0 + 2; z++) {
-        for (let x = x0 - 2; x <= x0 + 2; x++) window.__mc.setBlock(x, y, z, id);
-      }
-    },
-    [px, PLATFORM_Y, pz, STONE],
-  );
-  await setPlayer(page, { x: px + 0.5, y: PLATFORM_Y + 1, z: pz + 0.5, yaw: 0, pitch: 0 });
-  await step(page, 5);
+  const { px, pz } = await buildPlatform(page);
   const state = await getState(page);
   expect(state.player.onGround).toBe(true);
   expect(state.player.y).toBe(PLATFORM_Y + 1);

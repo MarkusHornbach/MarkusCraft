@@ -68,3 +68,35 @@ export async function step(page: Page, n: number): Promise<void> {
 }
 
 export const DEG = Math.PI / 180;
+
+export const PLATFORM_Y = 110;
+
+/**
+ * Builds a runway of the given block high above the terrain and puts the player on it,
+ * facing -Z. Returns the block column the player stands in.
+ */
+export async function standOnPlatform(
+  page: Page,
+  blockId = 3,
+): Promise<{ px: number; pz: number }> {
+  const { player } = await getState(page);
+  const px = Math.floor(player.x);
+  const pz = Math.floor(player.z);
+  await page.evaluate(
+    ([x0, y, z0, id]) => {
+      for (let z = z0 - 12; z <= z0 + 2; z++) {
+        for (let x = x0 - 3; x <= x0 + 3; x++) window.__mc.setBlock(x, y, z, id);
+      }
+    },
+    [px, PLATFORM_Y, pz, blockId],
+  );
+  await setPlayer(page, { x: px + 0.5, y: PLATFORM_Y + 1, z: pz + 0.5, yaw: 0, pitch: 0 });
+  await step(page, 5);
+  return { px, pz };
+}
+
+/** Clicks the centre of the view (where the crosshair is). */
+export async function clickCenter(page: Page, button: 'left' | 'right' = 'left'): Promise<void> {
+  await page.mouse.click(480, 270, { button });
+  await whenIdle(page);
+}
