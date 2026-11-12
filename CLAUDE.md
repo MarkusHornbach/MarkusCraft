@@ -38,17 +38,17 @@ game in a procedurally generated world"; everything in it is original work.
 
 ## Tech stack
 
-| Concern | Choice |
-|---|---|
-| Language | TypeScript, `strict` mode |
-| Build / dev server | Vite, `base: './'` so the build works under any path |
-| Rendering | Three.js (WebGL2) |
-| Unit tests | Vitest (Node environment) |
-| Browser tests | Playwright (`@playwright/test`), Chromium, software WebGL |
-| Lint / format | ESLint (typescript-eslint) + Prettier |
-| Package manager | npm, lockfile committed |
-| Runtime | Node 22 (`.nvmrc`) |
-| CI / deploy | GitHub Actions: checks on every push, deploy `main` to GitHub Pages |
+| Concern            | Choice                                                              |
+| ------------------ | ------------------------------------------------------------------- |
+| Language           | TypeScript, `strict` mode                                           |
+| Build / dev server | Vite, `base: './'` so the build works under any path                |
+| Rendering          | Three.js (WebGL2)                                                   |
+| Unit tests         | Vitest (Node environment)                                           |
+| Browser tests      | Playwright (`@playwright/test`), Chromium, software WebGL           |
+| Lint / format      | ESLint (typescript-eslint) + Prettier                               |
+| Package manager    | npm, lockfile committed                                             |
+| Runtime            | Node 22 (`.nvmrc`)                                                  |
+| CI / deploy        | GitHub Actions: checks on every push, deploy `main` to GitHub Pages |
 
 Keep runtime dependencies minimal: `three` only, unless a phase plan says otherwise.
 Noise, RNG, physics and meshing are implemented in this repo.
@@ -106,19 +106,19 @@ Unit tests live next to the code as `*.test.ts`.
 
 ## Commands
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Dev server |
-| `npm run build` | Type check + production build into `dist/` |
-| `npm run preview` | Serve the production build |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run lint` | ESLint + Prettier check |
-| `npm run format` | Apply Prettier |
-| `npm test` | Vitest unit tests, single run |
-| `npm run test:e2e` | Build, then Playwright tests against the preview server |
-| `npm run test:e2e:update` | Same, regenerating reference screenshots |
-| `npm run check` | `typecheck` + `lint` + `test` (fast gate for every commit) |
-| `npm run check:all` | `check` + `build` + `test:e2e` (gate for every plan step) |
+| Command                   | Purpose                                                    |
+| ------------------------- | ---------------------------------------------------------- |
+| `npm run dev`             | Dev server                                                 |
+| `npm run build`           | Type check + production build into `dist/`                 |
+| `npm run preview`         | Serve the production build                                 |
+| `npm run typecheck`       | `tsc --noEmit`                                             |
+| `npm run lint`            | ESLint + Prettier check                                    |
+| `npm run format`          | Apply Prettier                                             |
+| `npm test`                | Vitest unit tests, single run                              |
+| `npm run test:e2e`        | Build, then Playwright tests against the preview server    |
+| `npm run test:e2e:update` | Same, regenerating reference screenshots                   |
+| `npm run check`           | `typecheck` + `lint` + `test` (fast gate for every commit) |
+| `npm run check:all`       | `check` + `build` + `test:e2e` (gate for every plan step)  |
 
 ## Headless testing
 

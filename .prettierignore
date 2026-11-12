@@ -1,0 +1,7 @@
+dist/
+coverage/
+test-results/
+playwright-report/
+package-lock.json
+e2e/**/*.png
+docs/phase-1-plan.md
