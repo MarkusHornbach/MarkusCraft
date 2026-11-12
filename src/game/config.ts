@@ -50,8 +50,8 @@ export const SPRINT_SPEED = 5.6;
 export const GROUND_ACCEL = 60;
 export const AIR_ACCEL = 12;
 export const GRAVITY = 28;
-/** Gives a jump apex of v²/2g ≈ 1.25 blocks. */
-export const JUMP_SPEED = 8.4;
+/** Gives a jump apex of about 1.25 blocks with the discrete 60 Hz integration. */
+export const JUMP_SPEED = 8.6;
 export const MAX_FALL_SPEED = 50;
 export const FLY_SPEED = 10;
 export const FLY_SPRINT_SPEED = 20;
@@ -60,9 +60,13 @@ export const SWIM_SPEED = 2.2;
 export const SWIM_ACCEL = 20;
 export const SWIM_SINK_SPEED = 2;
 export const SWIM_RISE_SPEED = 3;
-export const SWIM_VERTICAL_ACCEL = 14;
-/** Upward speed given when jumping at the surface next to a bank, enough to climb out. */
-export const SWIM_EXIT_SPEED = 7;
+export const SWIM_VERTICAL_ACCEL = 30;
+/**
+ * Upward speed while jumping against a bank with the feet still in water. Leaving the
+ * water at this speed lifts the feet about 1.1 blocks: enough for a bank one block
+ * above the water surface, not for two.
+ */
+export const SWIM_EXIT_SPEED = 8;
 export const VOID_Y = -20;
 
 export const REACH = 5;

@@ -19,6 +19,8 @@ export interface PlayerState {
   mode: MoveMode;
   onGround: boolean;
   inWater: boolean;
+  /** True if horizontal movement was blocked by a solid block in the last step. */
+  againstWall: boolean;
 }
 
 export function createPlayer(x: number, y: number, z: number): PlayerState {
@@ -34,6 +36,7 @@ export function createPlayer(x: number, y: number, z: number): PlayerState {
     mode: 'walk',
     onGround: false,
     inWater: false,
+    againstWall: false,
   };
 }
 

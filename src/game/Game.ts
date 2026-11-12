@@ -1,4 +1,6 @@
 // Game: wires world, player, renderer and UI together and runs the fixed-step loop.
+import { Input, type PressAction } from '../input/Input';
+import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, type PlayerState } from '../player/player';
 import { Renderer } from '../render/Renderer';
 import { ChunkManager } from '../world/ChunkManager';
@@ -27,6 +29,9 @@ export class Game {
   private readonly chunkManager: ChunkManager;
   private readonly player: PlayerState;
   private readonly spawn: SpawnPoint;
+  private readonly input: Input;
+  /** Player position before the latest simulation step, for render interpolation. */
+  private readonly previous = { x: 0, y: 0, z: 0 };
   private time: number;
   private paused = false;
   private lastFrameMs = 0;
@@ -62,6 +67,13 @@ export class Game {
 
     this.spawn = findSpawn(getTerrain(params.seed));
     this.player = createPlayer(this.spawn.x + 0.5, this.spawn.y, this.spawn.z + 0.5);
+    this.rememberPosition();
+
+    this.input = new Input({
+      element: canvas,
+      isActive: () => !this.paused,
+      onPress: (action) => this.handlePress(action),
+    });
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -101,8 +113,13 @@ export class Game {
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
     }
 
+    if (!this.paused) {
+      const look = this.input.consumeLook();
+      this.applyLookPixels(look.dx, look.dy);
+    }
+
     this.updateChunks();
-    this.draw();
+    this.draw(this.params.test ? 1 : this.accumulator / SIM_DT);
 
     if (this.chunkManager.pending === 0) {
       this.framesSinceIdle++;
@@ -116,7 +133,44 @@ export class Game {
 
   /** One fixed simulation step. */
   private simulate(): void {
-    // Physics, interaction and the day/night clock are added in later steps.
+    this.rememberPosition();
+    stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
+    if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
+  }
+
+  private rememberPosition(): void {
+    this.previous.x = this.player.x;
+    this.previous.y = this.player.y;
+    this.previous.z = this.player.z;
+  }
+
+  private spawnPosition(): { x: number; y: number; z: number } {
+    return { x: this.spawn.x + 0.5, y: this.spawn.y, z: this.spawn.z + 0.5 };
+  }
+
+  private readMoveInput(): MoveInput {
+    const input = this.input;
+    return {
+      forward: (input.isHeld('forward') ? 1 : 0) - (input.isHeld('back') ? 1 : 0),
+      strafe: (input.isHeld('right') ? 1 : 0) - (input.isHeld('left') ? 1 : 0),
+      jump: input.isHeld('jump'),
+      sprint: input.isHeld('sprint'),
+      descend: input.isHeld('descend'),
+    };
+  }
+
+  private handlePress(action: PressAction): void {
+    if (action.type === 'toggleFly') {
+      this.player.mode = this.player.mode === 'fly' ? 'walk' : 'fly';
+      this.player.vy = 0;
+    }
+  }
+
+  /** Mouse movement in pixels → rotation. Moving right turns right, moving up looks up. */
+  private applyLookPixels(dx: number, dy: number): void {
+    if (dx === 0 && dy === 0) return;
+    const scale = LOOK_RADIANS_PER_PIXEL * this.mouseSensitivity;
+    applyLook(this.player, -dx * scale, -dy * scale);
   }
 
   private updateChunks(): void {
@@ -124,8 +178,17 @@ export class Game {
     this.chunkManager.update(() => performance.now(), CHUNK_BUDGET_MS);
   }
 
-  private draw(): void {
-    this.renderer.setCamera(this.player);
+  /** Renders one frame; `alpha` blends from the previous to the current simulation state. */
+  private draw(alpha: number): void {
+    const p = this.player;
+    const prev = this.previous;
+    this.renderer.setCamera({
+      x: prev.x + (p.x - prev.x) * alpha,
+      y: prev.y + (p.y - prev.y) * alpha,
+      z: prev.z + (p.z - prev.z) * alpha,
+      yaw: p.yaw,
+      pitch: p.pitch,
+    });
     this.renderer.render();
   }
 
@@ -184,6 +247,7 @@ export class Game {
     p.yaw = 0;
     p.pitch = 0;
     applyLook(p, yaw, pitch);
+    this.rememberPosition();
     // A teleport changes which chunks are needed: not idle until the next frame says so.
     this.updateChunkCenter();
   }
@@ -202,12 +266,7 @@ export class Game {
         }),
       getState: () => this.getState(),
       setPlayer: (patch) => this.setPlayer(patch),
-      look: (dx, dy) =>
-        applyLook(
-          this.player,
-          -dx * LOOK_RADIANS_PER_PIXEL * this.mouseSensitivity,
-          -dy * LOOK_RADIANS_PER_PIXEL * this.mouseSensitivity,
-        ),
+      look: (dx, dy) => this.applyLookPixels(dx, dy),
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),
       setBlock: (x, y, z, id) => this.setBlock(x, y, z, id),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
@@ -217,7 +276,7 @@ export class Game {
       step: (n) => {
         for (let i = 0; i < n; i++) this.simulate();
         this.updateChunkCenter();
-        this.draw();
+        this.draw(1);
       },
     };
   }
