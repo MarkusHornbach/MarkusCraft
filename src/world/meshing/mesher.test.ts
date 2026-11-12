@@ -163,7 +163,7 @@ describe('meshChunk pass routing (AC6.4)', () => {
     expect(faces(waterStone.opaque)).toBe(6);
   });
 
-  it('does not let cutout blocks occlude, and merges equal cutout neighbours', () => {
+  it('does not let cutout blocks occlude, and merges only glass neighbours', () => {
     const stoneLeaves = mesh([
       [5, 60, 5, Block.STONE],
       [6, 60, 5, Block.LEAVES],
@@ -176,6 +176,12 @@ describe('meshChunk pass routing (AC6.4)', () => {
       [6, 60, 5, Block.GLASS],
     ]);
     expect(faces(glassPair.cutout)).toBe(10);
+
+    const leafPair = mesh([
+      [5, 60, 5, Block.LEAVES],
+      [6, 60, 5, Block.LEAVES],
+    ]);
+    expect(faces(leafPair.cutout)).toBe(12);
 
     const glassLeaves = mesh([
       [5, 60, 5, Block.GLASS],

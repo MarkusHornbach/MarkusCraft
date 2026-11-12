@@ -5,11 +5,13 @@ export default defineConfig({
   testDir: 'e2e',
   timeout: 60_000,
   fullyParallel: true,
-  workers: process.env.CI ? 2 : 4,
+  workers: process.env.CI ? 2 : 3,
   retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   snapshotPathTemplate: '{testDir}/screenshots/{arg}{ext}',
   expect: {
+    // Software WebGL is slow; stable screenshots need more than the default 5 s.
+    timeout: 30_000,
     toHaveScreenshot: { maxDiffPixelRatio: 0.02, threshold: 0.2, animations: 'disabled' },
   },
   use: {

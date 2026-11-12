@@ -11,6 +11,7 @@ import {
 } from '../../game/config';
 import {
   BLOCK_CASTS_AO,
+  BLOCK_MERGES_FACES,
   BLOCK_RENDER,
   BLOCK_TILE_BOTTOM,
   BLOCK_TILE_SIDE,
@@ -252,7 +253,8 @@ export function meshChunk(center: Uint8Array, neighbour: NeighbourLookup): Chunk
             if (other !== Block.AIR) continue;
           } else {
             if (BLOCK_RENDER[other] === RENDER_OPAQUE) continue;
-            if (kind === RENDER_CUTOUT && other === id) continue;
+            // Leaves keep their inner faces (denser canopy); glass panes merge.
+            if (other === id && BLOCK_MERGES_FACES[id] === 1) continue;
           }
 
           const tile =

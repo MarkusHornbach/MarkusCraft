@@ -26,6 +26,7 @@ describe('block registry (AC3.3)', () => {
       expect(typeof def.breakable).toBe('boolean');
       expect(typeof def.replaceable).toBe('boolean');
       expect(typeof def.castsAo).toBe('boolean');
+      expect(typeof def.mergesFaces).toBe('boolean');
     });
     expect(new Set(BLOCKS.map((b) => b.name)).size).toBe(BLOCKS.length);
   });

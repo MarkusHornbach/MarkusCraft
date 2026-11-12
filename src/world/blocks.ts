@@ -63,6 +63,8 @@ export interface BlockDef {
   replaceable: boolean;
   /** Whether the block darkens neighbouring faces through ambient occlusion. */
   castsAo: boolean;
+  /** Cutout blocks only: hide faces between two blocks of this kind (glass panes merge). */
+  mergesFaces: boolean;
 }
 
 function uniform(tile: TileId): BlockTiles {
@@ -77,6 +79,7 @@ function solidBlock(
   slot: number | null,
   render: RenderKind = 'opaque',
   castsAo = true,
+  mergesFaces = false,
 ): BlockDef {
   return {
     id,
@@ -89,6 +92,7 @@ function solidBlock(
     breakable: true,
     replaceable: false,
     castsAo,
+    mergesFaces,
   };
 }
 
@@ -105,6 +109,7 @@ export const BLOCKS: readonly BlockDef[] = [
     breakable: false,
     replaceable: true,
     castsAo: false,
+    mergesFaces: false,
   },
   solidBlock(
     Block.GRASS,
@@ -126,7 +131,7 @@ export const BLOCKS: readonly BlockDef[] = [
   solidBlock(Block.LEAVES, 'leaves', 'Leaves', uniform(Tile.LEAVES), 6, 'cutout', true),
   solidBlock(Block.PLANKS, 'planks', 'Planks', uniform(Tile.PLANKS), 7),
   solidBlock(Block.BRICKS, 'bricks', 'Bricks', uniform(Tile.BRICKS), 8),
-  solidBlock(Block.GLASS, 'glass', 'Glass', uniform(Tile.GLASS), 9, 'cutout', false),
+  solidBlock(Block.GLASS, 'glass', 'Glass', uniform(Tile.GLASS), 9, 'cutout', false, true),
   {
     id: Block.WATER,
     name: 'water',
@@ -138,6 +143,7 @@ export const BLOCKS: readonly BlockDef[] = [
     breakable: false,
     replaceable: true,
     castsAo: false,
+    mergesFaces: false,
   },
   {
     ...solidBlock(Block.BEDROCK, 'bedrock', 'Bedrock', uniform(Tile.BEDROCK), null),
@@ -160,6 +166,7 @@ const RENDER_CODES: Record<RenderKind, number> = {
 export const BLOCK_SOLID = new Uint8Array(256);
 export const BLOCK_RENDER = new Uint8Array(256);
 export const BLOCK_CASTS_AO = new Uint8Array(256);
+export const BLOCK_MERGES_FACES = new Uint8Array(256);
 export const BLOCK_REPLACEABLE = new Uint8Array(256).fill(1);
 export const BLOCK_TILE_TOP = new Uint8Array(256);
 export const BLOCK_TILE_SIDE = new Uint8Array(256);
@@ -168,6 +175,7 @@ for (const def of BLOCKS) {
   BLOCK_SOLID[def.id] = def.solid ? 1 : 0;
   BLOCK_RENDER[def.id] = RENDER_CODES[def.render];
   BLOCK_CASTS_AO[def.id] = def.castsAo ? 1 : 0;
+  BLOCK_MERGES_FACES[def.id] = def.mergesFaces ? 1 : 0;
   BLOCK_REPLACEABLE[def.id] = def.replaceable ? 1 : 0;
   if (def.tiles) {
     BLOCK_TILE_TOP[def.id] = def.tiles.top;

@@ -1,5 +1,8 @@
 // Spawn search: the dry column nearest to the origin, away from tree canopies.
 import { TREE_CANOPY_RADIUS } from './trees';
+
+/** No tree trunk this close to the spawn: leaves stay at least two blocks away. */
+export const SPAWN_TREE_CLEARANCE = TREE_CANOPY_RADIUS + 2;
 import type { Terrain } from './terrain';
 
 export interface SpawnPoint {
@@ -15,8 +18,8 @@ const MAX_RINGS = 2048;
 
 function isSuitable(terrain: Terrain, x: number, z: number): boolean {
   if (terrain.isUnderWater(x, z)) return false;
-  // Keep the player's head out of leaves and trunks.
-  const r = TREE_CANOPY_RADIUS;
+  // Keep the player's head out of leaves and the first view clear of foliage.
+  const r = SPAWN_TREE_CLEARANCE;
   for (let dz = -r; dz <= r; dz++) {
     for (let dx = -r; dx <= r; dx++) {
       if (terrain.treeAt(x + dx, z + dz) > 0) return false;
