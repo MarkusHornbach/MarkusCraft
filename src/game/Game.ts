@@ -9,11 +9,18 @@ import { TouchControls } from '../input/TouchControls';
 import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
-import { type WorldEdits, type WorldMeta, makeWorldId, normalizeName } from '../save/saveFormat';
+import {
+  type LoadedWorld,
+  type WorldEdits,
+  type WorldMeta,
+  makeWorldId,
+  normalizeName,
+  seedFromText,
+} from '../save/saveFormat';
 import { MemoryStore, type WorldStore } from '../save/WorldStore';
 import { DebugOverlay } from '../ui/DebugOverlay';
 import { Hud } from '../ui/Hud';
-import { type InputMode, PauseScreen } from '../ui/PauseScreen';
+import { type InputMode, PauseScreen, SAVE_FAILED_TEXT } from '../ui/PauseScreen';
 import {
   DEFAULT_SETTINGS,
   type Settings,
@@ -23,6 +30,7 @@ import {
   saveSettings,
 } from '../ui/settings';
 import { TouchHud } from '../ui/TouchHud';
+import { WorldMenu } from '../ui/WorldMenu';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
 import { chunkKey, toChunkCoord } from '../world/chunk';
@@ -45,6 +53,7 @@ import {
   SAVE_FORMAT_VERSION,
   SIM_DT,
   SIM_HZ,
+  START_TIME_OF_DAY,
   TEST_RENDER_DISTANCE,
   TEST_VIEW_HEIGHT,
   TEST_VIEW_WIDTH,
@@ -56,6 +65,18 @@ import {
 import { IdbStore } from './idbStore';
 import { type GameState, type PlayerPatch, type TestApi, installTestApi } from './testApi';
 import type { GameParams } from './urlParams';
+import { type ReleaseLock, acquireWorldLock } from './worldLock';
+
+/** What covers the view outside test mode: a menu, or nothing while playing. */
+type Screen = 'worlds' | 'settings' | 'pause' | 'play';
+
+/** A problem the world menu tells the player about. */
+class MenuProblem extends Error {}
+
+const TEXT_OTHER_TAB = 'This world is open in another tab.';
+const TEXT_NOT_OPENED = 'This world could not be opened.';
+const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.';
+const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 
 /** True on devices whose main pointer is a finger (phones and tablets). */
 function prefersTouch(): boolean {
@@ -83,6 +104,14 @@ export class Game {
   private readonly hud: Hud;
   private readonly debug: DebugOverlay;
   private readonly pauseScreen: PauseScreen | null = null;
+  /** The start screen with the list of worlds; like the pause screen not in test mode. */
+  private readonly worldMenu: WorldMenu | null = null;
+  private screen: Screen = 'play';
+  /** True while a world is being opened, created or deleted from the menu. */
+  private menuBusy = false;
+  /** Releases the tab lock of the open world. */
+  private releaseWorldLock: ReleaseLock | null = null;
+  private persistRequested = false;
   private settings: Settings;
   private mode: InputMode = 'mouse';
   /** Touch source and its on-screen controls; they exist only in touch mode. */
@@ -151,27 +180,35 @@ export class Game {
     this.hud.setSelected(this.selectedSlot, false);
     this.debug = new DebugOverlay(this.root);
 
-    if (params.test && params.save) {
+    if (!params.test) {
+      // Normal play starts in the world menu; no world is open until one is chosen.
+      this.pauseScreen = new PauseScreen(this.root, {
+        settings: this.settings,
+        mode: this.mode,
+        onPlay: (via) => this.requestPlay(via),
+        onBack: () => void this.backToWorlds(),
+        onSettingsChange: (settings) => this.applySettings(settings),
+        onDebugChange: (visible) => this.setDebugVisible(visible),
+      });
+      this.worldMenu = new WorldMenu(this.root, {
+        mode: this.mode,
+        onPlay: (id, via) => void this.startWorld(() => this.loadStoredWorld(id), via),
+        onCreate: (name, seedText, via) =>
+          void this.startWorld(() => this.createStoredWorld(name, seedText), via),
+        onDelete: (id) => void this.deleteWorld(id),
+        onSettings: () => this.showScreen('settings'),
+      });
+      this.paused = true;
+      this.showScreen('worlds');
+      document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
+      document.addEventListener('pointerlockerror', () => this.onPointerLockError());
+      void this.openStore();
+    } else if (params.save) {
       // The stored world arrives asynchronously; until then no world is open.
       void this.openStoredTestWorld();
     } else {
       // A new world in memory. It is never stored.
-      this.loadWorld(this.newWorldMeta(params.world, params.seed), new Map());
-    }
-
-    if (!params.test) {
-      // Normal play starts on the start screen; the simulation waits for pointer lock.
-      this.pauseScreen = new PauseScreen(this.root, {
-        seed: params.seed,
-        settings: this.settings,
-        mode: this.mode,
-        onPlay: (via) => this.requestPlay(via),
-        onSettingsChange: (settings) => this.applySettings(settings),
-        onDebugChange: (visible) => this.setDebugVisible(visible),
-      });
-      this.setPaused(true);
-      document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
-      document.addEventListener('pointerlockerror', () => this.onPointerLockError());
+      this.loadWorld(this.newWorldMeta(params.world, params.seed, params.time), new Map());
     }
 
     // Phones and tablets start in touch mode; the play button can still switch the mode.
@@ -202,7 +239,7 @@ export class Game {
   }
 
   /** The record of a world that does not exist yet: at its start point, in the morning. */
-  private newWorldMeta(name: string, seed: number): WorldMeta {
+  private newWorldMeta(name: string, seed: number, time: number): WorldMeta {
     const spawn = findSpawn(getTerrain(seed));
     const now = Date.now();
     const random = (): number => Math.floor(Math.random() * 0x100000000);
@@ -216,7 +253,7 @@ export class Game {
       formatVersion: SAVE_FORMAT_VERSION,
       createdMs: now,
       playedMs: now,
-      time: this.params.time,
+      time,
       pose: { x: spawn.x + 0.5, y: spawn.y, z: spawn.z + 0.5, yaw: 0, pitch: 0 },
       moveMode: 'walk',
       player: createPlayerRecord(mode),
@@ -246,6 +283,7 @@ export class Game {
     this.session = this.createSession(meta.player);
     this.autosave = this.createAutosave();
     this.hud.setSelected(this.selectedSlot, false);
+    this.pauseScreen?.setWorld(meta.seed);
     this.updateChunkCenter();
     this.framesSinceIdle = 0;
   }
@@ -306,7 +344,7 @@ export class Game {
     const entries = await this.store.list();
     const entry = entries.find((e) => e.status === 'ok' && e.meta.name === wanted);
     if (!entry) {
-      const meta = this.newWorldMeta(wanted, seed);
+      const meta = this.newWorldMeta(wanted, seed, this.params.time);
       await this.store.create(meta);
       this.loadWorld(meta, new Map());
     } else {
@@ -315,6 +353,179 @@ export class Game {
       this.loadWorld(loaded.value.meta, loaded.value.edits);
     }
     this.lastLoadMs = performance.now() - start;
+  }
+
+  // --- world menu (not in test mode) --------------------------------------------------
+
+  /** Opens IndexedDB and fills the world list. Without it worlds live in memory only. */
+  private async openStore(): Promise<void> {
+    try {
+      this.store = await IdbStore.open();
+    } catch {
+      // Private windows of some browsers have no IndexedDB: play without saving.
+      this.worldMenu?.setMessage(TEXT_NO_STORAGE);
+    }
+    // The autosave of the placeholder world was bound to the first store.
+    this.autosave = this.createAutosave();
+    await this.refreshWorldList();
+    // A link with a seed opens the form for a new world with that seed.
+    if (this.params.seedFromUrl) this.worldMenu?.showForm(String(this.params.seed));
+  }
+
+  private async refreshWorldList(): Promise<void> {
+    try {
+      this.worldMenu?.setWorlds(await this.store.list());
+    } catch {
+      this.worldMenu?.setWorlds([]);
+      this.worldMenu?.setMessage(TEXT_NO_STORAGE);
+    }
+  }
+
+  /** Shows one of the menus, or the game. Only outside test mode. */
+  private showScreen(screen: Screen): void {
+    this.screen = screen;
+    this.worldMenu?.setVisible(screen === 'worlds');
+    this.pauseScreen?.setKind(screen === 'settings' ? 'settings' : 'pause');
+    this.pauseScreen?.setVisible(screen === 'settings' || screen === 'pause');
+    this.hud.setVisible(screen === 'play');
+    this.touchHud?.setVisible(screen === 'play');
+  }
+
+  /** Reads a stored world for playing; takes its tab lock. */
+  private async loadStoredWorld(id: string): Promise<LoadedWorld> {
+    const release = await acquireWorldLock(id);
+    if (!release) throw new MenuProblem(TEXT_OTHER_TAB);
+    const loaded = await this.store.load(id).catch(() => null);
+    if (!loaded || !loaded.ok) {
+      release();
+      throw new MenuProblem(TEXT_NOT_OPENED);
+    }
+    this.releaseWorldLock = release;
+    return loaded.value;
+  }
+
+  /** Creates and stores the world of the "New world" form. */
+  private async createStoredWorld(name: string, seedText: string): Promise<LoadedWorld> {
+    const seed = seedFromText(seedText) ?? Math.floor(Math.random() * 0x100000000);
+    const time = this.params.timeFromUrl ? this.params.time : START_TIME_OF_DAY;
+    const meta = this.newWorldMeta(name, seed, time);
+    try {
+      await this.store.create(meta);
+    } catch {
+      throw new MenuProblem(TEXT_NOT_CREATED);
+    }
+    this.requestPersistence();
+    this.releaseWorldLock = await acquireWorldLock(meta.id);
+    return { meta, edits: new Map() };
+  }
+
+  /** Asks the browser once not to evict the stored worlds. The answer does not matter. */
+  private requestPersistence(): void {
+    if (this.persistRequested) return;
+    this.persistRequested = true;
+    try {
+      void navigator.storage?.persist?.().catch(() => {});
+    } catch {
+      // Not every browser has the API.
+    }
+  }
+
+  /**
+   * A play button of the world menu was activated: opens the world that `load` delivers
+   * and starts playing. Mouse capture is requested at once, while the browser still
+   * accepts the click as the reason for it; the world arrives a moment later.
+   */
+  private async startWorld(load: () => Promise<LoadedWorld>, via: InputMode | null): Promise<void> {
+    if (this.menuBusy) return;
+    this.setMenuBusy(true);
+    this.worldMenu?.setMessage('');
+    this.pauseScreen?.setHint('');
+    // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
+    if (via && via !== this.mode && !this.params.touch) this.setMode(via);
+    if (this.mode === 'mouse') this.requestPointerLock();
+    try {
+      const loaded = await load();
+      this.loadWorld(loaded.meta, loaded.edits);
+      // Playing a world counts as "last played", also when nothing in it changes.
+      this.markMetaDirty();
+      if (this.mode === 'touch') {
+        if (this.isPortrait()) this.showScreen('pause');
+        else this.setPaused(false);
+      } else if (this.input.pointerLocked) {
+        this.setPaused(false);
+      } else {
+        // The mouse is not captured (yet): the pause menu offers "Click to play".
+        this.showScreen('pause');
+      }
+    } catch (error) {
+      if (document.pointerLockElement) document.exitPointerLock();
+      await this.refreshWorldList();
+      this.worldMenu?.setMessage(error instanceof MenuProblem ? error.message : TEXT_NOT_OPENED);
+    } finally {
+      this.setMenuBusy(false);
+    }
+  }
+
+  private setMenuBusy(busy: boolean): void {
+    this.menuBusy = busy;
+    this.worldMenu?.setBusy(busy);
+  }
+
+  /** "Save and back to worlds" (or "Back to worlds" on the settings page). */
+  private async backToWorlds(): Promise<void> {
+    if (this.screen === 'settings') {
+      this.showScreen('worlds');
+      return;
+    }
+    if (this.menuBusy || !this.meta) return;
+    this.setMenuBusy(true);
+    try {
+      await this.saveNow();
+      // An unsaved world is not closed: the pause menu shows why.
+      if (this.autosave.lastError !== null) return;
+      this.closeWorld();
+      await this.refreshWorldList();
+      this.worldMenu?.setMessage('');
+      this.showScreen('worlds');
+    } finally {
+      this.setMenuBusy(false);
+    }
+  }
+
+  /** Leaves the open world: frees its meshes and its tab lock. Nothing is saved here. */
+  private closeWorld(): void {
+    this.meta = null;
+    this.renderer.clearChunkMeshes();
+    this.world = new World(0);
+    this.chunkManager = this.createChunkManager(this.settings.renderDistance);
+    this.autosave = this.createAutosave();
+    this.target = null;
+    this.releaseWorldLock?.();
+    this.releaseWorldLock = null;
+  }
+
+  private async deleteWorld(id: string): Promise<void> {
+    if (this.menuBusy) return;
+    this.setMenuBusy(true);
+    try {
+      // A world that is open in another tab stays.
+      const release = await acquireWorldLock(id);
+      if (!release) {
+        this.worldMenu?.setMessage(TEXT_OTHER_TAB);
+        return;
+      }
+      try {
+        await this.store.delete(id);
+        this.worldMenu?.setMessage('');
+      } catch {
+        this.worldMenu?.setMessage(TEXT_NOT_OPENED);
+      } finally {
+        release();
+      }
+      await this.refreshWorldList();
+    } finally {
+      this.setMenuBusy(false);
+    }
   }
 
   /** `test=1&save=1`: the world named by the URL, kept in IndexedDB. */
@@ -388,6 +599,7 @@ export class Game {
       this.touchHud = null;
     }
     this.pauseScreen?.setMode(mode);
+    this.worldMenu?.setMode(mode);
     if (!this.params.test) {
       const cap = touch ? TOUCH_PIXEL_RATIO_MAX : PIXEL_RATIO_MAX;
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, cap));
@@ -408,6 +620,7 @@ export class Game {
    * mouse and the game resumes once the lock is granted; in touch mode it resumes at once.
    */
   private requestPlay(via: InputMode | null): void {
+    if (!this.meta) return;
     this.pauseScreen?.setHint('');
     // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
     if (via && via !== this.mode && !this.params.touch) this.setMode(via);
@@ -415,6 +628,10 @@ export class Game {
       if (!this.isPortrait()) this.setPaused(false);
       return;
     }
+    this.requestPointerLock();
+  }
+
+  private requestPointerLock(): void {
     try {
       // Older browsers return nothing, newer ones a promise that rejects on failure.
       const result = this.renderer.canvas.requestPointerLock() as Promise<void> | undefined;
@@ -426,6 +643,8 @@ export class Game {
 
   private onPointerLockChange(): void {
     if (this.mode === 'touch') return;
+    // While a world is still being opened, `startWorld` looks at the lock when it is there.
+    if (!this.meta) return;
     this.setPaused(!this.input.pointerLocked);
   }
 
@@ -436,9 +655,12 @@ export class Game {
 
   private setPaused(paused: boolean): void {
     this.paused = paused;
-    this.pauseScreen?.setVisible(paused);
-    this.hud.setVisible(!paused);
-    this.touchHud?.setVisible(!paused);
+    if (this.pauseScreen) {
+      this.showScreen(paused ? 'pause' : 'play');
+    } else {
+      this.hud.setVisible(!paused);
+      this.touchHud?.setVisible(!paused);
+    }
     if (paused) {
       this.touch?.tracker.reset();
       this.input.reset();
@@ -529,6 +751,12 @@ export class Game {
 
     if (this.meta) this.updateChunks();
     this.autosave.tick(performance.now());
+    if (this.screen === 'pause') {
+      const failed = this.autosave.lastError !== null;
+      this.pauseScreen?.setSaveState(
+        failed ? SAVE_FAILED_TEXT : this.autosave.dirty ? 'Saving…' : 'Saved',
+      );
+    }
     this.draw(this.params.test ? 1 : this.accumulator / SIM_DT);
 
     if (this.chunkManager.pending === 0) {

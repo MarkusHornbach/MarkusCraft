@@ -24,8 +24,20 @@ async function openOnDevice(page: Page, query = '?seed=1337&time=0.25'): Promise
   await page.waitForFunction(() => window.__mc !== undefined);
 }
 
+/** Creates a world from the form of the world menu (Phase 3) and starts it by tap. */
+async function tapCreate(page: Page): Promise<void> {
+  await page.locator('.world-create-button').tap();
+  await page.waitForFunction(() => !window.__mc.getState().paused);
+}
+
+/** Opens the pause menu with the on-screen menu button. */
+async function tapMenu(page: Page): Promise<void> {
+  await page.locator('.touch-menu').tap();
+  await page.waitForFunction(() => window.__mc.getState().paused);
+}
+
 async function tapPlay(page: Page): Promise<void> {
-  await page.locator('.play-button').tap();
+  await page.locator('.play-button:visible').tap();
   await page.waitForFunction(() => !window.__mc.getState().paused);
 }
 
@@ -87,10 +99,13 @@ for (const [device, view] of [
     await page.setViewportSize(view);
     await openOnDevice(page);
 
-    // The menu: every button is on screen, finger-sized and free of its neighbours.
+    await tapCreate(page);
+    await tapMenu(page);
+    // The pause menu: every button is on screen, finger-sized and free of its neighbours.
     const menuButtons = await boxes(page, '.pause-screen button');
     expect(menuButtons.map((b) => b.name)).toEqual([
       'play-button',
+      'menu-button back-button',
       'copy-link-button',
       'fullscreen-button',
     ]);
@@ -136,7 +151,7 @@ test('portrait shows the rotate overlay and pauses; landscape removes it (AC3.2)
   await page.setViewportSize(PHONE);
   await openOnDevice(page);
   await expect(page.locator('.rotate-overlay')).toBeHidden();
-  await tapPlay(page);
+  await tapCreate(page);
 
   await page.setViewportSize({ width: 360, height: 640 });
   await expect(page.locator('.rotate-overlay')).toBeVisible();
@@ -152,7 +167,7 @@ test('portrait shows the rotate overlay and pauses; landscape removes it (AC3.2)
 
   await page.setViewportSize(PHONE);
   await expect(page.locator('.rotate-overlay')).toBeHidden();
-  await expect(page.locator('.play-button')).toHaveText('Tap to continue');
+  await expect(page.locator('.play-button:visible')).toHaveText('Tap to continue');
   await tapPlay(page);
   await page.waitForFunction((time) => window.__mc.getState().time > time, before.time);
 
@@ -226,7 +241,8 @@ test('the touch menu has fullscreen, debug overlay and touch sensitivity (AC3.4)
 }) => {
   await page.setViewportSize({ width: 960, height: 540 });
   await openOnDevice(page);
-  await whenIdle(page);
+  await tapCreate(page);
+  await tapMenu(page);
   const menu = page.locator('.pause-screen');
   await expect(menu.locator('.fullscreen-button')).toHaveText('Fullscreen');
   await expect(menu).toContainText('Debug overlay');
@@ -324,6 +340,7 @@ test.describe('on a high-density screen', () => {
     expect(state.render.renderDistance).toBe(3);
     expect(state.render.pixelRatio).toBe(1.5);
     await expect(page.locator('#setting-render-distance')).toHaveValue('3');
+    await tapCreate(page);
     await whenIdle(page);
     expect((await getState(page)).chunks.loaded).toBe(49);
   });

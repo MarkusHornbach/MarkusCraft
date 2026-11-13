@@ -70,3 +70,46 @@ cache) version 1 was 64 % slower.
 
 Measured in step 3 (headless Chromium in the cloud container): a world with 50 000 edits
 in 200 chunks was written in 27 ms and loaded (read, validated, world opened) in 49 ms.
+
+### Step 4 – World menu
+
+| Topic                    | Decision                                                                                                                                                                                                                                           | Why                                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Screens                  | Outside test mode there are four states: world menu, settings page, pause menu, playing. Until a world is chosen none is open and only the sky is drawn behind the menu                                                                            | Plan 5.4: the world menu replaces the single play button                                                           |
+| Settings page            | "Settings" in the world menu opens the existing pause screen without its world parts: no continue button, no seed, no link; the button reads "Back to worlds". In touch mode the fullscreen button moves next to it                                | "Opens the existing settings and controls page"                                                                    |
+| Pause menu               | "Save and back to worlds" sits beside the continue button; "Saved" / "Saving…" stands next to the seed. If saving failed, the line reads "Saving failed. Free up storage space." and the world is **not** closed by "Save and back to worlds"      | Leaving would throw the unsaved changes away                                                                       |
+| Mouse capture            | A play button of the world menu requests the pointer lock at once, inside the click, and loads the world afterwards. If the lock is not there when the world is, the pause menu shows with its play button                                         | Browsers grant the lock only for a user gesture; the player is never left without a way on (fallback of section 8) |
+| List                     | Rows are buttons; the first (most recently played) row is preselected every time the list is shown. Date format: "Jul 5, 2026" (fixed English, like all in-game text)                                                                              | Plan 5.4                                                                                                           |
+| "Last played"            | Starting a world from the menu marks its record dirty, so the date changes also when the player does nothing in it                                                                                                                                 | Found by the AC4.2 test: a world that was only opened did not move to the top                                      |
+| Seed of a new world      | Random per world when the field is empty. `?time=` in the address sets the time of day of worlds created during that visit                                                                                                                         | Seeds now belong to worlds, not to the page visit                                                                  |
+| Seed link                | `?seed=<n>` opens the "New world" form with the seed; with stored worlds a "Back" button leads to the list                                                                                                                                         | Plan 5.4                                                                                                           |
+| Tab lock                 | Web Locks, name `markuscraft-world-<id>`, taken when a world is opened or created from the menu and released by "Save and back to worlds" or by closing the tab. Deleting also needs the lock. `test=1&save=1` and `__mc.openWorld` do not take it | Change 13 of the plan; test mode stays free of it                                                                  |
+| Persistence request      | `navigator.storage.persist()` once per page visit, after the first world created in that visit; the answer and a rejection are ignored                                                                                                             | AC4.8                                                                                                              |
+| No IndexedDB             | The menu shows "Worlds cannot be saved in this browser window." and worlds live in memory until the page closes                                                                                                                                    | Fallback of section 8                                                                                              |
+| Damaged and newer worlds | Listed after the playable ones with "Damaged" or "Saved by a newer version"; the play button is disabled for them. A newer world can be deleted too                                                                                                | Plan 5.4 says a damaged world "can only be deleted"; nothing forbids deleting a newer one                          |
+| Phone layout             | Below 480 px of height the list shows about two rows and scrolls; the form has no heading. Everything else fits 640 × 360 without scrolling the page                                                                                               | Layout rules of Phase 2                                                                                            |
+| Shared button code       | `src/ui/activate.ts` holds the "which pointer pressed this button" logic that the pause screen had, now used by both menus                                                                                                                         | Mode selection by pointer type must work from the new buttons (AC4.10)                                             |
+
+Existing browser tests adapted for the new start flow (AC4.10):
+
+- `ui.spec.ts`: "the start screen is shown on load …" became "the pause screen shows the
+  controls and the simulation stands still" (the world menu is shown first; the pause
+  screen checks run after creating a world and pausing); "clicking play captures the mouse
+  …" starts from "Create and play" and additionally checks "Click to continue" and the
+  list's "Click to play"; "settings apply live …" creates a world before counting chunks
+  and continues it after the reload; "matches the pause screen reference" pauses a created
+  world. "seeds are random per visit unless given in the URL (AC11.4)" was removed: its
+  content is now `worldMenu.spec.ts` AC4.2 and AC4.5.
+- `touch.spec.ts`: "Tap to play starts the game …" (AC1.4) and "in mouse mode no touch
+  control is in the document" (AC1.5) start through the world menu's buttons.
+- `touchLayout.spec.ts`: AC3.1 checks the pause menu's buttons after opening it with the
+  menu button (now four: continue, back, copy link, fullscreen); AC3.2, AC3.4 and AC3.5
+  create a world by tap first. The world menu's own layout is AC4.9 in `worldMenu.spec.ts`.
+- Test-mode tests (`test=1`) were not changed.
+
+Test robustness (found while running the whole suite with three workers): under software
+WebGL three parallel browsers render at 1 to 7 frames per second. AC3.11 therefore takes
+the best of up to three saves and loads (alone: 27 ms and 49 ms; under load one save took
+2.8 s), menu tests store a render distance of 2 before they start and have a timeout of
+three minutes, and a yaw check after a real click resets the yaw first, because the
+captured mouse may have turned the view.
