@@ -598,3 +598,249 @@ canvas {
     display: none;
   }
 }
+
+/* ---- World menu (start screen) and the buttons it shares with the pause menu ---- */
+
+.world-menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  /* A menu taller than the screen can be scrolled with a finger. */
+  touch-action: pan-y;
+  background: rgba(14, 20, 32, 0.72);
+  color: #eef2f6;
+}
+
+.world-menu.hidden {
+  display: none;
+}
+
+.world-panel {
+  width: min(520px, calc(100% - 32px));
+  margin: auto;
+  padding: 14px 24px 14px;
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: rgba(28, 38, 54, 0.94);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+.world-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.world-view[hidden],
+.menu-button[hidden] {
+  display: none;
+}
+
+.world-list {
+  width: 100%;
+  max-height: min(216px, 38vh);
+  overflow-y: auto;
+  /* The list scrolls by finger; the page behind it does not. */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(10, 16, 26, 0.55);
+}
+
+.world-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  min-height: 40px;
+  padding: 4px 12px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 15px;
+  color: #eef2f6;
+  background: rgba(255, 255, 255, 0.06);
+  text-align: left;
+  cursor: pointer;
+}
+
+.world-row:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.world-row.selected {
+  border-color: #7fd15a;
+  background: rgba(127, 209, 90, 0.16);
+}
+
+.world-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.world-row-mode,
+.world-row-date {
+  flex: none;
+  font-size: 13px;
+  color: #a9c4e6;
+}
+
+.world-row-problem {
+  flex: none;
+  font-size: 13px;
+  color: #ffb199;
+}
+
+.world-buttons,
+.pause-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: #eef2f6;
+  background: #3a4a63;
+  box-shadow: 0 3px 0 #253246;
+  cursor: pointer;
+}
+
+.menu-button:hover {
+  background: #47597a;
+}
+
+.menu-button.danger {
+  background: #a8433a;
+  box-shadow: 0 3px 0 #6f2a24;
+}
+
+.menu-button:disabled,
+.play-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.world-menu.busy button {
+  pointer-events: none;
+}
+
+.world-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(360px, 100%);
+}
+
+.world-field-label {
+  flex: none;
+  width: 52px;
+  text-align: right;
+  font-size: 14px;
+  color: #a9c4e6;
+}
+
+.world-input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #50627f;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 16px;
+  color: #ffffff;
+  background: rgba(10, 16, 26, 0.7);
+  /* Text fields are the exception to "no selection" on the page. */
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+}
+
+.world-input::placeholder {
+  color: #7f93b3;
+}
+
+.world-confirm-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.world-message {
+  min-height: 18px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #ffd27f;
+}
+
+.world-note {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #a9c4e6;
+}
+
+.save-state {
+  margin-left: 12px;
+  font-size: 13px;
+  color: #a9c4e6;
+}
+
+/* Touch mode: everything that is tapped is finger-sized. */
+.touch-mode .menu-button,
+.touch-mode .world-row {
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.touch-mode .world-input {
+  height: 48px;
+}
+
+@media (max-height: 480px) {
+  .touch-mode .world-panel {
+    width: min(600px, calc(100% - 16px));
+    padding: 6px 14px 6px;
+  }
+
+  .touch-mode .world-view {
+    gap: 6px;
+  }
+
+  .touch-mode .world-list {
+    max-height: 108px;
+  }
+
+  .touch-mode .world-message {
+    min-height: 0;
+    margin-top: 4px;
+  }
+
+  .touch-mode .pause-buttons {
+    gap: 6px;
+  }
+
+  /* On a phone the form has no heading: the name field says what this is. */
+  .touch-mode .world-form .pause-heading {
+    display: none;
+  }
+}

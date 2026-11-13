@@ -12,7 +12,15 @@ export class Hud {
   private labelTimer: number | undefined;
   private readonly waterTint: HTMLElement;
 
-  constructor(parent: HTMLElement, tiles: Uint8ClampedArray[]) {
+  /**
+   * `keepLabel`: the block name stays until the next change instead of hiding after a
+   * while. Test mode uses it, so that no test depends on real time.
+   */
+  constructor(
+    parent: HTMLElement,
+    tiles: Uint8ClampedArray[],
+    private readonly keepLabel = false,
+  ) {
     this.element = document.createElement('div');
     this.element.className = 'hud';
 
@@ -58,6 +66,7 @@ export class Hud {
     this.label.textContent = getBlockDef(HOTBAR_BLOCKS[slot - 1]).label;
     this.label.classList.add('visible');
     window.clearTimeout(this.labelTimer);
+    if (this.keepLabel) return;
     this.labelTimer = window.setTimeout(
       () => this.label.classList.remove('visible'),
       LABEL_VISIBLE_MS,

@@ -109,3 +109,17 @@ export async function centerOf(page: Page, selector: string): Promise<{ x: numbe
   if (!box) throw new Error(`${selector} is not visible`);
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
+
+/**
+ * Makes the page a browser without fullscreen for pages (as on an iPhone). Since Phase 3
+ * a tap on a play button enters fullscreen, and a headless window in fullscreen cannot be
+ * resized. Tests of the fullscreen rule itself use their own fake (fullscreen.spec.ts).
+ */
+export async function withoutFullscreen(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(Element.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: undefined,
+    });
+  });
+}

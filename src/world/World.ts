@@ -1,22 +1,31 @@
 // World: the set of loaded chunks, block access in world coordinates, and the edit log.
-import { CHUNK_SIZE, WORLD_HEIGHT } from '../game/config';
+import { CHUNK_SIZE, GENERATOR_VERSION, WORLD_HEIGHT } from '../game/config';
 import { BLOCK_SOLID, Block } from './blocks';
 import { type Chunk, blockIndex, chunkKey, createChunk, toChunkCoord, toLocalCoord } from './chunk';
 import { generateChunk } from './generation/terrain';
 
 export class World {
   readonly seed: number;
+  /** Version of the terrain generator this world was created with. */
+  readonly generatorVersion: number;
   private readonly chunks = new Map<string, Chunk>();
   /**
    * Player edits per chunk (block index → block id). Kept when a chunk unloads and
-   * re-applied when it is generated again. This map is the future input of saving.
+   * re-applied when it is generated again. This map is what saving writes.
    */
-  readonly edits = new Map<string, Map<number, number>>();
+  readonly edits: Map<string, Map<number, number>>;
   // One-entry cache: consecutive block reads usually hit the same chunk.
   private lastChunk: Chunk | null = null;
 
-  constructor(seed: number) {
+  /** `edits` are the saved edits of a loaded world; the world takes the map over. */
+  constructor(
+    seed: number,
+    generatorVersion: number = GENERATOR_VERSION,
+    edits: Map<string, Map<number, number>> = new Map(),
+  ) {
     this.seed = seed >>> 0;
+    this.generatorVersion = generatorVersion;
+    this.edits = edits;
   }
 
   get chunkCount(): number {
@@ -43,7 +52,7 @@ export class World {
   generate(cx: number, cz: number): Chunk {
     const existing = this.getChunk(cx, cz);
     if (existing) return existing;
-    const chunk = createChunk(cx, cz, generateChunk(this.seed, cx, cz));
+    const chunk = createChunk(cx, cz, generateChunk(this.seed, cx, cz, this.generatorVersion));
     const edits = this.edits.get(chunkKey(cx, cz));
     if (edits) for (const [index, id] of edits) chunk.blocks[index] = id;
     this.chunks.set(chunkKey(cx, cz), chunk);

@@ -16,11 +16,18 @@ export const Tile = {
   GLASS: 10,
   WATER: 11,
   BEDROCK: 12,
+  COAL_ORE: 13,
+  IRON_ORE: 14,
+  CLAY: 15,
 } as const;
 export type TileId = (typeof Tile)[keyof typeof Tile];
 export const TILE_COUNT = Object.keys(Tile).length;
 export const TILE_NAMES: readonly string[] = Object.keys(Tile).map((k) => k.toLowerCase());
 
+/**
+ * Block ids are written into save files: the table is append-only. An id is never reused
+ * or renumbered (pinned by a unit test).
+ */
 export const Block = {
   AIR: 0,
   GRASS: 1,
@@ -34,6 +41,9 @@ export const Block = {
   GLASS: 9,
   WATER: 10,
   BEDROCK: 11,
+  COAL_ORE: 12,
+  IRON_ORE: 13,
+  CLAY: 14,
 } as const;
 export type BlockId = (typeof Block)[keyof typeof Block];
 
@@ -96,7 +106,7 @@ function solidBlock(
   };
 }
 
-/** The block table, indexed by block id. Later phases add rows here. */
+/** The block table, indexed by block id. Later phases append rows; ids never change. */
 export const BLOCKS: readonly BlockDef[] = [
   {
     id: Block.AIR,
@@ -149,6 +159,9 @@ export const BLOCKS: readonly BlockDef[] = [
     ...solidBlock(Block.BEDROCK, 'bedrock', 'Bedrock', uniform(Tile.BEDROCK), null),
     breakable: false,
   },
+  solidBlock(Block.COAL_ORE, 'coal_ore', 'Coal ore', uniform(Tile.COAL_ORE), null),
+  solidBlock(Block.IRON_ORE, 'iron_ore', 'Iron ore', uniform(Tile.IRON_ORE), null),
+  solidBlock(Block.CLAY, 'clay', 'Clay', uniform(Tile.CLAY), null),
 ];
 
 export const RENDER_NONE = 0;
@@ -197,4 +210,10 @@ export function getBlockDef(id: number): BlockDef {
 
 export function isSolid(id: number): boolean {
   return BLOCK_SOLID[id] === 1;
+}
+
+/** Blocks a player can hold and place: every solid block that can also be broken again. */
+export function isPlaceable(id: number): boolean {
+  const def = BLOCKS[id];
+  return def !== undefined && def.solid && def.breakable;
 }

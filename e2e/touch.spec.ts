@@ -3,17 +3,18 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import {
   DEG,
-  PLATFORM_Y,
   getBlock,
   getState,
   openGame,
+  PLATFORM_Y,
   setBlock,
   setPlayer,
   standOnPlatform,
   step,
+  untilPlaying,
   whenIdle,
 } from './game';
-import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame } from './touch';
+import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame, withoutFullscreen } from './touch';
 
 test.use(TOUCH_DEVICE);
 
@@ -121,16 +122,18 @@ test('stick and look drag work at the same time with two fingers (AC1.3)', async
 test('"Tap to play" starts the game without pointer lock; the menu button pauses (AC1.4)', async ({
   page,
 }) => {
+  // Phase 3: the start screen is the world menu; its buttons start the game the same way.
+  await withoutFullscreen(page);
   await page.goto('/?seed=1337&time=0.25');
   await page.waitForFunction(() => window.__mc !== undefined);
-  await whenIdle(page);
-  const before = await getState(page);
-  expect(before.paused).toBe(true);
-  await expect(page.locator('.play-button')).toHaveText('Tap to play');
+  expect((await getState(page)).paused).toBe(true);
+  await expect(page.locator('.world-play-button')).toHaveText('Tap to play');
   await expect(page.locator('.touch-hud')).toBeHidden();
 
-  await page.locator('.play-button').tap();
+  await page.locator('.world-create-button').tap();
   await page.waitForFunction(() => !window.__mc.getState().paused);
+  await whenIdle(page);
+  const before = await getState(page);
   await expect(page.locator('.pause-screen')).toBeHidden();
   await expect(page.locator('.touch-hud')).toBeVisible();
   await expect(page.locator('.touch-menu')).toBeVisible();
@@ -155,7 +158,7 @@ test('"Tap to play" starts the game without pointer lock; the menu button pauses
   await fingers.tap(2, menu.x, menu.y);
   await page.waitForFunction(() => window.__mc.getState().paused);
   await expect(page.locator('.pause-screen')).toBeVisible();
-  await expect(page.locator('.play-button')).toHaveText('Tap to continue');
+  await expect(page.locator('.play-button:visible')).toHaveText('Tap to continue');
   await expect(page.locator('.touch-hud')).toBeHidden();
   await fingers.touchUp(1);
   const paused = await getState(page);
@@ -167,7 +170,7 @@ test('"Tap to play" starts the game without pointer lock; the menu button pauses
 
   // Continue: the held stick was forgotten. The player only loses the speed they had
   // when the menu opened and then stands still.
-  await page.locator('.play-button').tap();
+  await page.locator('.play-button:visible').tap();
   // 0.001 of a day is 1.2 s of running clock.
   await page.waitForFunction(
     (time) => !window.__mc.getState().paused && window.__mc.getState().time > time + 0.001,
@@ -193,9 +196,9 @@ test.describe('with a mouse', () => {
     // The same holds for the start screen and after starting with a mouse click.
     await page.goto('/?seed=1337');
     await page.waitForFunction(() => window.__mc !== undefined);
-    await expect(page.locator('.play-button')).toHaveText('Click to play');
-    await page.locator('.play-button').click();
-    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await expect(page.locator('.world-play-button')).toHaveText('Click to play');
+    await page.locator('.world-create-button').click();
+    await untilPlaying(page);
     expect((await getState(page)).touch).toBe(false);
     await expect(page.locator('.touch-hud, [data-touch], .rotate-overlay')).toHaveCount(0);
     await expect(page.locator('#setting-touch-sensitivity, #setting-debug')).toHaveCount(0);

@@ -1,4 +1,5 @@
-// Start / pause screen: title, play button, controls, settings and the world seed.
+// Pause screen: continue button, controls, settings and the open world. Opened from the
+// world menu it is the settings page (no world, no continue button).
 import {
   FOV_MAX,
   FOV_MIN,
@@ -9,10 +10,15 @@ import {
   TOUCH_SENSITIVITY_MAX,
   TOUCH_SENSITIVITY_MIN,
 } from '../game/config';
+import { type InputMode, button, element, onActivate } from './activate';
 import type { Settings } from './settings';
 
-/** How the game is controlled: mouse and keyboard, or the on-screen touch controls. */
-export type InputMode = 'mouse' | 'touch';
+export type { InputMode } from './activate';
+
+/** `pause`: a world is open and paused. `settings`: opened from the world menu. */
+export type PauseKind = 'pause' | 'settings';
+
+export const SAVE_FAILED_TEXT = 'Saving failed. Free up storage space.';
 
 const CONTROLS: readonly [string, string][] = [
   ['Mouse', 'Look around'],
@@ -40,29 +46,21 @@ const TOUCH_CONTROLS: readonly [string, string][] = [
 ];
 
 export interface PauseScreenOptions {
-  seed: number;
   settings: Settings;
   mode: InputMode;
   /** `via` tells how the play button was activated; null if that is unknown (keyboard). */
   onPlay: (via: InputMode | null) => void;
+  /** "Save and back to worlds", or "Back to worlds" on the settings page. */
+  onBack: () => void;
   onSettingsChange: (settings: Settings) => void;
   onDebugChange: (visible: boolean) => void;
+  /** The player left fullscreen with the "Exit fullscreen" button. */
+  onFullscreenExit: () => void;
 }
 
 interface SliderHandle {
   row: HTMLElement;
   set: (value: number) => void;
-}
-
-function element<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
 }
 
 /** Link that opens the same world again: the current address with only the seed. */
@@ -82,7 +80,14 @@ export class PauseScreen {
   private readonly debugSwitch: HTMLInputElement;
   private readonly fullscreenButton: HTMLButtonElement;
   private readonly worldSection: HTMLElement;
+  private readonly backButton: HTMLButtonElement;
+  private readonly buttonRow: HTMLElement;
+  private readonly rightColumn: HTMLElement;
+  private readonly seedValue: HTMLElement;
+  private readonly seedLink: HTMLInputElement;
+  private readonly saveState: HTMLElement;
   private mode: InputMode;
+  private kind: PauseKind = 'pause';
   private resumed = false;
 
   constructor(parent: HTMLElement, options: PauseScreenOptions) {
@@ -93,19 +98,13 @@ export class PauseScreen {
     this.element.appendChild(panel);
 
     panel.appendChild(element('h1', 'pause-title', 'MarkusCraft'));
-    this.playButton = element('button', 'play-button');
-    this.playButton.type = 'button';
-    // Not every browser reports the pointer type on `click`; remember it from the press.
-    let pressedWith = '';
-    this.playButton.addEventListener('pointerdown', (e) => {
-      pressedWith = e.pointerType;
-    });
-    this.playButton.addEventListener('click', (e) => {
-      const type = (e as PointerEvent).pointerType || pressedWith;
-      pressedWith = '';
-      options.onPlay(type === 'touch' ? 'touch' : type === 'mouse' ? 'mouse' : null);
-    });
-    panel.appendChild(this.playButton);
+    this.buttonRow = element('div', 'pause-buttons');
+    this.playButton = button('play-button', '');
+    onActivate(this.playButton, (via) => options.onPlay(via));
+    this.backButton = button('menu-button back-button', '');
+    this.backButton.addEventListener('click', () => options.onBack());
+    this.buttonRow.append(this.playButton, this.backButton);
+    panel.appendChild(this.buttonRow);
     this.hint = element('div', 'pause-hint');
     panel.appendChild(this.hint);
 
@@ -119,6 +118,7 @@ export class PauseScreen {
     columns.appendChild(controls);
 
     const right = element('div', 'pause-right');
+    this.rightColumn = right;
     columns.appendChild(right);
 
     const settings = element('section', 'pause-section');
@@ -198,23 +198,27 @@ export class PauseScreen {
     world.appendChild(element('h2', 'pause-heading', 'World'));
     const seedLine = element('div', 'seed-line');
     seedLine.appendChild(element('span', 'seed-label', 'Seed: '));
-    seedLine.appendChild(element('span', 'seed-value', String(options.seed)));
+    this.seedValue = element('span', 'seed-value', '');
+    seedLine.appendChild(this.seedValue);
+    // Whether the world is written to the store: "Saved", "Saving…" or the failure.
+    this.saveState = element('span', 'save-state', '');
+    this.saveState.setAttribute('role', 'status');
+    seedLine.appendChild(this.saveState);
     world.appendChild(seedLine);
     const link = element('input', 'seed-link');
     link.type = 'text';
     link.readOnly = true;
-    link.value = worldLink(options.seed);
+    this.seedLink = link;
     link.setAttribute('aria-label', 'Link to this world');
     world.appendChild(link);
-    const copy = element('button', 'copy-link-button', 'Copy link to this world');
-    copy.type = 'button';
+    const copy = button('copy-link-button', 'Copy link to this world');
     copy.addEventListener('click', () => {
       void this.copyLink(link, copy);
     });
     world.appendChild(copy);
-    this.fullscreenButton = element('button', 'fullscreen-button', 'Fullscreen');
-    this.fullscreenButton.type = 'button';
+    this.fullscreenButton = button('fullscreen-button', 'Fullscreen');
     this.fullscreenButton.addEventListener('click', () => {
+      if (document.fullscreenElement) options.onFullscreenExit();
       void this.toggleFullscreen();
     });
     document.addEventListener('fullscreenchange', () => this.updateFullscreenLabel());
@@ -223,6 +227,42 @@ export class PauseScreen {
 
     parent.appendChild(this.element);
     this.setMode(options.mode);
+    this.setKind('pause');
+  }
+
+  /** Switches between the pause menu of an open world and the settings page. */
+  setKind(kind: PauseKind): void {
+    this.kind = kind;
+    const pause = kind === 'pause';
+    this.backButton.textContent = pause ? 'Save and back to worlds' : 'Back to worlds';
+    // Parts without a meaning on the settings page are taken out of the document.
+    if (pause) {
+      this.buttonRow.insertBefore(this.playButton, this.backButton);
+      this.rightColumn.appendChild(this.worldSection);
+    } else {
+      this.playButton.remove();
+      this.worldSection.remove();
+    }
+    this.placeFullscreenButton();
+  }
+
+  /** The world the pause menu is about: its seed and the link that recreates it. */
+  setWorld(seed: number): void {
+    this.seedValue.textContent = String(seed);
+    this.seedLink.value = worldLink(seed);
+    this.resumed = false;
+    this.updatePlayLabel();
+  }
+
+  setSaveState(text: string): void {
+    if (this.saveState.textContent !== text) this.saveState.textContent = text;
+  }
+
+  /** The fullscreen button lives in the world section, or next to "Back" without one. */
+  private placeFullscreenButton(): void {
+    if (this.mode !== 'touch') this.fullscreenButton.remove();
+    else if (this.kind === 'pause') this.worldSection.appendChild(this.fullscreenButton);
+    else this.buttonRow.appendChild(this.fullscreenButton);
   }
 
   /** Adapts the labels, the controls list and the settings to the input mode. */
@@ -246,7 +286,7 @@ export class PauseScreen {
       place(this.sliders.touchSensitivity.row, settings, this.sliders.fov.row, touch);
       for (const node of this.touchOnly) place(node, settings, null, touch);
     }
-    place(this.fullscreenButton, this.worldSection, null, touch);
+    this.placeFullscreenButton();
   }
 
   /** Shows other settings than the player chose, e.g. the defaults of another mode. */

@@ -15,6 +15,23 @@ export const FOG_START_FACTOR = 0.6;
 export const UNDERWATER_FOG_NEAR = 1;
 export const UNDERWATER_FOG_FAR = 24;
 
+/** Version of the terrain generator that new worlds are created with (stored per world). */
+export const GENERATOR_VERSION = 1;
+/** Land at or above this height (shifted by noise) is bare rock without soil. */
+export const ROCK_HEIGHT = 80;
+/** Largest shift of the rock line by its low-frequency noise, in blocks. */
+export const ROCK_HEIGHT_SHIFT = 4;
+/** A land column this much higher or lower than a direct neighbour is bare rock. */
+export const ROCK_SLOPE = 3;
+export const COAL_MIN_Y = 12;
+export const COAL_MAX_Y = 110;
+export const IRON_MIN_Y = 4;
+export const IRON_MAX_Y = 44;
+/** Clay needs at least this much water above the lake bed. */
+export const CLAY_MIN_WATER_DEPTH = 2;
+/** Clay replaces this many blocks from the top of the lake bed. */
+export const CLAY_DEPTH = 2;
+
 export const TILE_SIZE = 32;
 export const ATLAS_TILES_PER_ROW = 8;
 /** Fixed seed for the tile painters: textures do not vary with the world seed. */
@@ -70,7 +87,12 @@ export const SWIM_EXIT_SPEED = 8;
 export const VOID_Y = -20;
 
 export const REACH = 5;
+/** Slack for the reach check of the action layer (block centre against the actor's eye). */
+export const REACH_TOLERANCE = 1.5;
 export const ACTION_REPEAT_MS = 250;
+/** Slots of a player's inventory; the first `HOTBAR_SLOTS` are the bar. */
+export const INVENTORY_SLOTS = 36;
+export const STACK_SIZE = 99;
 export const HOTBAR_SLOTS = 9;
 
 export const DAY_LENGTH_SECONDS = 20 * 60;
@@ -99,3 +121,11 @@ export const TOUCH_SENSITIVITY_MAX = 3;
 export const TOUCH_RENDER_DISTANCE_DEFAULT = 5;
 export const PIXEL_RATIO_MAX = 2;
 export const TOUCH_PIXEL_RATIO_MAX = 1.5;
+
+/** Version of the save format; a world saved by a newer version is not opened. */
+export const SAVE_FORMAT_VERSION = 1;
+export const WORLD_NAME_MAX = 24;
+export const DEFAULT_WORLD_NAME = 'My world';
+/** Unsaved changes are written this long after the first of them. */
+export const AUTOSAVE_INTERVAL_MS = 5000;
+export const SAVE_DATABASE = 'markuscraft';

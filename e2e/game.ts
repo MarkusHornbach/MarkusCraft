@@ -11,6 +11,9 @@ export interface OpenOptions {
   test?: boolean;
   /** Force touch mode (`touch=1`). */
   touch?: boolean;
+  /** Keep the world in IndexedDB (`save=1`) under this name (`world=`, default "Test"). */
+  save?: boolean;
+  world?: string;
 }
 
 export function gameUrl(options: OpenOptions = {}): string {
@@ -20,6 +23,8 @@ export function gameUrl(options: OpenOptions = {}): string {
   query.set('time', String(options.time ?? 0.25));
   if (options.freeze ?? true) query.set('freeze', '1');
   if (options.touch) query.set('touch', '1');
+  if (options.save) query.set('save', '1');
+  if (options.world !== undefined) query.set('world', options.world);
   return `/?${query.toString()}`;
 }
 
@@ -102,4 +107,90 @@ export async function standOnPlatform(
 export async function clickCenter(page: Page, button: 'left' | 'right' = 'left'): Promise<void> {
   await page.mouse.click(480, 270, { button });
   await whenIdle(page);
+}
+
+const SETTINGS_KEY = 'markuscraft.settings.v1';
+/** Software WebGL is slow: menu tests play with a small render distance. */
+const SMALL_SETTINGS = { renderDistance: 2, mouseSensitivity: 1, fov: 75 };
+
+/**
+ * Opens the page as a player does: the world menu first, no world open. Unless
+ * `storeSettings` is false, a render distance of 2 is stored first (once per profile).
+ */
+export async function openMenu(page: Page, query = '', storeSettings = true): Promise<void> {
+  if (storeSettings) {
+    await page.addInitScript(
+      ([key, value]) => {
+        if (window.localStorage.getItem(key) === null) window.localStorage.setItem(key, value);
+      },
+      [SETTINGS_KEY, JSON.stringify(SMALL_SETTINGS)],
+    );
+  }
+  await page.goto(`/${query}`);
+  await page.waitForFunction(() => window.__mc !== undefined);
+  // The list of stored worlds has arrived when the list or the form is shown.
+  await page.locator('.world-list-view:visible, .world-form:visible').waitFor();
+}
+
+export interface NewWorld {
+  name?: string;
+  seed?: string;
+  /** Activate the button with a finger instead of the mouse. */
+  tap?: boolean;
+  /** Also wait until all chunks around the player are loaded (slow under software WebGL). */
+  idle?: boolean;
+}
+
+/**
+ * Fills the "New world" form (opening it from the list if needed), creates the world and
+ * waits until it is being played.
+ */
+export async function createWorld(page: Page, world: NewWorld = {}): Promise<void> {
+  const form = page.locator('.world-form');
+  if (!(await form.isVisible())) {
+    const open = page.locator('.world-new-button');
+    await (world.tap ? open.tap() : open.click());
+  }
+  if (world.name !== undefined) await page.locator('#world-name').fill(world.name);
+  if (world.seed !== undefined) await page.locator('#world-seed').fill(world.seed);
+  const create = page.locator('.world-create-button');
+  await (world.tap ? create.tap() : create.click());
+  await untilPlaying(page);
+  if (world.idle) await whenIdle(page);
+}
+
+/**
+ * Waits until the game runs after a play button was activated. Browsers sometimes refuse
+ * to capture the mouse again shortly after it was released; the game then shows the pause
+ * menu with "The browser did not capture the mouse yet. Please click again." This helper
+ * does what a player does: it clicks the offered play button again.
+ */
+export async function untilPlaying(page: Page): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const running = await page
+      .waitForFunction(() => !window.__mc.getState().paused, null, { timeout: 3000 })
+      .then(
+        () => true,
+        () => false,
+      );
+    if (running) return;
+    const again = page.locator('.pause-screen .play-button:visible');
+    if ((await again.count()) > 0 && (await page.locator('.pause-hint').textContent()) !== '') {
+      await again.click();
+    }
+  }
+  throw new Error('The game did not start after the play button was activated');
+}
+
+/** Pauses a running game in mouse mode. Esc does this in a real browser. */
+export async function pauseWithMouse(page: Page): Promise<void> {
+  await page.evaluate(() => document.exitPointerLock());
+  await page.waitForFunction(() => window.__mc.getState().paused);
+}
+
+/** "Save and back to worlds" from the pause menu; waits for the world list. */
+export async function backToWorlds(page: Page, tap = false): Promise<void> {
+  const back = page.locator('.back-button');
+  await (tap ? back.tap() : back.click());
+  await page.locator('.world-list-view').waitFor();
 }

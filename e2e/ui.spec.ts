@@ -1,7 +1,15 @@
 // Start/pause screen, settings and debug overlay in the browser (plan step 11).
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { getState, openGame, setPlayer, whenIdle } from './game';
+import {
+  createWorld,
+  getState,
+  openGame,
+  pauseWithMouse,
+  setPlayer,
+  untilPlaying,
+  whenIdle,
+} from './game';
 
 const STORAGE_KEY = 'markuscraft.settings.v1';
 
@@ -45,13 +53,22 @@ async function setSlider(page: Page, id: string, value: number): Promise<void> {
   }, value);
 }
 
-test('the start screen is shown on load and the simulation is paused (AC11.1, AC11.5)', async ({
+test('the pause screen shows the controls and the simulation stands still (AC11.1, AC11.5)', async ({
   page,
 }) => {
-  await openNormal(page, '?seed=1337', SMALL);
+  await openNormal(page, '', SMALL);
+  // Phase 3: the start screen is the world menu; the pause screen belongs to a world.
+  await expect(page.locator('.world-menu')).toBeVisible();
+  await expect(page.locator('.pause-screen')).toBeHidden();
+  await expect(page.locator('.crosshair')).toBeHidden();
+  await expect(page.locator('.hotbar')).toBeHidden();
+  expect((await getState(page)).paused).toBe(true);
+
+  await createWorld(page, { seed: '1337' });
+  await pauseWithMouse(page);
   await expect(page.locator('.pause-screen')).toBeVisible();
-  await expect(page.locator('.pause-title')).toHaveText('MarkusCraft');
-  await expect(page.locator('.play-button')).toHaveText('Click to play');
+  await expect(page.locator('.pause-title')).toHaveText(['MarkusCraft', 'MarkusCraft']);
+  await expect(page.locator('.play-button:visible')).toHaveText('Click to continue');
   await expect(page.locator('.controls-list dt')).toHaveCount(11);
   await expect(page.locator('.controls-list')).toContainText('Toggle fly mode');
   // Crosshair and selector bar are hidden behind the pause screen.
@@ -71,14 +88,14 @@ test('the start screen is shown on load and the simulation is paused (AC11.1, AC
   expect(after.player).toEqual(before.player);
 });
 
-test('clicking play captures the mouse and resumes; losing the lock pauses (AC11.7)', async ({
+test('clicking play captures the mouse and resumes; losing the lock pauses (AC11.7, Phase 3 AC4.10)', async ({
   page,
 }) => {
   await openNormal(page, '?seed=1337', SMALL);
-  await whenIdle(page);
+  await page.locator('.world-create-button').click();
+  await untilPlaying(page);
   const before = await getState(page);
-  await page.locator('.play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await expect(page.locator('.world-menu')).toBeHidden();
   await expect(page.locator('.pause-screen')).toBeHidden();
   await expect(page.locator('.crosshair')).toBeVisible();
   await expect(page.locator('.hotbar')).toBeVisible();
@@ -102,20 +119,37 @@ test('clicking play captures the mouse and resumes; losing the lock pauses (AC11
   await page.evaluate(() => document.exitPointerLock());
   await page.waitForFunction(() => window.__mc.getState().paused);
   await expect(page.locator('.pause-screen')).toBeVisible();
-  await expect(page.locator('.play-button')).toHaveText('Click to continue');
+  await expect(page.locator('.play-button:visible')).toHaveText('Click to continue');
   await expect(page.locator('.crosshair')).toBeHidden();
+
+  // "Click to continue" captures the mouse again.
+  await page.locator('.play-button:visible').click();
+  await untilPlaying(page);
+  expect(await page.evaluate(() => document.pointerLockElement?.tagName)).toBe('CANVAS');
+
+  // Back in the world menu, the play button of the list does the same.
+  await page.evaluate(() => document.exitPointerLock());
+  await page.waitForFunction(() => window.__mc.getState().paused);
+  await page.locator('.back-button').click();
+  await expect(page.locator('.world-play-button')).toHaveText('Click to play');
+  await page.locator('.world-play-button').click();
+  await untilPlaying(page);
+  expect(await page.evaluate(() => document.pointerLockElement?.tagName)).toBe('CANVAS');
 });
 
 test('settings apply live, persist across reloads and survive corrupt storage (AC11.2)', async ({
   page,
 }) => {
-  await openNormal(page, '?seed=1337');
+  await openNormal(page, '');
   // Defaults on a fresh profile.
   await expect(page.locator('#setting-render-distance')).toHaveValue('8');
   await expect(page.locator('#setting-fov')).toHaveValue('75');
   await expect(page.locator('#setting-sensitivity')).toHaveValue('1');
 
+  // Software WebGL is slow: go down to 2 chunks before a world is opened.
   await setSlider(page, 'setting-render-distance', 2);
+  await createWorld(page, { seed: '1337' });
+  await pauseWithMouse(page);
   await whenIdle(page);
   let state = await getState(page);
   expect(state.chunks.loaded).toBe(25);
@@ -133,12 +167,20 @@ test('settings apply live, persist across reloads and survive corrupt storage (A
   await expect(page.locator('#setting-render-distance')).toHaveValue('2');
   await expect(page.locator('#setting-fov')).toHaveValue('100');
   await expect(page.locator('#setting-sensitivity')).toHaveValue('2');
+  // Continue the saved world: it loads with the stored render distance.
+  await page.locator('.world-play-button').click();
+  await untilPlaying(page);
+  await pauseWithMouse(page);
   await whenIdle(page);
   state = await getState(page);
   expect(state.chunks.loaded).toBe(25);
   expect(state.render.fov).toBe(100);
   // Sensitivity 2 doubles the rotation per pixel.
-  await page.evaluate(() => window.__mc.look(100, 0));
+  // The click on the play button may have turned the view through the captured mouse.
+  await page.evaluate(() => {
+    window.__mc.setPlayer({ yaw: 0, pitch: 0 });
+    window.__mc.look(100, 0);
+  });
   expect((await getState(page)).player.yaw).toBeCloseTo(-0.5, 5);
 
   // Corrupt content falls back to defaults; the console fixture proves there is no error.
@@ -215,30 +257,15 @@ test('F3 toggles the debug overlay with live values (AC11.3)', async ({ page }) 
   await expect(overlay).toBeHidden();
 });
 
-test('seeds are random per visit unless given in the URL (AC11.4)', async ({ page, context }) => {
-  await openNormal(page, '', SMALL);
-  const first = (await getState(page)).seed;
-  await page.reload();
-  await page.waitForFunction(() => window.__mc !== undefined);
-  const second = (await getState(page)).seed;
-  expect(first).not.toBe(second);
-  await expect(page.locator('.seed-value')).toHaveText(String(second));
-
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/?seed=42');
-  await page.waitForFunction(() => window.__mc !== undefined);
-  expect((await getState(page)).seed).toBe(42);
-  await expect(page.locator('.seed-value')).toHaveText('42');
-  const link = await page.locator('.seed-link').inputValue();
-  expect(link).toBe('http://localhost:4173/?seed=42');
-  await page.locator('.copy-link-button').click();
-  await expect(page.locator('.copy-link-button')).toHaveText('Link copied');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(link);
-});
+// Phase 1 AC11.4 (random seed per visit, seed from the URL, copy link) is now covered by
+// "Phase 3 AC4.2" and "Phase 3 AC4.5" in worldMenu.spec.ts: seeds belong to worlds.
 
 test('matches the pause screen reference screenshot (AC11.6)', async ({ page }) => {
-  await openNormal(page, '?seed=1337', SMALL);
+  await openNormal(page, '', SMALL);
+  await createWorld(page, { seed: '1337' });
+  await pauseWithMouse(page);
   await whenIdle(page);
+  await expect(page.locator('.save-state')).toHaveText('Saved');
   // The world behind the screen is not part of this reference: hide the canvas.
   await page.locator('canvas.game-canvas').evaluate((node) => {
     (node as HTMLElement).style.visibility = 'hidden';

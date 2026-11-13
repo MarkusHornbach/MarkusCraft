@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE, CHUNK_VOLUME, WORLD_HEIGHT } from '../../game/config';
+import { CHUNK_SIZE, CHUNK_VOLUME, GENERATOR_VERSION, WORLD_HEIGHT } from '../../game/config';
 import { expectFasterThan } from '../../testing/timing';
 import { BLOCKS, Block, Tile } from '../blocks';
 import { blockIndex } from '../chunk';
@@ -359,7 +359,7 @@ describe('meshChunk performance (AC6.7)', () => {
       const key = `${cx},${cz}`;
       let blocks = cache.get(key);
       if (!blocks) {
-        blocks = generateChunk(seed, cx, cz);
+        blocks = generateChunk(seed, cx, cz, GENERATOR_VERSION);
         cache.set(key, blocks);
       }
       return blocks;
@@ -387,8 +387,8 @@ describe('meshChunk performance (AC6.7)', () => {
 
   it('produces no seams between generated neighbours', () => {
     // A face on a chunk border exists exactly when the neighbour cell does not occlude.
-    const a = generateChunk(1337, 0, 0);
-    const b = generateChunk(1337, 1, 0);
+    const a = generateChunk(1337, 0, 0, GENERATOR_VERSION);
+    const b = generateChunk(1337, 1, 0, GENERATOR_VERSION);
     const data = meshChunk(a, (dx, dz) => (dx === 1 && dz === 0 ? b : null));
     const eastFaces = quads(data.opaque).filter(
       (q) => q.normal[0] === 1 && q.corners.every((c) => c.pos[0] === CHUNK_SIZE),

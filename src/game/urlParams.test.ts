@@ -11,16 +11,24 @@ describe('parseParams', () => {
       freeze: false,
       test: false,
       touch: false,
+      timeFromUrl: false,
+      save: false,
+      world: 'Test',
     });
   });
   it('reads all parameters', () => {
-    expect(parseParams('?seed=42&time=0.75&freeze=1&test=1&touch=1', random)).toEqual({
+    expect(
+      parseParams('?seed=42&time=0.75&freeze=1&test=1&touch=1&save=1&world=%20Second%20', random),
+    ).toEqual({
       seed: 42,
       seedFromUrl: true,
       time: 0.75,
       freeze: true,
       test: true,
       touch: true,
+      timeFromUrl: true,
+      save: true,
+      world: 'Second',
     });
   });
   it('normalises seeds to unsigned 32-bit and ignores invalid input', () => {

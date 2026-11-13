@@ -16,10 +16,10 @@ import {
 
 describe('block registry (AC3.3)', () => {
   it('has complete properties for every id, in id order', () => {
-    expect(BLOCKS.length).toBe(12);
+    expect(BLOCKS.length).toBe(15);
     BLOCKS.forEach((def, index) => {
       expect(def.id).toBe(index);
-      expect(def.name).toMatch(/^[a-z]+$/);
+      expect(def.name).toMatch(/^[a-z_]+$/);
       expect(def.label.length).toBeGreaterThan(0);
       expect(typeof def.solid).toBe('boolean');
       expect(['none', 'opaque', 'cutout', 'translucent']).toContain(def.render);
@@ -64,6 +64,9 @@ describe('block registry (AC3.3)', () => {
       'glass',
       'water',
       'bedrock',
+      'coal_ore',
+      'iron_ore',
+      'clay',
     ]);
     expect(HOTBAR_BLOCKS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(isSolid(Block.AIR)).toBe(false);
@@ -78,6 +81,40 @@ describe('block registry (AC3.3)', () => {
     expect(getBlockDef(Block.WATER).breakable).toBe(false);
     expect(getBlockDef(Block.WATER).replaceable).toBe(true);
     expect(getBlockDef(Block.GRASS).tiles).toEqual({ top: 0, side: 1, bottom: 2 });
+  });
+
+  it('pins every block id: the table is append-only (Phase 3 AC1.9)', () => {
+    // Ids are written into save files. Never change a line here; only append.
+    expect(Block).toEqual({
+      AIR: 0,
+      GRASS: 1,
+      DIRT: 2,
+      STONE: 3,
+      SAND: 4,
+      LOG: 5,
+      LEAVES: 6,
+      PLANKS: 7,
+      BRICKS: 8,
+      GLASS: 9,
+      WATER: 10,
+      BEDROCK: 11,
+      COAL_ORE: 12,
+      IRON_ORE: 13,
+      CLAY: 14,
+    });
+    expect(BLOCKS.map((b) => [b.id, b.name])).toEqual(
+      Object.entries(Block).map(([key, id]) => [id, key.toLowerCase()]),
+    );
+  });
+
+  it('adds the terrain blocks of Phase 3 as breakable but not placeable', () => {
+    for (const id of [Block.COAL_ORE, Block.IRON_ORE, Block.CLAY]) {
+      const def = getBlockDef(id);
+      expect(def.solid).toBe(true);
+      expect(def.breakable).toBe(true);
+      expect(def.slot).toBeNull();
+      expect(BLOCK_RENDER[id]).toBe(RENDER_OPAQUE);
+    }
   });
 
   it('treats unknown ids like air', () => {

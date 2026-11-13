@@ -18,7 +18,7 @@ game in a procedurally generated world"; everything in it is original work.
      timed breaking, ores, tools, a recipe list with workbench and furnace. Every change
      to the world or a player's items goes through one action layer, so multiplayer can
      be added without restructuring. Four parts with separate pull requests: A foundation,
-     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`)
+     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`; part A report: `docs/phase-3a-report.md`)
   4. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the Phase 3 gameplay and its
      action layer (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
@@ -87,10 +87,17 @@ a later session, update the pin to match and regenerate the reference screenshot
 index.html
 src/
   main.ts            entry point: reads URL params, checks WebGL2, starts the game
-  game/              Game.ts (loop, wiring), config.ts (all constants), testApi.ts, urlParams.ts
+  game/              Game.ts (loop, wiring, screens, world loading), config.ts (all constants),
+                     testApi.ts, urlParams.ts, autosave.ts (pure: when to write what),
+                     idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world)
+  actions/           the action layer (pure): actions.ts (types, decodeAction), apply.ts
+                     (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
+  save/              pure: saveFormat.ts (records, validation, names, seeds), WorldStore.ts
+                     (interface + MemoryStore)
   world/             blocks.ts (block + tile table), chunk.ts, World.ts, ChunkManager.ts,
                      raycast.ts, dayNight.ts (time → sun, sky colours, daylight)
-    generation/      terrain.ts, trees.ts, spawn.ts
+    generation/      terrain.ts (heights, rock, layers, checksum), ores.ts (veins, clay),
+                     trees.ts, spawn.ts
     meshing/         mesher.ts (pure: block data in, typed arrays out), atlasLayout.ts
   player/            player.ts (state), physics.ts, interaction.ts (break/place rules)
   input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch as well
@@ -98,12 +105,15 @@ src/
                      TouchControls.ts (pointer events of fingers → TouchTracker → Input)
   render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts
     textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts
-  ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, PauseScreen.ts, settings.ts, ui.css,
-                     TouchHud.ts (on-screen stick and buttons, rotate hint)
+  ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, settings.ts, ui.css,
+                     WorldMenu.ts (start screen: list of worlds, new world, delete),
+                     PauseScreen.ts (pause menu of a world; also the settings page),
+                     activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint)
   util/              rng.ts, noise.ts, math.ts
-  testing/           timing.ts (helpers for unit tests only)
+  testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts
 e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, screenshots/
-scripts/             dev tools: shot.mjs, atlasPreview.ts, terrainStats.ts, perf.ts
+scripts/             dev tools: shot.mjs, atlasPreview.ts, terrainStats.ts (terrain statistics
+                     and generation time), perf.ts
 docs/                phase plans and phase reports
 .github/workflows/   ci.yml, deploy.yml
 ```
@@ -114,12 +124,41 @@ under coverage, which distorts timings. CI runs both.
 
 ## Architecture and code conventions
 
-- **Pure core, thin shell.** `world/`, `player/` and `util/` must not import `three` or
-  touch the DOM (enforced by an ESLint `no-restricted-imports` rule). They are tested in
-  Node. Only `render/`, `ui/`, `input/` and `game/` may use Three.js and browser APIs.
-  The same rule covers `render/textures/tiles.ts`. The core may import `game/config.ts`.
-  `input/TouchTracker.ts` follows the same discipline (no DOM, unit-tested in Node, in the
-  coverage scope) although it lives in `input/`.
+- **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/` (and
+  `items/` from Part B on) must not import `three` or touch the DOM (enforced by an ESLint
+  `no-restricted-imports` rule). They are tested in Node. Only `render/`, `ui/`, `input/`
+  and `game/` may use Three.js and browser APIs. The same rule covers
+  `render/textures/tiles.ts`. The core may import `game/config.ts`.
+  `input/TouchTracker.ts` and `game/autosave.ts` follow the same discipline (no DOM,
+  unit-tested in Node, in the coverage scope) although they live in the shell.
+- **One pipeline for changes (action layer).** `Game` and the UI never change blocks, the
+  selected slot or (later) the inventory themselves. They build a plain action
+  (`{ kind, ... }`, JSON-safe) and call `session.submit(action)`; the world and the screen
+  change when the session's listener reports back (`onBlocks`, `onPlayer`, `onResult`).
+  Never read a result from `submit`'s return: a later session may answer asynchronously.
+  `applyAction` is pure and never mutates its inputs; `PlayerRecord`s are immutable.
+  `src/actions/pipeline.test.ts` fails if `.setBlock(` is called anywhere but in
+  `actions/Session.ts` and once in `Game.ts` (the test API tool). Slots in actions and
+  records count from 0; keys, HUD and `getState().selectedSlot` count from 1.
+- **Stable ids.** Block ids (and item ids, from Part B) are written into save files. The
+  block table is append-only: never renumber or reuse an id. `blocks.test.ts` pins them.
+- **Generator version.** Every world stores the version of the terrain generator it was
+  created with (`GENERATOR_VERSION`, now 1). `generateChunk(seed, cx, cz, version)` must
+  keep producing the same blocks for an old version for ever: a change to generation adds
+  a new version and leaves the old code path working. The recorded checksum
+  (`src/testing/terrainChecksum.ts`) must never change; it is checked in Node and in the
+  browser.
+- **Saving.** A world is one `WorldMeta` record plus one record per edited chunk
+  (`save/saveFormat.ts`, `SAVE_FORMAT_VERSION`). Decoding validates every field and never
+  throws; a change to the format needs a new format version and a migration. Stores
+  implement `WorldStore`: `IdbStore` (database `markuscraft`, stores `worlds` and
+  `chunks`) in normal play and with `save=1`, `MemoryStore` in test mode. `Autosave`
+  decides when to write; `Game` marks chunks and the meta record dirty.
+  `Game.loadWorld(meta, edits)` swaps world, chunk manager, meshes, player and session in
+  place. Until a world is open `Game` holds an empty placeholder world.
+- **Screens.** Outside test mode: world menu → (play) → game ⇄ pause menu → "Save and back
+  to worlds". The settings page is the pause screen without its world parts. Play buttons
+  request the pointer lock (mouse) or fullscreen (touch) synchronously inside the click.
 - **Mouse mode and touch mode.** `Game` runs in one of two input modes. Touch mode has the
   on-screen controls, no pointer lock, a pixel ratio capped at 1.5 and a default render
   distance of 5. The play button selects the mode by the pointer type that activated it;
@@ -165,8 +204,26 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
 (section "Test strategy"). In short:
 
 - `?seed=<int>` fixes the world, `?time=<0..1>` sets the time of day, `?freeze=1` stops
-  the clock, `?test=1` runs without pointer lock and with fixed settings, `?touch=1`
-  forces touch mode (shows the touch controls without a touch on the play button).
+  the clock, `?test=1` runs without menus and pointer lock and with fixed settings,
+  `?touch=1` forces touch mode (shows the touch controls without a touch on the play
+  button).
+- With `test=1` the world lives in memory (`MemoryStore`) and is never stored.
+  `save=1` (with `test=1`) uses IndexedDB and opens the world named by `world=<name>`
+  (default "Test"), creating it from `seed`. Each Playwright test has its own browser
+  context and therefore an empty IndexedDB; persistence tests reload inside one context.
+- Without `test=1` the page starts in the world menu and `?seed=` only pre-fills the "New
+  world" form. Such tests use `openMenu`, `createWorld`, `pauseWithMouse` and
+  `backToWorlds` from `e2e/game.ts`. `openMenu` stores a render distance of 2 first:
+  three parallel browsers with software WebGL render at only 1 to 7 frames per second, so
+  keep these tests light and never assert on wall-clock time without taking the best of
+  several rounds.
+- Test API beyond Phase 2: `submit(action)` (returns the session's answer),
+  `save()`, `openWorld(name, seed)` (switch worlds in place), `terrainChecksum()`;
+  `getState()` has `mode`, `world`, `save { dirty, lastError, lastSaveMs, lastLoadMs }`
+  and `inventory`. `setBlock` stays a direct tool past the action layer.
+- Text-only reference screenshots use `maxDiffPixelRatio` 0.05, which is loose enough to
+  miss a whole button: after changing a menu, regenerate with `--update-snapshots=all`
+  and look at the result.
 - In test mode the simulation only advances through `__mc.step(n)`; rendering and chunk
   loading keep running. Tests without `test=1` cover the start screen and the real loop.
 - Tests wait on game state (`__mc.isReady()`, `__mc.whenIdle()`), never on fixed sleeps.
@@ -212,7 +269,10 @@ hold:
 - Phase 2 is complete with part A. Its former part B (multiplayer) was postponed by the
   owner and is now Phase 4; `docs/phase-2-plan.md`, Part B, is not to be implemented as
   written. It will be re-planned on top of Phase 3.
-- Phase 3 (Gathering & Crafting): planned (`docs/phase-3-plan.md`), not implemented. Parts
-  A, B and C are implemented in this order, each after the previous one is merged; part D
-  (Web Workers) only when the owner asks for it.
+- Phase 3 (Gathering & Crafting): planned in `docs/phase-3-plan.md`.
+  - Phase 3 part A (foundation: terrain version 1, action layer, saving, world menu):
+    implemented (report: `docs/phase-3a-report.md`). Read its "Decisions and deviations"
+    before changing generation, actions, the save format, the menus or the start flow.
+  - Parts B and C are implemented in this order, each after the previous one is merged;
+    part D (Web Workers) only when the owner asks for it.
 - Phases 4 (multiplayer) and 5 (personalization): not yet planned.

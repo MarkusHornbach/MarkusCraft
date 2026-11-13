@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE, SEA_LEVEL, WORLD_HEIGHT } from '../../game/config';
+import { CHUNK_SIZE, GENERATOR_VERSION, SEA_LEVEL, WORLD_HEIGHT } from '../../game/config';
 import { expectFasterThan } from '../../testing/timing';
 import { Block } from '../blocks';
 import { blockIndex } from '../chunk';
@@ -9,6 +9,8 @@ import { TREE_MIN_SPACING, hasLeaf, isTreeOrigin, trunkHeight } from './trees';
 
 const SEEDS = [1337, 42, 987654321];
 const AREA = 16; // chunks per side
+// Since Phase 3 ore veins replace some of the stone.
+const STONE_OR_ORE: number[] = [Block.STONE, Block.COAL_ORE, Block.IRON_ORE];
 
 function columnTop(blocks: Uint8Array, lx: number, lz: number, skipTree: boolean): number {
   for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
@@ -22,15 +24,17 @@ function columnTop(blocks: Uint8Array, lx: number, lz: number, skipTree: boolean
 
 describe('generateChunk', () => {
   it('is deterministic and depends on the seed (AC4.1)', () => {
-    const a = generateChunk(1337, 3, -2);
-    const b = generateChunk(1337, 3, -2);
+    const a = generateChunk(1337, 3, -2, GENERATOR_VERSION);
+    const b = generateChunk(1337, 3, -2, GENERATOR_VERSION);
     // Interleave another seed to prove the terrain cache does not leak state.
-    const c = generateChunk(7, 3, -2);
-    const d = generateChunk(1337, 3, -2);
+    const c = generateChunk(7, 3, -2, GENERATOR_VERSION);
+    const d = generateChunk(1337, 3, -2, GENERATOR_VERSION);
     expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
     expect(Buffer.from(a).equals(Buffer.from(d))).toBe(true);
     expect(Buffer.from(a).equals(Buffer.from(c))).toBe(false);
-    expect(Buffer.from(a).equals(Buffer.from(generateChunk(1337, 4, -2)))).toBe(false);
+    expect(Buffer.from(a).equals(Buffer.from(generateChunk(1337, 4, -2, GENERATOR_VERSION)))).toBe(
+      false,
+    );
   });
 
   it('builds valid columns over a 16×16-chunk area for 3 seeds (AC4.2)', () => {
@@ -94,19 +98,21 @@ describe('generateChunk', () => {
       const cz = Math.floor(z / CHUNK_SIZE);
       const blocks = terrain.generateChunk(cx, cz);
       const at = (y: number) => blocks[blockIndex(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE)];
+      // Bare rock (Phase 3) has its own tests in terrainV1.test.ts.
+      if (terrain.isRock(x, z)) continue;
       if (h > SEA_LEVEL + 2) {
         seen.grass = true;
         expect(at(h)).toBe(Block.GRASS);
         expect([at(h - 1), at(h - 2), at(h - 3)]).toEqual([Block.DIRT, Block.DIRT, Block.DIRT]);
-        expect(at(h - 4)).toBe(Block.STONE);
+        expect(STONE_OR_ORE).toContain(at(h - 4));
       } else if (h >= SEA_LEVEL - 3) {
         seen.beach = true;
-        expect(at(h)).toBe(Block.SAND);
+        expect([Block.SAND, Block.CLAY]).toContain(at(h));
         expect(at(h - 3)).toBe(Block.SAND);
-        expect(at(h - 4)).toBe(Block.STONE);
+        expect(STONE_OR_ORE).toContain(at(h - 4));
       } else {
         seen.deep = true;
-        expect(at(h)).toBe(Block.DIRT);
+        expect([Block.DIRT, Block.CLAY]).toContain(at(h));
         expect(at(h + 1)).toBe(Block.WATER);
       }
     }
@@ -148,11 +154,11 @@ describe('generateChunk', () => {
   });
 
   it('generates a chunk in under 15 ms on average (AC4.6)', () => {
-    generateChunk(5, 0, 0); // warm-up
+    generateChunk(5, 0, 0, GENERATOR_VERSION); // warm-up
     let average = Infinity;
     for (let round = 0; round < 3; round++) {
       const start = performance.now();
-      for (let i = 0; i < 50; i++) generateChunk(5, i - 25, (i * 7) % 13);
+      for (let i = 0; i < 50; i++) generateChunk(5, i - 25, (i * 7) % 13, GENERATOR_VERSION);
       average = Math.min(average, (performance.now() - start) / 50);
     }
     expectFasterThan(average, 15);
@@ -197,8 +203,8 @@ describe('trees', () => {
         const cx = Math.floor(x / CHUNK_SIZE);
         const cz = Math.floor(z / CHUNK_SIZE);
         // Order 1: own chunk first; order 2 (fresh generator): neighbour first.
-        const own1 = generateChunk(seed, cx, cz);
-        const next1 = generateChunk(seed, cx + 1, cz);
+        const own1 = generateChunk(seed, cx, cz, GENERATOR_VERSION);
+        const next1 = generateChunk(seed, cx + 1, cz, GENERATOR_VERSION);
         const fresh = new Terrain(seed);
         const next2 = fresh.generateChunk(cx + 1, cz);
         const own2 = fresh.generateChunk(cx, cz);

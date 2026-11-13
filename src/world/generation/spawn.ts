@@ -1,4 +1,4 @@
-// Spawn search: the dry column nearest to the origin, away from tree canopies.
+// Spawn search: the grass column nearest to the origin, away from tree canopies.
 import { TREE_CANOPY_RADIUS } from './trees';
 
 /** No tree trunk this close to the spawn: leaves stay at least two blocks away. */
@@ -17,7 +17,8 @@ export interface SpawnPoint {
 const MAX_RINGS = 2048;
 
 function isSuitable(terrain: Terrain, x: number, z: number): boolean {
-  if (terrain.isUnderWater(x, z)) return false;
+  // Grass only: not in water, not on a beach and not on bare rock.
+  if (!terrain.isGrass(x, z)) return false;
   // Keep the player's head out of leaves and the first view clear of foliage.
   const r = SPAWN_TREE_CLEARANCE;
   for (let dz = -r; dz <= r; dz++) {
@@ -28,7 +29,7 @@ function isSuitable(terrain: Terrain, x: number, z: number): boolean {
   return true;
 }
 
-/** Column (0, 0) if it is dry, otherwise the first dry column on an outward square spiral. */
+/** Column (0, 0) if it is suitable, otherwise the first one on an outward square spiral. */
 export function findSpawn(terrain: Terrain): SpawnPoint {
   for (let ring = 0; ring <= MAX_RINGS; ring++) {
     for (let dz = -ring; dz <= ring; dz++) {

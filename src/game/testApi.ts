@@ -1,4 +1,6 @@
 // Test API on `window.__mc`: lets headless tests observe and drive the game deterministically.
+import type { ActionResult } from '../actions/apply';
+import type { GameMode, ItemStack } from '../actions/playerRecord';
 import type { MoveMode } from '../player/player';
 
 export interface TargetInfo {
@@ -15,6 +17,21 @@ export interface GameState {
   seed: number;
   time: number;
   paused: boolean;
+  /** Game mode of the open world. */
+  mode: GameMode;
+  /** The open world, or null while none is open. */
+  world: { id: string; name: string; generatorVersion: number } | null;
+  save: {
+    /** True while a change of the world is not written yet. */
+    dirty: boolean;
+    /** Message of the last failed write, or null. */
+    lastError: string | null;
+    /** Milliseconds the last write and the last load of a stored world took. */
+    lastSaveMs: number;
+    lastLoadMs: number;
+  };
+  /** The player's confirmed item slots; `selected` counts from 0. */
+  inventory: { slots: (ItemStack | null)[]; selected: number };
   /** True in touch mode (touch controls shown), false in mouse mode. */
   touch: boolean;
   player: {
@@ -72,10 +89,25 @@ export interface TestApi {
   /** Feed a look delta in pixels, as if the mouse moved. */
   look(dx: number, dy: number): void;
   getBlock(x: number, y: number, z: number): number;
+  /** Sets a block directly, past the action layer (test tool). */
   setBlock(x: number, y: number, z: number, id: number): void;
+  /**
+   * Hands an arbitrary value to the session as an action and returns the answer (null if
+   * the session has not answered yet, which the local session never does).
+   */
+  submit(action: unknown): ActionResult | null;
   /** Highest non-air, non-leaf block of a column, or -1 if the column is not loaded. */
   surfaceY(x: number, z: number): number;
+  /** Checksum over the generated terrain around the origin (see `terrainChecksum`). */
+  terrainChecksum(): number;
   setTime(t: number): void;
+  /** Resolves when everything unsaved is written to the store. */
+  save(): Promise<void>;
+  /**
+   * Saves the open world, then opens the world with this name from the store in place,
+   * creating it from the seed if it does not exist.
+   */
+  openWorld(name: string, seed: number): Promise<void>;
   /** Advance exactly `n` fixed simulation steps and render once. */
   step(n: number): void;
 }
