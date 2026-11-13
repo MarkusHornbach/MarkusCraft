@@ -1,4 +1,5 @@
 // Test API on `window.__mc`: lets headless tests observe and drive the game deterministically.
+import type { ActionResult } from '../actions/apply';
 import type { MoveMode } from '../player/player';
 
 export interface TargetInfo {
@@ -72,7 +73,13 @@ export interface TestApi {
   /** Feed a look delta in pixels, as if the mouse moved. */
   look(dx: number, dy: number): void;
   getBlock(x: number, y: number, z: number): number;
+  /** Sets a block directly, past the action layer (test tool). */
   setBlock(x: number, y: number, z: number, id: number): void;
+  /**
+   * Hands an arbitrary value to the session as an action and returns the answer (null if
+   * the session has not answered yet, which the local session never does).
+   */
+  submit(action: unknown): ActionResult | null;
   /** Highest non-air, non-leaf block of a column, or -1 if the column is not loaded. */
   surfaceY(x: number, z: number): number;
   /** Checksum over the generated terrain around the origin (see `terrainChecksum`). */

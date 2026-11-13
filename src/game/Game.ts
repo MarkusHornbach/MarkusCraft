@@ -1,7 +1,10 @@
 // Game: wires world, player, renderer and UI together and runs the fixed-step loop.
+import type { Action } from '../actions/actions';
+import type { ActionResult, BlockChange } from '../actions/apply';
+import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
+import { LocalSession, type Session } from '../actions/Session';
 import { Input, type PressAction } from '../input/Input';
 import { TouchControls } from '../input/TouchControls';
-import { breakResult, canPlace } from '../player/interaction';
 import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
@@ -17,7 +20,7 @@ import {
   saveSettings,
 } from '../ui/settings';
 import { TouchHud } from '../ui/TouchHud';
-import { Block, HOTBAR_BLOCKS, getBlockDef } from '../world/blocks';
+import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
 import { toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
@@ -35,6 +38,7 @@ import {
   PLAYER_EYE_HEIGHT,
   REACH,
   SIM_DT,
+  SIM_HZ,
   TEST_RENDER_DISTANCE,
   TEST_VIEW_HEIGHT,
   TEST_VIEW_WIDTH,
@@ -72,7 +76,13 @@ export class Game {
   private fpsFrames = 0;
   private fpsTime = 0;
   private readonly root: HTMLElement;
-  private selectedSlot = 1;
+  /** Every change to blocks and to the player's items goes through the session. */
+  private session: Session;
+  private readonly gameMode: GameMode = 'creative';
+  /** Simulation steps since the world was opened: the clock of the action layer. */
+  private simSteps = 0;
+  /** Answer to the action submitted last (the test API returns it). */
+  private lastResult: ActionResult | null = null;
   private target: RayHit | null = null;
   /** Seconds a mouse button has been held since the last break/place action. */
   private repeatTimer = 0;
@@ -127,6 +137,7 @@ export class Game {
       onPress: (action) => this.handlePress(action),
     });
 
+    this.session = this.createSession();
     this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
     this.hud.setSelected(this.selectedSlot, false);
     this.debug = new DebugOverlay(this.root);
@@ -155,6 +166,39 @@ export class Game {
       if (this.mode === 'touch' && !(e.target instanceof HTMLInputElement)) e.preventDefault();
     });
     installTestApi(this.createTestApi());
+  }
+
+  /** Bar slot of the confirmed player record, 1-based as on the keyboard. */
+  private get selectedSlot(): number {
+    return this.session.record.selectedSlot + 1;
+  }
+
+  private createSession(): Session {
+    return new LocalSession(
+      {
+        world: this.world,
+        mode: this.gameMode,
+        pose: () => this.player,
+        nowMs: () => (this.simSteps * 1000) / SIM_HZ,
+      },
+      createPlayerRecord(this.gameMode),
+      {
+        onBlocks: (changes) => this.onBlocksChanged(changes),
+        onPlayer: () => {},
+        onResult: (action, result) => this.onActionResult(action, result),
+      },
+    );
+  }
+
+  /** The session set blocks: rebuild the meshes they touch, outside the frame budget. */
+  private onBlocksChanged(changes: readonly BlockChange[]): void {
+    for (const { x, z } of changes) this.remeshAround(x, z);
+  }
+
+  private onActionResult(action: Action, result: ActionResult): void {
+    this.lastResult = result;
+    if (!result.ok) return;
+    if (action.kind === 'selectSlot') this.hud.setSelected(this.selectedSlot, true);
   }
 
   start(): void {
@@ -343,6 +387,7 @@ export class Game {
     stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
     this.repeatHeldAction();
+    this.simSteps++;
     this.time = advanceTime(this.time, SIM_DT, this.params.freeze);
   }
 
@@ -382,9 +427,7 @@ export class Game {
     this.updateTarget();
     const t = this.target;
     if (!t) return;
-    const replacement = breakResult(this.world, t.x, t.y, t.z);
-    if (replacement === null) return;
-    this.setBlock(t.x, t.y, t.z, replacement);
+    this.session.submit({ kind: 'break', x: t.x, y: t.y, z: t.z });
     this.updateTarget();
   }
 
@@ -392,18 +435,20 @@ export class Game {
     this.updateTarget();
     const t = this.target;
     if (!t) return;
-    const x = t.x + t.face[0];
-    const y = t.y + t.face[1];
-    const z = t.z + t.face[2];
-    if (!canPlace(this.world, this.player, x, y, z)) return;
-    this.setBlock(x, y, z, HOTBAR_BLOCKS[this.selectedSlot - 1]);
+    this.session.submit({
+      kind: 'place',
+      x: t.x + t.face[0],
+      y: t.y + t.face[1],
+      z: t.z + t.face[2],
+      slot: this.session.record.selectedSlot,
+    });
     this.updateTarget();
   }
 
   private selectSlot(slot: number): void {
-    // Wrap around in both directions (mouse wheel).
-    this.selectedSlot = ((((slot - 1) % HOTBAR_SLOTS) + HOTBAR_SLOTS) % HOTBAR_SLOTS) + 1;
-    this.hud.setSelected(this.selectedSlot, true);
+    // Wrap around in both directions (mouse wheel). Actions count slots from 0.
+    const wrapped = (((slot - 1) % HOTBAR_SLOTS) + HOTBAR_SLOTS) % HOTBAR_SLOTS;
+    this.session.submit({ kind: 'selectSlot', slot: wrapped });
   }
 
   private rememberPosition(): void {
@@ -533,10 +578,22 @@ export class Game {
     return y - by < 1 - WATER_SURFACE_DROP || this.world.getBlock(bx, by + 1, bz) === Block.WATER;
   }
 
-  private setBlock(x: number, y: number, z: number, id: number): void {
-    if (!this.world.setBlock(x, y, z, id)) return;
-    // Edits remesh immediately, outside the per-frame budget.
+  /** Edits remesh immediately, outside the per-frame budget. */
+  private remeshAround(x: number, z: number): void {
     for (const { cx, cz } of chunksAffectedByEdit(x, z)) this.chunkManager.remesh(cx, cz);
+  }
+
+  /** Test tool: sets a block directly, past the action layer. */
+  private testSetBlock(x: number, y: number, z: number, id: number): void {
+    if (this.world.setBlock(x, y, z, id)) this.remeshAround(x, z);
+  }
+
+  /** Test tool: hands any value to the session as an action and returns the answer. */
+  private testSubmit(action: unknown): ActionResult | null {
+    this.lastResult = null;
+    this.session.submit(action as Action);
+    this.updateTarget();
+    return this.lastResult;
   }
 
   private getState(): GameState {
@@ -623,7 +680,8 @@ export class Game {
       setPlayer: (patch) => this.setPlayer(patch),
       look: (dx, dy) => this.applyLookPixels(dx, dy),
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),
-      setBlock: (x, y, z, id) => this.setBlock(x, y, z, id),
+      setBlock: (x, y, z, id) => this.testSetBlock(x, y, z, id),
+      submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
       terrainChecksum: () => terrainChecksum(this.world.seed, this.world.generatorVersion),
       setTime: (t) => {

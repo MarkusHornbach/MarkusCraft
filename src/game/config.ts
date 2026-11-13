@@ -87,7 +87,12 @@ export const SWIM_EXIT_SPEED = 8;
 export const VOID_Y = -20;
 
 export const REACH = 5;
+/** Slack for the reach check of the action layer (block centre against the actor's eye). */
+export const REACH_TOLERANCE = 1.5;
 export const ACTION_REPEAT_MS = 250;
+/** Slots of a player's inventory; the first `HOTBAR_SLOTS` are the bar. */
+export const INVENTORY_SLOTS = 36;
+export const STACK_SIZE = 99;
 export const HOTBAR_SLOTS = 9;
 
 export const DAY_LENGTH_SECONDS = 20 * 60;

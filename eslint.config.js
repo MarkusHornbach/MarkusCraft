@@ -30,7 +30,15 @@ export default tseslint.config(
   },
   {
     // Pure core: testable in Node, movable to workers later.
-    files: ['src/world/**', 'src/player/**', 'src/util/**', 'src/render/textures/tiles.ts'],
+    files: [
+      'src/world/**',
+      'src/player/**',
+      'src/util/**',
+      'src/actions/**',
+      'src/items/**',
+      'src/save/**',
+      'src/render/textures/tiles.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

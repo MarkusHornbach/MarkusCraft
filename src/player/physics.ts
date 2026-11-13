@@ -251,7 +251,12 @@ export function respawnIfFallen(
 }
 
 /** True if the player's box overlaps the unit cube of block (bx, by, bz). */
-export function playerIntersectsBlock(p: PlayerState, bx: number, by: number, bz: number): boolean {
+export function playerIntersectsBlock(
+  p: { x: number; y: number; z: number },
+  bx: number,
+  by: number,
+  bz: number,
+): boolean {
   return (
     p.x + HALF > bx + EPS &&
     p.x - HALF < bx + 1 - EPS &&

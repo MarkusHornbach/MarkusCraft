@@ -211,3 +211,9 @@ export function getBlockDef(id: number): BlockDef {
 export function isSolid(id: number): boolean {
   return BLOCK_SOLID[id] === 1;
 }
+
+/** Blocks a player can hold and place: every solid block that can also be broken again. */
+export function isPlaceable(id: number): boolean {
+  const def = BLOCKS[id];
+  return def !== undefined && def.solid && def.breakable;
+}
