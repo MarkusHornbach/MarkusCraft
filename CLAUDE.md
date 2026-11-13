@@ -38,17 +38,17 @@ game in a procedurally generated world"; everything in it is original work.
 
 ## Tech stack
 
-| Concern | Choice |
-|---|---|
-| Language | TypeScript, `strict` mode |
-| Build / dev server | Vite, `base: './'` so the build works under any path |
-| Rendering | Three.js (WebGL2) |
-| Unit tests | Vitest (Node environment) |
-| Browser tests | Playwright (`@playwright/test`), Chromium, software WebGL |
-| Lint / format | ESLint (typescript-eslint) + Prettier |
-| Package manager | npm, lockfile committed |
-| Runtime | Node 22 (`.nvmrc`) |
-| CI / deploy | GitHub Actions: checks on every push, deploy `main` to GitHub Pages |
+| Concern            | Choice                                                              |
+| ------------------ | ------------------------------------------------------------------- |
+| Language           | TypeScript, `strict` mode                                           |
+| Build / dev server | Vite, `base: './'` so the build works under any path                |
+| Rendering          | Three.js (WebGL2)                                                   |
+| Unit tests         | Vitest (Node environment)                                           |
+| Browser tests      | Playwright (`@playwright/test`), Chromium, software WebGL           |
+| Lint / format      | ESLint (typescript-eslint) + Prettier                               |
+| Package manager    | npm, lockfile committed                                             |
+| Runtime            | Node 22 (`.nvmrc`)                                                  |
+| CI / deploy        | GitHub Actions: checks on every push, deploy `main` to GitHub Pages |
 
 Keep runtime dependencies minimal: `three` only, unless a phase plan says otherwise.
 Noise, RNG, physics and meshing are implemented in this repo.
@@ -66,18 +66,20 @@ a later session, update the pin to match and regenerate the reference screenshot
 ```
 index.html
 src/
-  main.ts            entry point: reads URL params, starts the game
-  game/              game loop, wiring, constants (config.ts), test API (testApi.ts)
-  world/             blocks, chunks, world access, chunk manager, raycast
-    generation/      noise, terrain, trees
-    meshing/         chunk mesher (pure: block data in, typed arrays out)
-  player/            player state, physics, movement controller
-  input/             keyboard/mouse/pointer-lock abstraction
-  render/            Three.js scene, chunk meshes, sky, block highlight
-    textures/        procedural tile painters and atlas builder
-  ui/                HUD, hotbar, debug overlay, start/pause screen, settings (DOM + CSS)
-  util/              seeded RNG, math helpers
-e2e/                 Playwright tests and committed reference screenshots
+  main.ts            entry point: reads URL params, checks WebGL2, starts the game
+  game/              Game.ts (loop, wiring), config.ts (all constants), testApi.ts, urlParams.ts
+  world/             blocks.ts (block + tile table), chunk.ts, World.ts, ChunkManager.ts,
+                     raycast.ts, dayNight.ts (time → sun, sky colours, daylight)
+    generation/      terrain.ts, trees.ts, spawn.ts
+    meshing/         mesher.ts (pure: block data in, typed arrays out), atlasLayout.ts
+  player/            player.ts (state), physics.ts, interaction.ts (break/place rules)
+  input/             Input.ts: keyboard/mouse/pointer-lock abstraction
+  render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts
+    textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts
+  ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, PauseScreen.ts, settings.ts, ui.css
+  util/              rng.ts, noise.ts, math.ts
+e2e/                 Playwright tests, fixtures.ts, game.ts and helpers.ts, screenshots/
+scripts/             dev tools: shot.mjs, atlasPreview.ts, terrainStats.ts, perf.ts
 docs/                phase plans and phase reports
 .github/workflows/   ci.yml, deploy.yml
 ```
@@ -89,6 +91,7 @@ Unit tests live next to the code as `*.test.ts`.
 - **Pure core, thin shell.** `world/`, `player/` and `util/` must not import `three` or
   touch the DOM (enforced by an ESLint `no-restricted-imports` rule). They are tested in
   Node. Only `render/`, `ui/`, `input/` and `game/` may use Three.js and browser APIs.
+  The same rule covers `render/textures/tiles.ts`. The core may import `game/config.ts`.
 - **Determinism.** No `Math.random()` and no `Date.now()` in `world/`, `player/`, `util/`
   or texture generation. Randomness comes from the seeded RNG; time comes in as a parameter.
   The same seed must always produce the same world and the same textures.
@@ -106,33 +109,40 @@ Unit tests live next to the code as `*.test.ts`.
 
 ## Commands
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Dev server |
-| `npm run build` | Type check + production build into `dist/` |
-| `npm run preview` | Serve the production build |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run lint` | ESLint + Prettier check |
-| `npm run format` | Apply Prettier |
-| `npm test` | Vitest unit tests, single run |
-| `npm run test:e2e` | Build, then Playwright tests against the preview server |
-| `npm run test:e2e:update` | Same, regenerating reference screenshots |
-| `npm run check` | `typecheck` + `lint` + `test` (fast gate for every commit) |
-| `npm run check:all` | `check` + `build` + `test:e2e` (gate for every plan step) |
+| Command                   | Purpose                                                    |
+| ------------------------- | ---------------------------------------------------------- |
+| `npm run dev`             | Dev server                                                 |
+| `npm run build`           | Type check + production build into `dist/`                 |
+| `npm run preview`         | Serve the production build                                 |
+| `npm run typecheck`       | `tsc --noEmit`                                             |
+| `npm run lint`            | ESLint + Prettier check                                    |
+| `npm run format`          | Apply Prettier                                             |
+| `npm test`                | Vitest unit tests, single run                              |
+| `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI) |
+| `npm run test:e2e`        | Build, then Playwright tests against the preview server    |
+| `npm run test:e2e:update` | Same, regenerating reference screenshots                   |
+| `npm run check`           | `typecheck` + `lint` + `test` (fast gate for every commit) |
+| `npm run check:all`       | `check` + `build` + `test:e2e` (gate for every plan step)  |
 
 ## Headless testing
 
-The game exposes a test API on `window.__mc` and accepts URL parameters so tests are
-deterministic. Details are specified in `docs/phase-1-plan.md` (section "Test strategy").
-In short:
+The game exposes a test API on `window.__mc` (`src/game/testApi.ts`) and accepts URL
+parameters so tests are deterministic. Details are specified in `docs/phase-1-plan.md`
+(section "Test strategy"). In short:
 
 - `?seed=<int>` fixes the world, `?time=<0..1>` sets the time of day, `?freeze=1` stops
   the clock, `?test=1` runs without pointer lock and with fixed settings.
-- Tests wait on game state (`__mc.isReady()`, pending chunk count), never on fixed sleeps.
+- In test mode the simulation only advances through `__mc.step(n)`; rendering and chunk
+  loading keep running. Tests without `test=1` cover the start screen and the real loop.
+- Tests wait on game state (`__mc.isReady()`, `__mc.whenIdle()`), never on fixed sleeps.
+- `e2e/game.ts` opens the game and wraps the test API; `e2e/helpers.ts` measures pixels;
+  `e2e/fixtures.ts` fails any test whose page logs a console error or warning.
 - Every visual feature gets both a rule-based assertion (measurable pixel or state facts)
-  and, where useful, a reference screenshot comparison.
+  and, where useful, a reference screenshot comparison (`e2e/screenshots/`).
 - After changing anything visual, the implementing session must also open the produced
-  screenshots with the Read tool and judge them by eye.
+  screenshots with the Read tool and judge them by eye. For a quick look at any pose:
+  `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
+- The full e2e run takes about two minutes; run long commands in the background.
 
 ## Definition of Done (per phase)
 
@@ -152,4 +162,6 @@ A phase is done when all of the following hold:
 
 ## Current status
 
-- Phase 1: planned, not yet implemented. Start with `docs/phase-1-plan.md`.
+- Phase 1: implemented (report: `docs/phase-1-report.md`). Read its "Decisions and
+  deviations" before changing world, meshing, physics or the test API.
+- Phase 2: not yet planned.

@@ -1,0 +1,34 @@
+// URL parameters that make a session reproducible (seed, time of day, test mode).
+import { START_TIME_OF_DAY } from './config';
+
+export interface GameParams {
+  seed: number;
+  /** True if the seed came from the URL rather than being random. */
+  seedFromUrl: boolean;
+  time: number;
+  freeze: boolean;
+  test: boolean;
+}
+
+/** Parses the query string. `randomSeed` supplies the seed when the URL has none. */
+export function parseParams(search: string, randomSeed: () => number): GameParams {
+  const query = new URLSearchParams(search);
+
+  const seedText = query.get('seed');
+  const parsedSeed = seedText !== null && /^-?\d+$/.test(seedText.trim()) ? Number(seedText) : NaN;
+  const seedFromUrl = Number.isFinite(parsedSeed);
+  // Seeds are unsigned 32-bit integers everywhere.
+  const seed = (seedFromUrl ? parsedSeed : randomSeed()) >>> 0;
+
+  const timeText = query.get('time');
+  const parsedTime = timeText !== null && timeText.trim() !== '' ? Number(timeText) : NaN;
+  const time = Number.isFinite(parsedTime) ? ((parsedTime % 1) + 1) % 1 : START_TIME_OF_DAY;
+
+  return {
+    seed,
+    seedFromUrl,
+    time,
+    freeze: query.get('freeze') === '1',
+    test: query.get('test') === '1',
+  };
+}
