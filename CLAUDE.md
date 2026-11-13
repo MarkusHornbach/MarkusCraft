@@ -6,12 +6,18 @@ game in a procedurally generated world"; everything in it is original work.
 ## Vision
 
 - First-person voxel world: explore procedurally generated terrain, break and place blocks.
-- Runs as a static site (GitHub Pages), no server, desktop browsers with keyboard + mouse.
-- Built in three phases, each planned with the owner and then implemented autonomously:
+- Runs as a static site (GitHub Pages), no server. Desktop browsers with keyboard + mouse;
+  from Phase 2 also Android phones and tablets with touch controls.
+- Built in four phases, each planned with the owner and then implemented autonomously:
   1. **Core** – chunked terrain, movement and collision, break/place, day/night, basic UI
-     (plan: `docs/phase-1-plan.md`)
-  2. **Gameplay** – inventory/hotbar, saving/loading, further mechanics (not yet planned)
-  3. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
+     (plan: `docs/phase-1-plan.md`, report: `docs/phase-1-report.md`)
+  2. **Multiplayer and touch controls** – touch controls for phones and tablets; play
+     together in one world: a host opens their world, others join with a room code,
+     peer-to-peer over WebRTC. Two parts with separate pull requests: A touch controls,
+     B multiplayer (plan: `docs/phase-2-plan.md`)
+  3. **Gathering & Crafting** – inventory/hotbar, timed breaking, crafting, saving/loading;
+     built on the multiplayer foundation (not yet planned)
+  4. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
 
 ## Hard rules
 
@@ -25,16 +31,24 @@ game in a procedurally generated world"; everything in it is original work.
 3. **Autonomous implementation.** Planning sessions are interactive; implementation sessions
    are not. During implementation never ask the owner a question. If something is
    ambiguous, choose the simplest option consistent with the phase plan and record it in the
-   phase report (`docs/phase-N-report.md`, section "Decisions and deviations").
+   phase report (`docs/phase-N-report.md` or the part's report, section "Decisions and deviations").
 4. **Commit frequently.** Commit after every completed plan step at the latest, and more
    often for larger steps. Every commit must pass `npm run check`. Push after each step.
    Write messages as `<area>: <what changed>` (e.g. `world: add tree generation`).
-5. **One branch + one PR per phase.** All work of a phase goes onto a single branch: the
-   branch assigned to the cloud session if there is one, otherwise `phase-N-<name>`. When
-   the phase meets the Definition of Done, open exactly one pull request into `main`.
-   Never push to `main` directly. Merging is the owner's decision.
+5. **One branch + one PR per phase or phase part.** A phase plan may divide the phase into
+   parts (A, B, …) that are implemented in separate sessions; otherwise the whole phase is
+   one part. All work of a part goes onto a single branch: the branch assigned to the cloud
+   session if there is one, otherwise `phase-N-<name>`. When the part meets the Definition
+   of Done, open exactly one pull request into `main`. Never push to `main` directly.
+   Merging is the owner's decision.
 6. **Stay in scope.** Implement what the phase plan lists. Items under "Out of scope" are
    not to be built, even if they seem easy.
+7. **Planning sessions may challenge the brief.** The owner's starting prompt for a phase
+   is a proposal, not a specification. A planning session should question it (risks, wrong
+   assumptions, sizing) and bring in its own ideas. Every change to the scope needs the
+   owner's explicit agreement before it enters the plan, and is recorded in the plan's
+   section "Changes to the original scope" with its reason. Implementation sessions stay
+   bound to the approved plan (rules 3 and 6).
 
 ## Tech stack
 
@@ -78,13 +92,16 @@ src/
     textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts
   ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, PauseScreen.ts, settings.ts, ui.css
   util/              rng.ts, noise.ts, math.ts
+  testing/           timing.ts (helpers for unit tests only)
 e2e/                 Playwright tests, fixtures.ts, game.ts and helpers.ts, screenshots/
 scripts/             dev tools: shot.mjs, atlasPreview.ts, terrainStats.ts, perf.ts
 docs/                phase plans and phase reports
 .github/workflows/   ci.yml, deploy.yml
 ```
 
-Unit tests live next to the code as `*.test.ts`.
+Unit tests live next to the code as `*.test.ts`. Wall-clock limits in tests go through
+`expectFasterThan` (`src/testing/timing.ts`): they are enforced by `npm test` and skipped
+under coverage, which distorts timings. CI runs both.
 
 ## Architecture and code conventions
 
@@ -144,18 +161,19 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
 - The full e2e run takes about two minutes; run long commands in the background.
 
-## Definition of Done (per phase)
+## Definition of Done (per phase or phase part)
 
-A phase is done when all of the following hold:
+A phase, or a part of a phase that its plan defines, is done when all of the following
+hold:
 
-1. Every step of the phase plan is implemented and each acceptance criterion is met.
+1. Every step of the phase plan (of that part) is implemented and each acceptance criterion is met.
 2. `npm run check:all` passes locally with zero warnings from TypeScript and ESLint.
 3. CI is green on the phase branch.
 4. New logic has unit tests; every user-visible feature has at least one Playwright test.
 5. Reference screenshots are up to date, committed, and were looked at by the session.
 6. The browser console shows no errors or warnings during the e2e run.
 7. `CLAUDE.md` reflects the current structure, commands and conventions.
-8. `docs/phase-N-report.md` exists: what was built, decisions and deviations from the
+8. `docs/phase-N-report.md` (for a part: `docs/phase-Na-report.md`, `-Nb-`, …) exists: what was built, decisions and deviations from the
    plan, known issues, measured performance numbers, and suggestions for the next phase.
 9. Hard rule 1 has been checked: no third-party assets or protected names anywhere.
 10. One pull request into `main` is open, describing the result and linking the report.
@@ -164,4 +182,7 @@ A phase is done when all of the following hold:
 
 - Phase 1: implemented (report: `docs/phase-1-report.md`). Read its "Decisions and
   deviations" before changing world, meshing, physics or the test API.
-- Phase 2: not yet planned.
+- Phase 2: planned (`docs/phase-2-plan.md`) in two parts, A touch controls and B
+  multiplayer; neither is implemented yet. Part B starts only after Part A is merged.
+  Persistence moved to Phase 3.
+- Phases 3 and 4: not yet planned.

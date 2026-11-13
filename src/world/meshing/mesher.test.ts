@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, CHUNK_VOLUME, WORLD_HEIGHT } from '../../game/config';
+import { expectFasterThan } from '../../testing/timing';
 import { BLOCKS, Block, Tile } from '../blocks';
 import { blockIndex } from '../chunk';
 import { generateChunk } from '../generation/terrain';
@@ -381,7 +382,7 @@ describe('meshChunk performance (AC6.7)', () => {
       average = Math.min(average, (performance.now() - start) / count);
     }
     expect(triangles).toBeGreaterThan(0);
-    expect(average).toBeLessThan(20);
+    expectFasterThan(average, 20);
   });
 
   it('produces no seams between generated neighbours', () => {

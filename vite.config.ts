@@ -1,12 +1,16 @@
 // Vite build + Vitest configuration.
 import { defineConfig } from 'vitest/config';
 
+// Coverage runs skip wall-clock limits (see src/testing/timing.ts).
+const withCoverage = process.argv.some((arg) => arg.startsWith('--coverage'));
+
 export default defineConfig({
   base: './',
   build: { target: 'es2022', chunkSizeWarningLimit: 1200 },
   preview: { port: 4173, strictPort: true },
   test: {
     environment: 'node',
+    env: { MC_COVERAGE: withCoverage ? '1' : '0' },
     // The terrain property tests generate hundreds of chunks; allow for slow CI machines.
     testTimeout: 60_000,
     include: ['src/**/*.test.ts'],

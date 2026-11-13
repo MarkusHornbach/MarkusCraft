@@ -27,6 +27,9 @@ jobs:
         run: npm run typecheck
       - name: Unit tests with coverage
         run: npm run test:coverage
+      # Coverage instrumentation distorts timings, so the time limits are checked here.
+      - name: Unit tests with time limits
+        run: npm test
       - name: Build
         run: npm run build
       - name: Install Chromium
