@@ -92,13 +92,16 @@ src/
     textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts
   ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, PauseScreen.ts, settings.ts, ui.css
   util/              rng.ts, noise.ts, math.ts
+  testing/           timing.ts (helpers for unit tests only)
 e2e/                 Playwright tests, fixtures.ts, game.ts and helpers.ts, screenshots/
 scripts/             dev tools: shot.mjs, atlasPreview.ts, terrainStats.ts, perf.ts
 docs/                phase plans and phase reports
 .github/workflows/   ci.yml, deploy.yml
 ```
 
-Unit tests live next to the code as `*.test.ts`.
+Unit tests live next to the code as `*.test.ts`. Wall-clock limits in tests go through
+`expectFasterThan` (`src/testing/timing.ts`): they are enforced by `npm test` and skipped
+under coverage, which distorts timings. CI runs both.
 
 ## Architecture and code conventions
 

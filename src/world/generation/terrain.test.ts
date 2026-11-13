@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, SEA_LEVEL, WORLD_HEIGHT } from '../../game/config';
+import { expectFasterThan } from '../../testing/timing';
 import { Block } from '../blocks';
 import { blockIndex } from '../chunk';
 import { findSpawn } from './spawn';
@@ -154,7 +155,7 @@ describe('generateChunk', () => {
       for (let i = 0; i < 50; i++) generateChunk(5, i - 25, (i * 7) % 13);
       average = Math.min(average, (performance.now() - start) / 50);
     }
-    expect(average).toBeLessThan(15);
+    expectFasterThan(average, 15);
   });
 });
 

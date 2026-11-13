@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { expectFasterThan } from '../testing/timing';
 import { Block } from './blocks';
 import { ChunkManager } from './ChunkManager';
 import { World } from './World';
@@ -201,6 +202,6 @@ describe('ChunkManager performance (AC12.2)', () => {
     while (manager.pending > 0) manager.update(() => performance.now(), 1000);
     const elapsed = performance.now() - start;
     expect(manager.loaded).toBe(81);
-    expect(elapsed).toBeLessThan(3000);
+    expectFasterThan(elapsed, 3000);
   });
 });
