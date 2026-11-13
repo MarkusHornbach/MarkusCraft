@@ -144,6 +144,17 @@ rate on the real phone and tablet is the most important open number (manual list
 
 ## Known issues
 
+- **A Phase 1 browser test can fail on a slow CI machine.** `keys 1–9 and the mouse wheel
+select the block slot (AC9.4)` presses a key, checks the text of the block name label
+  and then checks that the label is visible. The label hides after 1.6 s of real time
+  (`LABEL_VISIBLE_MS` in `src/ui/Hud.ts`); when the machine stalls between the two checks
+  the second one comes too late. This happened once, in the CI run of the step 2 commit
+  (run 20); the run of the step 1 commit passed, and the status of the final commit is on
+  the pull request. Part A changed neither that test nor the label,
+  but its 17 additional browser tests add load. It was left alone because Part A must
+  not change Phase 1 assertions. Suggested fix in a small session: read the text and the
+  class in one step right after the key press, or keep the label from hiding by
+  real time in test mode.
 - **Nothing was tried on a real device.** All touch input in the tests is emulated in
   desktop Chromium.
 - The stick can start on the strip left and right of the block bar, but a touch on a slot
