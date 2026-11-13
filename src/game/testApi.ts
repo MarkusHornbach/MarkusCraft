@@ -1,5 +1,6 @@
 // Test API on `window.__mc`: lets headless tests observe and drive the game deterministically.
 import type { ActionResult } from '../actions/apply';
+import type { GameMode, ItemStack } from '../actions/playerRecord';
 import type { MoveMode } from '../player/player';
 
 export interface TargetInfo {
@@ -16,6 +17,21 @@ export interface GameState {
   seed: number;
   time: number;
   paused: boolean;
+  /** Game mode of the open world. */
+  mode: GameMode;
+  /** The open world, or null while none is open. */
+  world: { id: string; name: string; generatorVersion: number } | null;
+  save: {
+    /** True while a change of the world is not written yet. */
+    dirty: boolean;
+    /** Message of the last failed write, or null. */
+    lastError: string | null;
+    /** Milliseconds the last write and the last load of a stored world took. */
+    lastSaveMs: number;
+    lastLoadMs: number;
+  };
+  /** The player's confirmed item slots; `selected` counts from 0. */
+  inventory: { slots: (ItemStack | null)[]; selected: number };
   /** True in touch mode (touch controls shown), false in mouse mode. */
   touch: boolean;
   player: {
@@ -85,6 +101,13 @@ export interface TestApi {
   /** Checksum over the generated terrain around the origin (see `terrainChecksum`). */
   terrainChecksum(): number;
   setTime(t: number): void;
+  /** Resolves when everything unsaved is written to the store. */
+  save(): Promise<void>;
+  /**
+   * Saves the open world, then opens the world with this name from the store in place,
+   * creating it from the seed if it does not exist.
+   */
+  openWorld(name: string, seed: number): Promise<void>;
   /** Advance exactly `n` fixed simulation steps and render once. */
   step(n: number): void;
 }

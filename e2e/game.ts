@@ -11,6 +11,9 @@ export interface OpenOptions {
   test?: boolean;
   /** Force touch mode (`touch=1`). */
   touch?: boolean;
+  /** Keep the world in IndexedDB (`save=1`) under this name (`world=`, default "Test"). */
+  save?: boolean;
+  world?: string;
 }
 
 export function gameUrl(options: OpenOptions = {}): string {
@@ -20,6 +23,8 @@ export function gameUrl(options: OpenOptions = {}): string {
   query.set('time', String(options.time ?? 0.25));
   if (options.freeze ?? true) query.set('freeze', '1');
   if (options.touch) query.set('touch', '1');
+  if (options.save) query.set('save', '1');
+  if (options.world !== undefined) query.set('world', options.world);
   return `/?${query.toString()}`;
 }
 

@@ -2,12 +2,15 @@
 import type { Action } from '../actions/actions';
 import type { ActionResult, BlockChange } from '../actions/apply';
 import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
+import { type PlayerRecord } from '../actions/playerRecord';
 import { LocalSession, type Session } from '../actions/Session';
 import { Input, type PressAction } from '../input/Input';
 import { TouchControls } from '../input/TouchControls';
 import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
+import { type WorldEdits, type WorldMeta, makeWorldId, normalizeName } from '../save/saveFormat';
+import { MemoryStore, type WorldStore } from '../save/WorldStore';
 import { DebugOverlay } from '../ui/DebugOverlay';
 import { Hud } from '../ui/Hud';
 import { type InputMode, PauseScreen } from '../ui/PauseScreen';
@@ -22,21 +25,24 @@ import {
 import { TouchHud } from '../ui/TouchHud';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
-import { toChunkCoord } from '../world/chunk';
+import { chunkKey, toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
 import { type RayHit, raycast } from '../world/raycast';
 import { World, chunksAffectedByEdit } from '../world/World';
+import { Autosave, type SaveBatch } from './autosave';
 import {
   ACTION_REPEAT_MS,
   CHUNK_BUDGET_MS,
+  GENERATOR_VERSION,
   HOTBAR_SLOTS,
   LOOK_RADIANS_PER_PIXEL,
   MAX_STEPS_PER_FRAME,
   PIXEL_RATIO_MAX,
   PLAYER_EYE_HEIGHT,
   REACH,
+  SAVE_FORMAT_VERSION,
   SIM_DT,
   SIM_HZ,
   TEST_RENDER_DISTANCE,
@@ -47,6 +53,7 @@ import {
   TOUCH_RENDER_DISTANCE_DEFAULT,
   WATER_SURFACE_DROP,
 } from './config';
+import { IdbStore } from './idbStore';
 import { type GameState, type PlayerPatch, type TestApi, installTestApi } from './testApi';
 import type { GameParams } from './urlParams';
 
@@ -57,11 +64,21 @@ function prefersTouch(): boolean {
 
 export class Game {
   readonly params: GameParams;
-  private readonly world: World;
+  // World, chunk manager, player and session belong to the open world; `loadWorld`
+  // replaces them. Until a world is open they are empty placeholders.
+  private world: World;
   private readonly renderer: Renderer;
-  private readonly chunkManager: ChunkManager;
-  private readonly player: PlayerState;
-  private readonly spawn: SpawnPoint;
+  private chunkManager: ChunkManager;
+  private player: PlayerState;
+  private spawn: SpawnPoint;
+  /** Where worlds are kept: IndexedDB, or memory in test mode. */
+  private store: WorldStore = new MemoryStore();
+  /** The open world as it was loaded or last saved; null while no world is open. */
+  private meta: WorldMeta | null = null;
+  private autosave: Autosave;
+  /** Milliseconds the last load and the last save of a world took (for tests). */
+  private lastLoadMs = 0;
+  private lastSaveMs = 0;
   private readonly input: Input;
   private readonly hud: Hud;
   private readonly debug: DebugOverlay;
@@ -78,7 +95,7 @@ export class Game {
   private readonly root: HTMLElement;
   /** Every change to blocks and to the player's items goes through the session. */
   private session: Session;
-  private readonly gameMode: GameMode = 'creative';
+  private gameMode: GameMode = 'creative';
   /** Simulation steps since the world was opened: the clock of the action layer. */
   private simSteps = 0;
   /** Answer to the action submitted last (the test API returns it). */
@@ -98,7 +115,7 @@ export class Game {
   constructor(container: HTMLElement, params: GameParams) {
     this.params = params;
     this.time = params.time;
-    this.world = new World(params.seed);
+    this.world = new World(0);
 
     this.root = document.createElement('div');
     this.root.className = 'game-root';
@@ -118,18 +135,10 @@ export class Game {
     const radius = this.settings.renderDistance;
     this.renderer.setRenderDistance(radius);
 
-    this.chunkManager = new ChunkManager(
-      this.world,
-      {
-        onMesh: (cx, cz, data) => this.renderer.setChunkMesh(cx, cz, data),
-        onUnload: (cx, cz) => this.renderer.removeChunkMesh(cx, cz),
-      },
-      radius,
-    );
-
-    this.spawn = findSpawn(getTerrain(params.seed));
-    this.player = createPlayer(this.spawn.x + 0.5, this.spawn.y, this.spawn.z + 0.5);
-    this.rememberPosition();
+    this.chunkManager = this.createChunkManager(radius);
+    this.spawn = { x: 0, y: 0, z: 0 };
+    this.player = createPlayer(0, 0, 0);
+    this.autosave = this.createAutosave();
 
     this.input = new Input({
       element: canvas,
@@ -137,10 +146,18 @@ export class Game {
       onPress: (action) => this.handlePress(action),
     });
 
-    this.session = this.createSession();
+    this.session = this.createSession(createPlayerRecord(this.gameMode));
     this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
     this.hud.setSelected(this.selectedSlot, false);
     this.debug = new DebugOverlay(this.root);
+
+    if (params.test && params.save) {
+      // The stored world arrives asynchronously; until then no world is open.
+      void this.openStoredTestWorld();
+    } else {
+      // A new world in memory. It is never stored.
+      this.loadWorld(this.newWorldMeta(params.world, params.seed), new Map());
+    }
 
     if (!params.test) {
       // Normal play starts on the start screen; the simulation waits for pointer lock.
@@ -165,7 +182,145 @@ export class Game {
     this.root.addEventListener('contextmenu', (e) => {
       if (this.mode === 'touch' && !(e.target instanceof HTMLInputElement)) e.preventDefault();
     });
+    // Leaving or hiding the page may be the last chance to save.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') void this.saveNow();
+    });
+    window.addEventListener('pagehide', () => void this.saveNow());
     installTestApi(this.createTestApi());
+  }
+
+  private createChunkManager(radius: number): ChunkManager {
+    return new ChunkManager(
+      this.world,
+      {
+        onMesh: (cx, cz, data) => this.renderer.setChunkMesh(cx, cz, data),
+        onUnload: (cx, cz) => this.renderer.removeChunkMesh(cx, cz),
+      },
+      radius,
+    );
+  }
+
+  /** The record of a world that does not exist yet: at its start point, in the morning. */
+  private newWorldMeta(name: string, seed: number): WorldMeta {
+    const spawn = findSpawn(getTerrain(seed));
+    const now = Date.now();
+    const random = (): number => Math.floor(Math.random() * 0x100000000);
+    const mode: GameMode = 'creative';
+    return {
+      id: makeWorldId(now, random(), random()),
+      name: normalizeName(name),
+      seed: seed >>> 0,
+      mode,
+      generatorVersion: GENERATOR_VERSION,
+      formatVersion: SAVE_FORMAT_VERSION,
+      createdMs: now,
+      playedMs: now,
+      time: this.params.time,
+      pose: { x: spawn.x + 0.5, y: spawn.y, z: spawn.z + 0.5, yaw: 0, pitch: 0 },
+      moveMode: 'walk',
+      player: createPlayerRecord(mode),
+    };
+  }
+
+  /**
+   * Opens a world in place: replaces world, chunk manager, chunk meshes, player and
+   * session without reloading the page, and frees the GPU buffers of the old world.
+   * `edits` is taken over by the new world.
+   */
+  loadWorld(meta: WorldMeta, edits: WorldEdits): void {
+    this.renderer.clearChunkMeshes();
+    this.world = new World(meta.seed, meta.generatorVersion, edits);
+    this.chunkManager = this.createChunkManager(this.settings.renderDistance);
+    this.spawn = findSpawn(getTerrain(meta.seed));
+    this.player = createPlayer(meta.pose.x, meta.pose.y, meta.pose.z);
+    applyLook(this.player, meta.pose.yaw, meta.pose.pitch);
+    this.player.mode = meta.moveMode;
+    this.rememberPosition();
+    this.time = meta.time;
+    this.gameMode = meta.mode;
+    this.simSteps = 0;
+    this.repeatTimer = 0;
+    this.target = null;
+    this.meta = meta;
+    this.session = this.createSession(meta.player);
+    this.autosave = this.createAutosave();
+    this.hud.setSelected(this.selectedSlot, false);
+    this.updateChunkCenter();
+    this.framesSinceIdle = 0;
+  }
+
+  /** The open world's record with the current pose, time and player record. */
+  private currentMeta(meta: WorldMeta): WorldMeta {
+    const p = this.player;
+    return {
+      ...meta,
+      playedMs: Date.now(),
+      time: this.time,
+      pose: { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch },
+      moveMode: p.mode,
+      // A break in progress is measured on a clock that restarts with the world.
+      player: { ...this.session.record, breaking: null },
+    };
+  }
+
+  /** A fresh autosave for the world that is open right now. */
+  private createAutosave(): Autosave {
+    const world = this.world;
+    const store = this.store;
+    return new Autosave(async (batch: SaveBatch) => {
+      const meta = this.meta;
+      if (!meta || this.world !== world) return;
+      const start = performance.now();
+      // Both calls take their snapshot at once, before anything is awaited.
+      const chunks = store.saveChunks(meta.id, world.edits, batch.chunks);
+      const saved = this.currentMeta(meta);
+      const record = batch.meta ? store.saveMeta(saved) : Promise.resolve();
+      await Promise.all([chunks, record]);
+      if (batch.meta && this.meta === meta) this.meta = saved;
+      this.lastSaveMs = performance.now() - start;
+    });
+  }
+
+  /** Writes everything unsaved now. Never rejects; a failure shows in the save state. */
+  private saveNow(): Promise<void> {
+    return this.autosave.flush(performance.now());
+  }
+
+  private markMetaDirty(): void {
+    if (this.meta) this.autosave.markMeta(performance.now());
+  }
+
+  private markChunkDirty(x: number, z: number): void {
+    this.autosave.markChunk(chunkKey(toChunkCoord(x), toChunkCoord(z)), performance.now());
+  }
+
+  /**
+   * Opens the world with this name from the store, creating it from the seed if there
+   * is none. Saves the world that is open first.
+   */
+  private async openNamedWorld(name: string, seed: number): Promise<void> {
+    await this.saveNow();
+    const start = performance.now();
+    const wanted = normalizeName(name);
+    const entries = await this.store.list();
+    const entry = entries.find((e) => e.status === 'ok' && e.meta.name === wanted);
+    if (!entry) {
+      const meta = this.newWorldMeta(wanted, seed);
+      await this.store.create(meta);
+      this.loadWorld(meta, new Map());
+    } else {
+      const loaded = await this.store.load(entry.id);
+      if (!loaded || !loaded.ok) throw new Error(`World "${wanted}" cannot be opened`);
+      this.loadWorld(loaded.value.meta, loaded.value.edits);
+    }
+    this.lastLoadMs = performance.now() - start;
+  }
+
+  /** `test=1&save=1`: the world named by the URL, kept in IndexedDB. */
+  private async openStoredTestWorld(): Promise<void> {
+    this.store = await IdbStore.open();
+    await this.openNamedWorld(this.params.world, this.params.seed);
   }
 
   /** Bar slot of the confirmed player record, 1-based as on the keyboard. */
@@ -173,7 +328,7 @@ export class Game {
     return this.session.record.selectedSlot + 1;
   }
 
-  private createSession(): Session {
+  private createSession(record: PlayerRecord): Session {
     return new LocalSession(
       {
         world: this.world,
@@ -181,10 +336,10 @@ export class Game {
         pose: () => this.player,
         nowMs: () => (this.simSteps * 1000) / SIM_HZ,
       },
-      createPlayerRecord(this.gameMode),
+      record,
       {
         onBlocks: (changes) => this.onBlocksChanged(changes),
-        onPlayer: () => {},
+        onPlayer: () => this.markMetaDirty(),
         onResult: (action, result) => this.onActionResult(action, result),
       },
     );
@@ -192,7 +347,10 @@ export class Game {
 
   /** The session set blocks: rebuild the meshes they touch, outside the frame budget. */
   private onBlocksChanged(changes: readonly BlockChange[]): void {
-    for (const { x, z } of changes) this.remeshAround(x, z);
+    for (const { x, z } of changes) {
+      this.markChunkDirty(x, z);
+      this.remeshAround(x, z);
+    }
   }
 
   private onActionResult(action: Action, result: ActionResult): void {
@@ -284,6 +442,7 @@ export class Game {
     if (paused) {
       this.touch?.tracker.reset();
       this.input.reset();
+      void this.saveNow();
     } else {
       this.pauseScreen?.setResumeMode();
       // Do not let the time spent paused turn into a burst of simulation steps.
@@ -368,7 +527,8 @@ export class Game {
       }
     }
 
-    this.updateChunks();
+    if (this.meta) this.updateChunks();
+    this.autosave.tick(performance.now());
     this.draw(this.params.test ? 1 : this.accumulator / SIM_DT);
 
     if (this.chunkManager.pending === 0) {
@@ -388,6 +548,8 @@ export class Game {
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
     this.repeatHeldAction();
     this.simSteps++;
+    // Pose and time of day are part of the world's record.
+    this.markMetaDirty();
     this.time = advanceTime(this.time, SIM_DT, this.params.freeze);
   }
 
@@ -508,6 +670,7 @@ export class Game {
     if (dx === 0 && dy === 0) return;
     const scale = LOOK_RADIANS_PER_PIXEL * this.settings.mouseSensitivity;
     applyLook(this.player, -dx * scale, -dy * scale);
+    this.markMetaDirty();
   }
 
   /** A touch drag in CSS pixels → rotation, with the same signs as the mouse. */
@@ -515,6 +678,7 @@ export class Game {
     if (dx === 0 && dy === 0) return;
     const scale = TOUCH_LOOK_RADIANS_PER_PIXEL * this.settings.touchSensitivity;
     applyLook(this.player, -dx * scale, -dy * scale);
+    this.markMetaDirty();
   }
 
   private updateChunks(): void {
@@ -560,7 +724,7 @@ export class Game {
       pending: this.chunkManager.pending,
       drawCalls: stats.drawCalls,
       triangles: stats.triangles,
-      seed: this.params.seed,
+      seed: this.world.seed,
       time: this.time,
       mode: p.mode,
       onGround: p.onGround,
@@ -585,7 +749,9 @@ export class Game {
 
   /** Test tool: sets a block directly, past the action layer. */
   private testSetBlock(x: number, y: number, z: number, id: number): void {
-    if (this.world.setBlock(x, y, z, id)) this.remeshAround(x, z);
+    if (!this.world.setBlock(x, y, z, id)) return;
+    this.markChunkDirty(x, z);
+    this.remeshAround(x, z);
   }
 
   /** Test tool: hands any value to the session as an action and returns the answer. */
@@ -599,10 +765,29 @@ export class Game {
   private getState(): GameState {
     const p = this.player;
     const stats = this.renderer.getStats();
+    const record = this.session.record;
     return {
-      seed: this.params.seed,
+      seed: this.world.seed,
       time: this.time,
       paused: this.paused,
+      mode: this.gameMode,
+      world: this.meta
+        ? {
+            id: this.meta.id,
+            name: this.meta.name,
+            generatorVersion: this.meta.generatorVersion,
+          }
+        : null,
+      save: {
+        dirty: this.autosave.dirty,
+        lastError: this.autosave.lastError,
+        lastSaveMs: this.lastSaveMs,
+        lastLoadMs: this.lastLoadMs,
+      },
+      inventory: {
+        slots: record.slots.map((slot) => (slot ? { ...slot } : null)),
+        selected: record.selectedSlot,
+      },
       touch: this.mode === 'touch',
       player: {
         x: p.x,
@@ -657,6 +842,7 @@ export class Game {
     p.pitch = 0;
     applyLook(p, yaw, pitch);
     this.rememberPosition();
+    this.markMetaDirty();
     // A teleport changes which chunks are needed: not idle until the next frame says so.
     this.updateChunkCenter();
   }
@@ -668,7 +854,8 @@ export class Game {
 
   private createTestApi(): TestApi {
     return {
-      isReady: () => this.chunkManager.pending === 0 && this.framesSinceIdle > 0,
+      isReady: () =>
+        this.meta !== null && this.chunkManager.pending === 0 && this.framesSinceIdle > 0,
       whenIdle: () =>
         new Promise<void>((resolve) => {
           this.idleWaiters.push(resolve);
@@ -686,7 +873,10 @@ export class Game {
       terrainChecksum: () => terrainChecksum(this.world.seed, this.world.generatorVersion),
       setTime: (t) => {
         this.time = wrapTime(t);
+        this.markMetaDirty();
       },
+      save: () => this.saveNow(),
+      openWorld: (name, seed) => this.openNamedWorld(name, seed),
       step: (n) => {
         for (let i = 0; i < n; i++) this.simulate();
         this.updateChunkCenter();

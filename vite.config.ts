@@ -25,6 +25,7 @@ export default defineConfig({
         'src/save/**',
         'src/render/textures/tiles.ts',
         'src/input/TouchTracker.ts',
+        'src/game/autosave.ts',
       ],
       exclude: ['**/*.test.ts'],
       thresholds: { lines: 85 },

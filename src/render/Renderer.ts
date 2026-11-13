@@ -158,6 +158,11 @@ export class Renderer {
     this.chunks.remove(cx, cz);
   }
 
+  /** Removes all chunk meshes and frees their GPU buffers (another world is loaded). */
+  clearChunkMeshes(): void {
+    this.chunks.dispose();
+  }
+
   setCamera(pose: CameraPose): void {
     this.camera.position.set(pose.x, pose.y + PLAYER_EYE_HEIGHT, pose.z);
     this.camera.rotation.set(pose.pitch, pose.yaw, 0);

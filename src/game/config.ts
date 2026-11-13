@@ -121,3 +121,11 @@ export const TOUCH_SENSITIVITY_MAX = 3;
 export const TOUCH_RENDER_DISTANCE_DEFAULT = 5;
 export const PIXEL_RATIO_MAX = 2;
 export const TOUCH_PIXEL_RATIO_MAX = 1.5;
+
+/** Version of the save format; a world saved by a newer version is not opened. */
+export const SAVE_FORMAT_VERSION = 1;
+export const WORLD_NAME_MAX = 24;
+export const DEFAULT_WORLD_NAME = 'My world';
+/** Unsaved changes are written this long after the first of them. */
+export const AUTOSAVE_INTERVAL_MS = 5000;
+export const SAVE_DATABASE = 'markuscraft';

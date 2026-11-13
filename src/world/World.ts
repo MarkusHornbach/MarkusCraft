@@ -11,15 +11,21 @@ export class World {
   private readonly chunks = new Map<string, Chunk>();
   /**
    * Player edits per chunk (block index → block id). Kept when a chunk unloads and
-   * re-applied when it is generated again. This map is the future input of saving.
+   * re-applied when it is generated again. This map is what saving writes.
    */
-  readonly edits = new Map<string, Map<number, number>>();
+  readonly edits: Map<string, Map<number, number>>;
   // One-entry cache: consecutive block reads usually hit the same chunk.
   private lastChunk: Chunk | null = null;
 
-  constructor(seed: number, generatorVersion: number = GENERATOR_VERSION) {
+  /** `edits` are the saved edits of a loaded world; the world takes the map over. */
+  constructor(
+    seed: number,
+    generatorVersion: number = GENERATOR_VERSION,
+    edits: Map<string, Map<number, number>> = new Map(),
+  ) {
     this.seed = seed >>> 0;
     this.generatorVersion = generatorVersion;
+    this.edits = edits;
   }
 
   get chunkCount(): number {

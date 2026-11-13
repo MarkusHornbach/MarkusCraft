@@ -1,4 +1,5 @@
 // URL parameters that make a session reproducible (seed, time of day, test mode).
+import { normalizeName } from '../save/saveFormat';
 import { START_TIME_OF_DAY } from './config';
 
 export interface GameParams {
@@ -10,6 +11,12 @@ export interface GameParams {
   test: boolean;
   /** Forces touch mode: the touch controls are shown from the start. */
   touch: boolean;
+  /** True if the URL names a time of day (it then applies to a newly created world). */
+  timeFromUrl: boolean;
+  /** With `test`: keep the world in IndexedDB instead of in memory. */
+  save: boolean;
+  /** With `save`: name of the world to open or create. */
+  world: string;
 }
 
 /** Parses the query string. `randomSeed` supplies the seed when the URL has none. */
@@ -33,5 +40,8 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
     freeze: query.get('freeze') === '1',
     test: query.get('test') === '1',
     touch: query.get('touch') === '1',
+    timeFromUrl: Number.isFinite(parsedTime),
+    save: query.get('save') === '1',
+    world: normalizeName(query.get('world') ?? '', 'Test'),
   };
 }
