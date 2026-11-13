@@ -1,6 +1,14 @@
 // Renderer: owns the Three.js renderer, scene, camera and everything drawn in the world.
 import * as THREE from 'three';
-import { CHUNK_SIZE, FOG_START_FACTOR, FOV_DEFAULT, PLAYER_EYE_HEIGHT } from '../game/config';
+import {
+  CHUNK_SIZE,
+  FOG_START_FACTOR,
+  FOV_DEFAULT,
+  PLAYER_EYE_HEIGHT,
+  UNDERWATER_FOG_FAR,
+  UNDERWATER_FOG_NEAR,
+} from '../game/config';
+import { daylightFactor } from '../world/dayNight';
 import type { ChunkMeshData } from '../world/meshing/mesher';
 import { ChunkMeshes } from './ChunkMeshes';
 import { type ChunkMaterials, createChunkMaterials } from './materials';
@@ -8,6 +16,8 @@ import { Sky } from './Sky';
 import { type Atlas, buildAtlas } from './textures/atlas';
 
 const HIGHLIGHT_INFLATE = 0.004;
+/** Display-space colour of the fog under water at full daylight. */
+const UNDERWATER_COLOR: [number, number, number] = [0.1, 0.3, 0.6];
 
 export interface RenderStats {
   drawCalls: number;
@@ -69,7 +79,6 @@ export class Renderer {
     this.materials = createChunkMaterials(this.atlas);
     this.chunks = new ChunkMeshes(this.scene, this.materials);
     this.sky = new Sky(this.scene);
-    this.materials.uniforms.uFogColor.value.copy(this.sky.horizon);
     this.setRenderDistance(this.renderDistance);
 
     // Outline of the targeted block, slightly larger than the block to avoid z-fighting.
@@ -107,9 +116,29 @@ export class Renderer {
   /** Fog hides the edge of the loaded area: it starts at 60 % of the distance. */
   setRenderDistance(chunks: number): void {
     this.renderDistance = chunks;
-    const far = chunks * CHUNK_SIZE;
-    this.materials.uniforms.uFogNear.value = far * FOG_START_FACTOR;
-    this.materials.uniforms.uFogFar.value = far;
+  }
+
+  /**
+   * Applies time of day and the underwater state: sky, fog and world brightness.
+   * Under water the fog is short and blue instead of matching the horizon.
+   */
+  setEnvironment(time: number, underwater: boolean): void {
+    this.sky.update(this.camera, time);
+    const daylight = daylightFactor(time);
+    const uniforms = this.materials.uniforms;
+    uniforms.uDaylight.value = daylight;
+    if (underwater) {
+      uniforms.uFogColor.value
+        .setRGB(...UNDERWATER_COLOR, THREE.SRGBColorSpace)
+        .multiplyScalar(daylight ** 2.2);
+      uniforms.uFogNear.value = UNDERWATER_FOG_NEAR;
+      uniforms.uFogFar.value = UNDERWATER_FOG_FAR;
+    } else {
+      const far = this.renderDistance * CHUNK_SIZE;
+      uniforms.uFogColor.value.copy(this.sky.horizon);
+      uniforms.uFogNear.value = far * FOG_START_FACTOR;
+      uniforms.uFogFar.value = far;
+    }
   }
 
   setChunkMesh(cx: number, cz: number, data: ChunkMeshData): void {
@@ -126,7 +155,6 @@ export class Renderer {
   }
 
   render(): void {
-    this.sky.update(this.camera);
     this.webgl.render(this.scene, this.camera);
     const info = this.webgl.info;
     this.stats.drawCalls = info.render.calls;

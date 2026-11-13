@@ -5,9 +5,10 @@ import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
 import { Hud } from '../ui/Hud';
-import { HOTBAR_BLOCKS } from '../world/blocks';
+import { Block, HOTBAR_BLOCKS } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
 import { toChunkCoord } from '../world/chunk';
+import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain } from '../world/generation/terrain';
 import { type RayHit, raycast } from '../world/raycast';
@@ -19,12 +20,14 @@ import {
   HOTBAR_SLOTS,
   LOOK_RADIANS_PER_PIXEL,
   MAX_STEPS_PER_FRAME,
+  PLAYER_EYE_HEIGHT,
   REACH,
   RENDER_DISTANCE_DEFAULT,
   SIM_DT,
   TEST_RENDER_DISTANCE,
   TEST_VIEW_HEIGHT,
   TEST_VIEW_WIDTH,
+  WATER_SURFACE_DROP,
 } from './config';
 import { type GameState, type PlayerPatch, type TestApi, installTestApi } from './testApi';
 import type { GameParams } from './urlParams';
@@ -156,6 +159,7 @@ export class Game {
     stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
     this.repeatHeldAction();
+    this.time = advanceTime(this.time, SIM_DT, this.params.freeze);
   }
 
   /** Holding a mouse button repeats its action at a fixed interval. */
@@ -282,14 +286,23 @@ export class Game {
     const prev = this.previous;
     this.updateTarget();
     this.renderer.setHighlight(this.target);
-    this.renderer.setCamera({
-      x: prev.x + (p.x - prev.x) * alpha,
-      y: prev.y + (p.y - prev.y) * alpha,
-      z: prev.z + (p.z - prev.z) * alpha,
-      yaw: p.yaw,
-      pitch: p.pitch,
-    });
+    const x = prev.x + (p.x - prev.x) * alpha;
+    const y = prev.y + (p.y - prev.y) * alpha;
+    const z = prev.z + (p.z - prev.z) * alpha;
+    this.renderer.setCamera({ x, y, z, yaw: p.yaw, pitch: p.pitch });
+    const underwater = this.isUnderWater(x, y + PLAYER_EYE_HEIGHT, z);
+    this.hud.setUnderwater(underwater);
+    this.renderer.setEnvironment(this.time, underwater);
     this.renderer.render();
+  }
+
+  /** Whether a point (the camera) is inside water, below the lowered water surface. */
+  private isUnderWater(x: number, y: number, z: number): boolean {
+    const bx = Math.floor(x);
+    const by = Math.floor(y);
+    const bz = Math.floor(z);
+    if (this.world.getBlock(bx, by, bz) !== Block.WATER) return false;
+    return y - by < 1 - WATER_SURFACE_DROP || this.world.getBlock(bx, by + 1, bz) === Block.WATER;
   }
 
   private setBlock(x: number, y: number, z: number, id: number): void {
@@ -382,7 +395,7 @@ export class Game {
       setBlock: (x, y, z, id) => this.setBlock(x, y, z, id),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
       setTime: (t) => {
-        this.time = ((t % 1) + 1) % 1;
+        this.time = wrapTime(t);
       },
       step: (n) => {
         for (let i = 0; i < n; i++) this.simulate();

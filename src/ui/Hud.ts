@@ -10,10 +10,16 @@ export class Hud {
   private readonly slots: HTMLElement[] = [];
   private readonly label: HTMLElement;
   private labelTimer: number | undefined;
+  private readonly waterTint: HTMLElement;
 
   constructor(parent: HTMLElement, tiles: Uint8ClampedArray[]) {
     this.element = document.createElement('div');
     this.element.className = 'hud';
+
+    // Full-screen blue tint while the camera is under water; below the other HUD parts.
+    this.waterTint = document.createElement('div');
+    this.waterTint.className = 'water-tint';
+    parent.appendChild(this.waterTint);
 
     const crosshair = document.createElement('div');
     crosshair.className = 'crosshair';
@@ -56,6 +62,10 @@ export class Hud {
       () => this.label.classList.remove('visible'),
       LABEL_VISIBLE_MS,
     );
+  }
+
+  setUnderwater(underwater: boolean): void {
+    this.waterTint.classList.toggle('visible', underwater);
   }
 
   setVisible(visible: boolean): void {
