@@ -16,7 +16,7 @@ function main(): void {
     message.className = 'fatal-message';
     message.textContent =
       'MarkusCraft needs WebGL2, which this browser or device does not provide. ' +
-      'Please try a current desktop version of Firefox, Chrome, Edge or Safari.';
+      'Please try a current version of Chrome, Edge or Firefox.';
     container.appendChild(message);
     return;
   }

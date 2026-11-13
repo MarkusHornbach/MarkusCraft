@@ -32,10 +32,12 @@ describe('repository hygiene (AC12.4)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('contains no image, audio or font files except the e2e reference screenshots', () => {
+  it('contains no image, audio or font files except the e2e reference screenshots (Phase 2 AC3.6)', () => {
     const assets = files.filter((file) => BINARY_ASSET.test(file));
     const unexpected = assets.filter((file) => !/^e2e\/screenshots\/[a-z-]+\.png$/.test(file));
     expect(unexpected).toEqual([]);
-    expect(assets.length).toBe(8);
+    // Phase 2 part A added one reference screenshot and no image or font for the touch
+    // controls (Phase 2 AC3.6).
+    expect(assets.length).toBe(9);
   });
 });

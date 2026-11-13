@@ -149,6 +149,11 @@ export class Game {
     // Phones and tablets start in touch mode; the play button can still switch the mode.
     this.setMode(params.touch || (!params.test && prefersTouch()) ? 'touch' : 'mouse');
     window.addEventListener('resize', () => this.resize());
+    // A long press must not open the browser's menu in touch mode. Text fields keep it
+    // (paste). In mouse mode `Input` handles the right click on the canvas.
+    this.root.addEventListener('contextmenu', (e) => {
+      if (this.mode === 'touch' && !(e.target instanceof HTMLInputElement)) e.preventDefault();
+    });
     installTestApi(this.createTestApi());
   }
 
@@ -205,7 +210,7 @@ export class Game {
     // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
     if (via && via !== this.mode && !this.params.touch) this.setMode(via);
     if (this.mode === 'touch') {
-      this.setPaused(false);
+      if (!this.isPortrait()) this.setPaused(false);
       return;
     }
     try {
@@ -262,7 +267,20 @@ export class Game {
     this.pauseScreen?.setDebugChecked(visible);
   }
 
+  /** Touch mode is played in landscape only. Test mode has a fixed view and no menu. */
+  private isPortrait(): boolean {
+    return this.mode === 'touch' && !this.params.test && window.innerHeight > window.innerWidth;
+  }
+
+  /** Shows the rotate hint while the device is upright and pauses the game for it. */
+  private updateOrientation(): void {
+    const portrait = this.isPortrait();
+    this.touchHud?.setRotateVisible(portrait);
+    if (portrait && !this.paused) this.setPaused(true);
+  }
+
   private resize(): void {
+    this.updateOrientation();
     if (this.params.test) {
       // Fixed logical resolution so screenshots do not depend on the window.
       this.root.style.width = `${TEST_VIEW_WIDTH}px`;

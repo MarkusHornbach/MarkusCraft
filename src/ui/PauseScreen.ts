@@ -80,6 +80,8 @@ export class PauseScreen {
   /** Parts of the menu that only exist for touch mode. */
   private readonly touchOnly: HTMLElement[] = [];
   private readonly debugSwitch: HTMLInputElement;
+  private readonly fullscreenButton: HTMLButtonElement;
+  private readonly worldSection: HTMLElement;
   private mode: InputMode;
   private resumed = false;
 
@@ -210,6 +212,13 @@ export class PauseScreen {
       void this.copyLink(link, copy);
     });
     world.appendChild(copy);
+    this.fullscreenButton = element('button', 'fullscreen-button', 'Fullscreen');
+    this.fullscreenButton.type = 'button';
+    this.fullscreenButton.addEventListener('click', () => {
+      void this.toggleFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => this.updateFullscreenLabel());
+    this.worldSection = world;
     right.appendChild(world);
 
     parent.appendChild(this.element);
@@ -237,6 +246,7 @@ export class PauseScreen {
       place(this.sliders.touchSensitivity.row, settings, this.sliders.fov.row, touch);
       for (const node of this.touchOnly) place(node, settings, null, touch);
     }
+    place(this.fullscreenButton, this.worldSection, null, touch);
   }
 
   /** Shows other settings than the player chose, e.g. the defaults of another mode. */
@@ -269,6 +279,23 @@ export class PauseScreen {
   /** Shows a short message under the play button (empty string clears it). */
   setHint(text: string): void {
     this.hint.textContent = text;
+  }
+
+  /** Enters or leaves fullscreen; browsers allow this only from a tap or click. */
+  private async toggleFullscreen(): Promise<void> {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      // Some browsers (e.g. on phones of other makers) have no fullscreen for pages.
+      this.setHint('Fullscreen is not available in this browser.');
+    }
+  }
+
+  private updateFullscreenLabel(): void {
+    this.fullscreenButton.textContent = document.fullscreenElement
+      ? 'Exit fullscreen'
+      : 'Fullscreen';
   }
 
   private async copyLink(link: HTMLInputElement, button: HTMLButtonElement): Promise<void> {
