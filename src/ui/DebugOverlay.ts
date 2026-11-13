@@ -102,8 +102,12 @@ export class DebugOverlay {
   }
 
   toggle(): void {
-    this.shown = !this.shown;
-    this.element.classList.toggle('visible', this.shown);
+    this.setVisible(!this.shown);
+  }
+
+  setVisible(visible: boolean): void {
+    this.shown = visible;
+    this.element.classList.toggle('visible', visible);
   }
 
   update(info: DebugInfo): void {

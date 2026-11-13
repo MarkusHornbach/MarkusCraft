@@ -1,13 +1,22 @@
 // Game: wires world, player, renderer and UI together and runs the fixed-step loop.
 import { Input, type PressAction } from '../input/Input';
+import { TouchControls } from '../input/TouchControls';
 import { breakResult, canPlace } from '../player/interaction';
 import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
 import { DebugOverlay } from '../ui/DebugOverlay';
 import { Hud } from '../ui/Hud';
-import { PauseScreen } from '../ui/PauseScreen';
-import { type Settings, browserStorage, loadSettings, saveSettings } from '../ui/settings';
+import { type InputMode, PauseScreen } from '../ui/PauseScreen';
+import {
+  DEFAULT_SETTINGS,
+  type Settings,
+  browserStorage,
+  hasStoredSettings,
+  loadSettings,
+  saveSettings,
+} from '../ui/settings';
+import { TouchHud } from '../ui/TouchHud';
 import { Block, HOTBAR_BLOCKS, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
 import { toChunkCoord } from '../world/chunk';
@@ -19,21 +28,28 @@ import { World, chunksAffectedByEdit } from '../world/World';
 import {
   ACTION_REPEAT_MS,
   CHUNK_BUDGET_MS,
-  FOV_DEFAULT,
-  MOUSE_SENSITIVITY_DEFAULT,
   HOTBAR_SLOTS,
   LOOK_RADIANS_PER_PIXEL,
   MAX_STEPS_PER_FRAME,
+  PIXEL_RATIO_MAX,
   PLAYER_EYE_HEIGHT,
   REACH,
   SIM_DT,
   TEST_RENDER_DISTANCE,
   TEST_VIEW_HEIGHT,
   TEST_VIEW_WIDTH,
+  TOUCH_LOOK_RADIANS_PER_PIXEL,
+  TOUCH_PIXEL_RATIO_MAX,
+  TOUCH_RENDER_DISTANCE_DEFAULT,
   WATER_SURFACE_DROP,
 } from './config';
 import { type GameState, type PlayerPatch, type TestApi, installTestApi } from './testApi';
 import type { GameParams } from './urlParams';
+
+/** True on devices whose main pointer is a finger (phones and tablets). */
+function prefersTouch(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches;
+}
 
 export class Game {
   readonly params: GameParams;
@@ -47,6 +63,10 @@ export class Game {
   private readonly debug: DebugOverlay;
   private readonly pauseScreen: PauseScreen | null = null;
   private settings: Settings;
+  private mode: InputMode = 'mouse';
+  /** Touch source and its on-screen controls; they exist only in touch mode. */
+  private touch: TouchControls | null = null;
+  private touchHud: TouchHud | null = null;
   /** Smoothed frames per second for the debug overlay. */
   private fps = 0;
   private fpsFrames = 0;
@@ -78,15 +98,11 @@ export class Game {
     this.root.appendChild(canvas);
     this.renderer = new Renderer(canvas, {
       preserveDrawingBuffer: params.test,
-      pixelRatio: params.test ? 1 : null,
+      pixelRatio: 1,
     });
     // Test mode ignores stored settings so results do not depend on the browser profile.
     this.settings = params.test
-      ? {
-          renderDistance: TEST_RENDER_DISTANCE,
-          mouseSensitivity: MOUSE_SENSITIVITY_DEFAULT,
-          fov: FOV_DEFAULT,
-        }
+      ? { ...DEFAULT_SETTINGS, renderDistance: TEST_RENDER_DISTANCE }
       : loadSettings(browserStorage());
     this.renderer.setFov(this.settings.fov);
     const radius = this.settings.renderDistance;
@@ -120,16 +136,24 @@ export class Game {
       this.pauseScreen = new PauseScreen(this.root, {
         seed: params.seed,
         settings: this.settings,
-        onPlay: () => this.requestPlay(),
+        mode: this.mode,
+        onPlay: (via) => this.requestPlay(via),
         onSettingsChange: (settings) => this.applySettings(settings),
+        onDebugChange: (visible) => this.setDebugVisible(visible),
       });
       this.setPaused(true);
       document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
       document.addEventListener('pointerlockerror', () => this.onPointerLockError());
     }
 
-    this.resize();
+    // Phones and tablets start in touch mode; the play button can still switch the mode.
+    this.setMode(params.touch || (!params.test && prefersTouch()) ? 'touch' : 'mouse');
     window.addEventListener('resize', () => this.resize());
+    // A long press must not open the browser's menu in touch mode. Text fields keep it
+    // (paste). In mouse mode `Input` handles the right click on the canvas.
+    this.root.addEventListener('contextmenu', (e) => {
+      if (this.mode === 'touch' && !(e.target instanceof HTMLInputElement)) e.preventDefault();
+    });
     installTestApi(this.createTestApi());
   }
 
@@ -138,9 +162,57 @@ export class Game {
     requestAnimationFrame((ms) => this.frame(ms));
   }
 
-  /** Asks the browser to capture the mouse; the game resumes once the lock is granted. */
-  private requestPlay(): void {
+  /**
+   * Switches between mouse mode and touch mode. Touch mode has the on-screen controls,
+   * no pointer lock, a lower pixel ratio and its own default render distance.
+   */
+  private setMode(mode: InputMode): void {
+    this.mode = mode;
+    const touch = mode === 'touch';
+    this.root.classList.toggle('touch-mode', touch);
+    this.input.setMouseEnabled(!touch);
+    if (touch && !this.touch) {
+      this.touchHud = new TouchHud(this.root, this.hud.element);
+      this.touchHud.setVisible(!this.paused);
+      this.touch = new TouchControls({
+        root: this.root,
+        sink: this.input,
+        isActive: () => !this.paused,
+      });
+    } else if (!touch) {
+      this.touch?.dispose();
+      this.touch = null;
+      this.touchHud?.remove();
+      this.touchHud = null;
+    }
+    this.pauseScreen?.setMode(mode);
+    if (!this.params.test) {
+      const cap = touch ? TOUCH_PIXEL_RATIO_MAX : PIXEL_RATIO_MAX;
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, cap));
+      if (!hasStoredSettings(browserStorage())) {
+        // Nothing was chosen yet: use the mode's default without storing it.
+        const renderDistance = touch
+          ? TOUCH_RENDER_DISTANCE_DEFAULT
+          : DEFAULT_SETTINGS.renderDistance;
+        this.useSettings({ ...this.settings, renderDistance });
+        this.pauseScreen?.setSettings(this.settings);
+      }
+    }
+    this.resize();
+  }
+
+  /**
+   * The play button was activated. In mouse mode the browser is asked to capture the
+   * mouse and the game resumes once the lock is granted; in touch mode it resumes at once.
+   */
+  private requestPlay(via: InputMode | null): void {
     this.pauseScreen?.setHint('');
+    // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
+    if (via && via !== this.mode && !this.params.touch) this.setMode(via);
+    if (this.mode === 'touch') {
+      if (!this.isPortrait()) this.setPaused(false);
+      return;
+    }
     try {
       // Older browsers return nothing, newer ones a promise that rejects on failure.
       const result = this.renderer.canvas.requestPointerLock() as Promise<void> | undefined;
@@ -151,6 +223,7 @@ export class Game {
   }
 
   private onPointerLockChange(): void {
+    if (this.mode === 'touch') return;
     this.setPaused(!this.input.pointerLocked);
   }
 
@@ -163,7 +236,9 @@ export class Game {
     this.paused = paused;
     this.pauseScreen?.setVisible(paused);
     this.hud.setVisible(!paused);
+    this.touchHud?.setVisible(!paused);
     if (paused) {
+      this.touch?.tracker.reset();
       this.input.reset();
     } else {
       this.pauseScreen?.setResumeMode();
@@ -175,15 +250,37 @@ export class Game {
 
   /** Applies settings live and stores them. */
   private applySettings(settings: Settings): void {
+    this.useSettings(settings);
+    saveSettings(browserStorage(), settings);
+  }
+
+  private useSettings(settings: Settings): void {
     this.settings = settings;
     this.renderer.setFov(settings.fov);
     this.renderer.setRenderDistance(settings.renderDistance);
     this.chunkManager.setRadius(settings.renderDistance);
     if (this.chunkManager.pending > 0) this.framesSinceIdle = 0;
-    saveSettings(browserStorage(), settings);
+  }
+
+  private setDebugVisible(visible: boolean): void {
+    this.debug.setVisible(visible);
+    this.pauseScreen?.setDebugChecked(visible);
+  }
+
+  /** Touch mode is played in landscape only. Test mode has a fixed view and no menu. */
+  private isPortrait(): boolean {
+    return this.mode === 'touch' && !this.params.test && window.innerHeight > window.innerWidth;
+  }
+
+  /** Shows the rotate hint while the device is upright and pauses the game for it. */
+  private updateOrientation(): void {
+    const portrait = this.isPortrait();
+    this.touchHud?.setRotateVisible(portrait);
+    if (portrait && !this.paused) this.setPaused(true);
   }
 
   private resize(): void {
+    this.updateOrientation();
     if (this.params.test) {
       // Fixed logical resolution so screenshots do not depend on the window.
       this.root.style.width = `${TEST_VIEW_WIDTH}px`;
@@ -221,6 +318,10 @@ export class Game {
     if (!this.paused) {
       const look = this.input.consumeLook();
       this.applyLookPixels(look.dx, look.dy);
+      if (this.touch) {
+        const drag = this.touch.tracker.consumeLook();
+        this.applyTouchLook(drag.dx, drag.dy);
+      }
     }
 
     this.updateChunks();
@@ -317,9 +418,10 @@ export class Game {
 
   private readMoveInput(): MoveInput {
     const input = this.input;
+    const axes = input.moveAxes();
     return {
-      forward: (input.isHeld('forward') ? 1 : 0) - (input.isHeld('back') ? 1 : 0),
-      strafe: (input.isHeld('right') ? 1 : 0) - (input.isHeld('left') ? 1 : 0),
+      forward: axes.forward,
+      strafe: axes.strafe,
       jump: input.isHeld('jump'),
       sprint: input.isHeld('sprint'),
       descend: input.isHeld('descend'),
@@ -347,7 +449,11 @@ export class Game {
         this.selectSlot(this.selectedSlot + action.direction);
         break;
       case 'toggleDebug':
-        this.debug.toggle();
+        this.setDebugVisible(!this.debug.visible);
+        break;
+      case 'menu':
+        // Test mode has no menu to come back from.
+        if (this.pauseScreen) this.setPaused(true);
         break;
     }
   }
@@ -356,6 +462,13 @@ export class Game {
   private applyLookPixels(dx: number, dy: number): void {
     if (dx === 0 && dy === 0) return;
     const scale = LOOK_RADIANS_PER_PIXEL * this.settings.mouseSensitivity;
+    applyLook(this.player, -dx * scale, -dy * scale);
+  }
+
+  /** A touch drag in CSS pixels → rotation, with the same signs as the mouse. */
+  private applyTouchLook(dx: number, dy: number): void {
+    if (dx === 0 && dy === 0) return;
+    const scale = TOUCH_LOOK_RADIANS_PER_PIXEL * this.settings.touchSensitivity;
     applyLook(this.player, -dx * scale, -dy * scale);
   }
 
@@ -378,6 +491,10 @@ export class Game {
     this.hud.setUnderwater(underwater);
     this.renderer.setEnvironment(this.time, underwater);
     this.renderer.render();
+    if (this.touchHud && this.touch) {
+      this.touchHud.setStick(this.touch.tracker.stick);
+      this.touchHud.setFlying(p.mode === 'fly');
+    }
     if (this.debug.visible) this.updateDebug();
   }
 
@@ -429,6 +546,7 @@ export class Game {
       seed: this.params.seed,
       time: this.time,
       paused: this.paused,
+      touch: this.mode === 'touch',
       player: {
         x: p.x,
         y: p.y,
@@ -450,6 +568,8 @@ export class Game {
         triangles: stats.triangles,
         geometries: stats.geometries,
         fov: this.renderer.fov,
+        pixelRatio: this.renderer.pixelRatio,
+        renderDistance: this.settings.renderDistance,
       },
       selectedSlot: this.selectedSlot,
       target: this.target

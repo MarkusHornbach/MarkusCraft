@@ -6,8 +6,13 @@ import {
   MOUSE_SENSITIVITY_MIN,
   RENDER_DISTANCE_MAX,
   RENDER_DISTANCE_MIN,
+  TOUCH_SENSITIVITY_MAX,
+  TOUCH_SENSITIVITY_MIN,
 } from '../game/config';
 import type { Settings } from './settings';
+
+/** How the game is controlled: mouse and keyboard, or the on-screen touch controls. */
+export type InputMode = 'mouse' | 'touch';
 
 const CONTROLS: readonly [string, string][] = [
   ['Mouse', 'Look around'],
@@ -23,11 +28,30 @@ const CONTROLS: readonly [string, string][] = [
   ['Esc', 'Pause'],
 ];
 
+const TOUCH_CONTROLS: readonly [string, string][] = [
+  ['Left thumb', 'Move with the stick (push far to sprint)'],
+  ['Drag right side', 'Look around'],
+  ['Break / Place', 'Break or place a block at the crosshair'],
+  ['Up', 'Jump / swim up / fly up'],
+  ['Down', 'Fly down'],
+  ['Fly', 'Toggle fly mode'],
+  ['Block bar', 'Tap a block to select it'],
+  ['Menu', 'Pause and open this menu'],
+];
+
 export interface PauseScreenOptions {
   seed: number;
   settings: Settings;
-  onPlay: () => void;
+  mode: InputMode;
+  /** `via` tells how the play button was activated; null if that is unknown (keyboard). */
+  onPlay: (via: InputMode | null) => void;
   onSettingsChange: (settings: Settings) => void;
+  onDebugChange: (visible: boolean) => void;
+}
+
+interface SliderHandle {
+  row: HTMLElement;
+  set: (value: number) => void;
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -48,20 +72,39 @@ export function worldLink(seed: number): string {
 
 export class PauseScreen {
   readonly element: HTMLElement;
-  private readonly settings: Settings;
+  private settings: Settings;
   private readonly hint: HTMLElement;
   private readonly playButton: HTMLButtonElement;
+  private readonly controlsList: HTMLElement;
+  private readonly sliders: Record<keyof Settings, SliderHandle>;
+  /** Parts of the menu that only exist for touch mode. */
+  private readonly touchOnly: HTMLElement[] = [];
+  private readonly debugSwitch: HTMLInputElement;
+  private readonly fullscreenButton: HTMLButtonElement;
+  private readonly worldSection: HTMLElement;
+  private mode: InputMode;
+  private resumed = false;
 
   constructor(parent: HTMLElement, options: PauseScreenOptions) {
     this.settings = { ...options.settings };
+    this.mode = options.mode;
     this.element = element('div', 'pause-screen');
     const panel = element('div', 'pause-panel');
     this.element.appendChild(panel);
 
     panel.appendChild(element('h1', 'pause-title', 'MarkusCraft'));
-    this.playButton = element('button', 'play-button', 'Click to play');
+    this.playButton = element('button', 'play-button');
     this.playButton.type = 'button';
-    this.playButton.addEventListener('click', () => options.onPlay());
+    // Not every browser reports the pointer type on `click`; remember it from the press.
+    let pressedWith = '';
+    this.playButton.addEventListener('pointerdown', (e) => {
+      pressedWith = e.pointerType;
+    });
+    this.playButton.addEventListener('click', (e) => {
+      const type = (e as PointerEvent).pointerType || pressedWith;
+      pressedWith = '';
+      options.onPlay(type === 'touch' ? 'touch' : type === 'mouse' ? 'mouse' : null);
+    });
     panel.appendChild(this.playButton);
     this.hint = element('div', 'pause-hint');
     panel.appendChild(this.hint);
@@ -71,12 +114,8 @@ export class PauseScreen {
 
     const controls = element('section', 'pause-section');
     controls.appendChild(element('h2', 'pause-heading', 'Controls'));
-    const list = element('dl', 'controls-list');
-    for (const [input, action] of CONTROLS) {
-      list.appendChild(element('dt', 'control-input', input));
-      list.appendChild(element('dd', 'control-action', action));
-    }
-    controls.appendChild(list);
+    this.controlsList = element('dl', 'controls-list');
+    controls.appendChild(this.controlsList);
     columns.appendChild(controls);
 
     const right = element('div', 'pause-right');
@@ -85,51 +124,74 @@ export class PauseScreen {
     const settings = element('section', 'pause-section');
     settings.appendChild(element('h2', 'pause-heading', 'Settings'));
     const change = (): void => options.onSettingsChange({ ...this.settings });
-    settings.appendChild(
-      this.slider({
-        id: 'setting-render-distance',
-        label: 'Render distance',
-        min: RENDER_DISTANCE_MIN,
-        max: RENDER_DISTANCE_MAX,
-        step: 1,
-        value: this.settings.renderDistance,
-        format: (v) => `${v} chunks`,
-        apply: (v) => {
-          this.settings.renderDistance = v;
-          change();
-        },
-      }),
+    const renderDistance = this.slider({
+      id: 'setting-render-distance',
+      label: 'Render distance',
+      min: RENDER_DISTANCE_MIN,
+      max: RENDER_DISTANCE_MAX,
+      step: 1,
+      value: this.settings.renderDistance,
+      format: (v) => `${v} chunks`,
+      apply: (v) => {
+        this.settings.renderDistance = v;
+        change();
+      },
+    });
+    const mouseSensitivity = this.slider({
+      id: 'setting-sensitivity',
+      label: 'Mouse sensitivity',
+      min: MOUSE_SENSITIVITY_MIN,
+      max: MOUSE_SENSITIVITY_MAX,
+      step: 0.1,
+      value: this.settings.mouseSensitivity,
+      format: (v) => `${v.toFixed(1)}×`,
+      apply: (v) => {
+        this.settings.mouseSensitivity = v;
+        change();
+      },
+    });
+    const touchSensitivity = this.slider({
+      id: 'setting-touch-sensitivity',
+      label: 'Touch sensitivity',
+      min: TOUCH_SENSITIVITY_MIN,
+      max: TOUCH_SENSITIVITY_MAX,
+      step: 0.1,
+      value: this.settings.touchSensitivity,
+      format: (v) => `${v.toFixed(1)}×`,
+      apply: (v) => {
+        this.settings.touchSensitivity = v;
+        change();
+      },
+    });
+    const fov = this.slider({
+      id: 'setting-fov',
+      label: 'Field of view',
+      min: FOV_MIN,
+      max: FOV_MAX,
+      step: 1,
+      value: this.settings.fov,
+      format: (v) => `${v}°`,
+      apply: (v) => {
+        this.settings.fov = v;
+        change();
+      },
+    });
+    this.sliders = { renderDistance, mouseSensitivity, touchSensitivity, fov };
+    settings.append(renderDistance.row, mouseSensitivity.row, touchSensitivity.row, fov.row);
+
+    // Touch devices have no F3 key; this switch replaces it.
+    const debugRow = element('label', 'setting-row switch-row');
+    debugRow.htmlFor = 'setting-debug';
+    debugRow.appendChild(element('span', 'setting-label', 'Debug overlay'));
+    this.debugSwitch = element('input', 'setting-switch');
+    this.debugSwitch.type = 'checkbox';
+    this.debugSwitch.id = 'setting-debug';
+    this.debugSwitch.addEventListener('change', () =>
+      options.onDebugChange(this.debugSwitch.checked),
     );
-    settings.appendChild(
-      this.slider({
-        id: 'setting-sensitivity',
-        label: 'Mouse sensitivity',
-        min: MOUSE_SENSITIVITY_MIN,
-        max: MOUSE_SENSITIVITY_MAX,
-        step: 0.1,
-        value: this.settings.mouseSensitivity,
-        format: (v) => `${v.toFixed(1)}×`,
-        apply: (v) => {
-          this.settings.mouseSensitivity = v;
-          change();
-        },
-      }),
-    );
-    settings.appendChild(
-      this.slider({
-        id: 'setting-fov',
-        label: 'Field of view',
-        min: FOV_MIN,
-        max: FOV_MAX,
-        step: 1,
-        value: this.settings.fov,
-        format: (v) => `${v}°`,
-        apply: (v) => {
-          this.settings.fov = v;
-          change();
-        },
-      }),
-    );
+    debugRow.appendChild(this.debugSwitch);
+    settings.appendChild(debugRow);
+    this.touchOnly.push(debugRow);
     right.appendChild(settings);
 
     const world = element('section', 'pause-section');
@@ -150,9 +212,53 @@ export class PauseScreen {
       void this.copyLink(link, copy);
     });
     world.appendChild(copy);
+    this.fullscreenButton = element('button', 'fullscreen-button', 'Fullscreen');
+    this.fullscreenButton.type = 'button';
+    this.fullscreenButton.addEventListener('click', () => {
+      void this.toggleFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => this.updateFullscreenLabel());
+    this.worldSection = world;
     right.appendChild(world);
 
     parent.appendChild(this.element);
+    this.setMode(options.mode);
+  }
+
+  /** Adapts the labels, the controls list and the settings to the input mode. */
+  setMode(mode: InputMode): void {
+    this.mode = mode;
+    const touch = mode === 'touch';
+    this.updatePlayLabel();
+    this.controlsList.replaceChildren();
+    for (const [input, action] of touch ? TOUCH_CONTROLS : CONTROLS) {
+      this.controlsList.appendChild(element('dt', 'control-input', input));
+      this.controlsList.appendChild(element('dd', 'control-action', action));
+    }
+    // Parts that do not apply are taken out of the document, not just hidden.
+    const place = (node: HTMLElement, parent: HTMLElement, before: Node | null, on: boolean) => {
+      if (on) parent.insertBefore(node, before);
+      else node.remove();
+    };
+    const settings = this.sliders.fov.row.parentElement;
+    if (settings) {
+      place(this.sliders.mouseSensitivity.row, settings, this.sliders.fov.row, !touch);
+      place(this.sliders.touchSensitivity.row, settings, this.sliders.fov.row, touch);
+      for (const node of this.touchOnly) place(node, settings, null, touch);
+    }
+    place(this.fullscreenButton, this.worldSection, null, touch);
+  }
+
+  /** Shows other settings than the player chose, e.g. the defaults of another mode. */
+  setSettings(settings: Settings): void {
+    this.settings = { ...settings };
+    for (const key of Object.keys(this.sliders) as (keyof Settings)[]) {
+      this.sliders[key].set(settings[key]);
+    }
+  }
+
+  setDebugChecked(checked: boolean): void {
+    this.debugSwitch.checked = checked;
   }
 
   setVisible(visible: boolean): void {
@@ -161,12 +267,35 @@ export class PauseScreen {
 
   /** After the first start the same screen serves as the pause screen. */
   setResumeMode(): void {
-    this.playButton.textContent = 'Click to continue';
+    this.resumed = true;
+    this.updatePlayLabel();
+  }
+
+  private updatePlayLabel(): void {
+    const verb = this.mode === 'touch' ? 'Tap' : 'Click';
+    this.playButton.textContent = `${verb} to ${this.resumed ? 'continue' : 'play'}`;
   }
 
   /** Shows a short message under the play button (empty string clears it). */
   setHint(text: string): void {
     this.hint.textContent = text;
+  }
+
+  /** Enters or leaves fullscreen; browsers allow this only from a tap or click. */
+  private async toggleFullscreen(): Promise<void> {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      // Some browsers (e.g. on phones of other makers) have no fullscreen for pages.
+      this.setHint('Fullscreen is not available in this browser.');
+    }
+  }
+
+  private updateFullscreenLabel(): void {
+    this.fullscreenButton.textContent = document.fullscreenElement
+      ? 'Exit fullscreen'
+      : 'Fullscreen';
   }
 
   private async copyLink(link: HTMLInputElement, button: HTMLButtonElement): Promise<void> {
@@ -193,7 +322,7 @@ export class PauseScreen {
     value: number;
     format: (value: number) => string;
     apply: (value: number) => void;
-  }): HTMLElement {
+  }): SliderHandle {
     const row = element('label', 'setting-row');
     row.htmlFor = config.id;
     row.appendChild(element('span', 'setting-label', config.label));
@@ -211,6 +340,12 @@ export class PauseScreen {
       config.apply(v);
     });
     row.append(input, value);
-    return row;
+    return {
+      row,
+      set: (v) => {
+        input.value = String(v);
+        value.textContent = config.format(v);
+      },
+    };
   }
 }

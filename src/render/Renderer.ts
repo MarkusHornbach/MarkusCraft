@@ -37,8 +37,8 @@ export interface CameraPose {
 export interface RendererOptions {
   /** Test mode: keep the drawing buffer so screenshots and pixel reads are reliable. */
   preserveDrawingBuffer: boolean;
-  /** Fixed pixel ratio, or null to follow the device (capped at 2). */
-  pixelRatio: number | null;
+  /** Device pixels per CSS pixel to render at. */
+  pixelRatio: number;
 }
 
 /** True if the browser can create a WebGL2 context. */
@@ -72,7 +72,7 @@ export class Renderer {
       preserveDrawingBuffer: options.preserveDrawingBuffer,
       powerPreference: 'high-performance',
     });
-    this.webgl.setPixelRatio(options.pixelRatio ?? Math.min(window.devicePixelRatio, 2));
+    this.webgl.setPixelRatio(options.pixelRatio);
     this.camera = new THREE.PerspectiveCamera(FOV_DEFAULT, 16 / 9, 0.1, 2000);
     this.camera.rotation.order = 'YXZ';
     this.atlas = buildAtlas();
@@ -102,6 +102,15 @@ export class Renderer {
     this.webgl.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+  }
+
+  /** Changes the pixel ratio; call `setSize` afterwards to resize the drawing buffer. */
+  setPixelRatio(ratio: number): void {
+    this.webgl.setPixelRatio(ratio);
+  }
+
+  get pixelRatio(): number {
+    return this.webgl.getPixelRatio();
   }
 
   setFov(fov: number): void {

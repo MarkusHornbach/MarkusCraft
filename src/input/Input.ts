@@ -1,5 +1,6 @@
 // Input: one abstraction over keyboard, mouse and pointer lock. Exposes state ("is
 // move-forward held", "look delta since last frame") and reports discrete presses.
+// Touch controls feed the same state through `setHeld`, `setMove` and `press`.
 import { HOTBAR_SLOTS } from '../game/config';
 
 export type HeldAction =
@@ -8,6 +9,7 @@ export type HeldAction =
 export type PressAction =
   | { type: 'toggleFly' }
   | { type: 'toggleDebug' }
+  | { type: 'menu' }
   | { type: 'break' }
   | { type: 'place' }
   | { type: 'selectSlot'; slot: number }
@@ -38,6 +40,9 @@ export class Input {
   private readonly held = new Set<HeldAction>();
   private lookX = 0;
   private lookY = 0;
+  private analogForward = 0;
+  private analogStrafe = 0;
+  private mouseEnabled = true;
   private readonly element: HTMLElement;
   private readonly isActive: () => boolean;
   private readonly onPress: (action: PressAction) => void;
@@ -62,9 +67,44 @@ export class Input {
     return this.held.has(action);
   }
 
+  /** Sets or clears a held action from another source (touch buttons, the stick). */
+  setHeld(action: HeldAction, held: boolean): void {
+    if (!held) this.held.delete(action);
+    else if (this.isActive()) this.held.add(action);
+  }
+
+  /** Analog movement from the touch stick, each axis in [-1, 1]. */
+  setMove(forward: number, strafe: number): void {
+    const active = this.isActive();
+    this.analogForward = active ? forward : 0;
+    this.analogStrafe = active ? strafe : 0;
+  }
+
+  /** Reports a discrete press from another source (touch buttons). */
+  press(action: PressAction): void {
+    if (this.isActive()) this.onPress(action);
+  }
+
+  /** Movement axes in [-1, 1]: keys and the analog stick combined. */
+  moveAxes(): { forward: number; strafe: number } {
+    const keysForward = (this.held.has('forward') ? 1 : 0) - (this.held.has('back') ? 1 : 0);
+    const keysStrafe = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0);
+    return {
+      forward: Math.max(-1, Math.min(1, keysForward + this.analogForward)),
+      strafe: Math.max(-1, Math.min(1, keysStrafe + this.analogStrafe)),
+    };
+  }
+
+  /** In touch mode the mouse buttons are ignored; fingers act through the touch source. */
+  setMouseEnabled(enabled: boolean): void {
+    this.mouseEnabled = enabled;
+  }
+
   /** Forgets all held keys and pending look movement (used when the game pauses). */
   reset(): void {
     this.held.clear();
+    this.analogForward = 0;
+    this.analogStrafe = 0;
     this.lookX = 0;
     this.lookY = 0;
   }
@@ -111,7 +151,7 @@ export class Input {
   }
 
   private onMouseDown(e: MouseEvent): void {
-    if (!this.isActive()) return;
+    if (!this.isActive() || !this.mouseEnabled) return;
     const action = MOUSE_HELD[e.button];
     if (!action) return;
     e.preventDefault();

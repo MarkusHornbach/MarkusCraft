@@ -9,6 +9,8 @@ export interface OpenOptions {
   time?: number;
   freeze?: boolean;
   test?: boolean;
+  /** Force touch mode (`touch=1`). */
+  touch?: boolean;
 }
 
 export function gameUrl(options: OpenOptions = {}): string {
@@ -17,6 +19,7 @@ export function gameUrl(options: OpenOptions = {}): string {
   query.set('seed', String(options.seed ?? SEED));
   query.set('time', String(options.time ?? 0.25));
   if (options.freeze ?? true) query.set('freeze', '1');
+  if (options.touch) query.set('touch', '1');
   return `/?${query.toString()}`;
 }
 

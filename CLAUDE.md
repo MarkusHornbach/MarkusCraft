@@ -87,13 +87,16 @@ src/
     generation/      terrain.ts, trees.ts, spawn.ts
     meshing/         mesher.ts (pure: block data in, typed arrays out), atlasLayout.ts
   player/            player.ts (state), physics.ts, interaction.ts (break/place rules)
-  input/             Input.ts: keyboard/mouse/pointer-lock abstraction
+  input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch as well
+                     TouchTracker.ts (pure: finger events → stick, look, buttons),
+                     TouchControls.ts (pointer events of fingers → TouchTracker → Input)
   render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts
     textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts
-  ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, PauseScreen.ts, settings.ts, ui.css
+  ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, PauseScreen.ts, settings.ts, ui.css,
+                     TouchHud.ts (on-screen stick and buttons, rotate hint)
   util/              rng.ts, noise.ts, math.ts
   testing/           timing.ts (helpers for unit tests only)
-e2e/                 Playwright tests, fixtures.ts, game.ts and helpers.ts, screenshots/
+e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, screenshots/
 scripts/             dev tools: shot.mjs, atlasPreview.ts, terrainStats.ts, perf.ts
 docs/                phase plans and phase reports
 .github/workflows/   ci.yml, deploy.yml
@@ -109,6 +112,14 @@ under coverage, which distorts timings. CI runs both.
   touch the DOM (enforced by an ESLint `no-restricted-imports` rule). They are tested in
   Node. Only `render/`, `ui/`, `input/` and `game/` may use Three.js and browser APIs.
   The same rule covers `render/textures/tiles.ts`. The core may import `game/config.ts`.
+  `input/TouchTracker.ts` follows the same discipline (no DOM, unit-tested in Node, in the
+  coverage scope) although it lives in `input/`.
+- **Mouse mode and touch mode.** `Game` runs in one of two input modes. Touch mode has the
+  on-screen controls, no pointer lock, a pixel ratio capped at 1.5 and a default render
+  distance of 5. The play button selects the mode by the pointer type that activated it;
+  phones and tablets (`pointer: coarse`) start in touch mode; `touch=1` forces it. The
+  touch controls exist in the document only in touch mode. Game logic never asks for the
+  mode: both feed `Input`.
 - **Determinism.** No `Math.random()` and no `Date.now()` in `world/`, `player/`, `util/`
   or texture generation. Randomness comes from the seeded RNG; time comes in as a parameter.
   The same seed must always produce the same world and the same textures.
@@ -148,12 +159,20 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
 (section "Test strategy"). In short:
 
 - `?seed=<int>` fixes the world, `?time=<0..1>` sets the time of day, `?freeze=1` stops
-  the clock, `?test=1` runs without pointer lock and with fixed settings.
+  the clock, `?test=1` runs without pointer lock and with fixed settings, `?touch=1`
+  forces touch mode (shows the touch controls without a touch on the play button).
 - In test mode the simulation only advances through `__mc.step(n)`; rendering and chunk
   loading keep running. Tests without `test=1` cover the start screen and the real loop.
 - Tests wait on game state (`__mc.isReady()`, `__mc.whenIdle()`), never on fixed sleeps.
 - `e2e/game.ts` opens the game and wraps the test API; `e2e/helpers.ts` measures pixels;
   `e2e/fixtures.ts` fails any test whose page logs a console error or warning.
+- **Touch tests** run in contexts with `hasTouch` and `isMobile` (`test.use(TOUCH_DEVICE)`
+  from `e2e/touch.ts`). `Fingers` sends several fingers through the DevTools protocol
+  (`touchDown`, `touchMove`, `touchUp` with a finger id) and returns only once the page has
+  seen the event; Chromium delivers touch moves with its next frame. Behaviour tests use
+  `openTouchGame` (`test=1&touch=1`, fixed 960 × 540 view); layout tests run without
+  `test=1` at 640 × 360 and 1280 × 800. A look drag is applied by the next rendered frame:
+  wait with `whenIdle` before reading the angles.
 - Every visual feature gets both a rule-based assertion (measurable pixel or state facts)
   and, where useful, a reference screenshot comparison (`e2e/screenshots/`).
 - After changing anything visual, the implementing session must also open the produced
@@ -182,7 +201,8 @@ hold:
 
 - Phase 1: implemented (report: `docs/phase-1-report.md`). Read its "Decisions and
   deviations" before changing world, meshing, physics or the test API.
-- Phase 2: planned (`docs/phase-2-plan.md`) in two parts, A touch controls and B
-  multiplayer; neither is implemented yet. Part B starts only after Part A is merged.
-  Persistence moved to Phase 3.
+- Phase 2 part A (touch controls): implemented (report: `docs/phase-2a-report.md`). Read
+  its "Decisions and deviations" before changing input, the menu or the touch tests.
+- Phase 2 part B (multiplayer): planned (`docs/phase-2-plan.md`), not implemented. It
+  starts only after Part A is merged. Persistence moved to Phase 3.
 - Phases 3 and 4: not yet planned.

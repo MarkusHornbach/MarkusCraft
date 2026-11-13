@@ -8,6 +8,8 @@ export interface GameParams {
   time: number;
   freeze: boolean;
   test: boolean;
+  /** Forces touch mode: the touch controls are shown from the start. */
+  touch: boolean;
 }
 
 /** Parses the query string. `randomSeed` supplies the seed when the URL has none. */
@@ -30,5 +32,6 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
     time,
     freeze: query.get('freeze') === '1',
     test: query.get('test') === '1',
+    touch: query.get('touch') === '1',
   };
 }

@@ -5,6 +5,13 @@ body {
   height: 100%;
   overflow: hidden;
   background: #000;
+  /* Fingers belong to the game: no page zoom, scrolling, pull-to-refresh or selection. */
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   font-family:
     system-ui,
     -apple-system,
@@ -22,6 +29,8 @@ canvas {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  /* Fingers control the game: the browser must not pan, zoom or cancel the touches. */
+  touch-action: none;
 }
 
 .game-canvas {
@@ -196,9 +205,9 @@ canvas {
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: auto;
+  /* A menu taller than the screen can be scrolled with a finger. */
+  touch-action: pan-y;
   background: rgba(14, 20, 32, 0.72);
   color: #eef2f6;
 }
@@ -209,6 +218,8 @@ canvas {
 
 .pause-panel {
   width: min(760px, calc(100% - 32px));
+  /* Centres the panel; unlike flex centring, a too tall panel stays reachable at the top. */
+  margin: auto;
   padding: 14px 24px 16px;
   box-sizing: border-box;
   border-radius: 14px;
@@ -337,7 +348,8 @@ canvas {
   background: rgba(0, 0, 0, 0.25);
 }
 
-.copy-link-button {
+.copy-link-button,
+.fullscreen-button {
   padding: 5px 12px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
@@ -348,6 +360,241 @@ canvas {
   cursor: pointer;
 }
 
-.copy-link-button:hover {
+.copy-link-button:hover,
+.fullscreen-button:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Touch mode: on-screen controls. The container lets touches through to the canvas;
+   only the buttons take them. */
+.touch-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.touch-hud.hidden {
+  display: none;
+}
+
+.touch-mode {
+  /* Button size and gap. */
+  --touch-size: clamp(48px, 15vmin, 88px);
+  --touch-gap: 8px;
+  /* Height the block bar takes at the bottom, including its margin. */
+  --bar-clear: 72px;
+}
+
+.touch-button {
+  position: absolute;
+  width: var(--touch-size);
+  height: var(--touch-size);
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 22%;
+  background: rgba(20, 24, 32, 0.45);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-button.active {
+  border-color: #ffffff;
+  background: rgba(127, 209, 90, 0.6);
+}
+
+.touch-symbol {
+  position: absolute;
+  left: 20%;
+  top: 20%;
+  width: 60%;
+  height: 60%;
+  pointer-events: none;
+}
+
+.touch-menu {
+  left: var(--touch-gap);
+  top: var(--touch-gap);
+}
+
+/* Right edge, top to bottom: fly, then up above down. */
+.touch-fly {
+  right: var(--touch-gap);
+  top: var(--touch-gap);
+}
+
+.touch-up {
+  right: var(--touch-gap);
+  bottom: calc(var(--touch-size) + 2 * var(--touch-gap));
+}
+
+.touch-down {
+  right: var(--touch-gap);
+  bottom: var(--touch-gap);
+}
+
+/* Left of them, above the block bar: place low, break a little higher. */
+.touch-break {
+  right: calc(var(--touch-size) + 2 * var(--touch-gap));
+  bottom: calc(var(--bar-clear) + 0.6 * var(--touch-size));
+}
+
+.touch-place {
+  right: calc(2 * var(--touch-size) + 3 * var(--touch-gap));
+  bottom: var(--bar-clear);
+}
+
+/* In touch mode the block bar takes taps and its slots are finger-sized. */
+.touch-mode .hotbar {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-mode .hotbar-slot {
+  width: 48px;
+  height: 48px;
+}
+
+.touch-stick {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  background: rgba(20, 24, 32, 0.3);
+  display: none;
+}
+
+.touch-stick.visible {
+  display: block;
+}
+
+.touch-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.rotate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  color: #eef2f6;
+  background: #1c2430;
+  font-size: 18px;
+  text-align: center;
+}
+
+.rotate-overlay.visible {
+  display: flex;
+}
+
+/* A phone outline lying on its side. */
+.rotate-device {
+  width: 96px;
+  height: 54px;
+  box-sizing: border-box;
+  border: 4px solid #ffffff;
+  border-radius: 10px;
+}
+
+.touch-mode .debug-overlay {
+  left: calc(var(--touch-size) + 2 * var(--touch-gap));
+}
+
+.switch-row {
+  grid-template-columns: 120px 1fr;
+}
+
+.setting-switch {
+  justify-self: end;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: #7fd15a;
+}
+
+.seed-link {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Touch mode: menu buttons are finger-sized. */
+.touch-mode .play-button,
+.touch-mode .copy-link-button,
+.touch-mode .fullscreen-button {
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.touch-mode .fullscreen-button {
+  margin-left: 8px;
+}
+
+.touch-mode .setting-row {
+  min-height: 30px;
+}
+
+/* Phones in landscape: everything has to fit into about 360 px of height. */
+@media (max-height: 480px) {
+  .touch-mode .pause-panel {
+    width: calc(100% - 16px);
+    padding: 6px 14px 8px;
+  }
+
+  .touch-mode .pause-title {
+    margin-bottom: 4px;
+    font-size: 20px;
+    text-shadow: 0 2px 0 #2f7d3a;
+  }
+
+  .touch-mode .play-button {
+    padding: 0 34px;
+  }
+
+  .touch-mode .pause-hint {
+    min-height: 0;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .touch-mode .pause-columns {
+    gap: 16px;
+  }
+
+  .touch-mode .pause-right {
+    gap: 6px;
+  }
+
+  .touch-mode .pause-heading {
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+
+  .touch-mode .controls-list {
+    font-size: 12px;
+  }
+
+  .touch-mode .setting-row {
+    min-height: 26px;
+    margin-bottom: 2px;
+  }
+
+  /* The link field needs a keyboard to be of use; the copy button does the job. */
+  .touch-mode .seed-link {
+    display: none;
+  }
 }

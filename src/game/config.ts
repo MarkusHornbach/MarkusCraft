@@ -81,3 +81,21 @@ export const TEST_VIEW_WIDTH = 960;
 export const TEST_VIEW_HEIGHT = 540;
 
 export const SETTINGS_STORAGE_KEY = 'markuscraft.settings.v1';
+
+/** Stick deflection (0..1) below which the player does not move. */
+export const TOUCH_STICK_DEADZONE = 0.15;
+/** Finger travel in CSS pixels for full stick deflection. */
+export const TOUCH_STICK_RADIUS = 60;
+/** Stick deflection beyond which the player sprints. */
+export const TOUCH_SPRINT_THRESHOLD = 0.9;
+/** The stick can start in the left half of the view, below this fraction of its height. */
+export const TOUCH_STICK_ZONE_TOP = 0.3;
+/** Radians of rotation per CSS pixel of a look drag at touch sensitivity 1. */
+export const TOUCH_LOOK_RADIANS_PER_PIXEL = 0.004;
+export const TOUCH_SENSITIVITY_DEFAULT = 1;
+export const TOUCH_SENSITIVITY_MIN = 0.2;
+export const TOUCH_SENSITIVITY_MAX = 3;
+/** Render distance in touch mode while no setting is stored. */
+export const TOUCH_RENDER_DISTANCE_DEFAULT = 5;
+export const PIXEL_RATIO_MAX = 2;
+export const TOUCH_PIXEL_RATIO_MAX = 1.5;
