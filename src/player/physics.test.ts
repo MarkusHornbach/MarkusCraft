@@ -177,6 +177,37 @@ describe('walking (AC8.2, AC8.4, AC8.8)', () => {
   });
 });
 
+describe('analog movement (Phase 2 AC1.1)', () => {
+  it('scales the walking speed with the stick deflection', () => {
+    const world = new TestWorld(0);
+    for (const [deflection, expected] of [
+      [0.5, 0.5 * WALK_SPEED],
+      [0.25, 0.25 * WALK_SPEED],
+      [1, WALK_SPEED],
+    ]) {
+      const p = standing(world);
+      run(p, world, 60, { ...NO_INPUT, forward: deflection });
+      const speed = Math.hypot(p.vx, p.vz);
+      // Half deflection gives 50 % ± 10 % of the walking speed.
+      expect(speed).toBeGreaterThan(expected - 0.1 * WALK_SPEED);
+      expect(speed).toBeLessThan(expected + 0.1 * WALK_SPEED);
+      expect(speed).toBeCloseTo(expected, 6);
+    }
+  });
+
+  it('moves along the analog direction and never faster than full deflection', () => {
+    const world = new TestWorld(0);
+    const p = standing(world);
+    run(p, world, 60, { ...NO_INPUT, forward: 0.3, strafe: 0.4 });
+    // Yaw 0 looks towards -Z; strafing right is +X.
+    expect(p.vx).toBeCloseTo(0.4 * WALK_SPEED, 6);
+    expect(p.vz).toBeCloseTo(-0.3 * WALK_SPEED, 6);
+    const q = standing(world);
+    run(q, world, 60, { ...NO_INPUT, forward: 1, strafe: 1 });
+    expect(Math.hypot(q.vx, q.vz)).toBeCloseTo(WALK_SPEED, 6);
+  });
+});
+
 describe('jumping (AC8.3)', () => {
   it('peaks between 1.1 and 1.4 blocks', () => {
     const world = new TestWorld(0);

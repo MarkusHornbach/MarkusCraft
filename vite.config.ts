@@ -16,7 +16,13 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/world/**', 'src/player/**', 'src/util/**', 'src/render/textures/tiles.ts'],
+      include: [
+        'src/world/**',
+        'src/player/**',
+        'src/util/**',
+        'src/render/textures/tiles.ts',
+        'src/input/TouchTracker.ts',
+      ],
       exclude: ['**/*.test.ts'],
       thresholds: { lines: 85 },
       reporter: ['text-summary', 'html'],

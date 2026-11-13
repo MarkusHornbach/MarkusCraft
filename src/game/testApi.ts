@@ -15,6 +15,8 @@ export interface GameState {
   seed: number;
   time: number;
   paused: boolean;
+  /** True in touch mode (touch controls shown), false in mouse mode. */
+  touch: boolean;
   player: {
     x: number;
     y: number;
@@ -36,7 +38,16 @@ export interface GameState {
     /** All chunks with block data in memory. */
     generated: number;
   };
-  render: { drawCalls: number; triangles: number; geometries: number; fov: number };
+  render: {
+    drawCalls: number;
+    triangles: number;
+    geometries: number;
+    fov: number;
+    /** Device pixels per CSS pixel the renderer draws at. */
+    pixelRatio: number;
+    /** Render distance in chunks (the current setting). */
+    renderDistance: number;
+  };
   selectedSlot: number;
   target: TargetInfo | null;
 }

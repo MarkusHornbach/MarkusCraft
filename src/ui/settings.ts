@@ -10,6 +10,9 @@ import {
   RENDER_DISTANCE_MAX,
   RENDER_DISTANCE_MIN,
   SETTINGS_STORAGE_KEY,
+  TOUCH_SENSITIVITY_DEFAULT,
+  TOUCH_SENSITIVITY_MAX,
+  TOUCH_SENSITIVITY_MIN,
 } from '../game/config';
 
 export interface Settings {
@@ -19,12 +22,15 @@ export interface Settings {
   mouseSensitivity: number;
   /** Vertical field of view in degrees. */
   fov: number;
+  /** Multiplier on the look speed of a touch drag. */
+  touchSensitivity: number;
 }
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   renderDistance: RENDER_DISTANCE_DEFAULT,
   mouseSensitivity: MOUSE_SENSITIVITY_DEFAULT,
   fov: FOV_DEFAULT,
+  touchSensitivity: TOUCH_SENSITIVITY_DEFAULT,
 };
 
 /** The part of the Storage interface that is used; lets tests pass a fake. */
@@ -57,6 +63,12 @@ export function validateSettings(raw: unknown): Settings {
       DEFAULT_SETTINGS.mouseSensitivity,
     ),
     fov: Math.round(numberInRange(source.fov, FOV_MIN, FOV_MAX, DEFAULT_SETTINGS.fov)),
+    touchSensitivity: numberInRange(
+      source.touchSensitivity,
+      TOUCH_SENSITIVITY_MIN,
+      TOUCH_SENSITIVITY_MAX,
+      DEFAULT_SETTINGS.touchSensitivity,
+    ),
   };
 }
 
@@ -72,10 +84,25 @@ export function loadSettings(storage: SettingsStorage | null): Settings {
   }
 }
 
+/** True if settings were saved before (then they win over mode-dependent defaults). */
+export function hasStoredSettings(storage: SettingsStorage | null): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(SETTINGS_STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function saveSettings(storage: SettingsStorage | null, settings: Settings): void {
   if (!storage) return;
   try {
-    storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(validateSettings(settings)));
+    const { touchSensitivity, ...rest } = validateSettings(settings);
+    // The touch sensitivity is only written once it was changed, so the stored text of
+    // players who never used touch stays as it was before the setting existed.
+    const stored =
+      touchSensitivity === DEFAULT_SETTINGS.touchSensitivity ? rest : { ...rest, touchSensitivity };
+    storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(stored));
   } catch {
     // Storage can be full or blocked (private mode); the game works without it.
   }
