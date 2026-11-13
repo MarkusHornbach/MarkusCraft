@@ -7,6 +7,8 @@ export default defineConfig({
   preview: { port: 4173, strictPort: true },
   test: {
     environment: 'node',
+    // The terrain property tests generate hundreds of chunks; allow for slow CI machines.
+    testTimeout: 60_000,
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',

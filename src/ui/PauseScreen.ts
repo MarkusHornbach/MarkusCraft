@@ -1,0 +1,216 @@
+// Start / pause screen: title, play button, controls, settings and the world seed.
+import {
+  FOV_MAX,
+  FOV_MIN,
+  MOUSE_SENSITIVITY_MAX,
+  MOUSE_SENSITIVITY_MIN,
+  RENDER_DISTANCE_MAX,
+  RENDER_DISTANCE_MIN,
+} from '../game/config';
+import type { Settings } from './settings';
+
+const CONTROLS: readonly [string, string][] = [
+  ['Mouse', 'Look around'],
+  ['W A S D', 'Move'],
+  ['Space', 'Jump / swim up / fly up'],
+  ['Shift', 'Sprint'],
+  ['F', 'Toggle fly mode'],
+  ['C', 'Fly down'],
+  ['Left click', 'Break block'],
+  ['Right click', 'Place block'],
+  ['1–9, wheel', 'Select block'],
+  ['F3', 'Debug overlay'],
+  ['Esc', 'Pause'],
+];
+
+export interface PauseScreenOptions {
+  seed: number;
+  settings: Settings;
+  onPlay: () => void;
+  onSettingsChange: (settings: Settings) => void;
+}
+
+function element<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+  text?: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+/** Link that opens the same world again: the current address with only the seed. */
+export function worldLink(seed: number): string {
+  return `${window.location.origin}${window.location.pathname}?seed=${seed}`;
+}
+
+export class PauseScreen {
+  readonly element: HTMLElement;
+  private readonly settings: Settings;
+  private readonly hint: HTMLElement;
+  private readonly playButton: HTMLButtonElement;
+
+  constructor(parent: HTMLElement, options: PauseScreenOptions) {
+    this.settings = { ...options.settings };
+    this.element = element('div', 'pause-screen');
+    const panel = element('div', 'pause-panel');
+    this.element.appendChild(panel);
+
+    panel.appendChild(element('h1', 'pause-title', 'MarkusCraft'));
+    this.playButton = element('button', 'play-button', 'Click to play');
+    this.playButton.type = 'button';
+    this.playButton.addEventListener('click', () => options.onPlay());
+    panel.appendChild(this.playButton);
+    this.hint = element('div', 'pause-hint');
+    panel.appendChild(this.hint);
+
+    const columns = element('div', 'pause-columns');
+    panel.appendChild(columns);
+
+    const controls = element('section', 'pause-section');
+    controls.appendChild(element('h2', 'pause-heading', 'Controls'));
+    const list = element('dl', 'controls-list');
+    for (const [input, action] of CONTROLS) {
+      list.appendChild(element('dt', 'control-input', input));
+      list.appendChild(element('dd', 'control-action', action));
+    }
+    controls.appendChild(list);
+    columns.appendChild(controls);
+
+    const right = element('div', 'pause-right');
+    columns.appendChild(right);
+
+    const settings = element('section', 'pause-section');
+    settings.appendChild(element('h2', 'pause-heading', 'Settings'));
+    const change = (): void => options.onSettingsChange({ ...this.settings });
+    settings.appendChild(
+      this.slider({
+        id: 'setting-render-distance',
+        label: 'Render distance',
+        min: RENDER_DISTANCE_MIN,
+        max: RENDER_DISTANCE_MAX,
+        step: 1,
+        value: this.settings.renderDistance,
+        format: (v) => `${v} chunks`,
+        apply: (v) => {
+          this.settings.renderDistance = v;
+          change();
+        },
+      }),
+    );
+    settings.appendChild(
+      this.slider({
+        id: 'setting-sensitivity',
+        label: 'Mouse sensitivity',
+        min: MOUSE_SENSITIVITY_MIN,
+        max: MOUSE_SENSITIVITY_MAX,
+        step: 0.1,
+        value: this.settings.mouseSensitivity,
+        format: (v) => `${v.toFixed(1)}×`,
+        apply: (v) => {
+          this.settings.mouseSensitivity = v;
+          change();
+        },
+      }),
+    );
+    settings.appendChild(
+      this.slider({
+        id: 'setting-fov',
+        label: 'Field of view',
+        min: FOV_MIN,
+        max: FOV_MAX,
+        step: 1,
+        value: this.settings.fov,
+        format: (v) => `${v}°`,
+        apply: (v) => {
+          this.settings.fov = v;
+          change();
+        },
+      }),
+    );
+    right.appendChild(settings);
+
+    const world = element('section', 'pause-section');
+    world.appendChild(element('h2', 'pause-heading', 'World'));
+    const seedLine = element('div', 'seed-line');
+    seedLine.appendChild(element('span', 'seed-label', 'Seed: '));
+    seedLine.appendChild(element('span', 'seed-value', String(options.seed)));
+    world.appendChild(seedLine);
+    const link = element('input', 'seed-link');
+    link.type = 'text';
+    link.readOnly = true;
+    link.value = worldLink(options.seed);
+    link.setAttribute('aria-label', 'Link to this world');
+    world.appendChild(link);
+    const copy = element('button', 'copy-link-button', 'Copy link to this world');
+    copy.type = 'button';
+    copy.addEventListener('click', () => {
+      void this.copyLink(link, copy);
+    });
+    world.appendChild(copy);
+    right.appendChild(world);
+
+    parent.appendChild(this.element);
+  }
+
+  setVisible(visible: boolean): void {
+    this.element.classList.toggle('hidden', !visible);
+  }
+
+  /** After the first start the same screen serves as the pause screen. */
+  setResumeMode(): void {
+    this.playButton.textContent = 'Click to continue';
+  }
+
+  /** Shows a short message under the play button (empty string clears it). */
+  setHint(text: string): void {
+    this.hint.textContent = text;
+  }
+
+  private async copyLink(link: HTMLInputElement, button: HTMLButtonElement): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(link.value);
+      button.textContent = 'Link copied';
+    } catch {
+      // Clipboard access can be denied; select the text so Ctrl+C works.
+      link.focus();
+      link.select();
+      button.textContent = 'Press Ctrl+C to copy';
+    }
+    window.setTimeout(() => {
+      button.textContent = 'Copy link to this world';
+    }, 2000);
+  }
+
+  private slider(config: {
+    id: string;
+    label: string;
+    min: number;
+    max: number;
+    step: number;
+    value: number;
+    format: (value: number) => string;
+    apply: (value: number) => void;
+  }): HTMLElement {
+    const row = element('label', 'setting-row');
+    row.htmlFor = config.id;
+    row.appendChild(element('span', 'setting-label', config.label));
+    const input = element('input', 'setting-input');
+    input.type = 'range';
+    input.id = config.id;
+    input.min = String(config.min);
+    input.max = String(config.max);
+    input.step = String(config.step);
+    input.value = String(config.value);
+    const value = element('span', 'setting-value', config.format(config.value));
+    input.addEventListener('input', () => {
+      const v = Number(input.value);
+      value.textContent = config.format(v);
+      config.apply(v);
+    });
+    row.append(input, value);
+    return row;
+  }
+}
