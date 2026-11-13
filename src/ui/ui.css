@@ -367,37 +367,81 @@ canvas {
   display: none;
 }
 
+.touch-mode {
+  /* Button size and gap. */
+  --touch-size: 56px;
+  --touch-gap: 8px;
+  /* Height the block bar takes at the bottom, including its margin. */
+  --bar-clear: 72px;
+}
+
 .touch-button {
   position: absolute;
-  width: 56px;
-  height: 56px;
+  width: var(--touch-size);
+  height: var(--touch-size);
   box-sizing: border-box;
   border: 2px solid rgba(255, 255, 255, 0.45);
-  border-radius: 14px;
+  border-radius: 22%;
   background: rgba(20, 24, 32, 0.45);
   pointer-events: auto;
   touch-action: none;
 }
 
-.touch-menu {
-  left: 8px;
-  top: 8px;
+.touch-button.active {
+  border-color: #ffffff;
+  background: rgba(127, 209, 90, 0.6);
 }
 
-/* Three bars. */
-.touch-menu::before {
-  content: '';
+.touch-symbol {
   position: absolute;
-  left: 28%;
-  right: 28%;
-  top: 30%;
-  height: 8%;
-  border-radius: 2px;
-  background: #ffffff;
-  box-shadow:
-    0 0.6em 0 #ffffff,
-    0 1.2em 0 #ffffff;
-  font-size: 16px;
+  left: 20%;
+  top: 20%;
+  width: 60%;
+  height: 60%;
+  pointer-events: none;
+}
+
+.touch-menu {
+  left: var(--touch-gap);
+  top: var(--touch-gap);
+}
+
+/* Right edge, top to bottom: fly, then up above down. */
+.touch-fly {
+  right: var(--touch-gap);
+  top: var(--touch-gap);
+}
+
+.touch-up {
+  right: var(--touch-gap);
+  bottom: calc(var(--touch-size) + 2 * var(--touch-gap));
+}
+
+.touch-down {
+  right: var(--touch-gap);
+  bottom: var(--touch-gap);
+}
+
+/* Left of them, above the block bar: place low, break a little higher. */
+.touch-break {
+  right: calc(var(--touch-size) + 2 * var(--touch-gap));
+  bottom: calc(var(--bar-clear) + 0.6 * var(--touch-size));
+}
+
+.touch-place {
+  right: calc(2 * var(--touch-size) + 3 * var(--touch-gap));
+  bottom: var(--bar-clear);
+}
+
+/* In touch mode the block bar takes taps and its slots are finger-sized. */
+.touch-mode .hotbar {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-mode .hotbar-slot {
+  width: 48px;
+  height: 48px;
 }
 
 .touch-stick {
@@ -457,7 +501,7 @@ canvas {
 }
 
 .touch-mode .debug-overlay {
-  left: 72px;
+  left: calc(var(--touch-size) + 2 * var(--touch-gap));
 }
 
 .switch-row {

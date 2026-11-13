@@ -1,6 +1,18 @@
 // Touch controls in the browser (Phase 2, part A).
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { DEG, PLATFORM_Y, getState, openGame, standOnPlatform, step, whenIdle } from './game';
+import {
+  DEG,
+  PLATFORM_Y,
+  getBlock,
+  getState,
+  openGame,
+  setBlock,
+  setPlayer,
+  standOnPlatform,
+  step,
+  whenIdle,
+} from './game';
 import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame } from './touch';
 
 test.use(TOUCH_DEVICE);
@@ -188,4 +200,189 @@ test.describe('with a mouse', () => {
     await expect(page.locator('.touch-hud, [data-touch], .rotate-overlay')).toHaveCount(0);
     await expect(page.locator('#setting-touch-sensitivity, #setting-debug')).toHaveCount(0);
   });
+});
+
+const AIR = 0;
+const GRASS = 1;
+const STONE = 3;
+const BRICKS = 8;
+
+/** Puts a finger on a touch button and returns its id for lifting it again. */
+async function press(page: Page, fingers: Fingers, id: number, button: string): Promise<void> {
+  const centre = await centerOf(page, `.touch-${button}`);
+  await fingers.touchDown(id, centre.x, centre.y);
+}
+
+test('break removes the block at the crosshair, place puts the selected one (AC2.1)', async ({
+  page,
+}) => {
+  const fingers = await openTouchGame(page);
+  const { px, pz } = await standOnPlatform(page);
+  // Look down at the platform block in front of the feet.
+  await setPlayer(page, { pitch: -50 * DEG });
+  const row = (): Promise<number[]> =>
+    Promise.all([1, 2, 3, 4].map((dz) => getBlock(page, px, PLATFORM_Y, pz - dz)));
+  expect((await getState(page)).target).toMatchObject({ x: px, y: PLATFORM_Y, z: pz - 1 });
+
+  await press(page, fingers, 1, 'break');
+  await fingers.touchUp(1);
+  expect(await row()).toEqual([AIR, STONE, STONE, STONE]);
+
+  // The side of the next block is targeted now; placing fills the hole with bricks.
+  expect((await getState(page)).target).toMatchObject({ z: pz - 2, face: [0, 0, 1] });
+  const slot = await centerOf(page, '.hotbar-slot[data-slot="8"]');
+  await fingers.tap(1, slot.x, slot.y);
+  await press(page, fingers, 1, 'place');
+  await fingers.touchUp(1);
+  expect(await row()).toEqual([BRICKS, STONE, STONE, STONE]);
+
+  // Holding break repeats every 15 steps: the press and 40 steps break two blocks.
+  await press(page, fingers, 1, 'break');
+  expect(await row()).toEqual([AIR, STONE, STONE, STONE]);
+  await step(page, 40);
+  expect((await row()).filter((id) => id === AIR).length).toBeGreaterThanOrEqual(2);
+  await fingers.touchUp(1);
+
+  // Released: nothing more breaks.
+  const after = await row();
+  await step(page, 40);
+  expect(await row()).toEqual(after);
+});
+
+test('up jumps, fly switches the mode, up and down change height when flying (AC2.2)', async ({
+  page,
+}) => {
+  const fingers = await openTouchGame(page);
+  await standOnPlatform(page);
+
+  await press(page, fingers, 1, 'up');
+  await step(page, 10);
+  await fingers.touchUp(1);
+  let { player } = await getState(page);
+  expect(player.mode).toBe('walk');
+  expect(player.onGround).toBe(false);
+  expect(player.y).toBeGreaterThan(PLATFORM_Y + 1.5);
+  await step(page, 60);
+  expect((await getState(page)).player.y).toBe(PLATFORM_Y + 1);
+
+  await press(page, fingers, 1, 'fly');
+  await fingers.touchUp(1);
+  expect((await getState(page)).player.mode).toBe('fly');
+  await step(page, 1);
+  await expect(page.locator('.touch-fly')).toHaveClass(/active/);
+
+  await press(page, fingers, 1, 'up');
+  await step(page, 30);
+  await fingers.touchUp(1);
+  await step(page, 30);
+  ({ player } = await getState(page));
+  const high = player.y;
+  expect(high).toBeGreaterThan(PLATFORM_Y + 4);
+  // Flying: the player keeps the height when nothing is pressed.
+  await step(page, 30);
+  expect((await getState(page)).player.y).toBe(high);
+
+  await press(page, fingers, 1, 'down');
+  await step(page, 20);
+  await fingers.touchUp(1);
+  await step(page, 30);
+  expect((await getState(page)).player.y).toBeLessThan(high - 1.5);
+
+  await press(page, fingers, 1, 'fly');
+  await fingers.touchUp(1);
+  expect((await getState(page)).player.mode).toBe('walk');
+  await step(page, 1);
+  await expect(page.locator('.touch-fly')).not.toHaveClass(/active/);
+});
+
+test('tapping slot 5 of the block bar selects slot 5 (AC2.3)', async ({ page }) => {
+  const fingers = await openTouchGame(page);
+  expect((await getState(page)).selectedSlot).toBe(1);
+  const slot = await centerOf(page, '.hotbar-slot[data-slot="5"]');
+  await fingers.tap(1, slot.x, slot.y);
+  expect((await getState(page)).selectedSlot).toBe(5);
+  await expect(page.locator('.hotbar-slot.selected')).toHaveAttribute('data-slot', '5');
+  await expect(page.locator('.hotbar-label')).toHaveText('Log');
+  // A tap on the bar neither moves nor turns the player, and breaks nothing.
+  const { player } = await getState(page);
+  expect(player.yaw).toBe(0);
+  expect(player.pitch).toBe(0);
+});
+
+test('three fingers: stick moves, a drag turns, break breaks (AC2.4)', async ({ page }) => {
+  const fingers = await openTouchGame(page);
+  const { px, pz } = await standOnPlatform(page);
+  // A wall block ahead at eye height, in reach after the turn below.
+  // The player drifts from column pz into pz - 1 meanwhile, so the wall covers both.
+  await setBlock(page, px - 3, PLATFORM_Y + 2, pz, BRICKS);
+  await setBlock(page, px - 3, PLATFORM_Y + 2, pz - 1, BRICKS);
+
+  await fingers.touchDown(1, STICK.x, STICK.y);
+  await fingers.touchDown(2, LOOK.x, LOOK.y);
+  // Strafe right slowly (towards -Z after the turn), turn 90° left to face -X.
+  await fingers.touchMove(1, STICK.x + 20, STICK.y, 2);
+  await fingers.touchMove(2, LOOK.x - (90 * DEG) / 0.004, LOOK.y, 6);
+  await whenIdle(page);
+  await step(page, 30);
+  let state = await getState(page);
+  expect(state.player.yaw).toBeCloseTo(90 * DEG, 5);
+  expect(pz + 0.5 - state.player.z).toBeGreaterThan(0.4);
+  expect(pz + 0.5 - state.player.z).toBeLessThan(0.95);
+  const target = state.target;
+  expect(target).toMatchObject({ x: px - 3, y: PLATFORM_Y + 2, id: BRICKS });
+  if (!target) throw new Error('no target');
+
+  await press(page, fingers, 3, 'break');
+  expect(await getBlock(page, target.x, target.y, target.z)).toBe(AIR);
+  // The other two fingers keep working while the third rests on the button.
+  const z = state.player.z;
+  await fingers.touchMove(2, LOOK.x - (90 * DEG) / 0.004 - 50, LOOK.y, 2);
+  await whenIdle(page);
+  await step(page, 10);
+  state = await getState(page);
+  expect(state.player.yaw).toBeCloseTo(90 * DEG + 0.2, 5);
+  expect(state.player.z).not.toBe(z);
+  await fingers.touchUp(3);
+  await fingers.touchUp(2);
+  await fingers.touchUp(1);
+});
+
+test('buttons do not turn the view; stick and look area do not break or place (AC2.5)', async ({
+  page,
+}) => {
+  const fingers = await openTouchGame(page);
+  const { px, pz } = await standOnPlatform(page);
+  await setPlayer(page, { pitch: -50 * DEG });
+  const before = await getState(page);
+  expect(before.target).toMatchObject({ x: px, y: PLATFORM_Y, z: pz - 1 });
+
+  // A drag that starts on a button and wanders over the look area.
+  for (const button of ['up', 'down', 'fly', 'place']) {
+    await press(page, fingers, 1, button);
+    await fingers.touchMove(1, LOOK.x - 150, LOOK.y - 80, 4);
+    await fingers.touchUp(1);
+    await whenIdle(page);
+    const { player } = await getState(page);
+    expect([button, player.yaw, player.pitch]).toEqual([button, before.player.yaw, -50 * DEG]);
+  }
+  // Fly was toggled once by its button; the placed block (slot 1, grass) is the only edit.
+  expect((await getState(page)).player.mode).toBe('fly');
+  expect(await getBlock(page, px, PLATFORM_Y + 1, pz - 1)).toBe(GRASS);
+  await setBlock(page, px, PLATFORM_Y + 1, pz - 1, AIR);
+
+  // Fingers on the stick and in the look area, also when they pass over buttons.
+  const breakButton = await centerOf(page, '.touch-break');
+  const placeButton = await centerOf(page, '.touch-place');
+  await fingers.touchDown(1, STICK.x, STICK.y);
+  await fingers.touchDown(2, LOOK.x, 120);
+  await fingers.touchMove(2, breakButton.x, breakButton.y, 4);
+  await fingers.touchMove(2, placeButton.x, placeButton.y, 2);
+  await fingers.touchMove(1, placeButton.x, placeButton.y, 4);
+  await step(page, 40);
+  await fingers.touchUp(1);
+  await fingers.touchUp(2);
+  for (let dz = 0; dz <= 4; dz++) {
+    expect(await getBlock(page, px, PLATFORM_Y, pz - dz)).toBe(STONE);
+    expect(await getBlock(page, px, PLATFORM_Y + 1, pz - dz)).toBe(AIR);
+  }
 });

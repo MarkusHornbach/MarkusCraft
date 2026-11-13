@@ -4,7 +4,76 @@ import type { StickView, TouchButton } from '../input/TouchTracker';
 /** Buttons in document order. Positions come from the style sheet. */
 const BUTTONS: readonly { button: TouchButton; label: string }[] = [
   { button: 'menu', label: 'Menu' },
+  { button: 'fly', label: 'Fly' },
+  { button: 'up', label: 'Up' },
+  { button: 'down', label: 'Down' },
+  { button: 'break', label: 'Break' },
+  { button: 'place', label: 'Place' },
 ];
+
+/** Drawing size of a symbol in canvas pixels; the style sheet scales it to the button. */
+const SYMBOL_PIXELS = 96;
+
+/** Draws a button's symbol with plain shapes into a unit square. */
+function drawSymbol(ctx: CanvasRenderingContext2D, button: TouchButton): void {
+  ctx.lineWidth = 0.09;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#ffffff';
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  switch (button) {
+    case 'menu':
+      // Three bars.
+      for (const y of [0.27, 0.5, 0.73]) {
+        ctx.moveTo(0.2, y);
+        ctx.lineTo(0.8, y);
+      }
+      ctx.stroke();
+      break;
+    case 'up':
+    case 'down': {
+      // A triangle pointing up or down.
+      const tip = button === 'up' ? 0.2 : 0.8;
+      const base = button === 'up' ? 0.74 : 0.26;
+      ctx.moveTo(0.5, tip);
+      ctx.lineTo(0.86, base);
+      ctx.lineTo(0.14, base);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'fly':
+      // A pair of wings seen from the front.
+      ctx.moveTo(0.06, 0.62);
+      ctx.quadraticCurveTo(0.27, 0.16, 0.5, 0.6);
+      ctx.quadraticCurveTo(0.73, 0.16, 0.94, 0.62);
+      ctx.stroke();
+      break;
+    case 'break':
+      // A pick: a handle and a curved head.
+      ctx.moveTo(0.2, 0.84);
+      ctx.lineTo(0.64, 0.4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.lineWidth = 0.12;
+      ctx.moveTo(0.3, 0.2);
+      ctx.quadraticCurveTo(0.74, 0.22, 0.82, 0.7);
+      ctx.stroke();
+      break;
+    case 'place':
+      // A block outline with a plus.
+      ctx.strokeRect(0.17, 0.17, 0.66, 0.66);
+      ctx.beginPath();
+      ctx.moveTo(0.5, 0.34);
+      ctx.lineTo(0.5, 0.66);
+      ctx.moveTo(0.34, 0.5);
+      ctx.lineTo(0.66, 0.5);
+      ctx.stroke();
+      break;
+  }
+}
 
 export class TouchHud {
   readonly element: HTMLElement;
@@ -32,6 +101,16 @@ export class TouchHud {
       node.dataset.touch = button;
       node.setAttribute('role', 'button');
       node.setAttribute('aria-label', label);
+      const symbol = document.createElement('canvas');
+      symbol.className = 'touch-symbol';
+      symbol.width = SYMBOL_PIXELS;
+      symbol.height = SYMBOL_PIXELS;
+      const ctx = symbol.getContext('2d');
+      if (ctx) {
+        ctx.scale(SYMBOL_PIXELS, SYMBOL_PIXELS);
+        drawSymbol(ctx, button);
+      }
+      node.appendChild(symbol);
       this.element.appendChild(node);
       this.buttons.set(button, node);
     }
