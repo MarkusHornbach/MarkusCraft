@@ -1,5 +1,10 @@
 # Phase 2 plan – Multiplayer and touch controls
 
+> **Status (November 2026):** Part A (touch controls) is implemented and merged. Part B
+> (multiplayer) was postponed by the owner: it becomes Phase 4 and will be re-planned on
+> top of the Phase 3 gameplay (`docs/phase-3-plan.md`). Do not implement Part B from this
+> document; it stays here as reference.
+
 Read `CLAUDE.md` and `docs/phase-1-report.md` first. This plan is executed autonomously:
 do not ask the owner questions. Where this plan leaves a detail open, choose the simplest
 option and note it in the report of the part being implemented.

@@ -8,16 +8,22 @@ game in a procedurally generated world"; everything in it is original work.
 - First-person voxel world: explore procedurally generated terrain, break and place blocks.
 - Runs as a static site (GitHub Pages), no server. Desktop browsers with keyboard + mouse;
   from Phase 2 also Android phones and tablets with touch controls.
-- Built in four phases, each planned with the owner and then implemented autonomously:
+- Built in five phases, each planned with the owner and then implemented autonomously:
   1. **Core** – chunked terrain, movement and collision, break/place, day/night, basic UI
      (plan: `docs/phase-1-plan.md`, report: `docs/phase-1-report.md`)
-  2. **Multiplayer and touch controls** – touch controls for phones and tablets; play
-     together in one world: a host opens their world, others join with a room code,
-     peer-to-peer over WebRTC. Two parts with separate pull requests: A touch controls,
-     B multiplayer (plan: `docs/phase-2-plan.md`)
-  3. **Gathering & Crafting** – inventory/hotbar, timed breaking, crafting, saving/loading;
-     built on the multiplayer foundation (not yet planned)
-  4. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
+  2. **Touch controls** – on-screen controls for Android phones and tablets
+     (plan: `docs/phase-2-plan.md`, Part A; report: `docs/phase-2a-report.md`)
+  3. **Gathering & Crafting** – named worlds saved in the browser, a game mode per world
+     (Creative as before, or Gathering: no flying, limited items, peaceful), inventory,
+     timed breaking, ores, tools, a recipe list with workbench and furnace. Every change
+     to the world or a player's items goes through one action layer, so multiplayer can
+     be added without restructuring. Four parts with separate pull requests: A foundation,
+     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`)
+  4. **Multiplayer** – play together in one world: a host opens their world, others join
+     with a room code, peer-to-peer over WebRTC. Built on the Phase 3 gameplay and its
+     action layer (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
+     and serves as reference)
+  5. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
 
 ## Hard rules
 
@@ -203,6 +209,10 @@ hold:
   deviations" before changing world, meshing, physics or the test API.
 - Phase 2 part A (touch controls): implemented (report: `docs/phase-2a-report.md`). Read
   its "Decisions and deviations" before changing input, the menu or the touch tests.
-- Phase 2 part B (multiplayer): planned (`docs/phase-2-plan.md`), not implemented. It
-  starts only after Part A is merged. Persistence moved to Phase 3.
-- Phases 3 and 4: not yet planned.
+- Phase 2 is complete with part A. Its former part B (multiplayer) was postponed by the
+  owner and is now Phase 4; `docs/phase-2-plan.md`, Part B, is not to be implemented as
+  written. It will be re-planned on top of Phase 3.
+- Phase 3 (Gathering & Crafting): planned (`docs/phase-3-plan.md`), not implemented. Parts
+  A, B and C are implemented in this order, each after the previous one is merged; part D
+  (Web Workers) only when the owner asks for it.
+- Phases 4 (multiplayer) and 5 (personalization): not yet planned.
