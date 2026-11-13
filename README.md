@@ -34,8 +34,9 @@ Supported devices:
 
 ### Touch controls (phone and tablet)
 
-Tap **Tap to play** on the start screen. The game then shows its touch controls; it does
-not capture a mouse. Hold the device in landscape, otherwise the game asks you to rotate
+Create or choose a world in the world menu and tap its play button. The game then shows
+its touch controls and, where the browser allows it, switches to fullscreen; it does not
+capture a mouse. Hold the device in landscape, otherwise the game asks you to rotate
 it.
 
 ```
@@ -62,7 +63,8 @@ it.
 | Block bar        | Tap a block to select it                                                                                          |
 | Menu (☰)        | Pause and open the menu                                                                                           |
 
-The menu in touch mode has a **Fullscreen** button, a **Debug overlay** switch and a
+The menu in touch mode has a **Fullscreen** button (after "Exit fullscreen" the game no
+longer enters fullscreen by itself during that visit), a **Debug overlay** switch and a
 **Touch sensitivity** setting for the look speed. On a fresh device the render distance
 starts at 5 chunks to keep the frame rate up; it can be raised in the menu.
 
@@ -71,10 +73,43 @@ starts mouse mode. Adding `?touch=1` to the address forces touch mode. The touch
 react to fingers only, so on a computer this needs a touch screen or the device emulation
 of the browser's developer tools.
 
-### Worlds
+### Worlds and saving
 
-Every visit creates a new random world. Add `?seed=<number>` to the address to get a
-specific world; the pause screen has a button that copies a link to the current one.
+The game starts with the **world menu**. A world has a name and a seed (the number the
+terrain is generated from):
+
+- **New world**: choose a name; leave the seed empty for a random world, or type a number
+  or any text to get the same terrain again. "Create and play" starts it.
+- **Play**: the list shows your worlds, the one played last on top. Select one and press
+  "Click to play" (or "Tap to play").
+- **Delete** removes the selected world for ever, after asking once.
+- In a world, the pause menu (Esc, or the menu button on a touch screen) has **Save and
+  back to worlds**. It also has a button that copies a link with the world's seed; opening
+  such a link (`?seed=<number>`) offers to create a new world with that terrain. A link
+  carries the terrain only, not what was built.
+
+Worlds are **saved automatically**: a few seconds after every change, when the game is
+paused, when the page is hidden or closed, and when you go back to the world menu. The
+pause menu shows "Saved" when everything is written.
+
+**Where the data lives, and how it can be lost.** Worlds are stored in this browser, on
+this device only (in the browser's IndexedDB storage for the game's address). There is no
+account, no cloud copy and no export. A world is gone if
+
+- the browser's site data for the game is cleared ("clear browsing data", "delete cookies
+  and site data"), or the browser or its profile is removed;
+- the game is opened in a private / incognito window, which forgets everything when it is
+  closed (some browsers cannot save there at all; the menu then says so);
+- the device runs very low on storage and the browser clears data of sites by itself. The
+  game asks the browser to keep its data ("persistent storage"), but the browser decides.
+
+Another browser, another device or another address (for example a local development
+server instead of the published site) each have their own, separate worlds. A world cannot
+be open in two tabs at once; the second tab says so.
+
+All worlds are Creative worlds for now: flying, unlimited blocks, instant breaking. Hills
+above a certain height are bare rock; coal and iron ore lie in the stone and clay in lake
+beds. They can be broken but not yet collected (planned: Gathering mode).
 
 ### One-time setup for deployment
 

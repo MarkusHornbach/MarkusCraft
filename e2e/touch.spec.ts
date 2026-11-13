@@ -13,7 +13,7 @@ import {
   step,
   whenIdle,
 } from './game';
-import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame } from './touch';
+import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame, withoutFullscreen } from './touch';
 
 test.use(TOUCH_DEVICE);
 
@@ -122,6 +122,7 @@ test('"Tap to play" starts the game without pointer lock; the menu button pauses
   page,
 }) => {
   // Phase 3: the start screen is the world menu; its buttons start the game the same way.
+  await withoutFullscreen(page);
   await page.goto('/?seed=1337&time=0.25');
   await page.waitForFunction(() => window.__mc !== undefined);
   expect((await getState(page)).paused).toBe(true);

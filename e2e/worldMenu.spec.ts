@@ -10,7 +10,7 @@ import {
   pauseWithMouse,
   whenIdle,
 } from './game';
-import { TOUCH_DEVICE } from './touch';
+import { TOUCH_DEVICE, withoutFullscreen } from './touch';
 
 // Several worlds are created per test, each under slow software rendering.
 test.describe.configure({ timeout: 180_000 });
@@ -536,6 +536,7 @@ test.describe('by touch', () => {
       page,
     }) => {
       await page.setViewportSize(view);
+      await withoutFullscreen(page);
       await openMenu(page);
       expect((await getState(page)).touch).toBe(true);
 

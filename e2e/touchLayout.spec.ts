@@ -2,7 +2,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { getState, whenIdle } from './game';
-import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame } from './touch';
+import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame, withoutFullscreen } from './touch';
 
 test.use(TOUCH_DEVICE);
 
@@ -20,6 +20,7 @@ interface Box {
 
 /** Opens the game like a player on a touch device: start screen first, no test mode. */
 async function openOnDevice(page: Page, query = '?seed=1337&time=0.25'): Promise<void> {
+  await withoutFullscreen(page);
   await page.goto(`/${query}`);
   await page.waitForFunction(() => window.__mc !== undefined);
 }

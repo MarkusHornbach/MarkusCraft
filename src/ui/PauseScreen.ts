@@ -54,6 +54,8 @@ export interface PauseScreenOptions {
   onBack: () => void;
   onSettingsChange: (settings: Settings) => void;
   onDebugChange: (visible: boolean) => void;
+  /** The player left fullscreen with the "Exit fullscreen" button. */
+  onFullscreenExit: () => void;
 }
 
 interface SliderHandle {
@@ -216,6 +218,7 @@ export class PauseScreen {
     world.appendChild(copy);
     this.fullscreenButton = button('fullscreen-button', 'Fullscreen');
     this.fullscreenButton.addEventListener('click', () => {
+      if (document.fullscreenElement) options.onFullscreenExit();
       void this.toggleFullscreen();
     });
     document.addEventListener('fullscreenchange', () => this.updateFullscreenLabel());

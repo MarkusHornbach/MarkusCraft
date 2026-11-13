@@ -67,6 +67,9 @@ import { type GameState, type PlayerPatch, type TestApi, installTestApi } from '
 import type { GameParams } from './urlParams';
 import { type ReleaseLock, acquireWorldLock } from './worldLock';
 
+/** Time the view may need to settle after entering or leaving fullscreen. */
+const FULLSCREEN_SETTLE_MS = 500;
+
 /** What covers the view outside test mode: a menu, or nothing while playing. */
 type Screen = 'worlds' | 'settings' | 'pause' | 'play';
 
@@ -112,6 +115,10 @@ export class Game {
   /** Releases the tab lock of the open world. */
   private releaseWorldLock: ReleaseLock | null = null;
   private persistRequested = false;
+  /** The player chose "Exit fullscreen" during this visit: do not enter it again unasked. */
+  private fullscreenDeclined = false;
+  /** Until this time (performance clock) a portrait view does not pause the game. */
+  private orientationQuietUntil = 0;
   private settings: Settings;
   private mode: InputMode = 'mouse';
   /** Touch source and its on-screen controls; they exist only in touch mode. */
@@ -189,6 +196,13 @@ export class Game {
         onBack: () => void this.backToWorlds(),
         onSettingsChange: (settings) => this.applySettings(settings),
         onDebugChange: (visible) => this.setDebugVisible(visible),
+        onFullscreenExit: () => {
+          this.fullscreenDeclined = true;
+        },
+      });
+      document.addEventListener('fullscreenchange', () => {
+        this.orientationQuietUntil = performance.now() + FULLSCREEN_SETTLE_MS;
+        window.setTimeout(() => this.resize(), FULLSCREEN_SETTLE_MS + 20);
       });
       this.worldMenu = new WorldMenu(this.root, {
         mode: this.mode,
@@ -443,6 +457,7 @@ export class Game {
     // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
     if (via && via !== this.mode && !this.params.touch) this.setMode(via);
     if (this.mode === 'mouse') this.requestPointerLock();
+    else this.enterFullscreen();
     try {
       const loaded = await load();
       this.loadWorld(loaded.meta, loaded.edits);
@@ -625,10 +640,29 @@ export class Game {
     // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
     if (via && via !== this.mode && !this.params.touch) this.setMode(via);
     if (this.mode === 'touch') {
+      this.enterFullscreen();
       if (!this.isPortrait()) this.setPaused(false);
       return;
     }
     this.requestPointerLock();
+  }
+
+  /**
+   * Touch mode: a tap on a play or continue button also enters fullscreen, where the
+   * browser has it (not on iPhones). Must run inside the tap's event handler. A refusal
+   * is silent; the fullscreen button of the menu stays for a deliberate try.
+   */
+  private enterFullscreen(): void {
+    if (this.fullscreenDeclined || document.fullscreenElement) return;
+    const root = document.documentElement as HTMLElement & {
+      requestFullscreen?: () => Promise<void> | undefined;
+    };
+    if (typeof root.requestFullscreen !== 'function') return;
+    try {
+      root.requestFullscreen()?.catch(() => {});
+    } catch {
+      // Some browsers throw instead of rejecting.
+    }
   }
 
   private requestPointerLock(): void {
@@ -699,7 +733,9 @@ export class Game {
 
   /** Shows the rotate hint while the device is upright and pauses the game for it. */
   private updateOrientation(): void {
-    const portrait = this.isPortrait();
+    // Entering or leaving fullscreen can report odd sizes for a moment; the view is
+    // looked at again when it has settled.
+    const portrait = this.isPortrait() && performance.now() >= this.orientationQuietUntil;
     this.touchHud?.setRotateVisible(portrait);
     if (portrait && !this.paused) this.setPaused(true);
   }
