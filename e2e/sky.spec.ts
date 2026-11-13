@@ -54,7 +54,8 @@ test('the sun is visible at noon and the moon at midnight (AC10.4)', async ({ pa
   expect(pale).toBeGreaterThan(0.02);
   expect(meanLuminance(night)).toBeLessThan(40);
   // Stars: small bright points away from the moon.
-  const corner: Region = { x: 0, y: 0, width: 300, height: 540 };
+  // Left part of the sky, above the selector bar.
+  const corner: Region = { x: 0, y: 0, width: 300, height: 440 };
   const stars = shareOf(night, (r, g, b) => r > 120 && g > 120 && b > 120, corner);
   expect(stars * corner.width * corner.height).toBeGreaterThan(20);
 
