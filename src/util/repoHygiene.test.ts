@@ -36,8 +36,7 @@ describe('repository hygiene (AC12.4)', () => {
     const assets = files.filter((file) => BINARY_ASSET.test(file));
     const unexpected = assets.filter((file) => !/^e2e\/screenshots\/[a-z-]+\.png$/.test(file));
     expect(unexpected).toEqual([]);
-    // Phase 2 part A added one reference screenshot and no image or font for the touch
-    // controls (Phase 2 AC3.6).
-    expect(assets.length).toBe(9);
+    // Ten reference screenshots: nine from Phases 1 and 2, `rocky-hill` from Phase 3 step 1.
+    expect(assets.length).toBe(10);
   });
 });

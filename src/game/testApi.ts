@@ -75,6 +75,8 @@ export interface TestApi {
   setBlock(x: number, y: number, z: number, id: number): void;
   /** Highest non-air, non-leaf block of a column, or -1 if the column is not loaded. */
   surfaceY(x: number, z: number): number;
+  /** Checksum over the generated terrain around the origin (see `terrainChecksum`). */
+  terrainChecksum(): number;
   setTime(t: number): void;
   /** Advance exactly `n` fixed simulation steps and render once. */
   step(n: number): void;

@@ -15,6 +15,23 @@ export const FOG_START_FACTOR = 0.6;
 export const UNDERWATER_FOG_NEAR = 1;
 export const UNDERWATER_FOG_FAR = 24;
 
+/** Version of the terrain generator that new worlds are created with (stored per world). */
+export const GENERATOR_VERSION = 1;
+/** Land at or above this height (shifted by noise) is bare rock without soil. */
+export const ROCK_HEIGHT = 80;
+/** Largest shift of the rock line by its low-frequency noise, in blocks. */
+export const ROCK_HEIGHT_SHIFT = 4;
+/** A land column this much higher or lower than a direct neighbour is bare rock. */
+export const ROCK_SLOPE = 3;
+export const COAL_MIN_Y = 12;
+export const COAL_MAX_Y = 110;
+export const IRON_MIN_Y = 4;
+export const IRON_MAX_Y = 44;
+/** Clay needs at least this much water above the lake bed. */
+export const CLAY_MIN_WATER_DEPTH = 2;
+/** Clay replaces this many blocks from the top of the lake bed. */
+export const CLAY_DEPTH = 2;
+
 export const TILE_SIZE = 32;
 export const ATLAS_TILES_PER_ROW = 8;
 /** Fixed seed for the tile painters: textures do not vary with the world seed. */

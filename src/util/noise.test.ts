@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { createNoise2D, fbm2D } from './noise';
+import { GRAD_X, GRAD_Y, createNoise2D, fbm2D } from './noise';
 import { mulberry32 } from './rng';
 
 describe('simplex noise', () => {
+  it('uses a literal gradient table equal to the sin/cos values (Phase 3 AC1.1)', () => {
+    expect(GRAD_X.length).toBe(12);
+    expect(GRAD_Y.length).toBe(12);
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      expect(Math.abs(GRAD_X[i] - Math.cos(angle))).toBeLessThan(1e-7);
+      expect(Math.abs(GRAD_Y[i] - Math.sin(angle))).toBeLessThan(1e-7);
+    }
+  });
+
   it('stays in [-1, 1] with a mean near 0 over 100 000 samples (AC3.2)', () => {
     const noise = createNoise2D(1337);
     const rng = mulberry32(99);

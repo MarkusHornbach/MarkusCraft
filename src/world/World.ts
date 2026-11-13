@@ -1,11 +1,13 @@
 // World: the set of loaded chunks, block access in world coordinates, and the edit log.
-import { CHUNK_SIZE, WORLD_HEIGHT } from '../game/config';
+import { CHUNK_SIZE, GENERATOR_VERSION, WORLD_HEIGHT } from '../game/config';
 import { BLOCK_SOLID, Block } from './blocks';
 import { type Chunk, blockIndex, chunkKey, createChunk, toChunkCoord, toLocalCoord } from './chunk';
 import { generateChunk } from './generation/terrain';
 
 export class World {
   readonly seed: number;
+  /** Version of the terrain generator this world was created with. */
+  readonly generatorVersion: number;
   private readonly chunks = new Map<string, Chunk>();
   /**
    * Player edits per chunk (block index → block id). Kept when a chunk unloads and
@@ -15,8 +17,9 @@ export class World {
   // One-entry cache: consecutive block reads usually hit the same chunk.
   private lastChunk: Chunk | null = null;
 
-  constructor(seed: number) {
+  constructor(seed: number, generatorVersion: number = GENERATOR_VERSION) {
     this.seed = seed >>> 0;
+    this.generatorVersion = generatorVersion;
   }
 
   get chunkCount(): number {
@@ -43,7 +46,7 @@ export class World {
   generate(cx: number, cz: number): Chunk {
     const existing = this.getChunk(cx, cz);
     if (existing) return existing;
-    const chunk = createChunk(cx, cz, generateChunk(this.seed, cx, cz));
+    const chunk = createChunk(cx, cz, generateChunk(this.seed, cx, cz, this.generatorVersion));
     const edits = this.edits.get(chunkKey(cx, cz));
     if (edits) for (const [index, id] of edits) chunk.blocks[index] = id;
     this.chunks.set(chunkKey(cx, cz), chunk);

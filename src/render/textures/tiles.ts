@@ -420,6 +420,63 @@ function paintBedrock(rng: Rng): Uint8ClampedArray {
   return px;
 }
 
+/**
+ * Ore: the stone tile with nuggets set into it. Each nugget is a small irregular blob
+ * with a dark rim below and a highlight on top, so it reads from a distance.
+ */
+function paintOre(rng: Rng, dark: Rgb, light: Rgb, glint: Rgb): Uint8ClampedArray {
+  const px = paintStone(rng);
+  // One nugget per cell of a 3×3 grid keeps them spread out; some cells stay empty.
+  const cell = S / 3;
+  for (let gy = 0; gy < 3; gy++) {
+    for (let gx = 0; gx < 3; gx++) {
+      if (rng() < 0.2) continue;
+      const cx = Math.floor(gx * cell + 2 + rng() * (cell - 5));
+      const cy = Math.floor(gy * cell + 2 + rng() * (cell - 5));
+      const rx = 2 + rng() * 1.5;
+      const ry = 1.7 + rng() * 1.2;
+      for (let dy = -4; dy <= 4; dy++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          const d = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) + (rng() - 0.5) * 0.5;
+          if (d > 1.25) continue;
+          if (d > 1) {
+            // Shadow in the rock around the nugget.
+            shadePixel(px, cx + dx, cy + dy, -30);
+            continue;
+          }
+          const c = mix(dark, light, rng());
+          setPixel(px, cx + dx, cy + dy, dy < 0 && dx <= 0 && d < 0.5 ? glint : c);
+        }
+      }
+    }
+  }
+  return px;
+}
+
+function paintCoalOre(rng: Rng): Uint8ClampedArray {
+  return paintOre(rng, [22, 22, 26], [48, 48, 54], [86, 88, 98]);
+}
+
+function paintIronOre(rng: Rng): Uint8ClampedArray {
+  return paintOre(rng, [168, 104, 62], [214, 150, 98], [240, 200, 150]);
+}
+
+function paintClay(rng: Rng): Uint8ClampedArray {
+  const px = baseCoat(rng, [136, 150, 172], [172, 184, 202], 8);
+  // Smooth, layered sediment: faint horizontal bands that wander by a pixel.
+  const wander = blotches(rng, 4);
+  for (let band = 0; band < 5; band++) {
+    const y0 = Math.floor((band * S) / 5 + rng() * 3);
+    const amount = rng() < 0.5 ? -12 : 10;
+    for (let x = 0; x < S; x++) {
+      const y = y0 + Math.round((wander[y0 * S + x] - 0.5) * 3);
+      shadePixel(px, x, y, amount);
+    }
+  }
+  speckle(px, rng, 24, -12);
+  return px;
+}
+
 /** Painters indexed by tile id. */
 export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   const painters: TilePainter[] = [];
@@ -436,6 +493,9 @@ export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   painters[Tile.GLASS] = paintGlass;
   painters[Tile.WATER] = paintWater;
   painters[Tile.BEDROCK] = paintBedrock;
+  painters[Tile.COAL_ORE] = paintCoalOre;
+  painters[Tile.IRON_ORE] = paintIronOre;
+  painters[Tile.CLAY] = paintClay;
   return painters;
 })();
 

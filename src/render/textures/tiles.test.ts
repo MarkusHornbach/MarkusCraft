@@ -130,6 +130,16 @@ describe('tile painters', () => {
     const bedrock = mean(tiles[Tile.BEDROCK]);
     expect(bedrock.r).toBeLessThan(stone.r - 30);
 
+    // Phase 3: ores are stone with nuggets, clay is a pale blue-grey.
+    const coal = mean(tiles[Tile.COAL_ORE]);
+    expect(coal.r).toBeLessThan(stone.r - 5);
+    expect(Math.max(coal.r, coal.g, coal.b) - Math.min(coal.r, coal.g, coal.b)).toBeLessThan(12);
+    const iron = mean(tiles[Tile.IRON_ORE]);
+    expect(iron.r - iron.b).toBeGreaterThan(stone.r - stone.b + 8);
+    const clay = mean(tiles[Tile.CLAY]);
+    expect(clay.b).toBeGreaterThan(clay.r + 20);
+    expect(clay.b).toBeGreaterThan(stone.b + 20);
+
     // The grass side shows turf on top and soil below.
     const side = tiles[Tile.GRASS_SIDE];
     const topRow = { g: side[1], r: side[0] };

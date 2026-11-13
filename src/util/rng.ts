@@ -47,3 +47,13 @@ export function hash2Float(seed: number, x: number, z: number): number {
 export function deriveSeed(seed: number, salt: number): number {
   return hash32((seed >>> 0) ^ Math.imul(salt + 1, 0x9e3779b1));
 }
+
+/** 32-bit FNV-1a over bytes. `hash` continues a running checksum over several arrays. */
+export function fnv1a(bytes: Uint8Array, hash = 0x811c9dc5): number {
+  let h = hash;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= bytes[i];
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}

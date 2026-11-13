@@ -1,4 +1,5 @@
 // Dev tool: measures generation and meshing speed in Node. Run: npx vite-node scripts/perf.ts
+import { GENERATOR_VERSION } from '../src/game/config';
 import { ChunkManager } from '../src/world/ChunkManager';
 import { generateChunk } from '../src/world/generation/terrain';
 import { meshChunk } from '../src/world/meshing/mesher';
@@ -9,7 +10,8 @@ const N = 8;
 const chunks = new Map<string, Uint8Array>();
 let start = performance.now();
 for (let cz = -1; cz <= N; cz++) {
-  for (let cx = -1; cx <= N; cx++) chunks.set(`${cx},${cz}`, generateChunk(SEED, cx, cz));
+  for (let cx = -1; cx <= N; cx++)
+    chunks.set(`${cx},${cz}`, generateChunk(SEED, cx, cz, GENERATOR_VERSION));
 }
 const generation = (performance.now() - start) / chunks.size;
 

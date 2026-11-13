@@ -22,7 +22,7 @@ import { ChunkManager } from '../world/ChunkManager';
 import { toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
-import { getTerrain } from '../world/generation/terrain';
+import { getTerrain, terrainChecksum } from '../world/generation/terrain';
 import { type RayHit, raycast } from '../world/raycast';
 import { World, chunksAffectedByEdit } from '../world/World';
 import {
@@ -127,7 +127,7 @@ export class Game {
       onPress: (action) => this.handlePress(action),
     });
 
-    this.hud = new Hud(this.root, this.renderer.atlas.tiles);
+    this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
     this.hud.setSelected(this.selectedSlot, false);
     this.debug = new DebugOverlay(this.root);
 
@@ -625,6 +625,7 @@ export class Game {
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),
       setBlock: (x, y, z, id) => this.setBlock(x, y, z, id),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
+      terrainChecksum: () => terrainChecksum(this.world.seed, this.world.generatorVersion),
       setTime: (t) => {
         this.time = wrapTime(t);
       },

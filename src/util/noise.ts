@@ -8,14 +8,14 @@ const G2 = (3 - Math.sqrt(3)) / 6;
 /** Scales the raw simplex sum (unit-length gradients) so the output spans about [-1, 1]. */
 const SCALE = 99;
 
-// 12 gradient directions, evenly spread enough for 2D.
-const GRAD_X = new Float32Array(12);
-const GRAD_Y = new Float32Array(12);
-for (let i = 0; i < 12; i++) {
-  const a = (i / 12) * Math.PI * 2;
-  GRAD_X[i] = Math.cos(a);
-  GRAD_Y[i] = Math.sin(a);
-}
+/**
+ * 12 gradient directions, 30° apart. Written as literal values instead of
+ * `Math.cos`/`Math.sin`, whose last bits differ between browser engines: the same seed
+ * must give the same terrain everywhere. `Math.sqrt` is exactly specified.
+ */
+const H = Math.sqrt(3) / 2;
+export const GRAD_X = new Float32Array([1, H, 0.5, 0, -0.5, -H, -1, -H, -0.5, 0, 0.5, H]);
+export const GRAD_Y = new Float32Array([0, 0.5, H, 1, H, 0.5, 0, -0.5, -H, -1, -H, -0.5]);
 
 /** Creates a 2D simplex noise function for a seed. Output lies in [-1, 1]. */
 export function createNoise2D(seed: number): Noise2D {
