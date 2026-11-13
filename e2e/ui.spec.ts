@@ -1,7 +1,15 @@
 // Start/pause screen, settings and debug overlay in the browser (plan step 11).
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { createWorld, getState, openGame, pauseWithMouse, setPlayer, whenIdle } from './game';
+import {
+  createWorld,
+  getState,
+  openGame,
+  pauseWithMouse,
+  setPlayer,
+  untilPlaying,
+  whenIdle,
+} from './game';
 
 const STORAGE_KEY = 'markuscraft.settings.v1';
 
@@ -85,7 +93,7 @@ test('clicking play captures the mouse and resumes; losing the lock pauses (AC11
 }) => {
   await openNormal(page, '?seed=1337', SMALL);
   await page.locator('.world-create-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   const before = await getState(page);
   await expect(page.locator('.world-menu')).toBeHidden();
   await expect(page.locator('.pause-screen')).toBeHidden();
@@ -116,7 +124,7 @@ test('clicking play captures the mouse and resumes; losing the lock pauses (AC11
 
   // "Click to continue" captures the mouse again.
   await page.locator('.play-button:visible').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   expect(await page.evaluate(() => document.pointerLockElement?.tagName)).toBe('CANVAS');
 
   // Back in the world menu, the play button of the list does the same.
@@ -125,7 +133,7 @@ test('clicking play captures the mouse and resumes; losing the lock pauses (AC11
   await page.locator('.back-button').click();
   await expect(page.locator('.world-play-button')).toHaveText('Click to play');
   await page.locator('.world-play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   expect(await page.evaluate(() => document.pointerLockElement?.tagName)).toBe('CANVAS');
 });
 
@@ -161,7 +169,7 @@ test('settings apply live, persist across reloads and survive corrupt storage (A
   await expect(page.locator('#setting-sensitivity')).toHaveValue('2');
   // Continue the saved world: it loads with the stored render distance.
   await page.locator('.world-play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   await pauseWithMouse(page);
   await whenIdle(page);
   state = await getState(page);

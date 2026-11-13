@@ -2,7 +2,14 @@
 // headless fullscreen is unreliable, and the rule under test is when the game asks.
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { backToWorlds, createWorld, getState, openMenu, pauseWithMouse } from './game';
+import {
+  backToWorlds,
+  createWorld,
+  getState,
+  openMenu,
+  pauseWithMouse,
+  untilPlaying,
+} from './game';
 import { TOUCH_DEVICE } from './touch';
 
 type Stub = 'works' | 'rejects' | 'throws' | 'missing';
@@ -149,11 +156,11 @@ test('in mouse mode no button requests fullscreen (Phase 3 AC5.1)', async ({ pag
   await createWorld(page);
   await pauseWithMouse(page);
   await page.locator('.play-button:visible').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   await pauseWithMouse(page);
   await backToWorlds(page);
   await page.locator('.world-play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   expect((await getState(page)).touch).toBe(false);
   expect((await fullscreenLog(page)).requests).toEqual([]);
 });

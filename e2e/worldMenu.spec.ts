@@ -8,6 +8,7 @@ import {
   getState,
   openMenu,
   pauseWithMouse,
+  untilPlaying,
   whenIdle,
 } from './game';
 import { TOUCH_DEVICE, withoutFullscreen } from './touch';
@@ -90,7 +91,7 @@ test('a first visit creates a world; after a reload it is listed and continues (
   await expect(page.locator('.world-play-button')).toHaveText('Click to play');
 
   await page.locator('.world-play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   await whenIdle(page);
   const continued = await getState(page);
   expect(continued.world).toEqual(created.world);
@@ -144,7 +145,7 @@ test('seeds: digits are the number, empty is random; the list is ordered by last
   await rows(page).nth(3).click();
   await expect(rows(page).nth(3)).toHaveClass(/selected/);
   await page.locator('.world-play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   expect((await getState(page)).world?.name).toBe('Digits');
   await pauseWithMouse(page);
   await backToWorlds(page);
@@ -250,7 +251,7 @@ test('"Save and back to worlds" switches worlds without a page reload (Phase 3 A
 
   await rows(page).filter({ hasText: 'One' }).click();
   await page.locator('.world-play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   await whenIdle(page);
   const again = await getState(page);
   expect(again.world).toEqual(one.world);
@@ -381,7 +382,7 @@ test('a damaged world is listed, cannot be played, and can be deleted (Phase 3 A
   await expect(rows(page).first()).toHaveClass(/selected/);
   await expect(page.locator('.world-play-button')).toBeEnabled();
   await page.locator('.world-play-button').click();
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   await whenIdle(page);
   expect((await getState(page)).world?.name).toBe('Healthy');
   expect(await getBlock(page, cell.x, cell.y, cell.z)).toBe(BRICKS);
@@ -418,7 +419,7 @@ for (const answer of ['granted', 'rejecting'] as const) {
     await pauseWithMouse(page);
     await backToWorlds(page);
     await page.locator('.world-play-button').click();
-    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await untilPlaying(page);
     expect(await calls()).toBe(1);
     // The console fixture proves that a rejection causes no message.
   });
@@ -441,6 +442,37 @@ test('the settings page opens from the world menu and leads back (Phase 3 AC4.10
   await expect(page.locator('.world-menu')).toBeVisible();
   await expect(page.locator('.pause-screen')).toBeHidden();
   await expect(page.locator('.world-form')).toBeVisible();
+});
+
+test('a refused mouse capture leaves the pause menu with a way on', async ({ page }) => {
+  // Browsers sometimes refuse to capture the mouse, e.g. shortly after it was released.
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.requestPointerLock;
+    let refusals = 1;
+    HTMLCanvasElement.prototype.requestPointerLock = function (
+      this: HTMLCanvasElement,
+      ...args: []
+    ) {
+      if (refusals-- > 0) return Promise.reject(new DOMException('refused', 'NotAllowedError'));
+      return Reflect.apply(original, this, args) as Promise<void>;
+    } as typeof original;
+  });
+  await openMenu(page);
+  await page.locator('.world-create-button').click();
+  // The world is open, but paused: the pause menu says what to do.
+  await expect(page.locator('.pause-screen')).toBeVisible();
+  await expect(page.locator('.pause-hint')).toHaveText(
+    'The browser did not capture the mouse yet. Please click again.',
+  );
+  await expect(page.locator('.play-button:visible')).toHaveText('Click to play');
+  const state = await getState(page);
+  expect(state.paused).toBe(true);
+  expect(state.world?.name).toBe('My world');
+
+  await page.locator('.play-button:visible').click();
+  await page.waitForFunction(() => !window.__mc.getState().paused);
+  expect(await page.evaluate(() => document.pointerLockElement?.tagName)).toBe('CANVAS');
+  await expect(page.locator('.pause-hint')).toHaveText('');
 });
 
 test('a world menu without IndexedDB plays in memory and says so', async ({ page }) => {

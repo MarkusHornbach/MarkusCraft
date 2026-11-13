@@ -155,8 +155,31 @@ export async function createWorld(page: Page, world: NewWorld = {}): Promise<voi
   if (world.seed !== undefined) await page.locator('#world-seed').fill(world.seed);
   const create = page.locator('.world-create-button');
   await (world.tap ? create.tap() : create.click());
-  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await untilPlaying(page);
   if (world.idle) await whenIdle(page);
+}
+
+/**
+ * Waits until the game runs after a play button was activated. Browsers sometimes refuse
+ * to capture the mouse again shortly after it was released; the game then shows the pause
+ * menu with "The browser did not capture the mouse yet. Please click again." This helper
+ * does what a player does: it clicks the offered play button again.
+ */
+export async function untilPlaying(page: Page): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const running = await page
+      .waitForFunction(() => !window.__mc.getState().paused, null, { timeout: 3000 })
+      .then(
+        () => true,
+        () => false,
+      );
+    if (running) return;
+    const again = page.locator('.pause-screen .play-button:visible');
+    if ((await again.count()) > 0 && (await page.locator('.pause-hint').textContent()) !== '') {
+      await again.click();
+    }
+  }
+  throw new Error('The game did not start after the play button was activated');
 }
 
 /** Pauses a running game in mouse mode. Esc does this in a real browser. */

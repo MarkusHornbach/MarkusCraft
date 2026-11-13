@@ -3,14 +3,15 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import {
   DEG,
-  PLATFORM_Y,
   getBlock,
   getState,
   openGame,
+  PLATFORM_Y,
   setBlock,
   setPlayer,
   standOnPlatform,
   step,
+  untilPlaying,
   whenIdle,
 } from './game';
 import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame, withoutFullscreen } from './touch';
@@ -197,7 +198,7 @@ test.describe('with a mouse', () => {
     await page.waitForFunction(() => window.__mc !== undefined);
     await expect(page.locator('.world-play-button')).toHaveText('Click to play');
     await page.locator('.world-create-button').click();
-    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await untilPlaying(page);
     expect((await getState(page)).touch).toBe(false);
     await expect(page.locator('.touch-hud, [data-touch], .rotate-overlay')).toHaveCount(0);
     await expect(page.locator('#setting-touch-sensitivity, #setting-debug')).toHaveCount(0);

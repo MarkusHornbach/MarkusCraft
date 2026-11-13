@@ -32,7 +32,7 @@ Plan: [`phase-3-plan.md`](phase-3-plan.md), Part A (steps 1–5). Implemented on
   where the browser has it, unless the player chose "Exit fullscreen" in this visit.
 - **Fixed:** the Phase 1 browser test for the block name label no longer depends on real
   time (known issue of the Phase 2 part A report).
-- **Automation:** 61 new unit tests (218 in total), 31 new browser tests (83 in total),
+- **Automation:** 61 new unit tests (218 in total), 32 new browser tests (84 in total),
   two new reference screenshots (`rocky-hill`, `world-menu`).
 
 Nothing was cut: the cut list of section 8 (tab lock, damaged-world listing, seed-link
@@ -250,10 +250,13 @@ frames per second with three browsers in parallel). The frame rate on real devic
 - **AC1.10 is a relative limit measured in a busy test run.** It takes the best of 40
   rounds and had about 8 points of margin; if it ever fails on a slow CI machine, it is
   the test's noise and not a slower generator (compare with `scripts/terrainStats.ts`).
-- **One unexplained failure**: "Phase 3 AC4.2" (list order after playing an older world)
-  failed once right after a rebuild and passed 7 times in a row afterwards, alone and in
-  parallel. If it shows up in CI, the place to look is the write of `playedMs` between
-  pausing and "Save and back to worlds".
+- **Mouse capture can be refused.** The first CI run of the final commit failed in "Phase
+  3 AC4.2": the browser refused to capture the mouse shortly after it had been released,
+  the game showed its pause menu with "The browser did not capture the mouse yet. Please
+  click again." (the intended fallback), and the test helper waited instead of clicking.
+  The same had happened once locally. The helpers now click the offered play button again
+  (`untilPlaying` in `e2e/game.ts`), and a test with a refusing fake covers the fallback.
+  On a real computer this shows as a start that needs a second click now and then.
 - Iron ore never shows on the surface (it lies below sea level); it is found by digging.
 - Browsers without the Web Locks API skip the two-tab check; browsers without IndexedDB
   play without saving. Neither was tested on a real browser of that kind.
