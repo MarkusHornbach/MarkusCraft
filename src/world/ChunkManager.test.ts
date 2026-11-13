@@ -192,3 +192,15 @@ describe('ChunkManager (AC7.3)', () => {
     expect(recorder.meshed).toEqual(['3,0']);
   });
 });
+
+describe('ChunkManager performance (AC12.2)', () => {
+  it('generates and meshes the 81 chunks of render distance 4 in under 3 s', () => {
+    const { manager } = setup(4);
+    manager.setCenter(0, 0);
+    const start = performance.now();
+    while (manager.pending > 0) manager.update(() => performance.now(), 1000);
+    const elapsed = performance.now() - start;
+    expect(manager.loaded).toBe(81);
+    expect(elapsed).toBeLessThan(3000);
+  });
+});

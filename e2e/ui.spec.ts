@@ -243,7 +243,9 @@ test('matches the pause screen reference screenshot (AC11.6)', async ({ page }) 
   await page.locator('canvas.game-canvas').evaluate((node) => {
     (node as HTMLElement).style.visibility = 'hidden';
   });
-  await expect(page).toHaveScreenshot('pause-screen.png');
+  // Text-only screen: CI renders the system font slightly differently (3.7 % of pixels),
+  // so this reference uses the raised tolerance the phase plan allows (section 5.5).
+  await expect(page).toHaveScreenshot('pause-screen.png', { maxDiffPixelRatio: 0.05 });
 });
 
 test('shows a readable message when WebGL2 is unavailable', async ({ page }) => {

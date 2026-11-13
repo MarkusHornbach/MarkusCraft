@@ -5,10 +5,7 @@ import { test as base, expect } from '@playwright/test';
  * Messages proven to come from software WebGL itself, not from the game.
  * Keep this list minimal; every entry needs a comment.
  */
-const ALLOWED_CONSOLE: RegExp[] = [
-  // Chromium notes that readPixels-style screenshots stall the software GPU pipeline.
-  /GPU stall due to ReadPixels/,
-];
+const ALLOWED_CONSOLE: RegExp[] = [];
 
 export const test = base.extend<{ consoleProblems: string[] }>({
   consoleProblems: [

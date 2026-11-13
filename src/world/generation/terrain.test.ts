@@ -44,9 +44,11 @@ describe('generateChunk', () => {
             for (let lx = 0; lx < CHUNK_SIZE; lx++) {
               columns++;
               const h = terrain.heightAt(cx * CHUNK_SIZE + lx, cz * CHUNK_SIZE + lz);
-              expect(blocks[blockIndex(lx, 0, lz)]).toBe(Block.BEDROCK);
-              expect(h).toBeGreaterThanOrEqual(20);
-              expect(h).toBeLessThanOrEqual(110);
+              // Plain checks instead of expect(): this loop runs 200 000 times.
+              if (blocks[blockIndex(lx, 0, lz)] !== Block.BEDROCK) {
+                throw new Error(`no bedrock at seed ${seed} chunk ${cx},${cz}`);
+              }
+              if (h < 20 || h > 110) throw new Error(`height ${h} out of range at seed ${seed}`);
               // The generated ground agrees with the height function.
               if (columnTop(blocks, lx, lz, true) !== h) {
                 throw new Error(`ground mismatch at seed ${seed} chunk ${cx},${cz}`);
