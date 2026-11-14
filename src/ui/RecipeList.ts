@@ -70,7 +70,7 @@ export class RecipeList {
     const result = element('span', 'recipe-result');
     result.appendChild(createItemIcon(recipe.result.item, options.tiles));
     if (recipe.result.count > 1) {
-      result.appendChild(element('span', 'slot-count', String(recipe.result.count)));
+      result.appendChild(element('span', 'recipe-result-count', String(recipe.result.count)));
     }
     const name = element('span', 'recipe-name', itemLabel(recipe.result.item));
 

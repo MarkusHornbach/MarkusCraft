@@ -97,6 +97,36 @@ function watchFingers(): void {
   window.addEventListener('pointercancel', remove, true);
 }
 
+/**
+ * One finger that drags in a straight line and lifts. Unlike `Fingers` it does not wait
+ * until the page has seen each position: when the browser takes the drag over for
+ * scrolling it cancels the touch, and the page sees no more of it. Each event gets a frame.
+ */
+export async function swipe(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  steps = 6,
+): Promise<void> {
+  const session = await page.context().newCDPSession(page);
+  const frame = (): Promise<void> =>
+    page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
+  const send = async (type: string, x: number, y: number, lifted = false): Promise<void> => {
+    await session.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: lifted ? [] : [{ id: 1, x, y }],
+    });
+    await frame();
+  };
+  await send('touchStart', from.x, from.y);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    await send('touchMove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+  }
+  await send('touchEnd', to.x, to.y, true);
+  await session.detach();
+}
+
 /** Opens the game in test mode with forced touch mode and waits until ready. */
 export async function openTouchGame(page: Page, options: OpenOptions = {}): Promise<Fingers> {
   await openGame(page, { ...options, touch: true });

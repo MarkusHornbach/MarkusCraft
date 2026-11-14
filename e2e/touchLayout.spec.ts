@@ -2,7 +2,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { getState, whenIdle } from './game';
-import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame, withoutFullscreen } from './touch';
+import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame, swipe, withoutFullscreen } from './touch';
 
 test.use(TOUCH_DEVICE);
 
@@ -484,5 +484,123 @@ for (const [device, view] of [
     await expect(page.locator('.inventory-screen')).toBeHidden();
     expect((await getState(page)).paused).toBe(false);
     await expect(page.locator('.touch-bag')).toBeVisible();
+  });
+}
+
+// --- Phase 3 step 12: the recipe list on a phone and a tablet ------------------------
+
+for (const [device, view] of [
+  ['phone', PHONE],
+  ['tablet', TABLET],
+] as const) {
+  test(`Phase 3 AC12.6: the recipe list fits a ${view.width} × ${view.height} ${device}, scrolls by finger and crafts by taps`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(view);
+    await page.addInitScript(
+      ([key, value]) => window.localStorage.setItem(key, value),
+      [STORAGE_KEY, JSON.stringify({ renderDistance: 2, mouseSensitivity: 1, fov: 75 })],
+    );
+    await openOnDevice(page);
+    await tapCreate(page, 'gathering');
+    await page.evaluate(() => {
+      window.__mc.give(5, 2);
+      window.__mc.give(7, 3);
+    });
+    await page.locator('.touch-bag').tap();
+    await expect(page.locator('.inventory-screen')).toBeVisible();
+
+    // Both tabs and "Close" are finger-sized and on screen, on either page.
+    const header = '.inventory-tab, .inventory-close';
+    expect(await boxes(page, header)).toHaveLength(3);
+    expectFingerSized(await boxes(page, header));
+    await page.locator('.inventory-tab[data-tab="crafting"]').tap();
+    const list = page.locator('.recipe-list');
+    await expect(list).toBeVisible();
+    expect((await getState(page)).ui.tab).toBe('crafting');
+    const top = await boxes(page, header);
+    expectFingerSized(top);
+    expectInside(top, view);
+    expectNoOverlap(top);
+    // The panel fits the screen: only the list scrolls.
+    expectInside(await boxes(page, '.inventory-panel'), view);
+    const screenScrolls = await page
+      .locator('.inventory-screen')
+      .evaluate((node) => node.scrollHeight > node.clientHeight);
+    expect(screenScrolls).toBe(false);
+    const listBox = (await boxes(page, '.recipe-list'))[0];
+    expect(await list.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+
+    // Every recipe has a row at least 48 px high; no text leaves its row.
+    const rows = await boxes(page, '.recipe-row');
+    expect(rows).toHaveLength(19);
+    for (const row of rows) {
+      expect(row.height, row.name).toBeGreaterThanOrEqual(48);
+      expect(row.x, row.name).toBeGreaterThanOrEqual(listBox.x);
+      expect(row.x + row.width, row.name).toBeLessThanOrEqual(listBox.x + listBox.width);
+    }
+    expectNoOverlap(rows);
+    const overflowing = await page
+      .locator('.recipe-row, .recipe-name, .recipe-ingredients, .recipe-action')
+      .evaluateAll(
+        (nodes) =>
+          nodes.filter(
+            (node) =>
+              node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1,
+          ).length,
+      );
+    expect(overflowing).toBe(0);
+    // Two logs and three planks: planks and sticks can be made; their buttons are
+    // finger-sized and visible without scrolling.
+    const buttons = await boxes(page, '.recipe-craft');
+    expect(buttons).toHaveLength(2);
+    expectFingerSized(buttons);
+    expectInside(buttons, view);
+    for (const button of buttons) {
+      expect(button.y + button.height, button.name).toBeLessThanOrEqual(listBox.y + listBox.height);
+    }
+
+    if (device === 'phone') {
+      // The world behind the screen is not part of this reference: hide the canvas.
+      const canvas = page.locator('canvas.game-canvas');
+      await canvas.evaluate((node) => {
+        (node as HTMLElement).style.visibility = 'hidden';
+      });
+      await expect(page).toHaveScreenshot('recipe-list-touch.png', { maxDiffPixelRatio: 0.05 });
+      await canvas.evaluate((node) => {
+        (node as HTMLElement).style.visibility = '';
+      });
+    }
+
+    // A finger that drags a row upwards scrolls the list and crafts nothing.
+    const items = async () => (await getState(page)).inventory.slots;
+    const before = await items();
+    const start = rows[2];
+    const x = start.x + 150;
+    const y = start.y + start.height / 2;
+    await swipe(page, { x, y }, { x, y: y - 100 });
+    await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(40);
+    expect(await items()).toEqual(before);
+    // The last row can be reached by scrolling.
+    await list.evaluate((node) => node.scrollTo(0, node.scrollHeight));
+    const last = (await boxes(page, '.recipe-row')).at(-1);
+    expect(last && last.y + last.height).toBeLessThanOrEqual(listBox.y + listBox.height + 1);
+    await list.evaluate((node) => node.scrollTo(0, 0));
+
+    // Crafting by taps: two logs become eight planks.
+    const count = async (item: number) =>
+      (await items()).reduce((sum, s) => sum + (s?.item === item ? s.count : 0), 0);
+    const craftPlanks = page.locator('.recipe-row[data-recipe="planks"] .recipe-craft');
+    await craftPlanks.tap();
+    await expect.poll(() => count(7)).toBe(7);
+    await craftPlanks.tap();
+    await expect.poll(() => count(7)).toBe(11);
+    expect(await count(5)).toBe(0);
+    await expect(craftPlanks).toBeHidden();
+
+    await page.locator('.inventory-close').tap();
+    await expect(page.locator('.inventory-screen')).toBeHidden();
+    expect((await getState(page)).paused).toBe(false);
   });
 }

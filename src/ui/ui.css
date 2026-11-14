@@ -185,7 +185,8 @@ canvas {
 }
 
 /* How many items a slot holds: bottom right, readable on every icon. */
-.slot-count {
+.slot-count,
+.recipe-result-count {
   position: absolute;
   right: 3px;
   bottom: 0;
@@ -1136,9 +1137,10 @@ canvas {
 /* ---- Recipe list ---- */
 
 .recipe-list {
-  /* As wide as the items page (nine slots and the bin) and as high as its content. */
+  /* As wide as the items page (nine slots and the bin). */
   width: 524px;
-  height: 256px;
+  /* Five rows and half of the sixth, which shows that the list goes on. */
+  height: 284px;
   box-sizing: border-box;
   overflow-y: auto;
   overscroll-behavior: contain;

@@ -36,9 +36,9 @@ describe('repository hygiene (AC12.4)', () => {
     const assets = files.filter((file) => BINARY_ASSET.test(file));
     const unexpected = assets.filter((file) => !/^e2e\/screenshots\/[a-z-]+\.png$/.test(file));
     expect(unexpected).toEqual([]);
-    // Fifteen reference screenshots: nine from Phases 1 and 2, `rocky-hill` and `world-menu`
+    // Nineteen reference screenshots: nine from Phases 1 and 2, `rocky-hill` and `world-menu`
     // from Phase 3 part A, `gathering-hud`, `inventory`, `palette` and `inventory-touch`
-    // from part B.
-    expect(assets.length).toBe(15);
+    // from part B, `recipe-list`, `recipe-list-touch`, `item-icons` and `stations` from part C.
+    expect(assets.length).toBe(19);
   });
 });

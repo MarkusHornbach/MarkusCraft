@@ -177,6 +177,8 @@ export class Game {
   private craftHold: { recipe: number; timer: number; repeats: number } | null = null;
   /** The click that ends a hold which already crafted must not craft once more. */
   private suppressCraftClick = false;
+  /** The recipe made last and the action time it was made at. */
+  private lastCraft: { recipe: number; atMs: number } | null = null;
   /** Seconds a mouse button has been held since the last break/place action. */
   private repeatTimer = 0;
   /** Player position before the latest simulation step, for render interpolation. */
@@ -242,7 +244,8 @@ export class Game {
         this.craftHold = { recipe, timer: 0, repeats: 0 };
       },
       onCraftUp: () => {
-        this.suppressCraftClick = (this.craftHold?.repeats ?? 0) > 0;
+        // A hold that ended by itself (nothing left to craft) has set this already.
+        if (this.craftHold) this.suppressCraftClick = this.craftHold.repeats > 0;
         this.craftHold = null;
       },
       onCraftClick: (recipe) => {
@@ -708,6 +711,10 @@ export class Game {
   private craft(id: number): void {
     const recipe = getRecipe(id);
     if (!recipe || !this.inventoryOpen || this.gameMode !== 'gathering') return;
+    // The list reorders after a craft, and another recipe's button may slide under the
+    // pointer: a quick second press must not craft something the player did not choose.
+    const last = this.lastCraft;
+    if (last && last.recipe !== id && this.nowMs() - last.atMs < CRAFT_REPEAT_MS - 1e-6) return;
     if (recipe.station !== 'furnace') {
       this.session.submit({ kind: 'craft', recipe: id });
       return;
@@ -745,6 +752,7 @@ export class Game {
     this.smelt = null;
     this.craftHold = null;
     this.suppressCraftClick = false;
+    this.lastCraft = null;
     this.inventoryScreen.setSmelting(null, 0);
   }
 
@@ -816,8 +824,14 @@ export class Game {
       if (!result.ok && result.reason === 'full') this.fullUntilMs = this.nowMs() + NOTICE_MS;
     }
     // A recipe that cannot be made any more ends the hold on its button.
-    if (action.kind === 'craft' && !result.ok) this.craftHold = null;
+    if (action.kind === 'craft' && !result.ok && this.craftHold) {
+      this.suppressCraftClick = this.craftHold.repeats > 0;
+      this.craftHold = null;
+    }
     if (!result.ok) return;
+    if (action.kind === 'craft' && this.inventoryOpen) {
+      this.lastCraft = { recipe: action.recipe, atMs: this.nowMs() };
+    }
     if (action.kind === 'selectSlot') this.hud.setSelected(this.selectedSlot, true);
     if (action.kind === 'break') this.breakActive = false;
     for (const notice of result.notices) this.showPickup(notice.item, notice.count);
