@@ -317,9 +317,11 @@ test('a world that is open in another tab cannot be opened a second time (Phase 
   await page.close();
   // The lock goes with the tab; the browser may need a moment to release it.
   await expect(async () => {
-    await second.locator('.world-play-button').click();
+    // Under load the world may arrive after a round gave up: then the button is gone.
+    const open = await second.evaluate(() => window.__mc.getState().world !== null);
+    if (!open) await second.locator('.world-play-button').click({ timeout: 2000 });
     await second.waitForFunction(() => window.__mc.getState().world !== null, null, {
-      timeout: 2000,
+      timeout: 5000,
     });
   }).toPass();
   expect((await second.evaluate(() => window.__mc.getState())).world?.name).toBe('Shared');
@@ -432,7 +434,7 @@ test('the settings page opens from the world menu and leads back (Phase 3 AC4.10
   await page.locator('.world-form-settings-button').click();
   await expect(page.locator('.world-menu')).toBeHidden();
   await expect(page.locator('.pause-screen')).toBeVisible();
-  await expect(page.locator('.controls-list dt')).toHaveCount(11);
+  await expect(page.locator('.controls-list dt')).toHaveCount(12);
   await expect(page.locator('#setting-fov')).toBeVisible();
   // No world is open: no continue button, no seed, no link.
   await expect(page.locator('.pause-screen .play-button')).toHaveCount(0);

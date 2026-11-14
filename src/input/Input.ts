@@ -10,6 +10,7 @@ export type PressAction =
   | { type: 'toggleFly' }
   | { type: 'toggleDebug' }
   | { type: 'menu' }
+  | { type: 'inventory' }
   | { type: 'break' }
   | { type: 'place' }
   | { type: 'selectSlot'; slot: number }

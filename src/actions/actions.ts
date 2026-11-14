@@ -1,5 +1,5 @@
 // Actions: every change to the world or to a player's items, as plain serialisable data.
-import { HOTBAR_SLOTS } from '../game/config';
+import { HOTBAR_SLOTS, INVENTORY_SLOTS } from '../game/config';
 
 /** Selects a bar slot (0-based). */
 export interface SelectSlotAction {
@@ -15,6 +15,14 @@ export interface BreakAction {
   z: number;
 }
 
+/** Gathering: begins breaking the block in a cell; `break` follows when its time is up. */
+export interface StartBreakAction {
+  kind: 'startBreak';
+  x: number;
+  y: number;
+  z: number;
+}
+
 /** Places the block held in a bar slot (0-based) into a cell. */
 export interface PlaceAction {
   kind: 'place';
@@ -24,8 +32,35 @@ export interface PlaceAction {
   slot: number;
 }
 
-/** Parts B and C append kinds here; an action survives JSON unchanged. */
-export type Action = SelectSlotAction | BreakAction | PlaceAction;
+/** Moves the stack of one inventory slot (0-based) to another: move, merge or swap. */
+export interface MoveStackAction {
+  kind: 'moveStack';
+  from: number;
+  to: number;
+}
+
+/** Empties an inventory slot (the bin). */
+export interface DiscardAction {
+  kind: 'discard';
+  slot: number;
+}
+
+/** Creative only: puts a block into a bar slot (the palette). */
+export interface SetBarSlotAction {
+  kind: 'setBarSlot';
+  slot: number;
+  item: number;
+}
+
+/** Part C appends kinds here; an action survives JSON unchanged. */
+export type Action =
+  | SelectSlotAction
+  | BreakAction
+  | PlaceAction
+  | StartBreakAction
+  | MoveStackAction
+  | DiscardAction
+  | SetBarSlotAction;
 export type ActionKind = Action['kind'];
 
 export type DecodeResult = { ok: true; action: Action } | { ok: false; error: string };
@@ -39,12 +74,21 @@ const isCoord: Check = (value) =>
   typeof value === 'number' && Number.isInteger(value) && Math.abs(value) <= COORD_LIMIT;
 const isBarSlot: Check = (value) =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < HOTBAR_SLOTS;
+const isSlot: Check = (value) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < INVENTORY_SLOTS;
+/** Whether the id names an item is a rule about the game and checked by `applyAction`. */
+const isItemId: Check = (value) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 0xffff;
 
 /** The fields of every kind, besides `kind` itself, with their checks. */
 const FIELDS: Record<ActionKind, Record<string, Check>> = {
   selectSlot: { slot: isBarSlot },
   break: { x: isCoord, y: isCoord, z: isCoord },
   place: { x: isCoord, y: isCoord, z: isCoord, slot: isBarSlot },
+  startBreak: { x: isCoord, y: isCoord, z: isCoord },
+  moveStack: { from: isSlot, to: isSlot },
+  discard: { slot: isSlot },
+  setBarSlot: { slot: isBarSlot, item: isItemId },
 };
 
 function fail(error: string): DecodeResult {

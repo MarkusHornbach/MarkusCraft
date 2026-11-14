@@ -3,8 +3,11 @@ import type { Action } from '../actions/actions';
 import type { ActionResult, BlockChange } from '../actions/apply';
 import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
 import { type PlayerRecord } from '../actions/playerRecord';
-import { LocalSession, type Session } from '../actions/Session';
+import { LocalSession } from '../actions/Session';
 import { Input, type PressAction } from '../input/Input';
+import { breakTimeMs } from '../items/hardness';
+import { addItems } from '../items/inventory';
+import { isItem, itemLabel } from '../items/items';
 import { TouchControls } from '../input/TouchControls';
 import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
@@ -20,6 +23,7 @@ import {
 import { MemoryStore, type WorldStore } from '../save/WorldStore';
 import { DebugOverlay } from '../ui/DebugOverlay';
 import { Hud } from '../ui/Hud';
+import { InventoryScreen } from '../ui/InventoryScreen';
 import { type InputMode, PauseScreen, SAVE_FAILED_TEXT } from '../ui/PauseScreen';
 import {
   DEFAULT_SETTINGS,
@@ -31,6 +35,7 @@ import {
 } from '../ui/settings';
 import { TouchHud } from '../ui/TouchHud';
 import { WorldMenu } from '../ui/WorldMenu';
+import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
 import { chunkKey, toChunkCoord } from '../world/chunk';
@@ -47,6 +52,7 @@ import {
   HOTBAR_SLOTS,
   LOOK_RADIANS_PER_PIXEL,
   MAX_STEPS_PER_FRAME,
+  NOTICE_MS,
   PIXEL_RATIO_MAX,
   PLAYER_EYE_HEIGHT,
   REACH,
@@ -67,6 +73,8 @@ import { type GameState, type PlayerPatch, type TestApi, installTestApi } from '
 import type { GameParams } from './urlParams';
 import { type ReleaseLock, acquireWorldLock } from './worldLock';
 
+/** If the browser has not captured the mouse this long after a request, the game pauses. */
+const POINTER_LOCK_WAIT_MS = 1000;
 /** Time the view may need to settle after entering or leaving fullscreen. */
 const FULLSCREEN_SETTLE_MS = 500;
 
@@ -80,6 +88,15 @@ const TEXT_OTHER_TAB = 'This world is open in another tab.';
 const TEXT_NOT_OPENED = 'This world could not be opened.';
 const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.';
 const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
+const TEXT_INVENTORY_FULL = 'Inventory full';
+
+/** A timed break as the screen shows it: the cell and how far it has come (0..1). */
+interface BreakView {
+  x: number;
+  y: number;
+  z: number;
+  progress: number;
+}
 
 /** True on devices whose main pointer is a finger (phones and tablets). */
 function prefersTouch(): boolean {
@@ -110,6 +127,9 @@ export class Game {
   /** The start screen with the list of worlds; like the pause screen not in test mode. */
   private readonly worldMenu: WorldMenu | null = null;
   private screen: Screen = 'play';
+  private readonly inventoryScreen: InventoryScreen;
+  /** The inventory covers the view. Unlike the menus it does not pause the world. */
+  private inventoryOpen = false;
   /** True while a world is being opened, created or deleted from the menu. */
   private menuBusy = false;
   /** Releases the tab lock of the open world. */
@@ -130,13 +150,19 @@ export class Game {
   private fpsTime = 0;
   private readonly root: HTMLElement;
   /** Every change to blocks and to the player's items goes through the session. */
-  private session: Session;
+  private session: LocalSession;
   private gameMode: GameMode = 'creative';
   /** Simulation steps since the world was opened: the clock of the action layer. */
   private simSteps = 0;
   /** Answer to the action submitted last (the test API returns it). */
   private lastResult: ActionResult | null = null;
   private target: RayHit | null = null;
+  /** Gathering: the session confirmed the break that the held button is working on. */
+  private breakActive = false;
+  /** The pickup notice on screen ("+2 Dirt") and the action time until it stays. */
+  private pickup: { item: number; count: number; untilMs: number } | null = null;
+  /** "Inventory full" shows until this action time. */
+  private fullUntilMs = -1;
   /** Seconds a mouse button has been held since the last break/place action. */
   private repeatTimer = 0;
   /** Player position before the latest simulation step, for render interpolation. */
@@ -178,7 +204,7 @@ export class Game {
 
     this.input = new Input({
       element: canvas,
-      isActive: () => !this.paused,
+      isActive: () => !this.paused && !this.inventoryOpen,
       onPress: (action) => this.handlePress(action),
     });
 
@@ -186,6 +212,28 @@ export class Game {
     this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
     this.hud.setSelected(this.selectedSlot, false);
     this.debug = new DebugOverlay(this.root);
+    this.inventoryScreen = new InventoryScreen(this.root, {
+      tiles: this.renderer.atlas.tiles,
+      onMove: (from, to) => this.session.submit({ kind: 'moveStack', from, to }),
+      onDiscard: (slot) => this.session.submit({ kind: 'discard', slot }),
+      onPalette: (item, barSlot) =>
+        this.session.submit({
+          kind: 'setBarSlot',
+          slot: barSlot ?? this.session.record.selectedSlot,
+          item,
+        }),
+      onClose: () => this.closeInventory(),
+    });
+    // E opens and closes the inventory, Esc closes it. Not while a text field is typed in.
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat || e.target instanceof HTMLInputElement) return;
+      if (e.code === 'KeyE') {
+        if (this.inventoryOpen) this.closeInventory();
+        else this.openInventory();
+      } else if (e.code === 'Escape' && this.inventoryOpen) {
+        this.closeInventory();
+      }
+    });
 
     if (!params.test) {
       // Normal play starts in the world menu; no world is open until one is chosen.
@@ -207,8 +255,8 @@ export class Game {
       this.worldMenu = new WorldMenu(this.root, {
         mode: this.mode,
         onPlay: (id, via) => void this.startWorld(() => this.loadStoredWorld(id), via),
-        onCreate: (name, seedText, via) =>
-          void this.startWorld(() => this.createStoredWorld(name, seedText), via),
+        onCreate: (name, seedText, mode, via) =>
+          void this.startWorld(() => this.createStoredWorld(name, seedText, mode), via),
         onDelete: (id) => void this.deleteWorld(id),
         onSettings: () => this.showScreen('settings'),
       });
@@ -222,7 +270,10 @@ export class Game {
       void this.openStoredTestWorld();
     } else {
       // A new world in memory. It is never stored.
-      this.loadWorld(this.newWorldMeta(params.world, params.seed, params.time), new Map());
+      this.loadWorld(
+        this.newWorldMeta(params.world, params.seed, params.time, params.mode),
+        new Map(),
+      );
     }
 
     // Phones and tablets start in touch mode; the play button can still switch the mode.
@@ -253,11 +304,10 @@ export class Game {
   }
 
   /** The record of a world that does not exist yet: at its start point, in the morning. */
-  private newWorldMeta(name: string, seed: number, time: number): WorldMeta {
+  private newWorldMeta(name: string, seed: number, time: number, mode: GameMode): WorldMeta {
     const spawn = findSpawn(getTerrain(seed));
     const now = Date.now();
     const random = (): number => Math.floor(Math.random() * 0x100000000);
-    const mode: GameMode = 'creative';
     return {
       id: makeWorldId(now, random(), random()),
       name: normalizeName(name),
@@ -286,18 +336,28 @@ export class Game {
     this.spawn = findSpawn(getTerrain(meta.seed));
     this.player = createPlayer(meta.pose.x, meta.pose.y, meta.pose.z);
     applyLook(this.player, meta.pose.yaw, meta.pose.pitch);
-    this.player.mode = meta.moveMode;
+    // Nobody flies in a Gathering world, whatever the record says.
+    this.player.mode = meta.mode === 'gathering' ? 'walk' : meta.moveMode;
     this.rememberPosition();
     this.time = meta.time;
     this.gameMode = meta.mode;
     this.simSteps = 0;
     this.repeatTimer = 0;
+    this.breakActive = false;
+    this.pickup = null;
+    this.fullUntilMs = -1;
     this.target = null;
     this.meta = meta;
     this.session = this.createSession(meta.player);
     this.autosave = this.createAutosave();
+    this.hud.setSlots(meta.player.slots);
     this.hud.setSelected(this.selectedSlot, false);
+    this.hideInventory();
+    this.inventoryScreen.setGameMode(meta.mode);
+    this.inventoryScreen.setSlots(meta.player.slots, meta.player.selectedSlot);
     this.pauseScreen?.setWorld(meta.seed);
+    this.pauseScreen?.setGameMode(meta.mode);
+    this.touchHud?.setFlyAvailable(meta.mode === 'creative');
     this.updateChunkCenter();
     this.framesSinceIdle = 0;
   }
@@ -351,14 +411,14 @@ export class Game {
    * Opens the world with this name from the store, creating it from the seed if there
    * is none. Saves the world that is open first.
    */
-  private async openNamedWorld(name: string, seed: number): Promise<void> {
+  private async openNamedWorld(name: string, seed: number, mode: GameMode): Promise<void> {
     await this.saveNow();
     const start = performance.now();
     const wanted = normalizeName(name);
     const entries = await this.store.list();
     const entry = entries.find((e) => e.status === 'ok' && e.meta.name === wanted);
     if (!entry) {
-      const meta = this.newWorldMeta(wanted, seed, this.params.time);
+      const meta = this.newWorldMeta(wanted, seed, this.params.time, mode);
       await this.store.create(meta);
       this.loadWorld(meta, new Map());
     } else {
@@ -419,10 +479,14 @@ export class Game {
   }
 
   /** Creates and stores the world of the "New world" form. */
-  private async createStoredWorld(name: string, seedText: string): Promise<LoadedWorld> {
+  private async createStoredWorld(
+    name: string,
+    seedText: string,
+    mode: GameMode,
+  ): Promise<LoadedWorld> {
     const seed = seedFromText(seedText) ?? Math.floor(Math.random() * 0x100000000);
     const time = this.params.timeFromUrl ? this.params.time : START_TIME_OF_DAY;
-    const meta = this.newWorldMeta(name, seed, time);
+    const meta = this.newWorldMeta(name, seed, time, mode);
     try {
       await this.store.create(meta);
     } catch {
@@ -546,7 +610,7 @@ export class Game {
   /** `test=1&save=1`: the world named by the URL, kept in IndexedDB. */
   private async openStoredTestWorld(): Promise<void> {
     this.store = await IdbStore.open();
-    await this.openNamedWorld(this.params.world, this.params.seed);
+    await this.openNamedWorld(this.params.world, this.params.seed, this.params.mode);
   }
 
   /** Bar slot of the confirmed player record, 1-based as on the keyboard. */
@@ -554,21 +618,26 @@ export class Game {
     return this.session.record.selectedSlot + 1;
   }
 
-  private createSession(record: PlayerRecord): Session {
+  private createSession(record: PlayerRecord): LocalSession {
     return new LocalSession(
       {
         world: this.world,
         mode: this.gameMode,
         pose: () => this.player,
-        nowMs: () => (this.simSteps * 1000) / SIM_HZ,
+        nowMs: () => this.nowMs(),
       },
       record,
       {
         onBlocks: (changes) => this.onBlocksChanged(changes),
-        onPlayer: () => this.markMetaDirty(),
+        onPlayer: (changed) => this.onPlayerChanged(changed),
         onResult: (action, result) => this.onActionResult(action, result),
       },
     );
+  }
+
+  /** The clock of the action layer: simulation time since the world was opened. */
+  private nowMs(): number {
+    return (this.simSteps * 1000) / SIM_HZ;
   }
 
   /** The session set blocks: rebuild the meshes they touch, outside the frame budget. */
@@ -579,10 +648,78 @@ export class Game {
     }
   }
 
+  /** The session confirmed a new record of the player: show it and save it. */
+  private onPlayerChanged(record: PlayerRecord): void {
+    this.hud.setSlots(record.slots);
+    this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
+    this.markMetaDirty();
+  }
+
+  // --- inventory screen ----------------------------------------------------------------
+
+  /**
+   * Opens the inventory over the running game. The player gets no movement or look input
+   * while it is open; in mouse mode the mouse is set free for it.
+   */
+  private openInventory(): void {
+    if (!this.meta || this.paused || this.inventoryOpen) return;
+    this.inventoryOpen = true;
+    this.touch?.tracker.reset();
+    this.input.reset();
+    const record = this.session.record;
+    this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
+    this.inventoryScreen.setVisible(true);
+    if (this.pauseScreen && this.mode === 'mouse' && document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  }
+
+  /**
+   * Closes the inventory and goes on playing. In mouse mode the mouse is captured again;
+   * if the browser refuses (it may, right after Esc), the pause menu offers "Click to
+   * continue" instead, so the player is never left without the mouse.
+   */
+  private closeInventory(): void {
+    if (!this.inventoryOpen) return;
+    this.hideInventory();
+    if (!this.pauseScreen || this.mode !== 'mouse') return;
+    this.requestPointerLock();
+    window.setTimeout(() => this.pauseWithoutPointerLock(), POINTER_LOCK_WAIT_MS);
+  }
+
+  private hideInventory(): void {
+    this.inventoryOpen = false;
+    this.inventoryScreen.setVisible(false);
+  }
+
+  /** Mouse mode is played with a captured mouse; without it the pause menu shows. */
+  private pauseWithoutPointerLock(): void {
+    if (this.mode !== 'mouse' || this.inventoryOpen || this.paused || !this.meta) return;
+    if (!this.input.pointerLocked) this.setPaused(true);
+  }
+
   private onActionResult(action: Action, result: ActionResult): void {
     this.lastResult = result;
+    // A malformed value is refused and reported as it came: it may not be an object.
+    if (!result.ok && (typeof action !== 'object' || action === null)) return;
+    if (action.kind === 'startBreak') {
+      // The break runs from now on, or it does not start at all.
+      this.breakActive = result.ok;
+      if (!result.ok && result.reason === 'full') this.fullUntilMs = this.nowMs() + NOTICE_MS;
+    }
     if (!result.ok) return;
     if (action.kind === 'selectSlot') this.hud.setSelected(this.selectedSlot, true);
+    if (action.kind === 'break') this.breakActive = false;
+    for (const notice of result.notices) this.showPickup(notice.item, notice.count);
+  }
+
+  /** "+1 Stone"; another pickup of the same item while it shows counts up. */
+  private showPickup(item: number, count: number): void {
+    const now = this.nowMs();
+    const shown = this.pickup;
+    const total =
+      shown && shown.item === item && now <= shown.untilMs ? shown.count + count : count;
+    this.pickup = { item, count: total, untilMs: now + NOTICE_MS };
   }
 
   start(): void {
@@ -601,11 +738,12 @@ export class Game {
     this.input.setMouseEnabled(!touch);
     if (touch && !this.touch) {
       this.touchHud = new TouchHud(this.root, this.hud.element);
+      this.touchHud.setFlyAvailable(this.gameMode === 'creative');
       this.touchHud.setVisible(!this.paused);
       this.touch = new TouchControls({
         root: this.root,
         sink: this.input,
-        isActive: () => !this.paused,
+        isActive: () => !this.paused && !this.inventoryOpen,
       });
     } else if (!touch) {
       this.touch?.dispose();
@@ -679,12 +817,15 @@ export class Game {
     if (this.mode === 'touch') return;
     // While a world is still being opened, `startWorld` looks at the lock when it is there.
     if (!this.meta) return;
+    // The inventory sets the mouse free without pausing.
+    if (this.inventoryOpen) return;
     this.setPaused(!this.input.pointerLocked);
   }
 
   private onPointerLockError(): void {
     // Browsers refuse to lock again for a moment after Esc; a second click works.
     this.pauseScreen?.setHint('The browser did not capture the mouse yet. Please click again.');
+    this.pauseWithoutPointerLock();
   }
 
   private setPaused(paused: boolean): void {
@@ -696,6 +837,8 @@ export class Game {
       this.touchHud?.setVisible(!paused);
     }
     if (paused) {
+      // A menu over the game closes the inventory.
+      this.hideInventory();
       this.touch?.tracker.reset();
       this.input.reset();
       void this.saveNow();
@@ -776,7 +919,7 @@ export class Game {
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
     }
 
-    if (!this.paused) {
+    if (!this.paused && !this.inventoryOpen) {
       const look = this.input.consumeLook();
       this.applyLookPixels(look.dx, look.dy);
       if (this.touch) {
@@ -810,16 +953,22 @@ export class Game {
     this.rememberPosition();
     stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
-    this.repeatHeldAction();
+    // The step is over: actions of this step carry its end time.
     this.simSteps++;
+    this.repeatHeldAction();
     // Pose and time of day are part of the world's record.
     this.markMetaDirty();
     this.time = advanceTime(this.time, SIM_DT, this.params.freeze);
   }
 
-  /** Holding a mouse button repeats its action at a fixed interval. */
+  /**
+   * Holding a mouse button repeats its action at a fixed interval. In Gathering only
+   * placing repeats; a held break button works on one block for its break time.
+   */
   private repeatHeldAction(): void {
-    const breaking = this.input.isHeld('break');
+    const timed = this.gameMode === 'gathering';
+    if (timed) this.continueBreak();
+    const breaking = !timed && this.input.isHeld('break');
     const placing = this.input.isHeld('place');
     if (!breaking && !placing) {
       this.repeatTimer = 0;
@@ -831,6 +980,61 @@ export class Game {
     this.repeatTimer = 0;
     if (breaking) this.breakTarget();
     else this.placeAtTarget();
+  }
+
+  /**
+   * Gathering: one step of a timed break. A press on a block submits `startBreak`;
+   * looking at another block, or pressing again after a release, starts over; when the
+   * block's time is up `break` follows, and holding on starts the next block.
+   */
+  private continueBreak(): void {
+    if (!this.input.isHeld('break')) {
+      this.breakActive = false;
+      return;
+    }
+    this.updateTarget();
+    const t = this.target;
+    if (!t) {
+      this.breakActive = false;
+      return;
+    }
+    const started = this.session.record.breaking;
+    const same = started && started.x === t.x && started.y === t.y && started.z === t.z;
+    if (!this.breakActive || !started || !same) {
+      this.breakActive = false;
+      this.session.submit({ kind: 'startBreak', x: t.x, y: t.y, z: t.z });
+      return;
+    }
+    const required = breakTimeMs(t.id) ?? 0;
+    // The tolerance keeps 36 steps of 1/60 s from falling just short of 600 ms.
+    if (this.nowMs() - started.startMs < required - 1e-6) return;
+    this.session.submit({ kind: 'break', x: t.x, y: t.y, z: t.z });
+    this.updateTarget();
+  }
+
+  /** The timed break on screen, or null while none runs. */
+  private breakView(): BreakView | null {
+    const started = this.session.record.breaking;
+    const t = this.target;
+    if (!this.breakActive || !started || !t || !this.input.isHeld('break')) return null;
+    if (started.x !== t.x || started.y !== t.y || started.z !== t.z) return null;
+    const required = breakTimeMs(t.id) ?? 0;
+    const elapsed = this.nowMs() - started.startMs;
+    const progress = required > 0 ? Math.max(0, Math.min(1, (elapsed + 1e-6) / required)) : 1;
+    return { x: started.x, y: started.y, z: started.z, progress };
+  }
+
+  /** Break progress, pickup notice and hints of the HUD. */
+  private updateHudStatus(): void {
+    const view = this.breakView();
+    // Five stages of cracks over the break time.
+    const stage = view ? Math.min(CRACK_STAGES - 1, Math.floor(view.progress * CRACK_STAGES)) : 0;
+    this.renderer.setBreakOverlay(view, stage);
+    this.hud.setBreakProgress(view ? view.progress : null);
+    const now = this.nowMs();
+    const pickup = this.pickup && now <= this.pickup.untilMs ? this.pickup : null;
+    this.hud.setNotice(pickup ? `+${pickup.count} ${itemLabel(pickup.item)}` : null);
+    this.hud.setMessage(now <= this.fullUntilMs ? TEXT_INVENTORY_FULL : null);
   }
 
   /** Finds the block the player is looking at, within reach. */
@@ -902,12 +1106,20 @@ export class Game {
   private handlePress(action: PressAction): void {
     switch (action.type) {
       case 'toggleFly':
+        // Gathering worlds are walked and swum.
+        if (this.gameMode === 'gathering') break;
         this.player.mode = this.player.mode === 'fly' ? 'walk' : 'fly';
         this.player.vy = 0;
         break;
       case 'break':
         this.repeatTimer = 0;
-        this.breakTarget();
+        if (this.gameMode === 'gathering') {
+          // A new press starts over, also on the block of the press before.
+          this.breakActive = false;
+          this.continueBreak();
+        } else {
+          this.breakTarget();
+        }
         break;
       case 'place':
         this.repeatTimer = 0;
@@ -921,6 +1133,9 @@ export class Game {
         break;
       case 'toggleDebug':
         this.setDebugVisible(!this.debug.visible);
+        break;
+      case 'inventory':
+        this.openInventory();
         break;
       case 'menu':
         // Test mode has no menu to come back from.
@@ -956,6 +1171,7 @@ export class Game {
     const prev = this.previous;
     this.updateTarget();
     this.renderer.setHighlight(this.target);
+    this.updateHudStatus();
     const x = prev.x + (p.x - prev.x) * alpha;
     const y = prev.y + (p.y - prev.y) * alpha;
     const z = prev.z + (p.z - prev.z) * alpha;
@@ -1018,6 +1234,20 @@ export class Game {
     this.remeshAround(x, z);
   }
 
+  /** Test tool: puts items into the inventory, past the action layer. */
+  private testGive(item: number, count: number): void {
+    if (!isItem(item) || !Number.isInteger(count) || count < 1) return;
+    const record = this.session.record;
+    const { slots } = addItems(record.slots, item, count);
+    this.session.replaceRecord({ ...record, slots });
+  }
+
+  /** Test tool: empties all slots. */
+  private testClearInventory(): void {
+    const record = this.session.record;
+    this.session.replaceRecord({ ...record, slots: record.slots.map(() => null) });
+  }
+
   /** Test tool: hands any value to the session as an action and returns the answer. */
   private testSubmit(action: unknown): ActionResult | null {
     this.lastResult = null;
@@ -1053,6 +1283,7 @@ export class Game {
         selected: record.selectedSlot,
       },
       touch: this.mode === 'touch',
+      ui: { screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play' },
       player: {
         x: p.x,
         y: p.y,
@@ -1078,6 +1309,7 @@ export class Game {
         renderDistance: this.settings.renderDistance,
       },
       selectedSlot: this.selectedSlot,
+      breaking: this.breakView(),
       target: this.target
         ? {
             x: this.target.x,
@@ -1095,7 +1327,10 @@ export class Game {
     if (patch.x !== undefined) p.x = patch.x;
     if (patch.y !== undefined) p.y = patch.y;
     if (patch.z !== undefined) p.z = patch.z;
-    if (patch.mode !== undefined) p.mode = patch.mode;
+    // Fly mode cannot be entered in a Gathering world, also not by a test.
+    if (patch.mode !== undefined && (patch.mode === 'walk' || this.gameMode === 'creative')) {
+      p.mode = patch.mode;
+    }
     p.vx = 0;
     p.vy = 0;
     p.vz = 0;
@@ -1129,7 +1364,10 @@ export class Game {
         return this.getState();
       },
       setPlayer: (patch) => this.setPlayer(patch),
-      look: (dx, dy) => this.applyLookPixels(dx, dy),
+      look: (dx, dy) => {
+        // As the mouse: it turns nothing while the inventory is open.
+        if (!this.inventoryOpen) this.applyLookPixels(dx, dy);
+      },
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),
       setBlock: (x, y, z, id) => this.testSetBlock(x, y, z, id),
       submit: (action) => this.testSubmit(action),
@@ -1140,7 +1378,9 @@ export class Game {
         this.markMetaDirty();
       },
       save: () => this.saveNow(),
-      openWorld: (name, seed) => this.openNamedWorld(name, seed),
+      give: (item, count) => this.testGive(item, count),
+      clearInventory: () => this.testClearInventory(),
+      openWorld: (name, seed, mode) => this.openNamedWorld(name, seed, mode ?? this.params.mode),
       step: (n) => {
         for (let i = 0; i < n; i++) this.simulate();
         this.updateChunkCenter();

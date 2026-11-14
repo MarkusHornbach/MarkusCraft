@@ -161,7 +161,9 @@ describe('TouchTracker look', () => {
 });
 
 describe('TouchTracker buttons and slots', () => {
-  const button = (name: 'break' | 'place' | 'up' | 'down' | 'fly' | 'menu'): TouchTarget => ({
+  const button = (
+    name: 'break' | 'place' | 'up' | 'down' | 'fly' | 'menu' | 'bag',
+  ): TouchTarget => ({
     kind: 'button',
     button: name,
   });
@@ -192,6 +194,15 @@ describe('TouchTracker buttons and slots', () => {
     down(4, 30, 30, button('menu'));
     expect(sink.presses).toEqual([{ type: 'toggleFly' }, { type: 'menu' }]);
     expect(sink.held.size).toBe(0);
+  });
+
+  it('maps the bag button to an inventory press and holds nothing for it', () => {
+    const { tracker, sink, down } = setup();
+    down(1, 800, 30, button('bag'));
+    expect(sink.presses).toEqual([{ type: 'inventory' }]);
+    expect(sink.held.size).toBe(0);
+    tracker.up(1);
+    expect(sink.presses.length).toBe(1);
   });
 
   it('selects a slot of the block bar', () => {

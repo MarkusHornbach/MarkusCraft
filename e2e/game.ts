@@ -14,6 +14,8 @@ export interface OpenOptions {
   /** Keep the world in IndexedDB (`save=1`) under this name (`world=`, default "Test"). */
   save?: boolean;
   world?: string;
+  /** Game mode of a world the page creates (`mode=`, default Creative). */
+  mode?: 'creative' | 'gathering';
 }
 
 export function gameUrl(options: OpenOptions = {}): string {
@@ -25,6 +27,7 @@ export function gameUrl(options: OpenOptions = {}): string {
   if (options.touch) query.set('touch', '1');
   if (options.save) query.set('save', '1');
   if (options.world !== undefined) query.set('world', options.world);
+  if (options.mode !== undefined) query.set('mode', options.mode);
   return `/?${query.toString()}`;
 }
 
@@ -73,6 +76,24 @@ export function surfaceY(page: Page, x: number, z: number): Promise<number> {
 /** Advances the simulation by exactly `n` fixed steps and renders. */
 export async function step(page: Page, n: number): Promise<void> {
   await page.evaluate((count) => window.__mc.step(count), n);
+}
+
+/** Test tool: puts items into the inventory. */
+export async function give(page: Page, item: number, count: number): Promise<void> {
+  await page.evaluate(([i, c]) => window.__mc.give(i, c), [item, count]);
+}
+
+/** The player's 36 slots as the game state reports them. */
+export async function inventory(page: Page): Promise<GameState['inventory']['slots']> {
+  return (await getState(page)).inventory.slots;
+}
+
+/** Hands an action to the session; returns `true` or the reason it was refused for. */
+export function submit(page: Page, action: unknown): Promise<true | string> {
+  return page.evaluate((a) => {
+    const result = window.__mc.submit(a);
+    return result === null ? 'no answer' : result.ok ? true : result.reason;
+  }, action);
 }
 
 export const DEG = Math.PI / 180;
@@ -128,13 +149,17 @@ export async function openMenu(page: Page, query = '', storeSettings = true): Pr
   }
   await page.goto(`/${query}`);
   await page.waitForFunction(() => window.__mc !== undefined);
-  // The list of stored worlds has arrived when the list or the form is shown.
+  // The form is on screen from the start and is reset when the list of stored worlds
+  // arrives: wait for the list before typing into it.
+  await page.locator('.world-menu[data-ready]').waitFor();
   await page.locator('.world-list-view:visible, .world-form:visible').waitFor();
 }
 
 export interface NewWorld {
   name?: string;
   seed?: string;
+  /** Game mode; the helper chooses Creative unless told otherwise (the form: Gathering). */
+  mode?: 'creative' | 'gathering';
   /** Activate the button with a finger instead of the mouse. */
   tap?: boolean;
   /** Also wait until all chunks around the player are loaded (slow under software WebGL). */
@@ -153,6 +178,8 @@ export async function createWorld(page: Page, world: NewWorld = {}): Promise<voi
   }
   if (world.name !== undefined) await page.locator('#world-name').fill(world.name);
   if (world.seed !== undefined) await page.locator('#world-seed').fill(world.seed);
+  const mode = page.locator(`.world-mode-button[data-mode="${world.mode ?? 'creative'}"]`);
+  await (world.tap ? mode.tap() : mode.click());
   const create = page.locator('.world-create-button');
   await (world.tap ? create.tap() : create.click());
   await untilPlaying(page);

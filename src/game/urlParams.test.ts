@@ -14,6 +14,7 @@ describe('parseParams', () => {
       timeFromUrl: false,
       save: false,
       world: 'Test',
+      mode: 'creative',
     });
   });
   it('reads all parameters', () => {
@@ -29,6 +30,7 @@ describe('parseParams', () => {
       timeFromUrl: true,
       save: true,
       world: 'Second',
+      mode: 'creative',
     });
   });
   it('normalises seeds to unsigned 32-bit and ignores invalid input', () => {

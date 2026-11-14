@@ -23,10 +23,14 @@ async function openOnDevice(page: Page, query = '?seed=1337&time=0.25'): Promise
   await withoutFullscreen(page);
   await page.goto(`/${query}`);
   await page.waitForFunction(() => window.__mc !== undefined);
+  // The form is reset when the list of stored worlds arrives.
+  await page.locator('.world-menu[data-ready]').waitFor();
 }
 
 /** Creates a world from the form of the world menu (Phase 3) and starts it by tap. */
 async function tapCreate(page: Page): Promise<void> {
+  // A Creative world: these tests are about all controls, the fly button included.
+  await page.locator('.world-mode-button[data-mode="creative"]').tap();
   await page.locator('.world-create-button').tap();
   await page.waitForFunction(() => !window.__mc.getState().paused);
 }
@@ -122,6 +126,7 @@ for (const [device, view] of [
     await tapPlay(page);
     const buttons = await boxes(page, '.touch-button');
     expect(buttons.map((b) => b.name.split(' ').pop()).sort()).toEqual([
+      'bag',
       'break',
       'down',
       'fly',
@@ -253,10 +258,19 @@ test('the touch menu has fullscreen, debug overlay and touch sensitivity (AC3.4)
 
   // The controls list names the touch controls instead of keys.
   const list = menu.locator('.controls-list');
-  for (const text of ['stick', 'Drag right side', 'Break / Place', 'Up', 'Down', 'Fly', 'Menu']) {
+  for (const text of [
+    'stick',
+    'Drag right side',
+    'Break / Place',
+    'Up',
+    'Down',
+    'Fly',
+    'Bag',
+    'Menu',
+  ]) {
     await expect(list).toContainText(text);
   }
-  await expect(list.locator('dt')).toHaveCount(8);
+  await expect(list.locator('dt')).toHaveCount(9);
   await expect(list).not.toContainText('W A S D');
   await expect(list).not.toContainText('F3');
 
@@ -361,7 +375,7 @@ test('matches the touch-controls reference; controls leave crosshair and bar fre
   const stick = await boxes(page, '.touch-stick');
   const bar = await boxes(page, '.hotbar');
   const crosshair = await boxes(page, '.crosshair');
-  expect(buttons).toHaveLength(6);
+  expect(buttons).toHaveLength(7);
   for (const control of [...buttons, ...stick]) {
     expect(overlap(control, bar[0]), control.name).toBe(false);
     expect(overlap(control, crosshair[0]), control.name).toBe(false);
@@ -375,7 +389,7 @@ test('matches the touch-controls reference; controls leave crosshair and bar fre
       return count / (canvas.width * canvas.height);
     }),
   );
-  expect(painted).toHaveLength(6);
+  expect(painted).toHaveLength(7);
   for (const share of painted) {
     expect(share).toBeGreaterThan(0.05);
     expect(share).toBeLessThan(0.6);

@@ -34,6 +34,8 @@ export interface GameState {
   inventory: { slots: (ItemStack | null)[]; selected: number };
   /** True in touch mode (touch controls shown), false in mouse mode. */
   touch: boolean;
+  /** What covers the view: a menu, the inventory, or nothing (`play`). */
+  ui: { screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' };
   player: {
     x: number;
     y: number;
@@ -66,6 +68,8 @@ export interface GameState {
     renderDistance: number;
   };
   selectedSlot: number;
+  /** The timed break in progress (Gathering): its cell and progress 0..1, or null. */
+  breaking: { x: number; y: number; z: number; progress: number } | null;
   target: TargetInfo | null;
 }
 
@@ -105,9 +109,14 @@ export interface TestApi {
   save(): Promise<void>;
   /**
    * Saves the open world, then opens the world with this name from the store in place,
-   * creating it from the seed if it does not exist.
+   * creating it from the seed (and the mode, default: the `mode` parameter) if it does
+   * not exist.
    */
-  openWorld(name: string, seed: number): Promise<void>;
+  openWorld(name: string, seed: number, mode?: GameMode): Promise<void>;
+  /** Puts items into the inventory directly, as far as they fit (test tool). */
+  give(item: number, count: number): void;
+  /** Empties the inventory directly (test tool). */
+  clearInventory(): void;
   /** Advance exactly `n` fixed simulation steps and render once. */
   step(n: number): void;
 }

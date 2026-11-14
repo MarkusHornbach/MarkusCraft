@@ -69,7 +69,7 @@ test('the pause screen shows the controls and the simulation stands still (AC11.
   await expect(page.locator('.pause-screen')).toBeVisible();
   await expect(page.locator('.pause-title')).toHaveText(['MarkusCraft', 'MarkusCraft']);
   await expect(page.locator('.play-button:visible')).toHaveText('Click to continue');
-  await expect(page.locator('.controls-list dt')).toHaveCount(11);
+  await expect(page.locator('.controls-list dt')).toHaveCount(12);
   await expect(page.locator('.controls-list')).toContainText('Toggle fly mode');
   // Crosshair and selector bar are hidden behind the pause screen.
   await expect(page.locator('.crosshair')).toBeHidden();

@@ -31,6 +31,52 @@ function sourceFiles(dir: string): string[] {
   return files;
 }
 
+/**
+ * The player's items change the same way: only `applyAction` uses the functions that
+ * build changed slots, and only the session stores a new record. The two exceptions are
+ * the test API tools `give` and `clearInventory` in `Game.ts`.
+ */
+const INVENTORY_CALL = /\b(addItems|removeItems|moveStack|emptySlot|setSlot)\s*\(/g;
+const INVENTORY_ALLOWED: Record<string, number> = {
+  // `give` adds items for tests.
+  'src/game/Game.ts': 1,
+};
+const REPLACE_RECORD_ALLOWED: Record<string, number> = {
+  // `give` and `clearInventory`.
+  'src/game/Game.ts': 2,
+};
+
+function countCalls(pattern: RegExp, skip: (file: string) => boolean): Record<string, number> {
+  const found: Record<string, number> = {};
+  for (const path of sourceFiles('src')) {
+    const file = path.split('\\').join('/');
+    if (skip(file)) continue;
+    const count = (readFileSync(path, 'utf8').match(pattern) ?? []).length;
+    if (count > 0) found[file] = count;
+  }
+  return found;
+}
+
+describe('single pipeline for items (Phase 3 plan 5.2)', () => {
+  it('the inventory functions that change slots are called only by the action layer', () => {
+    const found = countCalls(
+      INVENTORY_CALL,
+      (file) => file.startsWith('src/actions/') || file === 'src/items/inventory.ts',
+    );
+    expect(found).toEqual(INVENTORY_ALLOWED);
+  });
+
+  it('a record is replaced past the session only by the test API', () => {
+    const found = countCalls(/\.replaceRecord\s*\(/g, () => false);
+    expect(found).toEqual(REPLACE_RECORD_ALLOWED);
+  });
+
+  it('the pattern finds calls and ignores definitions of other names', () => {
+    expect('x = addItems(slots, 1, 2); moveStack (a, b, c)'.match(INVENTORY_CALL)?.length).toBe(2);
+    expect('function countItems(slots) {} fits(slots, 1, 1)'.match(INVENTORY_CALL)).toBeNull();
+  });
+});
+
 describe('single pipeline (Phase 3 AC2.6)', () => {
   it('counts calls, not definitions', () => {
     expect(countSetBlockCalls('world.setBlock(1, 2, 3, 4);')).toBe(1);

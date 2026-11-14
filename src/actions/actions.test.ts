@@ -9,11 +9,18 @@ const SAMPLES: Action[] = [
   { kind: 'break', x: -17, y: 127, z: 123456 },
   { kind: 'place', x: 5, y: 64, z: -9, slot: 3 },
   { kind: 'place', x: -COORD_LIMIT, y: 1, z: COORD_LIMIT, slot: 8 },
+  { kind: 'startBreak', x: -4, y: 60, z: 9 },
+  { kind: 'moveStack', from: 0, to: 35 },
+  { kind: 'moveStack', from: 12, to: 3 },
+  { kind: 'discard', slot: 35 },
+  { kind: 'setBarSlot', slot: 8, item: 14 },
 ];
 
 describe('decodeAction', () => {
-  it('lets every action kind of Part A survive JSON unchanged (Phase 3 AC2.1)', () => {
-    expect(new Set(SAMPLES.map((a) => a.kind))).toEqual(new Set(['selectSlot', 'break', 'place']));
+  it('lets every action kind survive JSON unchanged (Phase 3 AC2.1)', () => {
+    expect(new Set(SAMPLES.map((a) => a.kind))).toEqual(
+      new Set(['selectSlot', 'break', 'place', 'startBreak', 'moveStack', 'discard', 'setBarSlot']),
+    );
     for (const action of SAMPLES) {
       const decoded = decodeAction(JSON.parse(JSON.stringify(action)));
       expect(decoded).toEqual({ ok: true, action });
@@ -55,6 +62,22 @@ describe('decodeAction', () => {
       { kind: 'place', x: 1, y: 2, z: 3, slot: 9 },
       { kind: 'place', x: 1, y: 2, z: 3, slot: 0, id: 3 },
       { kind: 'place', x: [1], y: 2, z: 3, slot: 0 },
+      { kind: 'startBreak', x: 1, y: 2 },
+      { kind: 'startBreak', x: 1, y: 2.5, z: 3 },
+      { kind: 'startBreak', x: 1, y: 2, z: 3, startMs: 0 },
+      { kind: 'moveStack', from: 0 },
+      { kind: 'moveStack', from: 0, to: 36 },
+      { kind: 'moveStack', from: -1, to: 2 },
+      { kind: 'moveStack', from: 0.5, to: 2 },
+      { kind: 'moveStack', from: 0, to: 2, slot: 1 },
+      { kind: 'discard' },
+      { kind: 'discard', slot: 36 },
+      { kind: 'discard', slot: '3' },
+      { kind: 'setBarSlot', slot: 9, item: 3 },
+      { kind: 'setBarSlot', slot: 0, item: 0 },
+      { kind: 'setBarSlot', slot: 0, item: 70000 },
+      { kind: 'setBarSlot', slot: 0, item: 3.5 },
+      { kind: 'setBarSlot', slot: 0 },
     ];
     for (const value of bad) {
       const decoded = decodeAction(value);
@@ -101,13 +124,30 @@ describe('decodeAction', () => {
       'break',
       'place',
       'selectSlot',
+      'moveStack',
+      'startBreak',
+      'discard',
+      'setBarSlot',
+      35,
       null,
       undefined,
       true,
       [],
       {},
     ];
-    const keys = ['kind', 'x', 'y', 'z', 'slot', 'extra', '__proto__', 'constructor'];
+    const keys = [
+      'kind',
+      'x',
+      'y',
+      'z',
+      'slot',
+      'from',
+      'to',
+      'item',
+      'extra',
+      '__proto__',
+      'constructor',
+    ];
     const random = (depth: number): unknown => {
       const pick = randInt(rng, depth > 2 ? atoms.length : atoms.length + 6);
       if (pick < atoms.length) return atoms[pick];
