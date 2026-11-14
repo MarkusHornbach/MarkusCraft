@@ -8,6 +8,7 @@ import { Input, type PressAction } from '../input/Input';
 import { breakTimeMs, missingTool } from '../items/hardness';
 import { addItems } from '../items/inventory';
 import { isItem, itemLabel } from '../items/items';
+import { type RecipeStatus, getRecipe, listRecipes, stationsNear } from '../items/recipes';
 import { TouchControls } from '../input/TouchControls';
 import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
@@ -48,6 +49,7 @@ import { Autosave, type SaveBatch } from './autosave';
 import {
   ACTION_REPEAT_MS,
   CHUNK_BUDGET_MS,
+  CRAFT_REPEAT_MS,
   GENERATOR_VERSION,
   HOTBAR_SLOTS,
   LOOK_RADIANS_PER_PIXEL,
@@ -59,6 +61,7 @@ import {
   SAVE_FORMAT_VERSION,
   SIM_DT,
   SIM_HZ,
+  SMELT_MS,
   START_TIME_OF_DAY,
   TEST_RENDER_DISTANCE,
   TEST_VIEW_HEIGHT,
@@ -77,6 +80,9 @@ import { type ReleaseLock, acquireWorldLock } from './worldLock';
 const POINTER_LOCK_WAIT_MS = 1000;
 /** Time the view may need to settle after entering or leaving fullscreen. */
 const FULLSCREEN_SETTLE_MS = 500;
+
+/** While the recipe list is open, the stations around the player are looked for this often. */
+const STATION_CHECK_STEPS = 15;
 
 /** What covers the view outside test mode: a menu, or nothing while playing. */
 type Screen = 'worlds' | 'settings' | 'pause' | 'play';
@@ -165,6 +171,12 @@ export class Game {
   private pickup: { item: number; count: number; untilMs: number } | null = null;
   /** "Inventory full" shows until this action time. */
   private fullUntilMs = -1;
+  /** The item in the furnace: its recipe and the action time the progress bar started. */
+  private smelt: { recipe: number; startMs: number } | null = null;
+  /** A "Craft" button that is held down: its recipe, and how often it has repeated. */
+  private craftHold: { recipe: number; timer: number; repeats: number } | null = null;
+  /** The click that ends a hold which already crafted must not craft once more. */
+  private suppressCraftClick = false;
   /** Seconds a mouse button has been held since the last break/place action. */
   private repeatTimer = 0;
   /** Player position before the latest simulation step, for render interpolation. */
@@ -225,6 +237,20 @@ export class Game {
           item,
         }),
       onClose: () => this.closeInventory(),
+      onCraftDown: (recipe) => {
+        this.suppressCraftClick = false;
+        this.craftHold = { recipe, timer: 0, repeats: 0 };
+      },
+      onCraftUp: () => {
+        this.suppressCraftClick = (this.craftHold?.repeats ?? 0) > 0;
+        this.craftHold = null;
+      },
+      onCraftClick: (recipe) => {
+        const suppressed = this.suppressCraftClick;
+        this.suppressCraftClick = false;
+        if (!suppressed) this.craft(recipe);
+      },
+      onTab: () => this.refreshRecipes(),
     });
     // E opens and closes the inventory, Esc closes it. Not while a text field is typed in.
     window.addEventListener('keydown', (e) => {
@@ -349,6 +375,7 @@ export class Game {
     this.pickup = null;
     this.fullUntilMs = -1;
     this.target = null;
+    this.stopCrafting();
     this.meta = meta;
     this.session = this.createSession(meta.player);
     this.autosave = this.createAutosave();
@@ -648,13 +675,84 @@ export class Game {
       this.markChunkDirty(x, z);
       this.remeshAround(x, z);
     }
+    // A station may have been placed or taken away.
+    this.refreshRecipes();
   }
 
   /** The session confirmed a new record of the player: show it and save it. */
   private onPlayerChanged(record: PlayerRecord): void {
     this.hud.setSlots(record.slots);
     this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
+    this.refreshRecipes();
     this.markMetaDirty();
+  }
+
+  // --- crafting ------------------------------------------------------------------------
+
+  /** The recipes as the list shows them now: what the player has, which stations are near. */
+  private recipeStatuses(): RecipeStatus[] {
+    return listRecipes(this.session.record.slots, stationsNear(this.world, this.player));
+  }
+
+  /** Brings the recipe list up to date while it is on screen. */
+  private refreshRecipes(): void {
+    if (!this.inventoryOpen || this.gameMode !== 'gathering') return;
+    this.inventoryScreen.setRecipes(this.recipeStatuses());
+  }
+
+  /**
+   * "Craft" was pressed for a recipe. Workbench and hand recipes are made at once; a
+   * furnace recipe first shows its progress bar for `SMELT_MS`. The wait is presentation
+   * only: the action layer checks ingredients and station when the `craft` action comes.
+   */
+  private craft(id: number): void {
+    const recipe = getRecipe(id);
+    if (!recipe || !this.inventoryOpen || this.gameMode !== 'gathering') return;
+    if (recipe.station !== 'furnace') {
+      this.session.submit({ kind: 'craft', recipe: id });
+      return;
+    }
+    // One item at a time, and only if it can be made at all.
+    if (this.smelt) return;
+    if (!this.recipeStatuses().some((status) => status.id === id && status.craftable)) return;
+    this.smelt = { recipe: id, startMs: this.nowMs() };
+  }
+
+  /** One step of the furnace and of a held "Craft" button. */
+  private continueCrafting(): void {
+    if (!this.inventoryOpen) return;
+    if (this.smelt && this.nowMs() - this.smelt.startMs >= SMELT_MS - 1e-6) {
+      const recipe = this.smelt.recipe;
+      this.smelt = null;
+      this.session.submit({ kind: 'craft', recipe });
+    }
+    const hold = this.craftHold;
+    if (hold) {
+      hold.timer += SIM_DT;
+      // The small tolerance keeps 15 steps of 1/60 s from falling just short of 250 ms.
+      if (hold.timer >= CRAFT_REPEAT_MS / 1000 - 1e-9) {
+        hold.timer = 0;
+        hold.repeats++;
+        this.craft(hold.recipe);
+      }
+    }
+    // The player may drift or fall while the list is open: look for the stations again.
+    if (this.simSteps % STATION_CHECK_STEPS === 0) this.refreshRecipes();
+  }
+
+  /** Empties the furnace and lets go of the "Craft" button; nothing was taken yet. */
+  private stopCrafting(): void {
+    this.smelt = null;
+    this.craftHold = null;
+    this.suppressCraftClick = false;
+    this.inventoryScreen.setSmelting(null, 0);
+  }
+
+  /** The furnace's progress bar. */
+  private smeltView(): { recipe: number; progress: number } | null {
+    if (!this.smelt) return null;
+    const elapsed = this.nowMs() - this.smelt.startMs;
+    return { recipe: this.smelt.recipe, progress: Math.max(0, Math.min(1, elapsed / SMELT_MS)) };
   }
 
   // --- inventory screen ----------------------------------------------------------------
@@ -671,6 +769,7 @@ export class Game {
     const record = this.session.record;
     this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
     this.inventoryScreen.setVisible(true);
+    this.refreshRecipes();
     // The screen has its own bar; the controls of the game would only shine through.
     this.hud.setVisible(false);
     this.touchHud?.setCovered(true);
@@ -697,6 +796,8 @@ export class Game {
     this.touchHud?.setCovered(false);
     this.inventoryOpen = false;
     this.inventoryScreen.setVisible(false);
+    // Closing cancels what is in the furnace: its ingredients were never taken.
+    this.stopCrafting();
   }
 
   /** Mouse mode is played with a captured mouse; without it the pause menu shows. */
@@ -714,6 +815,8 @@ export class Game {
       this.breakActive = result.ok;
       if (!result.ok && result.reason === 'full') this.fullUntilMs = this.nowMs() + NOTICE_MS;
     }
+    // A recipe that cannot be made any more ends the hold on its button.
+    if (action.kind === 'craft' && !result.ok) this.craftHold = null;
     if (!result.ok) return;
     if (action.kind === 'selectSlot') this.hud.setSelected(this.selectedSlot, true);
     if (action.kind === 'break') this.breakActive = false;
@@ -963,6 +1066,7 @@ export class Game {
     // The step is over: actions of this step carry its end time.
     this.simSteps++;
     this.repeatHeldAction();
+    this.continueCrafting();
     // Pose and time of day are part of the world's record.
     this.markMetaDirty();
     this.time = advanceTime(this.time, SIM_DT, this.params.freeze);
@@ -1042,6 +1146,8 @@ export class Game {
     const pickup = this.pickup && now <= this.pickup.untilMs ? this.pickup : null;
     this.hud.setNotice(pickup ? `+${pickup.count} ${itemLabel(pickup.item)}` : null);
     this.hud.setMessage(now <= this.fullUntilMs ? TEXT_INVENTORY_FULL : this.toolHint());
+    const smelt = this.smeltView();
+    this.inventoryScreen.setSmelting(smelt ? smelt.recipe : null, smelt ? smelt.progress : 0);
   }
 
   /**
@@ -1302,7 +1408,18 @@ export class Game {
         selected: record.selectedSlot,
       },
       touch: this.mode === 'touch',
-      ui: { screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play' },
+      ui: {
+        screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play',
+        tab: this.inventoryOpen ? this.inventoryScreen.currentTab : null,
+      },
+      recipes: this.recipeStatuses().map((status) => ({
+        id: status.id,
+        name: getRecipe(status.id)?.name ?? '',
+        craftable: status.craftable,
+        missing: status.missing,
+        stationMissing: status.stationMissing,
+      })),
+      smelting: this.smeltView(),
       player: {
         x: p.x,
         y: p.y,

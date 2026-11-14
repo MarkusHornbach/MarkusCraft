@@ -1099,9 +1099,207 @@ canvas {
   min-width: 72px;
 }
 
+/* The pages of the screen: the items page, and in Gathering the recipe list. */
+.inventory-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inventory-items[hidden],
+.inventory-tabs[hidden] {
+  display: none;
+}
+
+.inventory-tabs {
+  display: flex;
+  gap: 6px;
+  margin-right: auto;
+}
+
+.inventory-tab {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+  color: #a9c4e6;
+}
+
+.inventory-tab.active {
+  background: #3a4a63;
+  box-shadow: inset 0 0 0 2px #ffffff;
+  color: #ffffff;
+}
+
+.touch-mode .inventory-tab {
+  min-width: 72px;
+}
+
+/* ---- Recipe list ---- */
+
+.recipe-list {
+  /* As wide as the items page (nine slots and the bin) and as high as its content. */
+  width: 524px;
+  height: 256px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 4px;
+}
+
+.recipe-list[hidden] {
+  display: none;
+}
+
+.recipe-row {
+  flex: none;
+  min-height: 48px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 44px 128px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  /* Recipes that cannot be made yet stand back. */
+  color: #9fb0c6;
+}
+
+.recipe-row.craftable {
+  border-color: rgba(127, 209, 90, 0.55);
+  background: rgba(127, 209, 90, 0.12);
+  color: #ffffff;
+}
+
+.recipe-result {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recipe-result canvas {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+}
+
+.recipe-row:not(.craftable) .recipe-result canvas {
+  opacity: 0.6;
+}
+
+.recipe-name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.recipe-ingredients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.recipe-ingredient {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px 1px 2px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #d7e6c9;
+}
+
+.recipe-ingredient canvas {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
+
+/* An ingredient the player is short of. */
+.recipe-ingredient.short {
+  color: #ff8a78;
+  background: rgba(168, 67, 58, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 120, 0.7);
+}
+
+.recipe-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 76px;
+}
+
+.recipe-craft {
+  background: #4d8f3a;
+  box-shadow: 0 3px 0 #2f5c23;
+  /* The button repeats while held: no text selection, no callout. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.recipe-craft:hover {
+  background: #5aa646;
+}
+
+.recipe-craft[hidden],
+.recipe-note[hidden],
+.recipe-progress[hidden] {
+  display: none;
+}
+
+.touch-mode .recipe-craft {
+  min-width: 76px;
+  min-height: 48px;
+}
+
+.recipe-note {
+  max-width: 108px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: right;
+  color: #ffd27f;
+}
+
+.recipe-progress {
+  width: 76px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 4px;
+  box-sizing: border-box;
+  background: rgba(20, 24, 32, 0.6);
+  overflow: hidden;
+}
+
+.recipe-progress-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #ffa640;
+}
+
 @media (max-height: 480px) {
   .inventory-panel {
     padding: 6px 12px 6px;
     gap: 6px;
+  }
+
+  .inventory-items {
+    gap: 6px;
+  }
+
+  .recipe-list {
+    height: 246px;
   }
 }
