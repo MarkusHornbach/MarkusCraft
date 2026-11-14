@@ -6,6 +6,11 @@ export interface Chunk {
   readonly cz: number;
   /** Block ids, index `x + z*16 + y*256` (see `blockIndex`). */
   readonly blocks: Uint8Array;
+  /**
+   * Light per cell in the layout of `blocks` (see `packLight`), or null until the chunk is
+   * lit. It follows from the blocks and is never saved.
+   */
+  light: Uint8Array | null;
   /** True once a mesh for the current block data has been handed to the renderer. */
   meshed: boolean;
 }
@@ -34,5 +39,5 @@ export function toLocalCoord(v: number): number {
 export function createChunk(cx: number, cz: number, blocks?: Uint8Array): Chunk {
   const data = blocks ?? new Uint8Array(CHUNK_VOLUME);
   if (data.length !== CHUNK_VOLUME) throw new Error('Chunk data has the wrong size');
-  return { cx, cz, blocks: data, meshed: false };
+  return { cx, cz, blocks: data, light: null, meshed: false };
 }

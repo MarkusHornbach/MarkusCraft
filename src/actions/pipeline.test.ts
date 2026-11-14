@@ -94,10 +94,24 @@ describe('single pipeline (Phase 3 AC2.6)', () => {
 
   it('World.setBlock is called only by the session and the test API', () => {
     const found: Record<string, number> = {};
-    for (const file of sourceFiles('src')) {
-      const count = countSetBlockCalls(readFileSync(file, 'utf8'));
-      if (count > 0) found[file.split('\\').join('/')] = count;
+    for (const path of sourceFiles('src')) {
+      const file = path.split('\\').join('/');
+      // Helpers of unit tests build their scenes directly, as the tests themselves do.
+      if (file.startsWith('src/testing/')) continue;
+      const count = countSetBlockCalls(readFileSync(path, 'utf8'));
+      if (count > 0) found[file] = count;
     }
     expect(found).toEqual(ALLOWED);
+  });
+
+  it('Phase 4 AC2.9: stored light is written only by the world and its light functions', () => {
+    // An assignment to a chunk's `light`, or a call of the functions that change it.
+    const writes = /\.light\s*=[^=]|\b(updateLight|lightChunk)\s*\(/g;
+    const found = countCalls(writes, (file) => file.startsWith('src/testing/'));
+    expect(Object.keys(found).sort()).toEqual([
+      'src/world/World.ts',
+      'src/world/light/lightChunk.ts',
+      'src/world/light/lightUpdate.ts',
+    ]);
   });
 });

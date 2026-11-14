@@ -28,7 +28,7 @@ test('unloads and reloads chunks without leaking GPU resources (AC7.2)', async (
     const back = await getState(page);
     expect(back.chunks.loaded).toBe(81);
     expect(back.chunks.meshed).toBe(81);
-    expect(back.chunks.generated).toBe(121);
+    expect(back.chunks.generated).toBe(169);
     if (round === 0) baseline = back.render.geometries;
     expect(back.render.geometries).toBeLessThanOrEqual(baseline * 1.1);
   }

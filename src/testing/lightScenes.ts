@@ -62,26 +62,32 @@ export class ChunkGroup {
  * hanging in the air (overhangs), closed hollows, tunnels that cross chunk borders,
  * leaves, glass and emitters. The ground stays low, so the slow check is quick.
  */
-export function artificialGroup(seed: number, count = 3): ChunkGroup {
+export function artificialGroup(seed: number, count = 3, low = false): ChunkGroup {
+  // `low` squeezes everything into the lowest 16 layers and leaves the tower out.
+  const base = low ? 4 : 9;
+  const sea = low ? 4 : 8;
+  const spread = low ? 3 : 6;
   const rng = mulberry32(seed);
   const group = new ChunkGroup(count);
   const size = group.size;
   const phaseX = rng() * 7;
   const phaseZ = rng() * 7;
   const heightAt = (x: number, z: number): number =>
-    Math.round(9 + 4 * Math.sin(x / 5 + phaseX) + 3 * Math.cos(z / 4 + phaseZ));
+    Math.round(
+      base + (base / 2.2) * Math.sin(x / 5 + phaseX) + (base / 3) * Math.cos(z / 4 + phaseZ),
+    );
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const h = heightAt(x, z);
       for (let y = 0; y <= h; y++) group.set(x, y, z, y === h ? Block.GRASS : Block.STONE);
-      for (let y = h + 1; y <= 8; y++) group.set(x, y, z, Block.WATER);
+      for (let y = h + 1; y <= sea; y++) group.set(x, y, z, Block.WATER);
     }
   }
   const spot = (): [number, number] => [randInt(rng, size), randInt(rng, size)];
   // Slabs above the ground, some with a glass pane or a hole.
   for (let i = 0; i < 4 * count; i++) {
     const [x, z] = spot();
-    const y = heightAt(x, z) + 2 + randInt(rng, 6);
+    const y = heightAt(x, z) + 2 + randInt(rng, spread);
     const w = 2 + randInt(rng, 12);
     const d = 2 + randInt(rng, 12);
     group.fill(x, y, z, x + w, y + randInt(rng, 2), z + d, Block.PLANKS);
@@ -105,7 +111,7 @@ export function artificialGroup(seed: number, count = 3): ChunkGroup {
   // Tunnels, one wide and two high, long enough to cross a chunk border.
   for (let i = 0; i < 3 * count; i++) {
     const [x, z] = spot();
-    const y = 2 + randInt(rng, 9);
+    const y = 2 + randInt(rng, base);
     const length = 10 + randInt(rng, 24);
     if (rng() < 0.5) group.fill(x, y, z, x + length, y + 1, z, Block.AIR);
     else group.fill(x, y, z, x, y + 1, z + length, Block.AIR);
@@ -113,18 +119,18 @@ export function artificialGroup(seed: number, count = 3): ChunkGroup {
   // Leaves in blobs, like tree tops.
   for (let i = 0; i < 4 * count; i++) {
     const [x, z] = spot();
-    const y = heightAt(x, z) + 3 + randInt(rng, 4);
+    const y = heightAt(x, z) + 2 + randInt(rng, spread - 1);
     group.fill(x - 2, y, z - 2, x + 2, y + 1 + randInt(rng, 2), z + 2, Block.LEAVES);
   }
   // A tower up to the top of the world, so the highest layer is not always air.
-  if (rng() < 0.5) {
+  if (rng() < 0.5 && !low) {
     const [x, z] = spot();
     group.fill(x, 0, z, x + 1, WORLD_HEIGHT - 1, z + 1, rng() < 0.5 ? Block.STONE : Block.LEAVES);
   }
   // Emitters anywhere up to a little above the ground: in the open, in water, buried.
   for (let i = 0; i < 3 * count; i++) {
     const [x, z] = spot();
-    group.set(x, 1 + randInt(rng, 18), z, rng() < 0.7 ? LAMP : GLOW_ROCK);
+    group.set(x, 1 + randInt(rng, base * 2), z, rng() < 0.7 ? LAMP : GLOW_ROCK);
   }
   return group;
 }

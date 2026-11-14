@@ -43,6 +43,8 @@ import { chunkKey, toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
+import { lightChecksumOf } from '../world/light/lightChunk';
+import { blockOf, skyOf } from '../world/light/lightRules';
 import { type RayHit, raycast } from '../world/raycast';
 import { World, chunksAffectedByEdit } from '../world/World';
 import { Autosave, type SaveBatch } from './autosave';
@@ -985,7 +987,7 @@ export class Game {
     this.renderer.setFov(settings.fov);
     this.renderer.setRenderDistance(settings.renderDistance);
     this.chunkManager.setRadius(settings.renderDistance);
-    if (this.chunkManager.pending > 0) this.framesSinceIdle = 0;
+    if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
   private setDebugVisible(visible: boolean): void {
@@ -1062,7 +1064,7 @@ export class Game {
     }
     this.draw(this.params.test ? 1 : this.accumulator / SIM_DT);
 
-    if (this.chunkManager.pending === 0) {
+    if (this.chunksIdle()) {
       this.framesSinceIdle++;
       const waiters = this.idleWaiters;
       this.idleWaiters = [];
@@ -1299,6 +1301,11 @@ export class Game {
     this.markMetaDirty();
   }
 
+  /** Nothing left to load, and no mesh waits for the light an edit changed. */
+  private chunksIdle(): boolean {
+    return this.chunkManager.pending === 0 && this.chunkManager.relight === 0;
+  }
+
   private updateChunks(): void {
     this.chunkManager.setCenter(toChunkCoord(this.player.x), toChunkCoord(this.player.z));
     this.chunkManager.update(() => performance.now(), CHUNK_BUDGET_MS);
@@ -1361,9 +1368,13 @@ export class Game {
     return y - by < 1 - WATER_SURFACE_DROP || this.world.getBlock(bx, by + 1, bz) === Block.WATER;
   }
 
-  /** Edits remesh immediately, outside the per-frame budget. */
+  /**
+   * Edits remesh immediately, outside the per-frame budget. Other chunks whose light the
+   * edit changed wait in the chunk manager's queue and follow in the next frames.
+   */
   private remeshAround(x: number, z: number): void {
     for (const { cx, cz } of chunksAffectedByEdit(x, z)) this.chunkManager.remesh(cx, cz);
+    if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
   /** Test tool: sets a block directly, past the action layer. */
@@ -1449,6 +1460,8 @@ export class Game {
         pending: this.chunkManager.pending,
         meshed: this.chunkManager.meshed,
         generated: this.world.chunkCount,
+        lit: this.world.litCount,
+        relight: this.chunkManager.relight,
       },
       render: {
         drawCalls: stats.drawCalls,
@@ -1498,13 +1511,12 @@ export class Game {
 
   private updateChunkCenter(): void {
     this.chunkManager.setCenter(toChunkCoord(this.player.x), toChunkCoord(this.player.z));
-    if (this.chunkManager.pending > 0) this.framesSinceIdle = 0;
+    if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
   private createTestApi(): TestApi {
     return {
-      isReady: () =>
-        this.meta !== null && this.chunkManager.pending === 0 && this.framesSinceIdle > 0,
+      isReady: () => this.meta !== null && this.chunksIdle() && this.framesSinceIdle > 0,
       whenIdle: () =>
         new Promise<void>((resolve) => {
           this.idleWaiters.push(resolve);
@@ -1523,6 +1535,12 @@ export class Game {
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
       terrainChecksum: () => terrainChecksum(this.world.seed, this.world.generatorVersion),
+      getLight: (x, y, z) => {
+        const light = this.world.getLight(Math.floor(x), Math.floor(y), Math.floor(z));
+        return light === null ? null : { sky: skyOf(light), block: blockOf(light) };
+      },
+      verifyLight: () => this.world.verifyLight(),
+      lightChecksum: () => lightChecksumOf((cx, cz) => this.world.lightOf(cx, cz)),
       setTime: (t) => {
         this.time = wrapTime(t);
         this.markMetaDirty();

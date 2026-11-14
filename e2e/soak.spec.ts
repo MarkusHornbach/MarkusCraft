@@ -40,7 +40,7 @@ test('flying 2 000 blocks keeps chunk counts and memory stable (AC12.1)', async 
   expect(end.chunks.loaded).toBe(81);
   expect(end.chunks.pending).toBe(0);
   // Data exists for the 11×11 area only; meshes for the radius plus the hysteresis ring.
-  expect(end.chunks.generated).toBe(121);
+  expect(end.chunks.generated).toBe(169);
   expect(result.maxMeshed).toBeLessThanOrEqual(121);
   // At most three geometries per meshed chunk, plus sky, sun, moon, stars and outline.
   expect(result.maxGeometries).toBeLessThanOrEqual(3 * 121 + 10);

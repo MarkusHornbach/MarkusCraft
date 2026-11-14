@@ -154,7 +154,7 @@ test('switching worlds in place frees the old world (Phase 3 AC3.9)', async ({ p
   expect(other.seed).toBe(4242);
   expect(other.chunks.loaded).toBe(81);
   expect(other.chunks.pending).toBe(0);
-  expect(other.chunks.generated).toBe(121);
+  expect(other.chunks.generated).toBe(169);
   expect(await getBlock(page, marker.x, marker.y, marker.z)).toBe(AIR);
 
   for (let i = 0; i < 9; i++) await openWorld(page, i % 2 === 0 ? 'A' : 'B', 4242);

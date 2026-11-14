@@ -3,15 +3,6 @@
 import { CHUNK_SIZE, LIGHT_MAX, WORLD_HEIGHT } from '../../game/config';
 import { BLOCK_LIGHT, type LightTables, packLight, stepLight } from './lightRules';
 
-const DIRECTIONS: readonly (readonly [number, number, number])[] = [
-  [0, -1, 0],
-  [0, 1, 0],
-  [-1, 0, 0],
-  [1, 0, 0],
-  [0, 0, -1],
-  [0, 0, 1],
-];
-
 /**
  * Light of a box of `sizeX` × `sizeZ` columns over the full height, from its blocks
  * (index `x + z * sizeX + y * sizeX * sizeZ`); the result has the same layout, one packed
@@ -26,51 +17,97 @@ export function checkLight(
 ): Uint8Array {
   const layer = sizeX * sizeZ;
   if (blocks.length !== layer * WORLD_HEIGHT) throw new Error('Block data has the wrong size');
-  // Above the highest block there is only air: full sky light, and block light at most
-  // 14 cells up. Nothing above that needs to be worked out.
+  // Above the highest block there is only air: full sky light there, and block light at
+  // most 14 cells up. Nothing above that needs to be worked out.
   let last = blocks.length - 1;
   while (last >= 0 && blocks[last] === 0) last--;
-  const height = Math.min(WORLD_HEIGHT, Math.floor(last / layer) + LIGHT_MAX + 1);
-  const result = new Uint8Array(blocks.length).fill(packLight(LIGHT_MAX, 0), height * layer);
-
+  const top = Math.floor(last / layer);
+  const result = new Uint8Array(blocks.length);
   for (const sky of [true, false]) {
-    const levels = new Uint8Array(height * layer);
-    const queue: number[] = [];
-    if (sky) {
-      // The cells above the box shine down into its top layer.
-      for (let i = (height - 1) * layer; i < height * layer; i++) {
-        levels[i] = stepLight(LIGHT_MAX, tables.opacity[blocks[i]], true);
-        if (levels[i] > 0) queue.push(i);
-      }
-    } else {
-      for (let i = 0; i < levels.length; i++) {
-        levels[i] = tables.emission[blocks[i]];
-        if (levels[i] > 0) queue.push(i);
+    const height = Math.min(WORLD_HEIGHT, top + (sky ? 2 : LIGHT_MAX));
+    if (sky) result.fill(packLight(LIGHT_MAX, 0), height * layer);
+    const levels = flood(blocks, sizeX, sizeZ, height, tables, sky);
+    for (let i = 0; i < levels.length; i++) result[i] |= sky ? packLight(levels[i], 0) : levels[i];
+  }
+  return result;
+}
+
+/** One kind of light for the lowest `height` layers of a box, by the rules and nothing else. */
+function flood(
+  blocks: Uint8Array,
+  sizeX: number,
+  sizeZ: number,
+  height: number,
+  tables: LightTables,
+  sky: boolean,
+): Uint8Array {
+  const layer = sizeX * sizeZ;
+  // The box gets a wall of one cell on every side, so each cell has six neighbours. The
+  // wall is opaque: nothing enters it. Only its top is open sky, which shines down.
+  const wideX = sizeX + 2;
+  const wideLayer = wideX * (sizeZ + 2);
+  const cells = wideLayer * (height + 2);
+  const opacity = new Uint8Array(cells).fill(LIGHT_MAX);
+  const emission = new Uint8Array(cells);
+  const wide = (x: number, y: number, z: number): number =>
+    x + 1 + (z + 1) * wideX + (y + 1) * wideLayer;
+  for (let y = 0; y < height; y++) {
+    for (let z = 0; z < sizeZ; z++) {
+      for (let x = 0; x < sizeX; x++) {
+        const id = blocks[x + z * sizeX + y * layer];
+        opacity[wide(x, y, z)] = tables.opacity[id];
+        emission[wide(x, y, z)] = tables.emission[id];
       }
     }
-    for (let head = 0; head < queue.length; head++) {
+  }
+  // The six neighbours as steps through the array; the first one goes straight down.
+  const steps = [-wideLayer, wideLayer, -1, 1, -wideX, wideX];
+  {
+    const levels = new Uint8Array(cells);
+    // A work list of cells whose light rose and may raise their neighbours'.
+    let queue = new Int32Array(cells);
+    let count = 0;
+    const add = (cell: number): void => {
+      if (count === queue.length) {
+        const bigger = new Int32Array(queue.length * 2);
+        bigger.set(queue);
+        queue = bigger;
+      }
+      queue[count++] = cell;
+    };
+    if (sky) {
+      for (let z = 0; z < sizeZ; z++) {
+        for (let x = 0; x < sizeX; x++) {
+          levels[wide(x, height, z)] = LIGHT_MAX;
+          add(wide(x, height, z));
+        }
+      }
+    } else {
+      for (let cell = 0; cell < cells; cell++) {
+        levels[cell] = emission[cell];
+        if (levels[cell] > 0) add(cell);
+      }
+    }
+    for (let head = 0; head < count; head++) {
       const cell = queue[head];
-      const x = cell % sizeX;
-      const z = Math.floor(cell / sizeX) % sizeZ;
-      const y = Math.floor(cell / layer);
-      for (const [dx, dy, dz] of DIRECTIONS) {
-        const nx = x + dx;
-        const ny = y + dy;
-        const nz = z + dz;
-        if (nx < 0 || nx >= sizeX || nz < 0 || nz >= sizeZ || ny < 0 || ny >= height) continue;
-        const next = nx + nz * sizeX + ny * layer;
-        const arrives = stepLight(levels[cell], tables.opacity[blocks[next]], sky && dy === -1);
+      for (let direction = 0; direction < 6; direction++) {
+        const next = cell + steps[direction];
+        if (next < 0 || next >= cells) continue;
+        const arrives = stepLight(levels[cell], opacity[next], sky && direction === 0);
         if (arrives > levels[next]) {
           levels[next] = arrives;
-          queue.push(next);
+          add(next);
         }
       }
     }
-    for (let i = 0; i < levels.length; i++) {
-      result[i] = sky ? packLight(levels[i], 0) : result[i] | levels[i];
+    const result = new Uint8Array(height * layer);
+    for (let y = 0; y < height; y++) {
+      for (let z = 0; z < sizeZ; z++) {
+        for (let x = 0; x < sizeX; x++) result[x + z * sizeX + y * layer] = levels[wide(x, y, z)];
+      }
     }
+    return result;
   }
-  return result;
 }
 
 /**
