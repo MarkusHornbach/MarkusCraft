@@ -632,7 +632,9 @@ test('Phase 3 AC12.7: matches the recipe-list reference (craftable rows, the fur
     'wooden_pickaxe',
   ]);
   expect((await getState(page)).smelting?.progress).toBeCloseTo(0.5, 5);
-  await expect(page).toHaveScreenshot('recipe-list.png');
+  // Mostly text, and CI has other fonts than the cloud session: the looser limit of the
+  // text references. The assertions above and AC12.1–AC12.3 check what the rows say.
+  await expect(page).toHaveScreenshot('recipe-list.png', { maxDiffPixelRatio: 0.05 });
 });
 
 test('Phase 3 AC12.7: matches the item-icons reference (every item once)', async ({ page }) => {
@@ -649,6 +651,11 @@ test('Phase 3 AC12.7: matches the item-icons reference (every item once)', async
   // The icons are the subject: no world behind the panel.
   await page.locator('canvas.game-canvas').evaluate((node) => {
     (node as HTMLElement).style.visibility = 'hidden';
+  });
+  // Only slots and icons, whose sizes are fixed in pixels: header and hint are text, and
+  // another font would change the height of the panel.
+  await page.locator('.inventory-header, .inventory-hint').evaluateAll((nodes) => {
+    for (const node of nodes) (node as HTMLElement).style.display = 'none';
   });
   await expect(page.locator('.inventory-panel')).toHaveScreenshot('item-icons.png');
 });
