@@ -8,7 +8,7 @@ game in a procedurally generated world"; everything in it is original work.
 - First-person voxel world: explore procedurally generated terrain, break and place blocks.
 - Runs as a static site (GitHub Pages), no server. Desktop browsers with keyboard + mouse;
   from Phase 2 also Android phones and tablets with touch controls.
-- Built in five phases, each planned with the owner and then implemented autonomously:
+- Built in seven phases, each planned with the owner and then implemented autonomously:
   1. **Core** – chunked terrain, movement and collision, break/place, day/night, basic UI
      (plan: `docs/phase-1-plan.md`, report: `docs/phase-1-report.md`)
   2. **Touch controls** – on-screen controls for Android phones and tablets
@@ -18,12 +18,19 @@ game in a procedurally generated world"; everything in it is original work.
      timed breaking, ores, tools, a recipe list with workbench and furnace. Every change
      to the world or a player's items goes through one action layer, so multiplayer can
      be added without restructuring. Four parts with separate pull requests: A foundation,
-     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`; reports: `docs/phase-3a-report.md`, `docs/phase-3b-report.md`, `docs/phase-3c-report.md`)
-  4. **Multiplayer** – play together in one world: a host opens their world, others join
-     with a room code, peer-to-peer over WebRTC. Built on the Phase 3 gameplay and its
-     action layer (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
+     B gathering, C crafting (plan: `docs/phase-3-plan.md`; reports: `docs/phase-3a-report.md`,
+     `docs/phase-3b-report.md`, `docs/phase-3c-report.md`). Its optional part D (Web
+     Workers) was never started and is replaced by Phase 4 part C
+  4. **Light & Torches** – sky light and block light per block cell, derived from the
+     blocks and never saved; dark tunnels and rooms, a darker night, a Brightness setting,
+     and the torch, the first block that is not a cube. Three parts with separate pull
+     requests: A light, B torch, C Web Workers (optional) (plan: `docs/phase-4-plan.md`)
+  5. **Gamepad controls** (not yet planned)
+  6. **Multiplayer** – play together in one world: a host opens their world, others join
+     with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
+     of Phases 3–5 (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
      and serves as reference)
-  5. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
+  7. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
 
 ## Hard rules
 
@@ -333,8 +340,8 @@ hold:
 - Phase 2 part A (touch controls): implemented (report: `docs/phase-2a-report.md`). Read
   its "Decisions and deviations" before changing input, the menu or the touch tests.
 - Phase 2 is complete with part A. Its former part B (multiplayer) was postponed by the
-  owner and is now Phase 4; `docs/phase-2-plan.md`, Part B, is not to be implemented as
-  written. It will be re-planned on top of Phase 3.
+  owner and is now Phase 6; `docs/phase-2-plan.md`, Part B, is not to be implemented as
+  written. It will be re-planned on top of Phases 3–5.
 - Phase 3 (Gathering & Crafting): implemented (parts A–C); plan: `docs/phase-3-plan.md`.
   - Phase 3 part A (foundation: terrain version 1, action layer, saving, world menu):
     implemented (report: `docs/phase-3a-report.md`). Read its "Decisions and deviations"
@@ -346,6 +353,12 @@ hold:
   - Phase 3 part C (crafting: tools, gating, recipes, workbench, furnace, recipe list):
     implemented (report: `docs/phase-3c-report.md`). Read its "Decisions and deviations"
     before changing recipes, tools, the break rules or the recipe list.
-  - Phase 3 is implemented with parts A–C. Part D (Web Workers) is optional and is built
-    only when the owner asks for it.
-- Phases 4 (multiplayer) and 5 (personalization): not yet planned.
+  - Phase 3 is complete with parts A–C. Its part D (Web Workers) was never started; the
+    topic is now Phase 4 part C. Do not implement Phase 3 part D as written.
+- Phase 4 (Light & Torches): planned (`docs/phase-4-plan.md`), not yet implemented. Parts
+  A (light) and B (torch) are implemented in separate sessions; part C (Web Workers) is
+  optional and is built only when the owner's starting prompt asks for it.
+- **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
+  personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
+  "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
+- Phases 5 (gamepad controls), 6 (multiplayer) and 7 (personalization): not yet planned.
