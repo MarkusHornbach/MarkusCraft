@@ -18,7 +18,7 @@ game in a procedurally generated world"; everything in it is original work.
      timed breaking, ores, tools, a recipe list with workbench and furnace. Every change
      to the world or a player's items goes through one action layer, so multiplayer can
      be added without restructuring. Four parts with separate pull requests: A foundation,
-     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`; reports: `docs/phase-3a-report.md`, `docs/phase-3b-report.md`)
+     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`; reports: `docs/phase-3a-report.md`, `docs/phase-3b-report.md`, `docs/phase-3c-report.md`)
   4. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the Phase 3 gameplay and its
      action layer (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
@@ -92,8 +92,9 @@ src/
                      idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world)
   actions/           the action layer (pure): actions.ts (types, decodeAction), apply.ts
                      (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
-  items/             pure: items.ts (item table), inventory.ts (functions on the 36 slots),
-                     hardness.ts (break times by hand, drop table)
+  items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
+                     slots), hardness.ts (break times, tool speed, gating, drop table),
+                     recipes.ts (recipe table, stations near a player, recipe status)
   save/              pure: saveFormat.ts (records, validation, names, seeds), WorldStore.ts
                      (interface + MemoryStore)
   world/             blocks.ts (block + tile table), chunk.ts, World.ts, ChunkManager.ts,
@@ -111,15 +112,17 @@ src/
                      itemIcons.ts (icons of items that are no blocks), cracks.ts (pure)
   ui/                Hud.ts (bar with counts, break progress, notices), blockIcon.ts,
                      itemIcon.ts, DebugOverlay.ts, settings.ts, ui.css,
-                     InventoryScreen.ts (27 slots or the Creative palette, bar, bin),
+                     InventoryScreen.ts (27 slots or the Creative palette, bar, bin, tabs),
+                     RecipeList.ts (the "Crafting" tab: one row per recipe),
                      WorldMenu.ts (start screen: list of worlds, new world, delete),
                      PauseScreen.ts (pause menu of a world; also the settings page),
                      activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint)
   util/              rng.ts, noise.ts, math.ts
   testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts
-e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, screenshots/
-scripts/             dev tools: shot.mjs, atlasPreview.ts, terrainStats.ts (terrain statistics
-                     and generation time), perf.ts
+e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, sites.ts
+                     (tree, beach and rock near the start point), screenshots/
+scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item
+                     icons), terrainStats.ts (terrain statistics and generation time), perf.ts
 docs/                phase plans and phase reports
 .github/workflows/   ci.yml, deploy.yml
 ```
@@ -149,21 +152,38 @@ under coverage, which distorts timings. CI runs both.
   or if `replaceRecord` is called outside the two test tools. Slots in actions and records
   count from 0; keys, HUD and `getState().selectedSlot` count from 1.
 - **Actions and reasons.** `break`, `place`, `selectSlot`, `startBreak`, `moveStack`,
-  `discard`, `setBarSlot` (Creative only). A refusal carries a short reason (`reach`,
-  `unbreakable`, `occupied`, `full`, `early`, `missing`, `mode`, `invalid`) that the UI
-  maps to a text; `ActionResult.notices` is a list of `{ item, count }`, not of strings.
+  `discard`, `setBarSlot` (Creative only), `craft { recipe }` (Gathering only). A refusal
+  carries a short reason (`reach`, `unbreakable`, `occupied`, `full`, `early`, `missing`,
+  `mode`, `station`, `invalid`) that the UI maps to a text; `ActionResult.notices` is a
+  list of `{ item, count }`, not of strings.
 - **Game modes.** A world is Creative or Gathering for ever (`WorldMeta.mode`). Creative:
   flying, unlimited blocks, instant breaking, the palette. Gathering: no flying (key, touch
   button, `setPlayer` and controls list), placing takes the item from the selected slot,
   breaking is timed: `startBreak` records `record.breaking`, `break` is accepted once
   `breakTimeMs` of simulation time has passed (otherwise `early`) and puts `dropOf(block)`
   into the inventory (`full` if it has no room; then the block stays). `selectSlot`,
-  `moveStack`, `discard` and a Gathering `place` clear `record.breaking`. The action clock
+  `moveStack`, `discard`, `craft` and a Gathering `place` clear `record.breaking`. The action clock
   is the simulation time (`simSteps × 1000 / 60`), so notices and break times are
   deterministic in test mode.
-- **Stable ids.** Block ids and item ids are written into save files. Both tables are
-  append-only: never renumber or reuse an id. `blocks.test.ts` and `items.test.ts` pin
-  them. Every placeable block is an item with the block's id; items that are no blocks
+- **Tools and gating.** The item in the selected slot decides: a tool of the block's class
+  (`pickaxe`, `axe`, `shovel`) divides the hand time by 2, 4 or 8 (wood, stone, iron);
+  everything else counts as the hand. Stone and coal ore yield their item only with a
+  pickaxe, iron ore only with a stone or iron one; without it the block breaks at hand
+  speed, yields nothing and is not refused by a full inventory. The HUD then shows "Needs
+  a pickaxe" / "Needs a stone pickaxe". Tools have stack size 1 and cannot be placed.
+- **Crafting.** `items/recipes.ts` is the one recipe table (ids 1–19, append-only like
+  item ids, pinned by `recipes.test.ts`). A recipe has ingredients, one result and
+  optionally a station (`workbench`, `furnace`): a placed block whose centre lies within
+  `STATION_REACH` (5) of the eye. `craft` answers `invalid` (unknown recipe), then
+  `station`, `missing`, `full`; ingredients are taken from the last slots first. The
+  furnace has no state in the world: its two seconds (`SMELT_MS`) are a progress bar in
+  `Game`, which submits `craft` when the bar is full and forgets it when the screen
+  closes. Holding "Craft" repeats every `CRAFT_REPEAT_MS` of simulation time; for that
+  long after a craft, a press on another recipe is ignored, because the list reorders
+  (craftable first) and another button may slide under the pointer.
+- **Stable ids.** Block ids, item ids and recipe ids are written into save files or
+  actions. The tables are append-only: never renumber or reuse an id. `blocks.test.ts`,
+  `items.test.ts` and `recipes.test.ts` pin them. Every placeable block is an item with the block's id; items that are no blocks
   start at 256 (`Item.COAL`). An unknown stored item id still loads and shows as "Unknown
   item"; a newer build must never make a world "damaged".
 - **Generator version.** Every world stores the version of the terrain generator it was
@@ -185,7 +205,9 @@ under coverage, which distorts timings. CI runs both.
   screen (`E`, `Esc`, touch button `bag`) lies over the running game and does not pause
   it; `Game` listens for its keys itself and `Input` ignores keys while it is open. The HUD
   is hidden and the touch controls are made invisible (`covered`), not removed. Closing
-  requests the pointer lock again; if the browser refuses, the pause menu shows. Play buttons
+  requests the pointer lock again; if the browser refuses, the pause menu shows. In a
+  Gathering world the screen has two tabs, "Items" and "Crafting" (the recipe list); it
+  always opens on the tab it was closed with, and on "Items" after a world was loaded. Play buttons
   request the pointer lock (mouse) or fullscreen (touch) synchronously inside the click.
 - **Mouse mode and touch mode.** `Game` runs in one of two input modes. Touch mode has the
   on-screen controls, no pointer lock, a pixel ratio capped at 1.5 and a default render
@@ -251,8 +273,14 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   `save()`, `openWorld(name, seed, mode?)` (switch worlds in place), `terrainChecksum()`,
   `give(item, count)`, `clearInventory()`; `getState()` has `mode`, `world`,
   `save { dirty, lastError, lastSaveMs, lastLoadMs }`, `inventory`,
-  `breaking { x, y, z, progress } | null` and `ui { screen }`. `setBlock`, `give` and
-  `clearInventory` are direct tools past the action layer.
+  `breaking { x, y, z, progress } | null`, `ui { screen, tab }`,
+  `recipes [{ id, name, craftable, missing, stationMissing }]` in the order of the list,
+  and `smelting { recipe, progress } | null`. `setBlock`, `give` and `clearInventory` are
+  direct tools past the action layer.
+- Recipe-list tests: a click on "Craft" of another recipe within 15 steps of the last
+  craft is ignored (see "Crafting"): step in between. `Fingers` waits until the page has
+  seen each finger position and therefore hangs on a gesture the browser takes over for
+  scrolling; use `swipe` from `e2e/touch.ts` for those.
 - The "New world" form is reset when the list of stored worlds arrives: `WorldMenu` sets
   `data-ready` then, and `openMenu` waits for it. `createWorld` chooses Creative unless
   told otherwise.
@@ -307,7 +335,7 @@ hold:
 - Phase 2 is complete with part A. Its former part B (multiplayer) was postponed by the
   owner and is now Phase 4; `docs/phase-2-plan.md`, Part B, is not to be implemented as
   written. It will be re-planned on top of Phase 3.
-- Phase 3 (Gathering & Crafting): planned in `docs/phase-3-plan.md`.
+- Phase 3 (Gathering & Crafting): implemented (parts A–C); plan: `docs/phase-3-plan.md`.
   - Phase 3 part A (foundation: terrain version 1, action layer, saving, world menu):
     implemented (report: `docs/phase-3a-report.md`). Read its "Decisions and deviations"
     before changing generation, actions, the save format, the menus or the start flow.
@@ -315,6 +343,9 @@ hold:
     screen): implemented (report: `docs/phase-3b-report.md`). Read its "Decisions and
     deviations" before changing items, the inventory, the break rules or the inventory
     screen.
-  - Part C (crafting) follows after part B is merged;
-    part D (Web Workers) only when the owner asks for it.
+  - Phase 3 part C (crafting: tools, gating, recipes, workbench, furnace, recipe list):
+    implemented (report: `docs/phase-3c-report.md`). Read its "Decisions and deviations"
+    before changing recipes, tools, the break rules or the recipe list.
+  - Phase 3 is implemented with parts A–C. Part D (Web Workers) is optional and is built
+    only when the owner asks for it.
 - Phases 4 (multiplayer) and 5 (personalization): not yet planned.

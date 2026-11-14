@@ -154,12 +154,15 @@ describe('break in Gathering (Phase 3 AC7.2)', () => {
     });
   });
 
-  it('coal ore yields one coal', () => {
-    const { ctx } = context();
+  it('coal ore yields one coal when broken with a pickaxe', () => {
+    const { ctx } = context({ 0: { item: Item.WOODEN_PICKAXE, count: 1 } });
     const running = started(ctx, 3, 9, 0, 0);
-    const result = applyAction(running, { kind: 'break', x: 3, y: 9, z: 0 }, 3500);
+    // A wooden pickaxe halves the 3.5 seconds.
+    const early = applyAction(running, { kind: 'break', x: 3, y: 9, z: 0 }, 1600);
+    expect(reasonOf(early)).toBe('early');
+    const result = applyAction(running, { kind: 'break', x: 3, y: 9, z: 0 }, 1750);
     expect(result.ok && result.notices).toEqual([{ item: Item.COAL, count: 1 }]);
-    expect(result.ok && result.player?.slots[0]).toEqual({ item: Item.COAL, count: 1 });
+    expect(result.ok && result.player?.slots[1]).toEqual({ item: Item.COAL, count: 1 });
   });
 
   it('keeps the water rule', () => {
@@ -201,8 +204,29 @@ describe('a full inventory (Phase 3 AC7.3)', () => {
     expect(reasonOf(result)).toBe('full');
     expect(JSON.stringify(ctx.record)).toBe(before);
     expect(world.getBlock(2, 9, 0)).toBe(Block.DIRT);
-    // Stone does not fit either: every stack of it is full.
-    expect(reasonOf(applyAction(ctx, { kind: 'startBreak', x: 0, y: 9, z: 3 }, 0))).toBe('full');
+    // Stone does not fit either: every stack of it is full, and the pickaxe would yield it.
+    const pick = { ...ctx.record.slots[0], item: Item.STONE_PICKAXE, count: 1 };
+    const withPick = {
+      ...ctx,
+      record: { ...ctx.record, slots: [pick, ...ctx.record.slots.slice(1)] },
+    };
+    const stone: Action = { kind: 'startBreak', x: 0, y: 9, z: 3 };
+    expect(reasonOf(applyAction(withPick, stone, 0))).toBe('full');
+  });
+
+  it('does not refuse a break that yields nothing (Phase 3 AC11.2)', () => {
+    // By hand stone drops nothing, so there is nothing that would have to fit.
+    const { world, ctx } = context(full());
+    const running = started(ctx, 0, 9, 3, 0);
+    expect(reasonOf(applyAction(running, { kind: 'break', x: 0, y: 9, z: 3 }, 2000))).toBe('early');
+    const result = applyAction(running, { kind: 'break', x: 0, y: 9, z: 3 }, 3000);
+    expect(result).toEqual({
+      ok: true,
+      blocks: [{ x: 0, y: 9, z: 3, id: Block.AIR }],
+      player: { ...ctx.record, breaking: null },
+      notices: [],
+    });
+    expect(world.getBlock(0, 9, 3)).toBe(Block.STONE);
   });
 
   it('accepts the drop into a partly filled stack of the same item', () => {
@@ -216,8 +240,11 @@ describe('a full inventory (Phase 3 AC7.3)', () => {
     if (!result.ok || !result.player) return;
     const after = { ...ctx, record: result.player };
     expect(reasonOf(applyAction(after, { kind: 'startBreak', x: 1, y: 9, z: 0 }, 0))).toBe('full');
-    // Coal has no stack to go to.
-    expect(reasonOf(applyAction(ctx, { kind: 'startBreak', x: 3, y: 9, z: 0 }, 0))).toBe('full');
+    // Coal has no stack to go to, once a pickaxe would yield it.
+    slots[0] = { item: Item.WOODEN_PICKAXE, count: 1 };
+    const coal: Action = { kind: 'startBreak', x: 3, y: 9, z: 0 };
+    expect(reasonOf(applyAction(context(slots).ctx, coal, 0))).toBe('full');
+    expect(reasonOf(applyAction(ctx, coal, 0))).toBe('ok');
   });
 });
 
@@ -234,7 +261,8 @@ describe('Gathering through a session', () => {
         onPlayer: () => {},
         onResult: (action, result) => {
           if (!result.ok) return;
-          if (action.kind === 'break') expected += 1;
+          // Stone and coal ore are broken by hand here and yield nothing.
+          if (action.kind === 'break') expected += result.notices.length;
           if (action.kind === 'place') expected -= 1;
           if (action.kind === 'discard') expected -= discarded;
         },
@@ -285,5 +313,76 @@ describe('Gathering through a session', () => {
     ]) {
       expect(outcomes.has(outcome), outcome).toBe(true);
     }
+  });
+});
+
+describe('tools and gating in the action layer (Phase 3 AC11.2)', () => {
+  /** Breaks the block at a cell with `held` in the selected slot, after `ms`. */
+  function breakWith(held: number | null, cell: [number, number, number], ms: number) {
+    const { world, ctx } = context(held === null ? {} : { 0: { item: held, count: 1 } });
+    world.setBlock(2, 9, 2, Block.IRON_ORE);
+    const [x, y, z] = cell;
+    const running = started(ctx, x, y, z, 0);
+    return applyAction(running, { kind: 'break', x, y, z }, ms);
+  }
+  const STONE_CELL: [number, number, number] = [0, 9, 3];
+  const COAL_CELL: [number, number, number] = [3, 9, 0];
+  const IRON_CELL: [number, number, number] = [2, 9, 2];
+  const got = (result: ActionResult): unknown => (result.ok ? result.notices : result.reason);
+
+  it('stone and coal ore yield nothing by hand and their item with any pickaxe', () => {
+    expect(got(breakWith(null, STONE_CELL, 3000))).toEqual([]);
+    expect(got(breakWith(null, COAL_CELL, 3500))).toEqual([]);
+    // Other items and tools of another class count as the hand.
+    expect(got(breakWith(Block.DIRT, STONE_CELL, 3000))).toEqual([]);
+    expect(got(breakWith(Item.IRON_AXE, STONE_CELL, 3000))).toEqual([]);
+    expect(got(breakWith(Item.IRON_SHOVEL, COAL_CELL, 3500))).toEqual([]);
+    for (const [pick, speed] of [
+      [Item.WOODEN_PICKAXE, 2],
+      [Item.STONE_PICKAXE, 4],
+      [Item.IRON_PICKAXE, 8],
+    ]) {
+      expect(got(breakWith(pick, STONE_CELL, 3000 / speed))).toEqual([
+        { item: Block.STONE, count: 1 },
+      ]);
+      expect(got(breakWith(pick, COAL_CELL, 3500 / speed))).toEqual([
+        { item: Item.COAL, count: 1 },
+      ]);
+    }
+  });
+
+  it('iron ore yields nothing with a wooden pickaxe and its block with a stone or iron one', () => {
+    expect(got(breakWith(null, IRON_CELL, 4500))).toEqual([]);
+    expect(got(breakWith(Item.WOODEN_PICKAXE, IRON_CELL, 2250))).toEqual([]);
+    const ore = [{ item: Block.IRON_ORE, count: 1 }];
+    expect(got(breakWith(Item.STONE_PICKAXE, IRON_CELL, 1125))).toEqual(ore);
+    expect(got(breakWith(Item.IRON_PICKAXE, IRON_CELL, 562.5))).toEqual(ore);
+  });
+
+  it('a break without a drop still removes the block and leaves the items alone', () => {
+    const result = breakWith(null, STONE_CELL, 3000);
+    expect(result.ok && result.blocks).toEqual([{ x: 0, y: 9, z: 3, id: Block.AIR }]);
+    expect(result.ok && countItems(result.player?.slots ?? [])).toBe(0);
+    expect(result.ok && result.player?.breaking).toBeNull();
+  });
+
+  it('the tool decides the time: too early by hand speed is in time with the tool', () => {
+    expect(got(breakWith(null, STONE_CELL, 750))).toBe('early');
+    expect(got(breakWith(Item.WOODEN_PICKAXE, STONE_CELL, 750))).toBe('early');
+    expect(got(breakWith(Item.STONE_PICKAXE, STONE_CELL, 750))).toEqual([
+      { item: Block.STONE, count: 1 },
+    ]);
+    // A shovel is no faster on stone, and a pickaxe no faster on dirt.
+    expect(got(breakWith(Item.IRON_SHOVEL, STONE_CELL, 1500))).toBe('early');
+    expect(got(breakWith(Item.IRON_PICKAXE, [2, 9, 0], 300))).toBe('early');
+    expect(got(breakWith(Item.WOODEN_SHOVEL, [2, 9, 0], 300))).toEqual([
+      { item: Block.DIRT, count: 1 },
+    ]);
+  });
+
+  it('a tool cannot be placed', () => {
+    const { ctx } = context({ 0: { item: Item.STONE_PICKAXE, count: 1 } });
+    const result = applyAction(ctx, { kind: 'place', x: 1, y: 10, z: 1, slot: 0 }, 0);
+    expect(result).toEqual({ ok: false, reason: 'invalid' });
   });
 });

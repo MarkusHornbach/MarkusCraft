@@ -11,13 +11,15 @@ import { type BlockReader, breakResult } from '../player/interaction';
 import { playerIntersectsBlock } from '../player/physics';
 import { addItems, emptySlot, fits, moveStack, removeItems, setSlot } from '../items/inventory';
 import { getItemDef } from '../items/items';
+import { getRecipe, stationsNear, takeIngredients } from '../items/recipes';
 import { BLOCK_REPLACEABLE } from '../world/blocks';
 import type { Action } from './actions';
 import type { GameMode, PlayerRecord } from './playerRecord';
 
 /**
  * Why an action was refused. Short identifiers; the user interface maps them to texts.
- * `missing` also stands for an empty slot; `station` is used from Part C on.
+ * `missing` also stands for an empty slot and for ingredients a recipe is short of;
+ * `station` for a recipe whose workbench or furnace is not within reach.
  */
 export type RejectReason =
   | 'reach'
@@ -83,6 +85,11 @@ function changed(record: PlayerRecord, slots: PlayerRecord['slots']): ActionResu
   return { ok: true, blocks: [], player: { ...record, slots, breaking: null }, notices: [] };
 }
 
+/** The item in the selected bar slot, or null for an empty hand. */
+export function heldItem(record: PlayerRecord): number | null {
+  return record.slots[record.selectedSlot]?.item ?? null;
+}
+
 /** Rules shared by all block actions: inside the height range and within reach. */
 function checkCell(ctx: ActionContext, x: number, y: number, z: number): RejectReason | null {
   if (y < 0 || y >= WORLD_HEIGHT) return 'invalid';
@@ -112,10 +119,12 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       const { x, y, z } = action;
       const problem = checkCell(ctx, x, y, z);
       if (problem) return reject(problem);
-      const drop = dropOf(ctx.world.getBlock(x, y, z));
-      if (!drop) return reject('unbreakable');
-      // Nothing may get lost: a block whose item has no room is not broken at all.
-      if (!fits(ctx.record.slots, drop.item, drop.count)) return reject('full');
+      const block = ctx.world.getBlock(x, y, z);
+      if (breakTimeMs(block) === null) return reject('unbreakable');
+      // Nothing may get lost: a block whose item has no room is not broken at all. A block
+      // that yields nothing without the right tool breaks whatever the inventory holds.
+      const drop = dropOf(block, heldItem(ctx.record));
+      if (drop && !fits(ctx.record.slots, drop.item, drop.count)) return reject('full');
       const player: PlayerRecord = { ...ctx.record, breaking: { x, y, z, startMs: nowMs } };
       return { ok: true, blocks: [], player, notices: [] };
     }
@@ -133,9 +142,11 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       const started = ctx.record.breaking;
       if (!started || started.x !== x || started.y !== y || started.z !== z) return reject('early');
       const block = ctx.world.getBlock(x, y, z);
-      const required = breakTimeMs(block) ?? 0;
+      // The tool in the hand decides the time and whether the block yields its item.
+      const held = heldItem(ctx.record);
+      const required = breakTimeMs(block, held) ?? 0;
       if (nowMs - started.startMs < required - BREAK_TOLERANCE_MS) return reject('early');
-      const drop = dropOf(block);
+      const drop = dropOf(block, held);
       let slots = ctx.record.slots;
       const notices: Notice[] = [];
       if (drop) {
@@ -184,6 +195,21 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       if ((getItemDef(action.item)?.block ?? null) === null) return reject('invalid');
       const slots = setSlot(ctx.record.slots, action.slot, { item: action.item, count: 1 });
       return changed(ctx.record, slots);
+    }
+    case 'craft': {
+      // Creative has every block already and counts mean nothing there.
+      if (ctx.mode !== 'gathering') return reject('mode');
+      const recipe = getRecipe(action.recipe);
+      if (!recipe) return reject('invalid');
+      if (recipe.station && !stationsNear(ctx.world, ctx.pose)[recipe.station]) {
+        return reject('station');
+      }
+      const taken = takeIngredients(ctx.record.slots, recipe);
+      if (!taken) return reject('missing');
+      // Nothing may get lost: the whole result must fit, or nothing is made.
+      const added = addItems(taken, recipe.result.item, recipe.result.count);
+      if (added.left > 0) return reject('full');
+      return changed(ctx.record, added.slots);
     }
   }
 }

@@ -132,7 +132,8 @@ go, looking at another block or changing the selected slot starts over. By hand,
 take a quarter of a second, glass 0.4 s, sand and dirt 0.6 s, grass 0.7 s, clay 0.8 s,
 planks 1.5 s, a log 2 s, stone and bricks 3 s, coal ore 3.5 s and iron ore 4.5 s. Coal ore
 yields a lump of coal instead of the block. If nothing more fits, the game says
-"Inventory full" and the block stays. Bedrock and water cannot be broken.
+"Inventory full" and the block stays. Bedrock and water cannot be broken. Tools make this
+faster, and stone and ores need a pickaxe: see "How to play Gathering" below.
 
 **The inventory** (E, or the bag button). The bar at the bottom of the screen holds nine
 slots; the selected one is what you place. The inventory screen shows the bar and
@@ -147,8 +148,67 @@ The game does not pause while the inventory is open. The inventory is saved with
 world.
 
 **The terrain.** Hills above a certain height are bare rock; coal and iron ore lie in the
-stone and clay in lake beds. Nothing can be made from them yet (planned: crafting with a
-workbench and a furnace).
+stone and clay in lake beds.
+
+### How to play Gathering
+
+You start with empty hands. Everything is made from what you break, in the **Crafting**
+tab of the inventory screen (E, or the bag button). The tab lists every recipe: what you
+can make right now stands on top with a green **Craft** button; below it are the recipes
+that still lack something, with what you have and what you need ("2 / 3", red when it is
+not enough) or with "Needs a workbench nearby" / "Needs a furnace nearby". Hold "Craft" to
+make one after the other. A Creative world has no recipes: all blocks are in its palette.
+
+**First steps**
+
+1. Find a tree and hold the break button on its trunk until you have three logs.
+2. Open the inventory, choose "Crafting" and make **planks** from the logs (three times),
+   then **sticks** and a **workbench**.
+3. Put the workbench into the bar, select it and place it on the ground. Its recipes work
+   while you stand within five blocks of it.
+4. Next to the workbench, make a **wooden pickaxe**. Select it in the bar.
+5. Find bare rock on a hill, or dig down through the dirt, and break stone with the
+   pickaxe in your hand. Without a pickaxe the stone breaks as well, but you get nothing;
+   the game says "Needs a pickaxe" then.
+6. Back at the workbench, three stone and two sticks make a **stone pickaxe**, eight stone
+   a **furnace**. Place the furnace like the workbench.
+7. The furnace needs coal: from coal ore (dark specks in the stone, any pickaxe) or by
+   burning two logs. Iron ore (rust-coloured specks, deeper down) needs a stone pickaxe;
+   the furnace turns it into iron ingots for the best tools.
+
+**Recipes**
+
+| Where     | You need                                  | You get                       |
+| --------- | ----------------------------------------- | ----------------------------- |
+| Anywhere  | 1 log                                     | 4 planks                      |
+| Anywhere  | 2 planks                                  | 4 sticks                      |
+| Anywhere  | 4 planks                                  | 1 workbench                   |
+| Workbench | 3 planks, stone or iron ingots + 2 sticks | Wooden, stone or iron pickaxe |
+| Workbench | 3 planks, stone or iron ingots + 2 sticks | Wooden, stone or iron axe     |
+| Workbench | 1 plank, stone or iron ingot + 2 sticks   | Wooden, stone or iron shovel  |
+| Workbench | 8 stone                                   | 1 furnace                     |
+| Workbench | 4 stone                                   | 4 stone bricks                |
+| Workbench | 9 iron ingots                             | 1 iron block                  |
+| Furnace   | 2 logs                                    | 1 coal                        |
+| Furnace   | 1 iron ore + 1 coal                       | 1 iron ingot                  |
+| Furnace   | 2 sand + 1 coal                           | 2 glass                       |
+| Furnace   | 2 clay + 1 coal                           | 2 bricks                      |
+
+The furnace takes two seconds per item and shows a bar meanwhile; closing the inventory
+before the bar is full cancels it and nothing is used up.
+
+**Tools.** A tool works while it is the selected slot of the bar. Tools do not stack and
+do not wear out.
+
+| Tool    | Faster on                                                            | Needed for                                                         |
+| ------- | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Pickaxe | Stone, coal ore, iron ore, bricks, stone bricks, furnace, iron block | Stone and coal ore (any pickaxe), iron ore (stone or iron pickaxe) |
+| Axe     | Logs, planks, workbench                                              | –                                                                  |
+| Shovel  | Dirt, grass, sand, clay                                              | –                                                                  |
+
+A wooden tool halves the time, a stone tool takes a quarter and an iron tool an eighth:
+stone takes 3 s by hand, 1.5 s with a wooden, 0.75 s with a stone and under 0.4 s with an
+iron pickaxe. A tool of the wrong kind is as slow as the hand.
 
 ### One-time setup for deployment
 

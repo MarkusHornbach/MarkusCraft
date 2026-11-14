@@ -1,10 +1,20 @@
 // Inventory screen: the 27 slots (Gathering) or the block palette (Creative), the bar
-// and a bin. It only reports what was activated; the game turns that into actions.
+// and a bin; in Gathering a second tab with the recipe list. It only reports what was
+// activated; the game turns that into actions.
 import type { GameMode, ItemStack } from '../actions/playerRecord';
 import { HOTBAR_SLOTS, INVENTORY_SLOTS } from '../game/config';
 import { BLOCK_ITEMS, getItemDef, itemLabel } from '../items/items';
+import type { RecipeStatus } from '../items/recipes';
 import { type InputMode, button, element, onActivate } from './activate';
 import { createItemIcon } from './itemIcon';
+import { RecipeList } from './RecipeList';
+
+/** The pages of the screen in a Gathering world. Creative has the first one only. */
+export type InventoryTab = 'items' | 'crafting';
+const TABS: readonly { tab: InventoryTab; label: string }[] = [
+  { tab: 'items', label: 'Items' },
+  { tab: 'crafting', label: 'Crafting' },
+];
 
 export interface InventoryScreenOptions {
   /** The painted tile images, for the block icons. */
@@ -16,6 +26,12 @@ export interface InventoryScreenOptions {
   /** Creative: a block of the palette for a bar slot; null means the selected slot. */
   onPalette: (item: number, barSlot: number | null) => void;
   onClose: (via: InputMode | null) => void;
+  /** The recipe list: a "Craft" button went down, came up, or was activated. */
+  onCraftDown: (recipe: number) => void;
+  onCraftUp: () => void;
+  onCraftClick: (recipe: number) => void;
+  /** Another tab was chosen. */
+  onTab: (tab: InventoryTab) => void;
 }
 
 const HINTS: Record<GameMode, string> = {
@@ -66,6 +82,12 @@ export class InventoryScreen {
   private readonly slots: HTMLButtonElement[] = [];
   private readonly shown: (ItemStack | null)[] = [];
   private readonly tiles: Uint8ClampedArray[];
+  private readonly tabBar: HTMLElement;
+  private readonly tabButtons = new Map<InventoryTab, HTMLButtonElement>();
+  /** Everything of the items page: slots or palette, bar, bin and hint. */
+  private readonly itemsPage: HTMLElement;
+  private readonly recipes: RecipeList;
+  private tab: InventoryTab = 'items';
   private gameMode: GameMode = 'creative';
   /** The slot chosen first; the next activation says where its items go. */
   private picked: number | null = null;
@@ -79,10 +101,25 @@ export class InventoryScreen {
 
     const header = element('div', 'inventory-header');
     this.title = element('h2', 'inventory-title', '');
+    this.tabBar = element('div', 'inventory-tabs');
+    this.tabBar.setAttribute('role', 'tablist');
+    for (const { tab, label } of TABS) {
+      const choice = button('menu-button inventory-tab', label);
+      choice.dataset.tab = tab;
+      choice.setAttribute('role', 'tab');
+      choice.addEventListener('click', () => {
+        if (this.tab === tab) return;
+        this.setTab(tab);
+        options.onTab(tab);
+      });
+      this.tabButtons.set(tab, choice);
+      this.tabBar.appendChild(choice);
+    }
     const close = button('menu-button inventory-close', 'Close');
     onActivate(close, (via) => options.onClose(via));
-    header.append(this.title, close);
+    header.append(this.title, this.tabBar, close);
     panel.appendChild(header);
+    this.itemsPage = element('div', 'inventory-items');
 
     for (let index = 0; index < INVENTORY_SLOTS; index++) {
       const slot = button('inv-slot', '');
@@ -107,7 +144,7 @@ export class InventoryScreen {
     // The 27 slots behind the bar, three rows of nine.
     this.grid = element('div', 'inventory-grid');
     this.grid.append(...this.slots.slice(HOTBAR_SLOTS));
-    panel.appendChild(this.grid);
+    this.itemsPage.appendChild(this.grid);
 
     // Creative: every block that can be placed, once.
     this.palette = element('div', 'inventory-palette');
@@ -124,7 +161,7 @@ export class InventoryScreen {
       });
       this.palette.appendChild(choice);
     }
-    panel.appendChild(this.palette);
+    this.itemsPage.appendChild(this.palette);
 
     const barRow = element('div', 'inventory-bar-row');
     const bar = element('div', 'inventory-bar');
@@ -140,10 +177,18 @@ export class InventoryScreen {
       options.onDiscard(slot);
     });
     barRow.append(bar, this.bin);
-    panel.appendChild(barRow);
+    this.itemsPage.appendChild(barRow);
 
     this.hint = element('div', 'inventory-hint', '');
-    panel.appendChild(this.hint);
+    this.itemsPage.appendChild(this.hint);
+    panel.appendChild(this.itemsPage);
+
+    this.recipes = new RecipeList(panel, {
+      tiles: this.tiles,
+      onCraftDown: options.onCraftDown,
+      onCraftUp: options.onCraftUp,
+      onCraftClick: options.onCraftClick,
+    });
     parent.appendChild(this.element);
     this.setGameMode(this.gameMode);
   }
@@ -156,7 +201,37 @@ export class InventoryScreen {
     this.hint.textContent = HINTS[mode];
     this.grid.hidden = mode !== 'gathering';
     this.palette.hidden = mode !== 'creative';
+    // Creative has every block already: no recipes, and so no tabs.
+    this.tabBar.hidden = mode !== 'gathering';
+    this.setTab('items');
+  }
+
+  /** Shows the items page or the recipe list. Creative always shows its blocks. */
+  setTab(tab: InventoryTab): void {
+    this.tab = this.gameMode === 'gathering' ? tab : 'items';
+    this.element.dataset.tab = this.tab;
+    for (const [name, choice] of this.tabButtons) {
+      choice.classList.toggle('active', name === this.tab);
+      choice.setAttribute('aria-selected', String(name === this.tab));
+    }
+    this.itemsPage.hidden = this.tab !== 'items';
+    this.recipes.element.hidden = this.tab !== 'crafting';
+    if (this.tab === 'crafting') this.recipes.scrollToTop();
     this.setPicked(null);
+  }
+
+  get currentTab(): InventoryTab {
+    return this.tab;
+  }
+
+  /** The recipes in the order of the list, with what the player has for each. */
+  setRecipes(statuses: readonly RecipeStatus[]): void {
+    this.recipes.update(statuses);
+  }
+
+  /** The furnace's progress bar in the row of a recipe; null hides it. */
+  setSmelting(recipe: number | null, progress: number): void {
+    this.recipes.setSmelting(recipe, progress);
   }
 
   /** Shows the player's confirmed slots; `selected` is the selected bar slot (0-based). */

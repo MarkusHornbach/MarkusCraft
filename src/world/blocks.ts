@@ -19,6 +19,12 @@ export const Tile = {
   COAL_ORE: 13,
   IRON_ORE: 14,
   CLAY: 15,
+  WORKBENCH_TOP: 16,
+  WORKBENCH_SIDE: 17,
+  FURNACE_SIDE: 18,
+  FURNACE_TOP: 19,
+  STONE_BRICKS: 20,
+  IRON_BLOCK: 21,
 } as const;
 export type TileId = (typeof Tile)[keyof typeof Tile];
 export const TILE_COUNT = Object.keys(Tile).length;
@@ -44,6 +50,10 @@ export const Block = {
   COAL_ORE: 12,
   IRON_ORE: 13,
   CLAY: 14,
+  WORKBENCH: 15,
+  FURNACE: 16,
+  STONE_BRICKS: 17,
+  IRON_BLOCK: 18,
 } as const;
 export type BlockId = (typeof Block)[keyof typeof Block];
 
@@ -162,6 +172,22 @@ export const BLOCKS: readonly BlockDef[] = [
   solidBlock(Block.COAL_ORE, 'coal_ore', 'Coal ore', uniform(Tile.COAL_ORE), null),
   solidBlock(Block.IRON_ORE, 'iron_ore', 'Iron ore', uniform(Tile.IRON_ORE), null),
   solidBlock(Block.CLAY, 'clay', 'Clay', uniform(Tile.CLAY), null),
+  solidBlock(
+    Block.WORKBENCH,
+    'workbench',
+    'Workbench',
+    { top: Tile.WORKBENCH_TOP, side: Tile.WORKBENCH_SIDE, bottom: Tile.PLANKS },
+    null,
+  ),
+  solidBlock(
+    Block.FURNACE,
+    'furnace',
+    'Furnace',
+    { top: Tile.FURNACE_TOP, side: Tile.FURNACE_SIDE, bottom: Tile.FURNACE_TOP },
+    null,
+  ),
+  solidBlock(Block.STONE_BRICKS, 'stone_bricks', 'Stone bricks', uniform(Tile.STONE_BRICKS), null),
+  solidBlock(Block.IRON_BLOCK, 'iron_block', 'Iron block', uniform(Tile.IRON_BLOCK), null),
 ];
 
 export const RENDER_NONE = 0;

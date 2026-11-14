@@ -35,7 +35,25 @@ export interface GameState {
   /** True in touch mode (touch controls shown), false in mouse mode. */
   touch: boolean;
   /** What covers the view: a menu, the inventory, or nothing (`play`). */
-  ui: { screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' };
+  ui: {
+    screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory';
+    /** The open page of the inventory screen, or null while it is closed. */
+    tab: 'items' | 'crafting' | null;
+  };
+  /**
+   * Every recipe in the order of the recipe list (craftable ones first): whether it can
+   * be made right now, which ingredients are short (item and missing count) and whether
+   * its station is out of reach.
+   */
+  recipes: {
+    id: number;
+    name: string;
+    craftable: boolean;
+    missing: ItemStack[];
+    stationMissing: boolean;
+  }[];
+  /** The furnace recipe whose progress bar runs (0..1), or null. */
+  smelting: { recipe: number; progress: number } | null;
   player: {
     x: number;
     y: number;

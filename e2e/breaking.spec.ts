@@ -24,6 +24,7 @@ const STONE = 3;
 const SAND = 4;
 const COAL_ORE = 12;
 const COAL = 256;
+const WOODEN_PICKAXE = 259;
 /** Dirt takes 0.6 s by hand: 36 simulation steps. */
 const DIRT_STEPS = 36;
 
@@ -74,16 +75,20 @@ test('Phase 3 AC7.4: holding break on dirt removes it after 36 steps, yields one
   expect(await total()).toBe(2);
 });
 
-test('Phase 3 AC7.4: coal ore takes 3.5 s and yields coal', async ({ page }) => {
+test('Phase 3 AC7.4: coal ore takes 1.75 s with a wooden pickaxe and yields coal', async ({
+  page,
+}) => {
   const { px, pz } = await onPlatform(page, STONE);
   await setBlock(page, px, PLATFORM_Y, pz - 1, COAL_ORE);
+  // Since Part C coal ore yields its coal only to a pickaxe; wood halves the 3.5 s.
+  await give(page, WOODEN_PICKAXE, 1);
   await hold(page);
-  await step(page, 200);
+  await step(page, 100);
   expect(await getBlock(page, px, PLATFORM_Y, pz - 1)).toBe(COAL_ORE);
-  await step(page, 11);
+  await step(page, 6);
   expect(await getBlock(page, px, PLATFORM_Y, pz - 1)).toBe(AIR);
   await page.mouse.up();
-  expect((await inventory(page))[0]).toEqual({ item: COAL, count: 1 });
+  expect((await inventory(page))[1]).toEqual({ item: COAL, count: 1 });
   await expect(page.locator('.pickup-notice')).toHaveText('+1 Coal');
 });
 

@@ -14,12 +14,23 @@ const SAMPLES: Action[] = [
   { kind: 'moveStack', from: 12, to: 3 },
   { kind: 'discard', slot: 35 },
   { kind: 'setBarSlot', slot: 8, item: 14 },
+  { kind: 'craft', recipe: 1 },
+  { kind: 'craft', recipe: 19 },
 ];
 
 describe('decodeAction', () => {
   it('lets every action kind survive JSON unchanged (Phase 3 AC2.1)', () => {
     expect(new Set(SAMPLES.map((a) => a.kind))).toEqual(
-      new Set(['selectSlot', 'break', 'place', 'startBreak', 'moveStack', 'discard', 'setBarSlot']),
+      new Set([
+        'selectSlot',
+        'break',
+        'place',
+        'startBreak',
+        'moveStack',
+        'discard',
+        'setBarSlot',
+        'craft',
+      ]),
     );
     for (const action of SAMPLES) {
       const decoded = decodeAction(JSON.parse(JSON.stringify(action)));
@@ -78,6 +89,13 @@ describe('decodeAction', () => {
       { kind: 'setBarSlot', slot: 0, item: 70000 },
       { kind: 'setBarSlot', slot: 0, item: 3.5 },
       { kind: 'setBarSlot', slot: 0 },
+      { kind: 'craft' },
+      { kind: 'craft', recipe: 0 },
+      { kind: 'craft', recipe: -1 },
+      { kind: 'craft', recipe: 1.5 },
+      { kind: 'craft', recipe: '1' },
+      { kind: 'craft', recipe: 70000 },
+      { kind: 'craft', recipe: 1, count: 2 },
     ];
     for (const value of bad) {
       const decoded = decodeAction(value);
@@ -128,6 +146,7 @@ describe('decodeAction', () => {
       'startBreak',
       'discard',
       'setBarSlot',
+      'craft',
       35,
       null,
       undefined,
@@ -144,6 +163,7 @@ describe('decodeAction', () => {
       'from',
       'to',
       'item',
+      'recipe',
       'extra',
       '__proto__',
       'constructor',

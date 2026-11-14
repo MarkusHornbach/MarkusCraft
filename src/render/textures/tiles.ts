@@ -477,6 +477,237 @@ function paintClay(rng: Rng): Uint8ClampedArray {
   return px;
 }
 
+/**
+ * Workbench top: a framed work surface. Dark rails run around a lighter board that
+ * carries a ruled measuring grid and a few cut marks.
+ */
+function paintWorkbenchTop(rng: Rng): Uint8ClampedArray {
+  const px = baseCoat(rng, [150, 110, 62], [196, 152, 92], 10);
+  const rail: Rgb = [92, 62, 36];
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const edge = Math.min(x, y, S - 1 - x, S - 1 - y);
+      if (edge < 3) {
+        const g = (rng() - 0.5) * 12 + (edge === 0 ? -14 : edge === 2 ? -24 : 8);
+        setPixel(px, x, y, [rail[0] + g, rail[1] + g, rail[2] + g]);
+      } else if (edge === 3) {
+        shadePixel(px, x, y, -30);
+      }
+    }
+  }
+  // Measuring marks: a faint grid every 6 pixels inside the frame.
+  for (let k = 9; k < S - 4; k += 6) {
+    for (let t = 5; t < S - 5; t++) {
+      shadePixel(px, k, t, -16);
+      shadePixel(px, t, k, -16);
+    }
+  }
+  // Cut marks left by a saw.
+  for (let i = 0; i < 4; i++) {
+    const x0 = 6 + Math.floor(rng() * 14);
+    const y0 = 6 + Math.floor(rng() * 18);
+    const length = 4 + Math.floor(rng() * 5);
+    for (let k = 0; k < length; k++) shadePixel(px, x0 + k, y0 + (k >> 1), -42);
+  }
+  // Bolt heads in the corners of the frame.
+  for (const [x, y] of [
+    [1, 1],
+    [S - 2, 1],
+    [1, S - 2],
+    [S - 2, S - 2],
+  ]) {
+    setPixel(px, x, y, [196, 198, 204]);
+  }
+  return px;
+}
+
+/**
+ * Workbench side: the planks, a dark top rail, and two drawers with metal pulls between
+ * two legs.
+ */
+function paintWorkbenchSide(rng: Rng): Uint8ClampedArray {
+  const px = paintPlanks(rng);
+  const dark: Rgb = [92, 62, 36];
+  const drawerDark: Rgb = [138, 98, 54];
+  const drawerLight: Rgb = [178, 134, 80];
+  const tint = blotches(rng, 8);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const g = (rng() - 0.5) * 10;
+      if (y < 5) {
+        // The edge of the work surface with a shadow line under it.
+        const shade = y === 0 ? 20 : y === 4 ? -26 : 0;
+        setPixel(px, x, y, [dark[0] + g + shade, dark[1] + g + shade, dark[2] + g + shade]);
+      } else if (x < 4 || x >= S - 4) {
+        // Legs.
+        const shade = x === 0 || x === S - 4 ? 14 : x === 3 || x === S - 1 ? -18 : 0;
+        setPixel(px, x, y, [dark[0] + g + shade, dark[1] + g + shade, dark[2] + g + shade]);
+      } else if (y >= 8 && y < 26) {
+        // Two drawers, 11 pixels wide, with a bevel.
+        const dx = (x - 5) % 11;
+        const dy = y - 8;
+        if (x >= 5 && x < 27) {
+          const c = mix(drawerDark, drawerLight, tint[y * S + x]);
+          let bevel = 0;
+          if (dx === 0 || dy === 0) bevel = 22;
+          if (dx === 10 || dy === 17) bevel = -34;
+          setPixel(px, x, y, [c[0] + g + bevel, c[1] + g + bevel, c[2] + g + bevel]);
+        }
+      }
+    }
+  }
+  // Drawer pulls: a short metal bar with a shadow.
+  for (const cx of [10, 21]) {
+    for (let k = -2; k <= 2; k++) {
+      setPixel(px, cx + k, 16, [206, 208, 214]);
+      setPixel(px, cx + k, 17, [70, 60, 52]);
+    }
+  }
+  return px;
+}
+
+const STONE_BRICK_DARK: Rgb = [104, 106, 112];
+const STONE_BRICK_LIGHT: Rgb = [152, 154, 160];
+
+/**
+ * Stone bricks: large dressed blocks, two courses of 16 pixels, the upper one shifted by
+ * half a block. `joint` darkens the grooves between them.
+ */
+function paintStoneBricks(rng: Rng): Uint8ClampedArray {
+  const px = createTile();
+  const groove: Rgb = [62, 63, 68];
+  const tint = blotches(rng, 8);
+  const rowHeight = 16;
+  const width = 16;
+  for (let row = 0; row < S / rowHeight; row++) {
+    const offset = row % 2 === 0 ? 0 : width / 2;
+    const tones = [rng(), rng()];
+    for (let y = row * rowHeight; y < (row + 1) * rowHeight; y++) {
+      for (let x = 0; x < S; x++) {
+        const bx = wrap(x - offset);
+        const inX = bx % width;
+        const inY = y % rowHeight;
+        const g = (rng() - 0.5) * 14;
+        if (inY === rowHeight - 1 || inX === width - 1) {
+          setPixel(px, x, y, [groove[0] + g, groove[1] + g, groove[2] + g]);
+          continue;
+        }
+        const tone = tones[Math.floor(bx / width)] * 0.45 + tint[y * S + x] * 0.55;
+        const c = mix(STONE_BRICK_DARK, STONE_BRICK_LIGHT, tone);
+        let bevel = 0;
+        if (inY === 0 || inX === 0) bevel = 18;
+        if (inY === rowHeight - 2 || inX === width - 2) bevel = -22;
+        setPixel(px, x, y, [c[0] + g + bevel, c[1] + g + bevel, c[2] + g + bevel]);
+      }
+    }
+  }
+  // A few chips and hairline cracks.
+  for (let i = 0; i < 10; i++) {
+    const x = Math.floor(rng() * S);
+    const y = Math.floor(rng() * S);
+    shadePixel(px, x, y, -26);
+    shadePixel(px, x + 1, y + 1, -20);
+  }
+  return px;
+}
+
+/** Furnace top: stone bricks seen from above with a round, sooty flue in the middle. */
+function paintFurnaceTop(rng: Rng): Uint8ClampedArray {
+  const px = paintStoneBricks(rng);
+  const c0 = (S - 1) / 2;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const d = Math.hypot(x - c0, y - c0);
+      if (d < 6) {
+        const g = (rng() - 0.5) * 10;
+        setPixel(px, x, y, [20 + g, 18 + g, 18 + g]);
+      } else if (d < 8) {
+        // An iron ring around the flue, lit from the upper left.
+        const lit = x + y < S - 1 ? 26 : -12;
+        const g = (rng() - 0.5) * 8 + lit;
+        setPixel(px, x, y, [86 + g, 88 + g, 96 + g]);
+      } else if (d < 11) {
+        shadePixel(px, x, y, -24 + (d - 8) * 6);
+      }
+    }
+  }
+  return px;
+}
+
+/**
+ * Furnace side: stone bricks with an arched fire opening. Embers glow at the bottom of
+ * the opening and the stone above it is blackened by soot.
+ */
+function paintFurnaceSide(rng: Rng): Uint8ClampedArray {
+  const px = paintStoneBricks(rng);
+  const left = 8;
+  const right = 23;
+  const top = 12;
+  const bottom = 27;
+  const mid = (left + right) / 2;
+  const half = (right - left) / 2;
+  const inside = (x: number, y: number, grow: number): boolean => {
+    if (x < left - grow || x > right + grow || y > bottom + grow) return false;
+    const arch = top + half;
+    if (y >= arch) return true;
+    return Math.hypot(x - mid, y - arch) <= half + grow;
+  };
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      if (inside(x, y, 0)) {
+        // Dark inside, embers towards the bottom.
+        const depth = (y - (bottom - 7)) / 7;
+        const g = (rng() - 0.5) * 10;
+        if (depth > 0 && rng() < 0.35 + depth * 0.6) {
+          const hot = rng();
+          setPixel(px, x, y, [222 + hot * 30, 96 + hot * 110 * depth, 22 + hot * 30]);
+        } else {
+          setPixel(px, x, y, [26 + g, 20 + g, 18 + g]);
+        }
+      } else if (inside(x, y, 2)) {
+        // An iron frame around the opening.
+        const lit = y < top + 4 ? 20 : 0;
+        const g = (rng() - 0.5) * 8 + lit;
+        setPixel(px, x, y, [70 + g, 72 + g, 80 + g]);
+      } else if (y < top + 2 && Math.abs(x - mid) < half + 4) {
+        // Soot above the opening, fading upwards.
+        shadePixel(px, x, y, -34 * Math.max(0, (y + 2) / (top + 4)));
+      }
+    }
+  }
+  return px;
+}
+
+/** Iron block: a brushed plate with a bevelled rim and a rivet in every corner. */
+function paintIronBlock(rng: Rng): Uint8ClampedArray {
+  const px = baseCoat(rng, [176, 182, 192], [214, 220, 228], 6);
+  // Brushed metal: faint horizontal streaks.
+  for (let y = 0; y < S; y++) {
+    const streak = (rng() - 0.5) * 14;
+    for (let x = 0; x < S; x++) shadePixel(px, x, y, streak);
+  }
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const edge = Math.min(x, y, S - 1 - x, S - 1 - y);
+      if (edge === 0) shadePixel(px, x, y, x === 0 || y === 0 ? 26 : -50);
+      else if (edge === 1) shadePixel(px, x, y, x === 1 || y === 1 ? 14 : -30);
+      else if (edge === 4) shadePixel(px, x, y, x === 4 || y === 4 ? -22 : 16);
+    }
+  }
+  for (const [cx, cy] of [
+    [7, 7],
+    [S - 9, 7],
+    [7, S - 9],
+    [S - 9, S - 9],
+  ]) {
+    setPixel(px, cx, cy, [236, 240, 246]);
+    setPixel(px, cx + 1, cy, [150, 156, 168]);
+    setPixel(px, cx, cy + 1, [150, 156, 168]);
+    setPixel(px, cx + 1, cy + 1, [104, 110, 122]);
+  }
+  return px;
+}
+
 /** Painters indexed by tile id. */
 export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   const painters: TilePainter[] = [];
@@ -496,6 +727,12 @@ export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   painters[Tile.COAL_ORE] = paintCoalOre;
   painters[Tile.IRON_ORE] = paintIronOre;
   painters[Tile.CLAY] = paintClay;
+  painters[Tile.WORKBENCH_TOP] = paintWorkbenchTop;
+  painters[Tile.WORKBENCH_SIDE] = paintWorkbenchSide;
+  painters[Tile.FURNACE_SIDE] = paintFurnaceSide;
+  painters[Tile.FURNACE_TOP] = paintFurnaceTop;
+  painters[Tile.STONE_BRICKS] = paintStoneBricks;
+  painters[Tile.IRON_BLOCK] = paintIronBlock;
   return painters;
 })();
 
