@@ -1,48 +1,16 @@
-# Phase 3 part B report – Gathering (work in progress)
+# Phase 3 part B report – Gathering
 
 Plan: [`phase-3-plan.md`](phase-3-plan.md), Part B (steps 6–9). Branch
-`claude/elegant-einstein-xisa8s`. **Part B is not finished.** The first session was stopped
-by the owner during step 8; this file is the hand-over. The next session completes it and
-then rewrites this file as the final report (Definition of Done, item 8).
+`claude/elegant-einstein-xisa8s`. Implemented in two cloud sessions: the first was stopped
+by the owner during step 8, the second finished steps 8 and 9.
 
-## Status when the session stopped
-
-| Step | State                                                                                                                                                                                                                                                             |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 6    | Done and committed. `npm run check:all` passed (99 browser tests) on the commit of steps 6 and 7                                                                                                                                                                  |
-| 7    | Done and committed together with step 6 (see "Decisions and deviations", commits)                                                                                                                                                                                 |
-| 8    | Code, browser tests and the four references are written. The step 8 tests (`e2e/inventoryScreen.spec.ts`, "Phase 3 AC8.5" in `e2e/touchLayout.spec.ts`) passed when run alone. **The full `npm run check:all` for step 8 was interrupted** after 44 passing tests |
-| 9    | `e2e/gathering.spec.ts` (AC9.1 play-through, AC9.2 soak) is written but **was never run**. README, `CLAUDE.md`, the final report, merging `main`, the pull request and CI are open                                                                                |
-
-## To do, in this order
-
-1. `npm ci`, `npm run check`, then `npm run test:e2e` (about 7 minutes; run nothing else in
-   parallel, see "Test robustness"). Fix what fails. Step 8 is then complete: commit.
-2. Run `e2e/gathering.spec.ts` and make it pass. It finds the nearest beach and tree of seed
-   1337 with the test API and uses real mouse and key events for breaking, selecting and
-   placing; the player is moved to the sites with `setPlayer` (record that in the report).
-   The geometry of the wall (three cells in one row on the beach, each targeted on its top
-   face) is untested and may need another spot or other angles.
-3. AC9.3: hygiene and hard rule 1 for icons, cracks and texts (coal icon, bag and bin
-   symbols, crack overlay are painted by code; texts are plain English).
-4. AC9.4: `README.md` – both modes, the inventory, the controls (E, bag button; no flying in
-   Gathering), timed breaking.
-5. AC9.5: `CLAUDE.md` – structure (`src/items/`, `render/BreakOverlay.ts`,
-   `render/textures/itemIcons.ts` and `cracks.ts`, `ui/InventoryScreen.ts`,
-   `ui/itemIcon.ts`), conventions and test API listed below, status "Phase 3 part B:
-   implemented".
-6. AC9.6: rewrite this file as the final report, including measured numbers and the manual
-   list for the owner (feel of the break times by finger and mouse, the inventory on the
-   phone, whether "Inventory full" is understood, the bag button, E and Esc with the
-   captured mouse, the mode choice in the form).
-7. Merge the current `main`, `npm run check:all`, open exactly one pull request, CI green.
-
-## What exists
+## What was built
 
 - **Items** (`src/items/items.ts`): every placeable block is an item with the block's id;
   coal is item 256 (`Item.COAL`). Ids are pinned by `items.test.ts`.
 - **Inventory** (`src/items/inventory.ts`): pure functions on the 36 slots (`addItems`,
-  `fits`, `removeItems`, `moveStack`, `emptySlot`, `setSlot`, `countItems`).
+  `fits`, `removeItems`, `moveStack`, `emptySlot`, `setSlot`, `countItems`); stacks of up
+  to 99.
 - **Hardness** (`src/items/hardness.ts`): break times of plan 5.5 by hand, drop table (coal
   ore yields coal).
 - **Actions**: `startBreak`, `moveStack`, `discard`, `setBarSlot` added; `break` and `place`
@@ -57,8 +25,25 @@ then rewrites this file as the final report (Definition of Done, item 8).
   `getState()` has `breaking { x, y, z, progress } | null` and `ui { screen }`.
 - **References**: `gathering-hud`, `inventory`, `palette`, `inventory-touch` (new),
   `touch-controls` and `pause-screen` (regenerated: bag button, line "E – Inventory"). All
-  six were opened and judged by eye: counts readable, cracks and progress bar clear, slots
-  48 px, nothing cut off at 640 × 360.
+  were opened and judged by eye in both sessions: counts readable, cracks and progress bar
+  clear, slots 48 px, nothing cut off at 640 × 360.
+- **Documents**: `README.md` (modes, breaking, inventory, controls), `CLAUDE.md`.
+
+## Acceptance criteria
+
+| Criteria     | Where                                                                                                                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC6.1–AC6.4  | `src/items/*.test.ts`, `src/actions/inventoryActions.test.ts`                                                                                                                                            |
+| AC6.5–AC6.9  | `e2e/inventory.spec.ts` (AC6.9 also as a unit test with a literal Part A record)                                                                                                                         |
+| AC7.1–AC7.3  | `src/items/hardness.test.ts`, `src/actions/breaking.test.ts`                                                                                                                                             |
+| AC7.4–AC7.11 | `e2e/breaking.spec.ts`; AC7.10 by the unchanged Phase 1 tests in `e2e/interaction.spec.ts`                                                                                                               |
+| AC8.1–AC8.4  | `e2e/inventoryScreen.spec.ts`                                                                                                                                                                            |
+| AC8.5        | `e2e/touchLayout.spec.ts` (640 × 360 and 1280 × 800)                                                                                                                                                     |
+| AC8.6, AC8.7 | `e2e/inventoryScreen.spec.ts`; the four references                                                                                                                                                       |
+| AC9.1, AC9.2 | `e2e/gathering.spec.ts`                                                                                                                                                                                  |
+| AC9.3        | `repoHygiene.test.ts` passes (15 images, all test references). Checked by hand: the coal icon, the bag and bin symbols and the cracks are painted by code; no protected name in code, texts or documents |
+| AC9.4–AC9.6  | `README.md`, `CLAUDE.md`, this file                                                                                                                                                                      |
+| AC9.7        | See the pull request                                                                                                                                                                                     |
 
 ## Decisions and deviations
 
@@ -85,6 +70,11 @@ then rewrites this file as the final report (Definition of Done, item 8).
 | Creative palette         | A block goes into the selected bar slot, or into a bar slot that was picked first                                                                                                                                         | By touch the selected slot cannot be changed while the screen is open                                        |
 | Reference screenshots    | `inventory-touch` hides the canvas and uses `maxDiffPixelRatio` 0.05 (no test mode); `inventory`, `palette` and `gathering-hud` are taken in test mode with the world behind them                                         | As `pause-screen`                                                                                            |
 
+| Play-through (AC9.1) | The test moves the player to the beach and to the tree with `setPlayer`; breaking, selecting and placing use real mouse and key events, and nothing is given. The nearest sites of seed 1337 are found with the test API (the beach about 36 blocks from the start point) | Walking there with keys under software rendering would take minutes and add nothing to what is tested |
+| Wall of the play-through | Three blocks in one row on a dry place of three by three columns; the sand is dug at its edge. A hole dug next to the lake fills with water, and `surfaceY` counts water as surface | Found when the test first ran |
+| Soak (AC9.2) | A fixed seed; 500 actions give 23 accepted breaks, 9 places, 4 discards and every listed refusal | Deterministic, so the counts are asserted |
+| Mode is permanent | A world's mode cannot be changed after it is created; the README says so | The plan has no such function |
+| Second session | The first session was stopped by the owner during step 8. The second one ran the full suite (the code of step 8 needed no change), made the two step 9 tests pass, and wrote the documents | – |
 Existing tests adapted: `e2e/game.ts` (`createWorld` chooses Creative unless told
 otherwise; `openMenu` waits for `.world-menu[data-ready]`), `touchLayout.spec.ts` (creates a
 Creative world; seven touch buttons with `bag`; nine lines in the touch controls list),
@@ -92,7 +82,7 @@ Creative world; seven touch buttons with `bag`; nine lines in the touch controls
 AC4.6 (the retry no longer blocks on a button that is gone), `actions.test.ts`,
 `urlParams.test.ts`, `repoHygiene.test.ts` (15 images).
 
-## Test robustness (found in this session)
+## Test robustness
 
 - The "New world" form is on screen before the list of stored worlds arrives and is reset
   when it does. A test that typed a name early lost it under load. `WorldMenu` now sets
@@ -102,9 +92,87 @@ AC4.6 (the retry no longer blocks on a button that is gone), `actions.test.ts`,
 - A vertical finger drag that starts on the inventory overlay is a scroll gesture for the
   browser (the overlay may scroll on very small screens) and cancels the touch. Tests drag
   sideways there.
+- A hole dug next to water fills with water and `surfaceY` reports water as the surface: a
+  test that looks for flat ground must check the block, not only the height.
+- In a test that builds actions from stored objects, spread the cell only
+  (`{ kind: 'break', ...cell }`): a stored action brings its own `kind` along.
+- The full browser run now takes a little over seven minutes with three workers.
+
+## Measured numbers
+
+| Measurement                   | Result                                                              |
+| ----------------------------- | ------------------------------------------------------------------- |
+| Production bundle             | 649 kB JavaScript (Part A: 630 kB), 13 kB CSS (Part A: 10 kB)       |
+| Unit tests                    | 275 (Part A: 218), about 8 s; line coverage of the pure core 98.7 % |
+| Browser tests                 | 111 (Part A: 83), 7.3 minutes with 3 workers                        |
+| `addItems` on 36 slots (Node) | about 0.0001 ms                                                     |
+| `moveStack` (Node)            | about 0.00003 ms                                                    |
+| Break overlay                 | 1 draw call while a block is being broken, 0 otherwise (AC7.11)     |
+| Soak of 500 actions (AC9.2)   | about 1 s in the browser, without a console message                 |
+
+Frame rates still cannot be measured in the cloud container (software WebGL). Part B adds
+one small mesh and a few HUD elements; nothing in it touches generation or meshing.
 
 ## Known issues
 
+- Nothing was tried on a real device: break times, the inventory by finger and the bag
+  button are judged from tests and screenshots only (see the list below).
+- Closing the inventory with `Esc` usually ends in the pause menu ("Click to continue"),
+  because browsers do not give the mouse back on that key. The close button returns to the
+  game directly (AC8.3); `E` should too, but that was not tested with a captured mouse.
+- The Creative screen shows the bin although nothing can be thrown away there (it is
+  greyed out).
+- A Gathering world offers nothing to do with coal, iron ore and clay yet; that is Part C.
 - A malformed action made `Game.onActionResult` throw while step 7 was written; fixed, and
-  covered by `e2e/actions.spec.ts` and the Part A soak test.
-- Nothing was tried on a real device.
+  covered by `e2e/actions.spec.ts` and both soak tests.
+
+## For the owner to try
+
+Open the deployed game after merging. Each item says what to look for.
+
+1. **The mode choice in the form.** "New world" shows Gathering (preselected) and Creative
+   with one line of explanation. Is it clear what each means? The list of worlds names the
+   mode of each world.
+2. **Feel of the break times with the mouse.** In a Gathering world hold the left button on
+   leaves (0.25 s), sand and dirt (0.6 s), a log (2 s) and stone (3 s). Too slow, too fast?
+   Holding on continues with the next block. Stone by hand is meant to feel long: Part C
+   brings tools.
+3. **Feel of the break times by finger**, on the phone and the tablet: hold the break
+   button. Is it comfortable to hold for three seconds while the other thumb looks around?
+   A short tap must not break anything.
+4. **Cracks and progress bar.** Are the cracks visible on dark blocks (log, coal ore) and
+   in the evening? Is the small bar under the crosshair noticed at all?
+5. **Pickup notice.** "+1 Dirt" above the bar, counting up while you keep digging: readable
+   on the phone, and gone soon enough?
+6. **"Inventory full".** Fill the inventory (sand and dirt go fastest; 36 slots of 99 take
+   a while – or fill it with many different blocks and stacks). Is it understood why the
+   block no longer breaks?
+7. **The inventory with the mouse.** `E` opens it, the mouse is free; click a stack, then
+   another slot: move, merge, swap; the bin throws away. The close button returns to the game with the mouse captured; does `E` as well? `Esc` closes too but usually shows the pause menu –
+   is that acceptable?
+8. **The inventory on the phone** (landscape): the bag button at the top right opens it.
+   Are the slots large enough for a finger, is everything on screen, are the counts
+   readable? The game goes on behind it.
+9. **The bag button.** Is the symbol recognised as a bag, and is its place good (left of
+   the fly button; in the corner in a Gathering world)?
+10. **Creative as before.** Flying, instant breaking, unlimited blocks. The inventory key
+    shows all blocks: put coal ore, iron ore or clay into the bar and build with them.
+11. **Old worlds.** A world created before this part opens as a Creative world with the
+    nine blocks in its bar and everything that was built.
+12. **Saving.** Gather something in a Gathering world, go back to the worlds, close the
+    browser, come back: the inventory is as it was.
+
+## Suggestions for Part C
+
+- Recipes are one more action (`craft`); the soak already sends `{ kind: 'craft' }` and
+  expects `invalid`, so that test must be adapted when the action exists.
+- `RejectReason` already has `station`; `missing` stands for an empty slot and fits "not
+  enough material".
+- Tools divide the times in `items/hardness.ts` (`breakTimeMs(block)` gets the held item).
+  `selectSlot` already clears a running break, which is what tools need.
+- Items that are no blocks start at 256 and get their icon from
+  `render/textures/itemIcons.ts`; `ui/itemIcon.ts` chooses between cube and icon.
+- The inventory screen has room below the 27 slots at 1280 × 800 but not at 640 × 360: the
+  recipe list needs its own page or a second column there.
+- Decide in the plan whether tools wear out; the record has only `{ item, count }` per
+  slot, and anything more is a new save format version.
