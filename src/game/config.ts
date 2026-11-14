@@ -90,6 +90,12 @@ export const REACH = 5;
 /** Slack for the reach check of the action layer (block centre against the actor's eye). */
 export const REACH_TOLERANCE = 1.5;
 export const ACTION_REPEAT_MS = 250;
+/** A workbench or furnace unlocks its recipes within this distance of the eye. */
+export const STATION_REACH = 5;
+/** A furnace recipe shows its progress bar this long before the item is made. */
+export const SMELT_MS = 2000;
+/** Holding "Craft" repeats at this interval. */
+export const CRAFT_REPEAT_MS = 250;
 /** Slots of a player's inventory; the first `HOTBAR_SLOTS` are the bar. */
 export const INVENTORY_SLOTS = 36;
 export const STACK_SIZE = 99;

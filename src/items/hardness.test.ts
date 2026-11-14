@@ -18,6 +18,10 @@ describe('break times (Phase 3 AC7.1)', () => {
       bricks: 3.0,
       coal_ore: 3.5,
       iron_ore: 4.5,
+      workbench: 1.5,
+      furnace: 3.0,
+      stone_bricks: 3.0,
+      iron_block: 5.0,
     };
     const table = Object.fromEntries(
       BLOCKS.filter((def) => def.breakable).map((def) => [def.name, breakTimeMs(def.id)]),

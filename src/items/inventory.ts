@@ -56,6 +56,24 @@ export function removeItems(slots: Slots, slot: number, count: number): Slots | 
 }
 
 /**
+ * Takes `count` items of one kind out of the inventory, wherever they lie; null if there
+ * are not that many. The last slots are emptied first, so the bar keeps its stacks longest.
+ */
+export function takeItems(slots: Slots, item: number, count: number): Slots | null {
+  if (count < 1) return null;
+  const next = slots.slice();
+  let left = count;
+  for (let i = next.length - 1; i >= 0 && left > 0; i--) {
+    const stack = next[i];
+    if (!stack || stack.item !== item) continue;
+    const taken = Math.min(left, stack.count);
+    next[i] = taken === stack.count ? null : { item, count: stack.count - taken };
+    left -= taken;
+  }
+  return left > 0 ? null : next;
+}
+
+/**
  * Moves the stack of slot `from` to slot `to`: into an empty slot it moves, onto the same
  * item it merges up to the stack size (the remainder stays behind), onto another item the
  * two swap. With `merge` false equal items swap as well (Creative, where counts mean

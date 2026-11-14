@@ -52,7 +52,13 @@ export interface SetBarSlotAction {
   item: number;
 }
 
-/** Part C appends kinds here; an action survives JSON unchanged. */
+/** Gathering: makes the result of a recipe (by its id) from the player's items, once. */
+export interface CraftAction {
+  kind: 'craft';
+  recipe: number;
+}
+
+/** An action survives JSON unchanged. */
 export type Action =
   | SelectSlotAction
   | BreakAction
@@ -60,7 +66,8 @@ export type Action =
   | StartBreakAction
   | MoveStackAction
   | DiscardAction
-  | SetBarSlotAction;
+  | SetBarSlotAction
+  | CraftAction;
 export type ActionKind = Action['kind'];
 
 export type DecodeResult = { ok: true; action: Action } | { ok: false; error: string };
@@ -80,6 +87,9 @@ const isSlot: Check = (value) =>
 const isItemId: Check = (value) =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 0xffff;
 
+/** Whether the id names a recipe is checked by `applyAction`. */
+const isRecipeId: Check = isItemId;
+
 /** The fields of every kind, besides `kind` itself, with their checks. */
 const FIELDS: Record<ActionKind, Record<string, Check>> = {
   selectSlot: { slot: isBarSlot },
@@ -89,6 +99,7 @@ const FIELDS: Record<ActionKind, Record<string, Check>> = {
   moveStack: { from: isSlot, to: isSlot },
   discard: { slot: isSlot },
   setBarSlot: { slot: isBarSlot, item: isItemId },
+  craft: { recipe: isRecipeId },
 };
 
 function fail(error: string): DecodeResult {

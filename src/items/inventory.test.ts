@@ -12,6 +12,7 @@ import {
   moveStack,
   removeItems,
   setSlot,
+  takeItems,
 } from './inventory';
 import { Item } from './items';
 
@@ -192,5 +193,33 @@ describe('slot operations', () => {
       count: 1,
     });
     expect(start[0]).toBeNull();
+  });
+});
+
+describe('takeItems', () => {
+  it('takes items of one kind from wherever they lie, the last slots first', () => {
+    const start = withSlots({
+      0: { item: Block.PLANKS, count: 5 },
+      4: { item: Block.STONE, count: 9 },
+      30: { item: Block.PLANKS, count: 2 },
+      35: { item: Block.PLANKS, count: 1 },
+    });
+    const taken = takeItems(start, Block.PLANKS, 4);
+    expect(taken?.[35]).toBeNull();
+    expect(taken?.[30]).toBeNull();
+    expect(taken?.[0]).toEqual({ item: Block.PLANKS, count: 4 });
+    expect(taken?.[4]).toEqual({ item: Block.STONE, count: 9 });
+    expect(countItems(taken ?? [], Block.PLANKS)).toBe(4);
+    // The input stays as it was.
+    expect(countItems(start, Block.PLANKS)).toBe(8);
+    expect(takeItems(start, Block.PLANKS, 8)?.every((s) => s?.item !== Block.PLANKS)).toBe(true);
+  });
+
+  it('gives null when there are not enough, or for a count below one', () => {
+    const start = withSlots({ 0: { item: Block.PLANKS, count: 5 } });
+    expect(takeItems(start, Block.PLANKS, 6)).toBeNull();
+    expect(takeItems(start, Block.STONE, 1)).toBeNull();
+    expect(takeItems(start, Block.PLANKS, 0)).toBeNull();
+    expect(takeItems(empty(), Item.COAL, 1)).toBeNull();
   });
 });

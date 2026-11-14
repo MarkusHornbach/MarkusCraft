@@ -15,15 +15,22 @@ const BREAK_SECONDS: ReadonlyMap<number, number> = new Map([
   [Block.GRASS, 0.7],
   [Block.CLAY, 0.8],
   [Block.PLANKS, 1.5],
+  [Block.WORKBENCH, 1.5],
   [Block.LOG, 2.0],
   [Block.STONE, 3.0],
   [Block.BRICKS, 3.0],
+  [Block.STONE_BRICKS, 3.0],
+  [Block.FURNACE, 3.0],
   [Block.COAL_ORE, 3.5],
   [Block.IRON_ORE, 4.5],
+  [Block.IRON_BLOCK, 5.0],
 ]);
 
-/** Milliseconds a block takes to break by hand, or null if it cannot be broken. */
-export function breakTimeMs(block: number): number | null {
+/**
+ * Milliseconds a block takes to break, or null if it cannot be broken. `held` is the item
+ * in the hand; step 11 lets tools divide the time.
+ */
+export function breakTimeMs(block: number, _held: number | null = null): number | null {
   if (!getBlockDef(block).breakable) return null;
   const seconds = BREAK_SECONDS.get(block);
   return seconds === undefined ? null : seconds * 1000;

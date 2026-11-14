@@ -16,7 +16,7 @@ import {
 
 describe('block registry (AC3.3)', () => {
   it('has complete properties for every id, in id order', () => {
-    expect(BLOCKS.length).toBe(15);
+    expect(BLOCKS.length).toBe(19);
     BLOCKS.forEach((def, index) => {
       expect(def.id).toBe(index);
       expect(def.name).toMatch(/^[a-z_]+$/);
@@ -67,6 +67,10 @@ describe('block registry (AC3.3)', () => {
       'coal_ore',
       'iron_ore',
       'clay',
+      'workbench',
+      'furnace',
+      'stone_bricks',
+      'iron_block',
     ]);
     expect(HOTBAR_BLOCKS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(isSolid(Block.AIR)).toBe(false);
@@ -101,6 +105,10 @@ describe('block registry (AC3.3)', () => {
       COAL_ORE: 12,
       IRON_ORE: 13,
       CLAY: 14,
+      WORKBENCH: 15,
+      FURNACE: 16,
+      STONE_BRICKS: 17,
+      IRON_BLOCK: 18,
     });
     expect(BLOCKS.map((b) => [b.id, b.name])).toEqual(
       Object.entries(Block).map(([key, id]) => [id, key.toLowerCase()]),
@@ -115,6 +123,19 @@ describe('block registry (AC3.3)', () => {
       expect(def.slot).toBeNull();
       expect(BLOCK_RENDER[id]).toBe(RENDER_OPAQUE);
     }
+  });
+
+  it('adds the crafted blocks of Phase 3 part C', () => {
+    for (const id of [Block.WORKBENCH, Block.FURNACE, Block.STONE_BRICKS, Block.IRON_BLOCK]) {
+      const def = getBlockDef(id);
+      expect(def.solid).toBe(true);
+      expect(def.breakable).toBe(true);
+      expect(def.slot).toBeNull();
+      expect(BLOCK_RENDER[id]).toBe(RENDER_OPAQUE);
+    }
+    // Workbench and furnace have a top of their own.
+    expect(getBlockDef(Block.WORKBENCH).tiles).toEqual({ top: 16, side: 17, bottom: 8 });
+    expect(getBlockDef(Block.FURNACE).tiles).toEqual({ top: 19, side: 18, bottom: 19 });
   });
 
   it('treats unknown ids like air', () => {

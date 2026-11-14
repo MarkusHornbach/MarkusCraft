@@ -308,6 +308,40 @@ describe('worlds of earlier versions', () => {
   });
 });
 
+describe('a world saved by Part B (Phase 3 AC10.6)', () => {
+  // Written by the game as of Phase 3 part B: a Gathering world with items in its slots.
+  const PART_B_META =
+    '{"id":"wpartb-fixture1","name":"Part B world","seed":4242,"mode":"gathering","generatorVersion":1,"formatVersion":1,"createdMs":1790000000000,"playedMs":1790000480000,"time":0.62,"pose":{"x":-12.5,"y":63,"z":40.75,"yaw":2.5,"pitch":0.4},"moveMode":"walk","player":{"slots":[{"item":2,"count":99},{"item":5,"count":7},{"item":256,"count":12},null,{"item":13,"count":3},null,null,null,{"item":14,"count":20},{"item":2,"count":41},null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,{"item":3,"count":64}],"selectedSlot":2,"breaking":null}}';
+  const PART_B_CHUNK =
+    '{"key":"wpartb-fixture1|-1,2","worldId":"wpartb-fixture1","cx":-1,"cz":2,"edits":[31000,0,31001,7,5,12]}';
+
+  it('loads unchanged', () => {
+    const decoded = decodeWorld(JSON.parse(PART_B_META), [JSON.parse(PART_B_CHUNK)]);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    const { meta, edits } = decoded.value;
+    expect(meta.mode).toBe('gathering');
+    expect(meta.name).toBe('Part B world');
+    expect(meta.seed).toBe(4242);
+    expect(meta.moveMode).toBe('walk');
+    expect(meta.player.selectedSlot).toBe(2);
+    expect(meta.player.slots[0]).toEqual({ item: 2, count: 99 });
+    expect(meta.player.slots[2]).toEqual({ item: 256, count: 12 });
+    expect(meta.player.slots[35]).toEqual({ item: 3, count: 64 });
+    expect(meta.player.slots.filter((slot) => slot !== null).length).toBe(7);
+    // Every stored item still means the same item.
+    expect(meta.player.slots.every((slot) => slot === null || isItem(slot.item))).toBe(true);
+    expect([...(edits.get('-1,2') ?? [])]).toEqual([
+      [31000, 0],
+      [31001, 7],
+      [5, 12],
+    ]);
+    // Saving it again writes the same records: Part C did not change the format.
+    expect(JSON.stringify(encodeMeta(meta))).toBe(PART_B_META);
+    expect(SAVE_FORMAT_VERSION).toBe(1);
+  });
+});
+
 describe('names, seeds and ids (Phase 3 AC3.3)', () => {
   it('trims names, strips control characters, cuts to 24 and falls back when empty', () => {
     expect(normalizeName('  Castle  ')).toBe('Castle');

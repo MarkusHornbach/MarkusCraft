@@ -36,7 +36,8 @@ function sourceFiles(dir: string): string[] {
  * build changed slots, and only the session stores a new record. The two exceptions are
  * the test API tools `give` and `clearInventory` in `Game.ts`.
  */
-const INVENTORY_CALL = /\b(addItems|removeItems|moveStack|emptySlot|setSlot)\s*\(/g;
+const INVENTORY_CALL =
+  /\b(addItems|removeItems|takeItems|takeIngredients|moveStack|emptySlot|setSlot)\s*\(/g;
 const INVENTORY_ALLOWED: Record<string, number> = {
   // `give` adds items for tests.
   'src/game/Game.ts': 1,
@@ -61,7 +62,11 @@ describe('single pipeline for items (Phase 3 plan 5.2)', () => {
   it('the inventory functions that change slots are called only by the action layer', () => {
     const found = countCalls(
       INVENTORY_CALL,
-      (file) => file.startsWith('src/actions/') || file === 'src/items/inventory.ts',
+      (file) =>
+        file.startsWith('src/actions/') ||
+        file === 'src/items/inventory.ts' ||
+        // The recipe table asks what would be left; it stores nothing.
+        file === 'src/items/recipes.ts',
     );
     expect(found).toEqual(INVENTORY_ALLOWED);
   });

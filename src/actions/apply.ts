@@ -11,13 +11,15 @@ import { type BlockReader, breakResult } from '../player/interaction';
 import { playerIntersectsBlock } from '../player/physics';
 import { addItems, emptySlot, fits, moveStack, removeItems, setSlot } from '../items/inventory';
 import { getItemDef } from '../items/items';
+import { getRecipe, stationsNear, takeIngredients } from '../items/recipes';
 import { BLOCK_REPLACEABLE } from '../world/blocks';
 import type { Action } from './actions';
 import type { GameMode, PlayerRecord } from './playerRecord';
 
 /**
  * Why an action was refused. Short identifiers; the user interface maps them to texts.
- * `missing` also stands for an empty slot; `station` is used from Part C on.
+ * `missing` also stands for an empty slot and for ingredients a recipe is short of;
+ * `station` for a recipe whose workbench or furnace is not within reach.
  */
 export type RejectReason =
   | 'reach'
@@ -184,6 +186,21 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       if ((getItemDef(action.item)?.block ?? null) === null) return reject('invalid');
       const slots = setSlot(ctx.record.slots, action.slot, { item: action.item, count: 1 });
       return changed(ctx.record, slots);
+    }
+    case 'craft': {
+      // Creative has every block already and counts mean nothing there.
+      if (ctx.mode !== 'gathering') return reject('mode');
+      const recipe = getRecipe(action.recipe);
+      if (!recipe) return reject('invalid');
+      if (recipe.station && !stationsNear(ctx.world, ctx.pose)[recipe.station]) {
+        return reject('station');
+      }
+      const taken = takeIngredients(ctx.record.slots, recipe);
+      if (!taken) return reject('missing');
+      // Nothing may get lost: the whole result must fit, or nothing is made.
+      const added = addItems(taken, recipe.result.item, recipe.result.count);
+      if (added.left > 0) return reject('full');
+      return changed(ctx.record, added.slots);
     }
   }
 }
