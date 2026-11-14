@@ -18,7 +18,7 @@ game in a procedurally generated world"; everything in it is original work.
      timed breaking, ores, tools, a recipe list with workbench and furnace. Every change
      to the world or a player's items goes through one action layer, so multiplayer can
      be added without restructuring. Four parts with separate pull requests: A foundation,
-     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`; part A report: `docs/phase-3a-report.md`)
+     B gathering, C crafting, D Web Workers (optional) (plan: `docs/phase-3-plan.md`; reports: `docs/phase-3a-report.md`, `docs/phase-3b-report.md`)
   4. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the Phase 3 gameplay and its
      action layer (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
@@ -92,6 +92,8 @@ src/
                      idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world)
   actions/           the action layer (pure): actions.ts (types, decodeAction), apply.ts
                      (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
+  items/             pure: items.ts (item table), inventory.ts (functions on the 36 slots),
+                     hardness.ts (break times by hand, drop table)
   save/              pure: saveFormat.ts (records, validation, names, seeds), WorldStore.ts
                      (interface + MemoryStore)
   world/             blocks.ts (block + tile table), chunk.ts, World.ts, ChunkManager.ts,
@@ -103,9 +105,13 @@ src/
   input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch as well
                      TouchTracker.ts (pure: finger events → stick, look, buttons),
                      TouchControls.ts (pointer events of fingers → TouchTracker → Input)
-  render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts
-    textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts
-  ui/                Hud.ts, blockIcon.ts, DebugOverlay.ts, settings.ts, ui.css,
+  render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts,
+                     BreakOverlay.ts (cracks on the block being broken, one draw call)
+    textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts,
+                     itemIcons.ts (icons of items that are no blocks), cracks.ts (pure)
+  ui/                Hud.ts (bar with counts, break progress, notices), blockIcon.ts,
+                     itemIcon.ts, DebugOverlay.ts, settings.ts, ui.css,
+                     InventoryScreen.ts (27 slots or the Creative palette, bar, bin),
                      WorldMenu.ts (start screen: list of worlds, new world, delete),
                      PauseScreen.ts (pause menu of a world; also the settings page),
                      activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint)
@@ -124,24 +130,42 @@ under coverage, which distorts timings. CI runs both.
 
 ## Architecture and code conventions
 
-- **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/` (and
-  `items/` from Part B on) must not import `three` or touch the DOM (enforced by an ESLint
+- **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/` and
+  `items/` must not import `three` or touch the DOM (enforced by an ESLint
   `no-restricted-imports` rule). They are tested in Node. Only `render/`, `ui/`, `input/`
   and `game/` may use Three.js and browser APIs. The same rule covers
-  `render/textures/tiles.ts`. The core may import `game/config.ts`.
+  `render/textures/tiles.ts`, `itemIcons.ts` and `cracks.ts`. The core may import `game/config.ts`.
   `input/TouchTracker.ts` and `game/autosave.ts` follow the same discipline (no DOM,
   unit-tested in Node, in the coverage scope) although they live in the shell.
 - **One pipeline for changes (action layer).** `Game` and the UI never change blocks, the
-  selected slot or (later) the inventory themselves. They build a plain action
+  selected slot or the inventory themselves. They build a plain action
   (`{ kind, ... }`, JSON-safe) and call `session.submit(action)`; the world and the screen
   change when the session's listener reports back (`onBlocks`, `onPlayer`, `onResult`).
   Never read a result from `submit`'s return: a later session may answer asynchronously.
   `applyAction` is pure and never mutates its inputs; `PlayerRecord`s are immutable.
   `src/actions/pipeline.test.ts` fails if `.setBlock(` is called anywhere but in
-  `actions/Session.ts` and once in `Game.ts` (the test API tool). Slots in actions and
-  records count from 0; keys, HUD and `getState().selectedSlot` count from 1.
-- **Stable ids.** Block ids (and item ids, from Part B) are written into save files. The
-  block table is append-only: never renumber or reuse an id. `blocks.test.ts` pins them.
+  `actions/Session.ts` and once in `Game.ts` (the test API tool), if a slot-changing
+  inventory function is called outside `src/actions/` (one call in `Game.ts` for `give`),
+  or if `replaceRecord` is called outside the two test tools. Slots in actions and records
+  count from 0; keys, HUD and `getState().selectedSlot` count from 1.
+- **Actions and reasons.** `break`, `place`, `selectSlot`, `startBreak`, `moveStack`,
+  `discard`, `setBarSlot` (Creative only). A refusal carries a short reason (`reach`,
+  `unbreakable`, `occupied`, `full`, `early`, `missing`, `mode`, `invalid`) that the UI
+  maps to a text; `ActionResult.notices` is a list of `{ item, count }`, not of strings.
+- **Game modes.** A world is Creative or Gathering for ever (`WorldMeta.mode`). Creative:
+  flying, unlimited blocks, instant breaking, the palette. Gathering: no flying (key, touch
+  button, `setPlayer` and controls list), placing takes the item from the selected slot,
+  breaking is timed: `startBreak` records `record.breaking`, `break` is accepted once
+  `breakTimeMs` of simulation time has passed (otherwise `early`) and puts `dropOf(block)`
+  into the inventory (`full` if it has no room; then the block stays). `selectSlot`,
+  `moveStack`, `discard` and a Gathering `place` clear `record.breaking`. The action clock
+  is the simulation time (`simSteps × 1000 / 60`), so notices and break times are
+  deterministic in test mode.
+- **Stable ids.** Block ids and item ids are written into save files. Both tables are
+  append-only: never renumber or reuse an id. `blocks.test.ts` and `items.test.ts` pin
+  them. Every placeable block is an item with the block's id; items that are no blocks
+  start at 256 (`Item.COAL`). An unknown stored item id still loads and shows as "Unknown
+  item"; a newer build must never make a world "damaged".
 - **Generator version.** Every world stores the version of the terrain generator it was
   created with (`GENERATOR_VERSION`, now 1). `generateChunk(seed, cx, cz, version)` must
   keep producing the same blocks for an old version for ever: a change to generation adds
@@ -157,7 +181,11 @@ under coverage, which distorts timings. CI runs both.
   `Game.loadWorld(meta, edits)` swaps world, chunk manager, meshes, player and session in
   place. Until a world is open `Game` holds an empty placeholder world.
 - **Screens.** Outside test mode: world menu → (play) → game ⇄ pause menu → "Save and back
-  to worlds". The settings page is the pause screen without its world parts. Play buttons
+  to worlds". The settings page is the pause screen without its world parts. The inventory
+  screen (`E`, `Esc`, touch button `bag`) lies over the running game and does not pause
+  it; `Game` listens for its keys itself and `Input` ignores keys while it is open. The HUD
+  is hidden and the touch controls are made invisible (`covered`), not removed. Closing
+  requests the pointer lock again; if the browser refuses, the pause menu shows. Play buttons
   request the pointer lock (mouse) or fullscreen (touch) synchronously inside the click.
 - **Mouse mode and touch mode.** `Game` runs in one of two input modes. Touch mode has the
   on-screen controls, no pointer lock, a pixel ratio capped at 1.5 and a default render
@@ -217,10 +245,20 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   three parallel browsers with software WebGL render at only 1 to 7 frames per second, so
   keep these tests light and never assert on wall-clock time without taking the best of
   several rounds.
+- `mode=gathering` or `mode=creative` (with `test=1`; default Creative) sets the game mode
+  of the test world.
 - Test API beyond Phase 2: `submit(action)` (returns the session's answer),
-  `save()`, `openWorld(name, seed)` (switch worlds in place), `terrainChecksum()`;
-  `getState()` has `mode`, `world`, `save { dirty, lastError, lastSaveMs, lastLoadMs }`
-  and `inventory`. `setBlock` stays a direct tool past the action layer.
+  `save()`, `openWorld(name, seed, mode?)` (switch worlds in place), `terrainChecksum()`,
+  `give(item, count)`, `clearInventory()`; `getState()` has `mode`, `world`,
+  `save { dirty, lastError, lastSaveMs, lastLoadMs }`, `inventory`,
+  `breaking { x, y, z, progress } | null` and `ui { screen }`. `setBlock`, `give` and
+  `clearInventory` are direct tools past the action layer.
+- The "New world" form is reset when the list of stored worlds arrives: `WorldMenu` sets
+  `data-ready` then, and `openMenu` waits for it. `createWorld` chooses Creative unless
+  told otherwise.
+- Run the browser suite alone: a build or `npm run check` in parallel makes menu tests
+  time out. A vertical finger drag that starts on the inventory overlay is a scroll
+  gesture for the browser and cancels the touch; tests drag sideways there.
 - Text-only reference screenshots use `maxDiffPixelRatio` 0.05, which is loose enough to
   miss a whole button: after changing a menu, regenerate with `--update-snapshots=all`
   and look at the result.
@@ -241,7 +279,7 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
 - After changing anything visual, the implementing session must also open the produced
   screenshots with the Read tool and judge them by eye. For a quick look at any pose:
   `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
-- The full e2e run takes about two minutes; run long commands in the background.
+- The full e2e run takes about seven minutes; run long commands in the background.
 
 ## Definition of Done (per phase or phase part)
 
@@ -273,10 +311,10 @@ hold:
   - Phase 3 part A (foundation: terrain version 1, action layer, saving, world menu):
     implemented (report: `docs/phase-3a-report.md`). Read its "Decisions and deviations"
     before changing generation, actions, the save format, the menus or the start flow.
-  - Phase 3 part B (gathering, steps 6–9): **in progress** on the branch
-    `claude/elegant-einstein-xisa8s`. Steps 6 and 7 are done, step 8 is written but its
-    full test run was interrupted, step 9 is open. Read `docs/phase-3b-report.md` first:
-    it is the hand-over with the status, the to-do list and the decisions so far.
-  - Parts B and C are implemented in this order, each after the previous one is merged;
+  - Phase 3 part B (gathering: items, inventory, game modes, timed breaking, inventory
+    screen): implemented (report: `docs/phase-3b-report.md`). Read its "Decisions and
+    deviations" before changing items, the inventory, the break rules or the inventory
+    screen.
+  - Part C (crafting) follows after part B is merged;
     part D (Web Workers) only when the owner asks for it.
 - Phases 4 (multiplayer) and 5 (personalization): not yet planned.
