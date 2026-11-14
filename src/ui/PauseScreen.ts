@@ -10,6 +10,7 @@ import {
   TOUCH_SENSITIVITY_MAX,
   TOUCH_SENSITIVITY_MIN,
 } from '../game/config';
+import type { GameMode } from '../actions/playerRecord';
 import { type InputMode, button, element, onActivate } from './activate';
 import type { Settings } from './settings';
 
@@ -20,28 +21,36 @@ export type PauseKind = 'pause' | 'settings';
 
 export const SAVE_FAILED_TEXT = 'Saving failed. Free up storage space.';
 
-const CONTROLS: readonly [string, string][] = [
+/**
+ * Key, what it does, and optionally what it does in a Gathering world, where nobody
+ * flies: another text, or null if the line is left out.
+ */
+type ControlLine = readonly [string, string, (string | null)?];
+
+const CONTROLS: readonly ControlLine[] = [
   ['Mouse', 'Look around'],
   ['W A S D', 'Move'],
-  ['Space', 'Jump / swim up / fly up'],
+  ['Space', 'Jump / swim up / fly up', 'Jump / swim up'],
   ['Shift', 'Sprint'],
-  ['F', 'Toggle fly mode'],
-  ['C', 'Fly down'],
+  ['F', 'Toggle fly mode', null],
+  ['C', 'Fly down', null],
   ['Left click', 'Break block'],
   ['Right click', 'Place block'],
   ['1–9, wheel', 'Select block'],
+  ['E', 'Inventory'],
   ['F3', 'Debug overlay'],
   ['Esc', 'Pause'],
 ];
 
-const TOUCH_CONTROLS: readonly [string, string][] = [
+const TOUCH_CONTROLS: readonly ControlLine[] = [
   ['Left thumb', 'Move with the stick (push far to sprint)'],
   ['Drag right side', 'Look around'],
   ['Break / Place', 'Break or place a block at the crosshair'],
-  ['Up', 'Jump / swim up / fly up'],
-  ['Down', 'Fly down'],
-  ['Fly', 'Toggle fly mode'],
+  ['Up', 'Jump / swim up / fly up', 'Jump / swim up'],
+  ['Down', 'Fly down', null],
+  ['Fly', 'Toggle fly mode', null],
   ['Block bar', 'Tap a block to select it'],
+  ['Bag', 'Open the inventory'],
   ['Menu', 'Pause and open this menu'],
 ];
 
@@ -88,6 +97,7 @@ export class PauseScreen {
   private readonly saveState: HTMLElement;
   private mode: InputMode;
   private kind: PauseKind = 'pause';
+  private gameMode: GameMode = 'creative';
   private resumed = false;
 
   constructor(parent: HTMLElement, options: PauseScreenOptions) {
@@ -244,6 +254,7 @@ export class PauseScreen {
       this.worldSection.remove();
     }
     this.placeFullscreenButton();
+    this.renderControls();
   }
 
   /** The world the pause menu is about: its seed and the link that recreates it. */
@@ -265,16 +276,30 @@ export class PauseScreen {
     else this.buttonRow.appendChild(this.fullscreenButton);
   }
 
+  /** The controls list names flying only where the open world has it. */
+  setGameMode(mode: GameMode): void {
+    this.gameMode = mode;
+    this.renderControls();
+  }
+
+  private renderControls(): void {
+    this.controlsList.replaceChildren();
+    // The settings page is about no world: it lists everything.
+    const gathering = this.gameMode === 'gathering' && this.kind === 'pause';
+    for (const [input, action, inGathering] of this.mode === 'touch' ? TOUCH_CONTROLS : CONTROLS) {
+      const text = gathering && inGathering !== undefined ? inGathering : action;
+      if (text === null) continue;
+      this.controlsList.appendChild(element('dt', 'control-input', input));
+      this.controlsList.appendChild(element('dd', 'control-action', text));
+    }
+  }
+
   /** Adapts the labels, the controls list and the settings to the input mode. */
   setMode(mode: InputMode): void {
     this.mode = mode;
     const touch = mode === 'touch';
     this.updatePlayLabel();
-    this.controlsList.replaceChildren();
-    for (const [input, action] of touch ? TOUCH_CONTROLS : CONTROLS) {
-      this.controlsList.appendChild(element('dt', 'control-input', input));
-      this.controlsList.appendChild(element('dd', 'control-action', action));
-    }
+    this.renderControls();
     // Parts that do not apply are taken out of the document, not just hidden.
     const place = (node: HTMLElement, parent: HTMLElement, before: Node | null, on: boolean) => {
       if (on) parent.insertBefore(node, before);

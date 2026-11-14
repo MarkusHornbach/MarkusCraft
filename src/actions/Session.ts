@@ -52,6 +52,15 @@ export class LocalSession implements Session {
     return this.current;
   }
 
+  /**
+   * Test tool: replaces the record past the action layer (`give`, `clearInventory`).
+   * Game and UI code must not call this; `pipeline.test.ts` guards it.
+   */
+  replaceRecord(record: PlayerRecord): void {
+    this.current = record;
+    this.listener.onPlayer(record);
+  }
+
   submit(action: Action): void {
     // Decoding again costs little and gives every source of actions the same checks.
     const decoded = decodeAction(action);

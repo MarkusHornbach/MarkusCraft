@@ -4,6 +4,7 @@ import type { StickView, TouchButton } from '../input/TouchTracker';
 /** Buttons in document order. Positions come from the style sheet. */
 const BUTTONS: readonly { button: TouchButton; label: string }[] = [
   { button: 'menu', label: 'Menu' },
+  { button: 'bag', label: 'Inventory' },
   { button: 'fly', label: 'Fly' },
   { button: 'up', label: 'Up' },
   { button: 'down', label: 'Down' },
@@ -44,6 +45,19 @@ function drawSymbol(ctx: CanvasRenderingContext2D, button: TouchButton): void {
       ctx.stroke();
       break;
     }
+    case 'bag':
+      // A bag: a body with a flap and a handle on top.
+      ctx.moveTo(0.36, 0.3);
+      ctx.quadraticCurveTo(0.5, 0.04, 0.64, 0.3);
+      ctx.stroke();
+      ctx.strokeRect(0.2, 0.3, 0.6, 0.52);
+      ctx.beginPath();
+      ctx.moveTo(0.2, 0.5);
+      ctx.lineTo(0.8, 0.5);
+      ctx.moveTo(0.5, 0.5);
+      ctx.lineTo(0.5, 0.62);
+      ctx.stroke();
+      break;
     case 'fly':
       // A pair of wings seen from the front.
       ctx.moveTo(0.06, 0.62);
@@ -135,6 +149,15 @@ export class TouchHud {
     this.knob.style.transform = `translate(${stick.knobX}px, ${stick.knobY}px)`;
   }
 
+  /** The fly button exists only where flying does (not in Gathering worlds). */
+  setFlyAvailable(available: boolean): void {
+    const fly = this.buttons.get('fly');
+    if (!fly) return;
+    this.element.classList.toggle('no-fly', !available);
+    if (!available) fly.remove();
+    else if (!fly.isConnected) this.element.insertBefore(fly, this.buttons.get('up') ?? null);
+  }
+
   /** Marks the fly button while fly mode is on. */
   setFlying(flying: boolean): void {
     this.buttons.get('fly')?.classList.toggle('active', flying);
@@ -142,6 +165,14 @@ export class TouchHud {
 
   setVisible(visible: boolean): void {
     this.element.classList.toggle('hidden', !visible);
+  }
+
+  /**
+   * The inventory lies over the controls: they are not drawn and take no touches, but
+   * stay in the layout, so a finger that rests on a button keeps reporting until it lifts.
+   */
+  setCovered(covered: boolean): void {
+    this.element.classList.toggle('covered', covered);
   }
 
   setRotateVisible(visible: boolean): void {

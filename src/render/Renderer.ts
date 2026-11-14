@@ -10,6 +10,7 @@ import {
 } from '../game/config';
 import { daylightFactor } from '../world/dayNight';
 import type { ChunkMeshData } from '../world/meshing/mesher';
+import { BreakOverlay } from './BreakOverlay';
 import { ChunkMeshes } from './ChunkMeshes';
 import { type ChunkMaterials, createChunkMaterials } from './materials';
 import { Sky } from './Sky';
@@ -63,6 +64,7 @@ export class Renderer {
   private readonly stats: RenderStats = { drawCalls: 0, triangles: 0, geometries: 0 };
   private renderDistance = 8;
   private readonly highlight: THREE.LineSegments;
+  private readonly breakOverlay: BreakOverlay;
 
   constructor(canvas: HTMLCanvasElement, options: RendererOptions) {
     this.canvas = canvas;
@@ -90,6 +92,12 @@ export class Renderer {
     this.highlight.visible = false;
     this.highlight.renderOrder = 2;
     this.scene.add(this.highlight);
+    this.breakOverlay = new BreakOverlay(this.scene);
+  }
+
+  /** Shows cracks of the given stage on a block being broken; null hides them. */
+  setBreakOverlay(block: { x: number; y: number; z: number } | null, stage = 0): void {
+    this.breakOverlay.set(block, stage);
   }
 
   /** Shows the outline around a block, or hides it when `block` is null. */

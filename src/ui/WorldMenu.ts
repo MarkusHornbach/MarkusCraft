@@ -1,4 +1,5 @@
 // World menu: the start screen. Lists the saved worlds, creates and deletes them.
+import type { GameMode } from '../actions/playerRecord';
 import { WORLD_NAME_MAX } from '../game/config';
 import { type WorldListEntry, nextWorldName } from '../save/saveFormat';
 import { type InputMode, button, element, onActivate } from './activate';
@@ -7,15 +8,21 @@ export interface WorldMenuOptions {
   mode: InputMode;
   /** Play the stored world with this id. */
   onPlay: (id: string, via: InputMode | null) => void;
-  /** Create a world from the form (raw texts) and play it. */
-  onCreate: (name: string, seedText: string, via: InputMode | null) => void;
+  /** Create a world from the form (raw texts, chosen mode) and play it. */
+  onCreate: (name: string, seedText: string, mode: GameMode, via: InputMode | null) => void;
   onDelete: (id: string) => void;
   onSettings: () => void;
 }
 
 type View = 'list' | 'form' | 'confirm';
 
-const MODE_LABELS: Record<string, string> = { creative: 'Creative', gathering: 'Gathering' };
+const MODE_LABELS: Record<GameMode, string> = { creative: 'Creative', gathering: 'Gathering' };
+/** The modes in the order of the form; the first one is preselected. */
+const FORM_MODES: readonly GameMode[] = ['gathering', 'creative'];
+const MODE_HINTS: Record<GameMode, string> = {
+  gathering: 'Gather blocks before you build. No flying.',
+  creative: 'All blocks, instant breaking, flying.',
+};
 export const STORAGE_NOTE = 'Worlds are saved in this browser, on this device only.';
 
 function playedDate(ms: number): string {
@@ -37,6 +44,10 @@ export class WorldMenu {
   private readonly confirmText: HTMLElement;
   private entries: WorldListEntry[] = [];
   private selectedId: string | null = null;
+  private readonly modeButtons = new Map<GameMode, HTMLButtonElement>();
+  private readonly modeHint: HTMLElement;
+  /** Game mode chosen in the form. */
+  private gameMode: GameMode = FORM_MODES[0];
   private mode: InputMode;
   private busy = false;
 
@@ -76,10 +87,30 @@ export class WorldMenu {
     this.nameInput = this.field('world-name', 'Name', WORLD_NAME_MAX * 2);
     this.seedInput = this.field('world-seed', 'Seed', 40);
     this.seedInput.placeholder = 'Random';
+    // The game mode: fixed once the world exists.
+    const modeRow = element('div', 'world-field world-mode-field');
+    modeRow.appendChild(element('span', 'world-field-label', 'Mode'));
+    const modeChoice = element('div', 'world-mode-choice');
+    modeChoice.setAttribute('role', 'radiogroup');
+    modeChoice.setAttribute('aria-label', 'Game mode');
+    for (const gameMode of FORM_MODES) {
+      const choice = button('menu-button world-mode-button', MODE_LABELS[gameMode]);
+      choice.dataset.mode = gameMode;
+      choice.setAttribute('role', 'radio');
+      choice.addEventListener('click', () => this.setGameMode(gameMode));
+      this.modeButtons.set(gameMode, choice);
+      modeChoice.appendChild(choice);
+    }
+    modeRow.appendChild(modeChoice);
+    this.formView.appendChild(modeRow);
+    this.modeHint = element('div', 'world-mode-hint');
+    this.formView.appendChild(this.modeHint);
+    this.setGameMode(this.gameMode);
     const formRow = element('div', 'world-buttons');
     const create = button('play-button world-create-button', 'Create and play');
     onActivate(create, (via) => {
-      if (!this.busy) options.onCreate(this.nameInput.value, this.seedInput.value, via);
+      if (this.busy) return;
+      options.onCreate(this.nameInput.value, this.seedInput.value, this.gameMode, via);
     });
     this.backButton = button('menu-button world-back-button', 'Back');
     this.backButton.addEventListener('click', () => this.setView('list'));
@@ -90,7 +121,8 @@ export class WorldMenu {
     // Enter in a text field creates the world; the input mode stays as it is.
     this.formView.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!this.busy) options.onCreate(this.nameInput.value, this.seedInput.value, null);
+      if (this.busy) return;
+      options.onCreate(this.nameInput.value, this.seedInput.value, this.gameMode, null);
     });
     panel.appendChild(this.formView);
 
@@ -140,6 +172,15 @@ export class WorldMenu {
     return input;
   }
 
+  private setGameMode(gameMode: GameMode): void {
+    this.gameMode = gameMode;
+    for (const [mode, choice] of this.modeButtons) {
+      choice.classList.toggle('selected', mode === gameMode);
+      choice.setAttribute('aria-checked', String(mode === gameMode));
+    }
+    this.modeHint.textContent = MODE_HINTS[gameMode];
+  }
+
   private selected(): WorldListEntry | undefined {
     return this.entries.find((entry) => entry.id === this.selectedId);
   }
@@ -150,6 +191,8 @@ export class WorldMenu {
    */
   setWorlds(entries: WorldListEntry[]): void {
     this.entries = entries;
+    // Tests wait for this before they type: the form is reset when the list arrives.
+    this.element.dataset.ready = '1';
     this.selectedId = entries[0]?.id ?? null;
     this.renderList();
     if (entries.length === 0) this.showForm();
@@ -205,6 +248,7 @@ export class WorldMenu {
     const names = this.entries.map((e) => (e.status === 'ok' ? e.meta.name : (e.name ?? '')));
     this.nameInput.value = nextWorldName(names);
     this.seedInput.value = seedText;
+    this.setGameMode(FORM_MODES[0]);
     this.setView('form');
   }
 

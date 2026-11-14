@@ -1,7 +1,7 @@
 // TouchTracker: turns finger events into game input (stick, look drag, buttons). No DOM.
 import type { HeldAction, PressAction } from './Input';
 
-export type TouchButton = 'break' | 'place' | 'up' | 'down' | 'fly' | 'menu';
+export type TouchButton = 'break' | 'place' | 'up' | 'down' | 'fly' | 'menu' | 'bag';
 
 /** What a finger landed on. */
 export type TouchTarget =
@@ -190,6 +190,7 @@ export class TouchTracker {
     if (button === 'break' || button === 'place') this.sink.press({ type: button });
     else if (button === 'fly') this.sink.press({ type: 'toggleFly' });
     else if (button === 'menu') this.sink.press({ type: 'menu' });
+    else if (button === 'bag') this.sink.press({ type: 'inventory' });
   }
 
   private setSprint(sprint: boolean): void {

@@ -7,7 +7,7 @@ import {
 } from '../game/config';
 import { type TouchButton, type TouchSink, type TouchTarget, TouchTracker } from './TouchTracker';
 
-const BUTTONS: readonly string[] = ['break', 'place', 'up', 'down', 'fly', 'menu'];
+const BUTTONS: readonly string[] = ['break', 'place', 'up', 'down', 'fly', 'menu', 'bag'];
 
 export interface TouchControlsOptions {
   /** Element that contains the canvas, the HUD and the touch buttons. */

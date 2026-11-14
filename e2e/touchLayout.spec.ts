@@ -23,10 +23,14 @@ async function openOnDevice(page: Page, query = '?seed=1337&time=0.25'): Promise
   await withoutFullscreen(page);
   await page.goto(`/${query}`);
   await page.waitForFunction(() => window.__mc !== undefined);
+  // The form is reset when the list of stored worlds arrives.
+  await page.locator('.world-menu[data-ready]').waitFor();
 }
 
 /** Creates a world from the form of the world menu (Phase 3) and starts it by tap. */
-async function tapCreate(page: Page): Promise<void> {
+async function tapCreate(page: Page, mode: 'creative' | 'gathering' = 'creative'): Promise<void> {
+  // A Creative world by default: these tests are about all controls, the fly button included.
+  await page.locator(`.world-mode-button[data-mode="${mode}"]`).tap();
   await page.locator('.world-create-button').tap();
   await page.waitForFunction(() => !window.__mc.getState().paused);
 }
@@ -122,6 +126,7 @@ for (const [device, view] of [
     await tapPlay(page);
     const buttons = await boxes(page, '.touch-button');
     expect(buttons.map((b) => b.name.split(' ').pop()).sort()).toEqual([
+      'bag',
       'break',
       'down',
       'fly',
@@ -253,10 +258,19 @@ test('the touch menu has fullscreen, debug overlay and touch sensitivity (AC3.4)
 
   // The controls list names the touch controls instead of keys.
   const list = menu.locator('.controls-list');
-  for (const text of ['stick', 'Drag right side', 'Break / Place', 'Up', 'Down', 'Fly', 'Menu']) {
+  for (const text of [
+    'stick',
+    'Drag right side',
+    'Break / Place',
+    'Up',
+    'Down',
+    'Fly',
+    'Bag',
+    'Menu',
+  ]) {
     await expect(list).toContainText(text);
   }
-  await expect(list.locator('dt')).toHaveCount(8);
+  await expect(list.locator('dt')).toHaveCount(9);
   await expect(list).not.toContainText('W A S D');
   await expect(list).not.toContainText('F3');
 
@@ -361,7 +375,7 @@ test('matches the touch-controls reference; controls leave crosshair and bar fre
   const stick = await boxes(page, '.touch-stick');
   const bar = await boxes(page, '.hotbar');
   const crosshair = await boxes(page, '.crosshair');
-  expect(buttons).toHaveLength(6);
+  expect(buttons).toHaveLength(7);
   for (const control of [...buttons, ...stick]) {
     expect(overlap(control, bar[0]), control.name).toBe(false);
     expect(overlap(control, crosshair[0]), control.name).toBe(false);
@@ -375,7 +389,7 @@ test('matches the touch-controls reference; controls leave crosshair and bar fre
       return count / (canvas.width * canvas.height);
     }),
   );
-  expect(painted).toHaveLength(6);
+  expect(painted).toHaveLength(7);
   for (const share of painted) {
     expect(share).toBeGreaterThan(0.05);
     expect(share).toBeLessThan(0.6);
@@ -384,3 +398,91 @@ test('matches the touch-controls reference; controls leave crosshair and bar fre
   await expect(page).toHaveScreenshot('touch-controls.png');
   await fingers.touchUp(1);
 });
+
+// --- Phase 3 step 8: the inventory screen on a phone and a tablet --------------------
+
+for (const [device, view] of [
+  ['phone', PHONE],
+  ['tablet', TABLET],
+] as const) {
+  test(`Phase 3 AC8.5: the bag button opens an inventory that fits a ${view.width} × ${view.height} ${device} and works by taps`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(view);
+    await page.addInitScript(
+      ([key, value]) => window.localStorage.setItem(key, value),
+      [STORAGE_KEY, JSON.stringify({ renderDistance: 2, mouseSensitivity: 1, fov: 75 })],
+    );
+    await openOnDevice(page);
+    await tapCreate(page, 'gathering');
+    // No fly button in Gathering; the bag button is finger-sized and on screen.
+    await expect(page.locator('.touch-fly')).toHaveCount(0);
+    const bag = await boxes(page, '.touch-bag');
+    expect(bag).toHaveLength(1);
+    expectFingerSized(bag);
+    expectInside(bag, view);
+    expectNoOverlap(await boxes(page, '.touch-button'));
+
+    await page.evaluate(() => {
+      window.__mc.give(2, 40);
+      window.__mc.give(4, 5);
+      window.__mc.give(256, 3);
+    });
+    await page.locator('.touch-bag').tap();
+    await expect(page.locator('.inventory-screen')).toBeVisible();
+    expect((await getState(page)).paused).toBe(false);
+
+    const slots = await boxes(page, '.inventory-screen .inv-slot');
+    // 27 slots, the bar and the bin.
+    expect(slots).toHaveLength(37);
+    const close = await boxes(page, '.inventory-close');
+    expect(close).toHaveLength(1);
+    expectFingerSized([...slots, ...close]);
+    expectInside([...slots, ...close], view);
+    expectNoOverlap([...slots, ...close]);
+    // The whole panel fits: nothing has to be scrolled.
+    expectInside(await boxes(page, '.inventory-panel'), view);
+    const scrolls = await page
+      .locator('.inventory-screen')
+      .evaluate((node) => node.scrollHeight > node.clientHeight);
+    expect(scrolls).toBe(false);
+
+    const slot = (index: number) => page.locator(`.inv-slot[data-index="${index}"]`);
+    const items = async () => (await getState(page)).inventory.slots;
+    // Move, merge, swap, bin and release, all by taps.
+    await slot(0).tap();
+    await expect(slot(0)).toHaveClass(/picked/);
+    await slot(35).tap();
+    expect((await items())[35]).toEqual({ item: 2, count: 40 });
+    expect((await items())[0]).toBeNull();
+    await page.evaluate(() => window.__mc.give(2, 70));
+    await slot(35).tap();
+    await slot(0).tap();
+    expect((await items())[0]).toEqual({ item: 2, count: 99 });
+    expect((await items())[35]).toEqual({ item: 2, count: 11 });
+    await slot(1).tap();
+    await slot(2).tap();
+    expect((await items())[1]).toEqual({ item: 256, count: 3 });
+    expect((await items())[2]).toEqual({ item: 4, count: 5 });
+    await slot(2).tap();
+    await page.locator('.inv-bin').tap();
+    expect((await items())[2]).toBeNull();
+    await slot(1).tap();
+    await slot(1).tap();
+    await expect(page.locator('.inv-slot.picked')).toHaveCount(0);
+
+    if (device === 'phone') {
+      // The world behind the screen is not part of this reference: hide the canvas.
+      await page.locator('canvas.game-canvas').evaluate((node) => {
+        (node as HTMLElement).style.visibility = 'hidden';
+      });
+      await expect(page).toHaveScreenshot('inventory-touch.png', { maxDiffPixelRatio: 0.05 });
+    }
+
+    await page.locator('.inventory-close').tap();
+    await expect(page.locator('.inventory-screen')).toBeHidden();
+    expect((await getState(page)).paused).toBe(false);
+    await expect(page.locator('.touch-bag')).toBeVisible();
+  });
+}

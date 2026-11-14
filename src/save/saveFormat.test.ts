@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_VOLUME, INVENTORY_SLOTS, SAVE_FORMAT_VERSION } from '../game/config';
+import { isItem } from '../items/items';
 import { sampleMeta } from '../testing/sampleWorld';
 import { mulberry32, randInt } from '../util/rng';
 import {
@@ -272,6 +273,38 @@ describe('save format', () => {
     expect(decodeMeta(hostile)).toEqual({ ok: false, error: 'damaged' });
     expect(decodeChunk(hostile)).toEqual({ ok: false, error: 'damaged' });
     expect(listEntries([hostile], ['x'])).toEqual([{ status: 'damaged', id: 'x', name: null }]);
+  });
+});
+
+describe('worlds of earlier versions', () => {
+  // Written by the game as of Phase 3 part A (format version 1), before Gathering existed.
+  const PART_A_META =
+    '{"id":"wparta-fixture1","name":"Part A world","seed":1337,"mode":"creative","generatorVersion":1,"formatVersion":1,"createdMs":1780000000000,"playedMs":1780000360000,"time":0.31,"pose":{"x":8.5,"y":71,"z":-3.25,"yaw":0.5,"pitch":-0.25},"moveMode":"fly","player":{"slots":[{"item":1,"count":1},{"item":2,"count":1},{"item":3,"count":1},{"item":4,"count":1},{"item":5,"count":1},{"item":6,"count":1},{"item":7,"count":1},{"item":8,"count":1},{"item":9,"count":1},null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"selectedSlot":7,"breaking":null}}';
+  const PART_A_CHUNK =
+    '{"key":"wparta-fixture1|0,-1","worldId":"wparta-fixture1","cx":0,"cz":-1,"edits":[100,8,2000,0]}';
+
+  it('loads a world saved by Part A as a Creative world with the Phase 1 bar (Phase 3 AC6.9)', () => {
+    const decoded = decodeWorld(JSON.parse(PART_A_META), [JSON.parse(PART_A_CHUNK)]);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    const { meta, edits } = decoded.value;
+    expect(meta.mode).toBe('creative');
+    expect(meta.name).toBe('Part A world');
+    expect(meta.seed).toBe(1337);
+    expect(meta.moveMode).toBe('fly');
+    expect(meta.pose).toEqual({ x: 8.5, y: 71, z: -3.25, yaw: 0.5, pitch: -0.25 });
+    expect(meta.player.selectedSlot).toBe(7);
+    expect(meta.player.slots.slice(0, 9)).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9].map((item) => ({ item, count: 1 })),
+    );
+    expect(meta.player.slots.slice(9).every((slot) => slot === null)).toBe(true);
+    expect(meta.player.slots.every((slot) => slot === null || isItem(slot.item))).toBe(true);
+    expect([...(edits.get('0,-1') ?? [])]).toEqual([
+      [100, 8],
+      [2000, 0],
+    ]);
+    // Saving it again writes the same record: nothing about the format changed.
+    expect(JSON.stringify(encodeMeta(meta))).toBe(PART_A_META);
   });
 });
 
