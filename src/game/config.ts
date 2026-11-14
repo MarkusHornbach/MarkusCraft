@@ -44,6 +44,12 @@ export const FACE_SHADE_BOTTOM = 0.5;
 export const AO_LEVELS: readonly number[] = [1.0, 0.8, 0.65, 0.5];
 export const WATER_SURFACE_DROP = 1 / 8;
 
+/** Brightest light level of a cell; sky light and block light both run from 0 to this. */
+export const LIGHT_MAX = 15;
+/** Light lost in a leaf or water block, on top of the one level every step costs. */
+export const LEAVES_OPACITY = 1;
+export const WATER_OPACITY = 1;
+
 export const PLAYER_WIDTH = 0.6;
 export const PLAYER_HEIGHT = 1.8;
 export const PLAYER_EYE_HEIGHT = 1.62;

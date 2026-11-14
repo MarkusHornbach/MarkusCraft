@@ -1,5 +1,5 @@
 // Block registry: a data table describing every block, plus fast lookup arrays.
-import { HOTBAR_SLOTS } from '../game/config';
+import { HOTBAR_SLOTS, LEAVES_OPACITY, LIGHT_MAX, WATER_OPACITY } from '../game/config';
 
 /** Texture tiles. The painters live in `render/textures/tiles.ts`, keyed by these ids. */
 export const Tile = {
@@ -85,6 +85,10 @@ export interface BlockDef {
   castsAo: boolean;
   /** Cutout blocks only: hide faces between two blocks of this kind (glass panes merge). */
   mergesFaces: boolean;
+  /** How much light the block takes away on top of the one level per step: 0–15 (opaque). */
+  opacity: number;
+  /** Block light the block gives off: 0–15. */
+  emission: number;
 }
 
 function uniform(tile: TileId): BlockTiles {
@@ -113,6 +117,8 @@ function solidBlock(
     replaceable: false,
     castsAo,
     mergesFaces,
+    opacity: LIGHT_MAX,
+    emission: 0,
   };
 }
 
@@ -130,6 +136,8 @@ export const BLOCKS: readonly BlockDef[] = [
     replaceable: true,
     castsAo: false,
     mergesFaces: false,
+    opacity: 0,
+    emission: 0,
   },
   solidBlock(
     Block.GRASS,
@@ -148,10 +156,16 @@ export const BLOCKS: readonly BlockDef[] = [
     { top: Tile.LOG_END, side: Tile.LOG_BARK, bottom: Tile.LOG_END },
     5,
   ),
-  solidBlock(Block.LEAVES, 'leaves', 'Leaves', uniform(Tile.LEAVES), 6, 'cutout', true),
+  {
+    ...solidBlock(Block.LEAVES, 'leaves', 'Leaves', uniform(Tile.LEAVES), 6, 'cutout', true),
+    opacity: LEAVES_OPACITY,
+  },
   solidBlock(Block.PLANKS, 'planks', 'Planks', uniform(Tile.PLANKS), 7),
   solidBlock(Block.BRICKS, 'bricks', 'Bricks', uniform(Tile.BRICKS), 8),
-  solidBlock(Block.GLASS, 'glass', 'Glass', uniform(Tile.GLASS), 9, 'cutout', false, true),
+  {
+    ...solidBlock(Block.GLASS, 'glass', 'Glass', uniform(Tile.GLASS), 9, 'cutout', false, true),
+    opacity: 0,
+  },
   {
     id: Block.WATER,
     name: 'water',
@@ -164,6 +178,8 @@ export const BLOCKS: readonly BlockDef[] = [
     replaceable: true,
     castsAo: false,
     mergesFaces: false,
+    opacity: WATER_OPACITY,
+    emission: 0,
   },
   {
     ...solidBlock(Block.BEDROCK, 'bedrock', 'Bedrock', uniform(Tile.BEDROCK), null),
@@ -210,7 +226,11 @@ export const BLOCK_REPLACEABLE = new Uint8Array(256).fill(1);
 export const BLOCK_TILE_TOP = new Uint8Array(256);
 export const BLOCK_TILE_SIDE = new Uint8Array(256);
 export const BLOCK_TILE_BOTTOM = new Uint8Array(256);
+export const BLOCK_OPACITY = new Uint8Array(256);
+export const BLOCK_EMISSION = new Uint8Array(256);
 for (const def of BLOCKS) {
+  BLOCK_OPACITY[def.id] = def.opacity;
+  BLOCK_EMISSION[def.id] = def.emission;
   BLOCK_SOLID[def.id] = def.solid ? 1 : 0;
   BLOCK_RENDER[def.id] = RENDER_CODES[def.render];
   BLOCK_CASTS_AO[def.id] = def.castsAo ? 1 : 0;
