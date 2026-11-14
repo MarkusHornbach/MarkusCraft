@@ -167,6 +167,14 @@ export class TouchHud {
     this.element.classList.toggle('hidden', !visible);
   }
 
+  /**
+   * The inventory lies over the controls: they are not drawn and take no touches, but
+   * stay in the layout, so a finger that rests on a button keeps reporting until it lifts.
+   */
+  setCovered(covered: boolean): void {
+    this.element.classList.toggle('covered', covered);
+  }
+
   setRotateVisible(visible: boolean): void {
     this.rotateOverlay.classList.toggle('visible', visible);
   }

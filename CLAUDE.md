@@ -273,6 +273,10 @@ hold:
   - Phase 3 part A (foundation: terrain version 1, action layer, saving, world menu):
     implemented (report: `docs/phase-3a-report.md`). Read its "Decisions and deviations"
     before changing generation, actions, the save format, the menus or the start flow.
+  - Phase 3 part B (gathering, steps 6–9): **in progress** on the branch
+    `claude/elegant-einstein-xisa8s`. Steps 6 and 7 are done, step 8 is written but its
+    full test run was interrupted, step 9 is open. Read `docs/phase-3b-report.md` first:
+    it is the hand-over with the status, the to-do list and the decisions so far.
   - Parts B and C are implemented in this order, each after the previous one is merged;
     part D (Web Workers) only when the owner asks for it.
 - Phases 4 (multiplayer) and 5 (personalization): not yet planned.

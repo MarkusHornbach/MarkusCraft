@@ -450,6 +450,14 @@ canvas {
   display: none;
 }
 
+.touch-hud.covered {
+  opacity: 0;
+}
+
+.touch-hud.covered .touch-button {
+  pointer-events: none;
+}
+
 .touch-mode {
   /* Button size and gap. */
   --touch-size: clamp(48px, 15vmin, 88px);

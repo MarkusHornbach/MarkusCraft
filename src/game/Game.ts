@@ -669,6 +669,9 @@ export class Game {
     const record = this.session.record;
     this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
     this.inventoryScreen.setVisible(true);
+    // The screen has its own bar; the controls of the game would only shine through.
+    this.hud.setVisible(false);
+    this.touchHud?.setCovered(true);
     if (this.pauseScreen && this.mode === 'mouse' && document.pointerLockElement) {
       document.exitPointerLock();
     }
@@ -688,6 +691,8 @@ export class Game {
   }
 
   private hideInventory(): void {
+    if (this.inventoryOpen && !this.paused) this.hud.setVisible(true);
+    this.touchHud?.setCovered(false);
     this.inventoryOpen = false;
     this.inventoryScreen.setVisible(false);
   }
