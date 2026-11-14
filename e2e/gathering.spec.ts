@@ -67,14 +67,23 @@ function findSites(page: Page): Promise<{
         if (top < 0) continue;
         const d = Math.hypot(dx, dz);
         const id = mc.getBlock(x, top, z);
-        // Dry sand with air above it and sand around: a beach to stand on.
-        if (id === 4 && mc.getBlock(x, top + 1, z) === 0 && (!sand || d < sand.d)) {
-          const flat = [
-            [1, 0],
-            [-1, 0],
-            [0, 1],
-            [0, -1],
-          ].every(([ax, az]) => mc.surfaceY(x + ax, z + az) === top);
+        // Dry sand at the edge of a flat, open place of three by three columns: the sand
+        // is dug at its -z edge, the wall goes into the middle row, the player stands in
+        // the row at +z.
+        if (id === 4 && (!sand || d < sand.d)) {
+          let flat = true;
+          for (let az = 0; az <= 2 && flat; az++) {
+            for (let ax = -1; ax <= 1 && flat; ax++) {
+              const ground = mc.getBlock(x + ax, top, z + az);
+              flat =
+                mc.surfaceY(x + ax, z + az) === top &&
+                // Not the lake (block 10): `surfaceY` counts water.
+                ground !== 0 &&
+                ground !== 10 &&
+                mc.getBlock(x + ax, top + 1, z + az) === 0 &&
+                mc.getBlock(x + ax, top + 2, z + az) === 0;
+            }
+          }
           if (flat) sand = { x, y: top, z, d };
         }
         if (id === 5 && (!tree || d < tree.d)) {
@@ -167,11 +176,12 @@ test('Phase 3 AC9.1: from an empty inventory, gather a log, dirt and sand, build
   ]);
   expect(gathered.slice(4).every((slot) => slot === null)).toBe(true);
 
-  // A wall of three on the beach: sand and dirt to the sides, the log in the middle.
+  // A wall of three on the beach, in the row between the player and the hole in the
+  // sand: sand and dirt to the sides, the log in the middle.
   await setPlayer(page, {
-    x: sand.x + 1.5,
+    x: sand.x + 0.5,
     y: sand.y + 1,
-    z: sand.z + 0.5,
+    z: sand.z + 2.5,
     yaw: 0,
     pitch: -50 * DEG,
   });
@@ -190,7 +200,8 @@ test('Phase 3 AC9.1: from an empty inventory, gather a log, dirt and sand, build
   }
   // Three different cells in one row.
   expect(new Set(wall.map((c) => `${c.x},${c.z}`)).size).toBe(3);
-  expect(new Set(wall.map((c) => c.z)).size).toBe(1);
+  expect(wall.map((c) => c.z)).toEqual([sand.z + 1, sand.z + 1, sand.z + 1]);
+  expect(wall.map((c) => c.y)).toEqual([sand.y + 1, sand.y + 1, sand.y + 1]);
   await step(page, 5);
   const before = await getState(page);
   expect(before.inventory.slots.slice(0, 4)).toEqual([{ item: GRASS, count: 1 }, null, null, null]);
@@ -286,7 +297,11 @@ test('Phase 3 AC9.2: 500 random actions of all kinds change the item count only 
         if (kind === 'break') expected += 1;
         if (kind === 'place') expected -= 1;
         if (kind === 'discard') expected -= slotBefore;
-        if (kind === 'startBreak') started = action as { x: number; y: number; z: number };
+        if (kind === 'startBreak') {
+          // Without the kind: the cell is spread into the `break` that follows.
+          const { x, y, z } = action as { x: number; y: number; z: number };
+          started = { x, y, z };
+        }
         if (kind === 'break') started = null;
       }
       const now = total();
