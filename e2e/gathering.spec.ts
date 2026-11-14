@@ -295,7 +295,8 @@ test('Phase 3 AC9.2: 500 random actions of all kinds change the item count only 
       const outcome = answer === null ? 'none' : answer.ok ? 'ok' : answer.reason;
       counts[`${kind}:${outcome}`] = (counts[`${kind}:${outcome}`] ?? 0) + 1;
       if (answer?.ok) {
-        if (kind === 'break') expected += 1;
+        // Stone broken without a pickaxe yields nothing (Part C).
+        if (kind === 'break') expected += answer.notices.reduce((sum, n) => sum + n.count, 0);
         if (kind === 'place') expected -= 1;
         if (kind === 'discard') expected -= slotBefore;
         if (kind === 'startBreak') {

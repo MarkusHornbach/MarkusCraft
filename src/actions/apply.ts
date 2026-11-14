@@ -85,6 +85,11 @@ function changed(record: PlayerRecord, slots: PlayerRecord['slots']): ActionResu
   return { ok: true, blocks: [], player: { ...record, slots, breaking: null }, notices: [] };
 }
 
+/** The item in the selected bar slot, or null for an empty hand. */
+export function heldItem(record: PlayerRecord): number | null {
+  return record.slots[record.selectedSlot]?.item ?? null;
+}
+
 /** Rules shared by all block actions: inside the height range and within reach. */
 function checkCell(ctx: ActionContext, x: number, y: number, z: number): RejectReason | null {
   if (y < 0 || y >= WORLD_HEIGHT) return 'invalid';
@@ -114,10 +119,12 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       const { x, y, z } = action;
       const problem = checkCell(ctx, x, y, z);
       if (problem) return reject(problem);
-      const drop = dropOf(ctx.world.getBlock(x, y, z));
-      if (!drop) return reject('unbreakable');
-      // Nothing may get lost: a block whose item has no room is not broken at all.
-      if (!fits(ctx.record.slots, drop.item, drop.count)) return reject('full');
+      const block = ctx.world.getBlock(x, y, z);
+      if (breakTimeMs(block) === null) return reject('unbreakable');
+      // Nothing may get lost: a block whose item has no room is not broken at all. A block
+      // that yields nothing without the right tool breaks whatever the inventory holds.
+      const drop = dropOf(block, heldItem(ctx.record));
+      if (drop && !fits(ctx.record.slots, drop.item, drop.count)) return reject('full');
       const player: PlayerRecord = { ...ctx.record, breaking: { x, y, z, startMs: nowMs } };
       return { ok: true, blocks: [], player, notices: [] };
     }
@@ -135,9 +142,11 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       const started = ctx.record.breaking;
       if (!started || started.x !== x || started.y !== y || started.z !== z) return reject('early');
       const block = ctx.world.getBlock(x, y, z);
-      const required = breakTimeMs(block) ?? 0;
+      // The tool in the hand decides the time and whether the block yields its item.
+      const held = heldItem(ctx.record);
+      const required = breakTimeMs(block, held) ?? 0;
       if (nowMs - started.startMs < required - BREAK_TOLERANCE_MS) return reject('early');
-      const drop = dropOf(block);
+      const drop = dropOf(block, held);
       let slots = ctx.record.slots;
       const notices: Notice[] = [];
       if (drop) {

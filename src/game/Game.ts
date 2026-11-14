@@ -1,11 +1,11 @@
 // Game: wires world, player, renderer and UI together and runs the fixed-step loop.
 import type { Action } from '../actions/actions';
-import type { ActionResult, BlockChange } from '../actions/apply';
+import { type ActionResult, type BlockChange, heldItem } from '../actions/apply';
 import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
 import { type PlayerRecord } from '../actions/playerRecord';
 import { LocalSession } from '../actions/Session';
 import { Input, type PressAction } from '../input/Input';
-import { breakTimeMs } from '../items/hardness';
+import { breakTimeMs, missingTool } from '../items/hardness';
 import { addItems } from '../items/inventory';
 import { isItem, itemLabel } from '../items/items';
 import { TouchControls } from '../input/TouchControls';
@@ -89,6 +89,8 @@ const TEXT_NOT_OPENED = 'This world could not be opened.';
 const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.';
 const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 const TEXT_INVENTORY_FULL = 'Inventory full';
+const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
+const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
 
 /** A timed break as the screen shows it: the cell and how far it has come (0..1). */
 interface BreakView {
@@ -1010,7 +1012,7 @@ export class Game {
       this.session.submit({ kind: 'startBreak', x: t.x, y: t.y, z: t.z });
       return;
     }
-    const required = breakTimeMs(t.id) ?? 0;
+    const required = breakTimeMs(t.id, heldItem(this.session.record)) ?? 0;
     // The tolerance keeps 36 steps of 1/60 s from falling just short of 600 ms.
     if (this.nowMs() - started.startMs < required - 1e-6) return;
     this.session.submit({ kind: 'break', x: t.x, y: t.y, z: t.z });
@@ -1023,7 +1025,7 @@ export class Game {
     const t = this.target;
     if (!this.breakActive || !started || !t || !this.input.isHeld('break')) return null;
     if (started.x !== t.x || started.y !== t.y || started.z !== t.z) return null;
-    const required = breakTimeMs(t.id) ?? 0;
+    const required = breakTimeMs(t.id, heldItem(this.session.record)) ?? 0;
     const elapsed = this.nowMs() - started.startMs;
     const progress = required > 0 ? Math.max(0, Math.min(1, (elapsed + 1e-6) / required)) : 1;
     return { x: started.x, y: started.y, z: started.z, progress };
@@ -1039,7 +1041,19 @@ export class Game {
     const now = this.nowMs();
     const pickup = this.pickup && now <= this.pickup.untilMs ? this.pickup : null;
     this.hud.setNotice(pickup ? `+${pickup.count} ${itemLabel(pickup.item)}` : null);
-    this.hud.setMessage(now <= this.fullUntilMs ? TEXT_INVENTORY_FULL : null);
+    this.hud.setMessage(now <= this.fullUntilMs ? TEXT_INVENTORY_FULL : this.toolHint());
+  }
+
+  /**
+   * Gathering: "Needs a pickaxe" while the targeted block would yield nothing with the
+   * item in the hand. It shows before and during breaking.
+   */
+  private toolHint(): string | null {
+    const t = this.target;
+    if (!t || this.gameMode !== 'gathering') return null;
+    const needed = missingTool(t.id, heldItem(this.session.record));
+    if (!needed) return null;
+    return needed.tier > 1 ? TEXT_NEEDS_STONE_PICKAXE : TEXT_NEEDS_PICKAXE;
   }
 
   /** Finds the block the player is looking at, within reach. */
