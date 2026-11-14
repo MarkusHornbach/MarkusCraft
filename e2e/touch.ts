@@ -111,7 +111,12 @@ export async function swipe(
   const session = await page.context().newCDPSession(page);
   const frame = (): Promise<void> =>
     page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
-  const send = async (type: string, x: number, y: number, lifted = false): Promise<void> => {
+  const send = async (
+    type: 'touchStart' | 'touchMove' | 'touchEnd',
+    x: number,
+    y: number,
+    lifted = false,
+  ): Promise<void> => {
     await session.send('Input.dispatchTouchEvent', {
       type,
       touchPoints: lifted ? [] : [{ id: 1, x, y }],
