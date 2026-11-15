@@ -12,7 +12,8 @@ export default defineConfig({
     environment: 'node',
     env: { MC_COVERAGE: withCoverage ? '1' : '0' },
     // The terrain property tests generate hundreds of chunks; allow for slow CI machines.
-    testTimeout: 60_000,
+    // Coverage makes the slow tests several times slower still.
+    testTimeout: withCoverage ? 240_000 : 60_000,
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
@@ -30,6 +31,7 @@ export default defineConfig({
         'src/render/textures/cracks.ts',
         'src/input/TouchTracker.ts',
         'src/game/autosave.ts',
+        'src/game/perfStats.ts',
       ],
       exclude: ['**/*.test.ts'],
       thresholds: { lines: 85 },

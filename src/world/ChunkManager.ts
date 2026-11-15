@@ -1,5 +1,6 @@
-// Chunk manager: decides which chunks to generate, mesh and unload around a centre,
+// Chunk manager: decides which chunks to generate, light, mesh and unload around a centre,
 // spending a limited time budget per frame. Pure: the renderer listens via callbacks.
+import { chunkKey } from './chunk';
 import { type ChunkMeshData, meshChunk } from './meshing/mesher';
 import type { World } from './World';
 
@@ -9,6 +10,19 @@ export interface ChunkListener {
   /** The chunk's mesh is no longer valid and its GPU resources must be released. */
   onUnload(cx: number, cz: number): void;
 }
+
+/** The chunk itself first, then its eight neighbours. */
+const NEIGHBOURHOOD: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+];
 
 /** Chebyshev distance: load areas are squares of chunks. */
 function ringDistance(dx: number, dz: number): number {
@@ -26,6 +40,10 @@ export class ChunkManager {
   private meshedInRange = 0;
   private meshedTotal = 0;
   private started = false;
+  /** Meshed chunks whose light changed through an edit elsewhere: remeshed before loading. */
+  private readonly urgent = new Map<string, { cx: number; cz: number }>();
+  /** Jobs done since the manager was created, by kind. */
+  readonly jobs = { generate: 0, light: 0, mesh: 0 };
 
   constructor(
     private readonly world: World,
@@ -34,6 +52,7 @@ export class ChunkManager {
   ) {
     this.radius = radius;
     this.buildOffsets();
+    world.onLightChange = (cx, cz, lit) => this.lightChanged(cx, cz, lit);
   }
 
   /** Number of chunks inside the load radius: (2R+1)². */
@@ -54,6 +73,11 @@ export class ChunkManager {
   /** All chunks that currently own a mesh, including the unload-hysteresis ring. */
   get meshed(): number {
     return this.meshedTotal;
+  }
+
+  /** Meshed chunks that wait for a new mesh because their light changed. */
+  get relight(): number {
+    return this.urgent.size;
   }
 
   get loadRadius(): number {
@@ -77,13 +101,19 @@ export class ChunkManager {
   }
 
   /**
-   * Runs generation and meshing jobs, nearest chunk first, until the budget is used up.
-   * At least one job runs per call so progress is guaranteed. Returns the job count.
+   * Runs jobs until the budget is used up: first the remeshes that a light change asked
+   * for, then generating, lighting and meshing, nearest chunk first. One job handles one
+   * chunk. At least one job runs per call so progress is guaranteed. Returns the job count.
    */
   update(now: () => number, budgetMs: number): number {
     if (!this.started) return 0;
     const start = now();
     let jobs = 0;
+    while (this.urgent.size > 0) {
+      this.remeshNearestUrgent();
+      jobs++;
+      if (now() - start >= budgetMs) return jobs;
+    }
     while (this.runNextJob()) {
       jobs++;
       if (now() - start >= budgetMs) break;
@@ -93,20 +123,57 @@ export class ChunkManager {
 
   /**
    * Rebuilds the mesh of a chunk right now (after an edit). If the chunk cannot be meshed
-   * correctly because a neighbour is missing, its mesh is dropped and queued again.
+   * correctly because a neighbour is missing or not lit, its mesh is dropped and queued
+   * again.
    */
   remesh(cx: number, cz: number): void {
     const chunk = this.world.getChunk(cx, cz);
     if (!chunk || !chunk.meshed) return;
-    if (this.missingNeighbour(cx, cz) === null) {
+    this.urgent.delete(chunkKey(cx, cz));
+    if (this.world.allLit(cx, cz)) {
+      this.jobs.mesh++;
       this.listener.onMesh(cx, cz, this.buildMesh(cx, cz));
       return;
     }
+    this.dropMesh(cx, cz);
+  }
+
+  /** The world reports a chunk whose mesh no longer shows its light. */
+  private lightChanged(cx: number, cz: number, lit: boolean): void {
+    if (lit) {
+      if (this.world.getChunk(cx, cz)?.meshed) this.urgent.set(chunkKey(cx, cz), { cx, cz });
+      return;
+    }
+    // The chunk has no light any more: no mesh that reads it can stay.
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) this.dropMesh(cx + dx, cz + dz);
+    }
+  }
+
+  /** Takes a chunk's mesh away; inside the radius it is built again by the loading jobs. */
+  private dropMesh(cx: number, cz: number): void {
+    const chunk = this.world.getChunk(cx, cz);
+    if (!chunk || !chunk.meshed) return;
     chunk.meshed = false;
     this.meshedTotal--;
     if (this.inRange(cx, cz)) this.meshedInRange--;
     this.next = 0;
+    this.urgent.delete(chunkKey(cx, cz));
     this.listener.onUnload(cx, cz);
+  }
+
+  private remeshNearestUrgent(): void {
+    let nearest: { cx: number; cz: number } | null = null;
+    let best = Infinity;
+    for (const entry of this.urgent.values()) {
+      const dx = entry.cx - this.centerCx;
+      const dz = entry.cz - this.centerCz;
+      if (dx * dx + dz * dz < best) {
+        best = dx * dx + dz * dz;
+        nearest = entry;
+      }
+    }
+    if (nearest) this.remesh(nearest.cx, nearest.cz);
   }
 
   private inRange(cx: number, cz: number): boolean {
@@ -126,20 +193,28 @@ export class ChunkManager {
     });
   }
 
-  /** After the centre or radius changed: unload far chunks and recount. */
+  /**
+   * After the centre or radius changed: unload far chunks and recount. Meshes live one
+   * ring beyond the radius (so walking back and forth over a border rebuilds nothing),
+   * block data and light two rings: that is what lighting the ring of meshes needs.
+   */
   private refresh(): void {
     if (!this.started) return;
-    const keep = this.radius + 1;
-    const far: { cx: number; cz: number; meshed: boolean }[] = [];
+    const far: { cx: number; cz: number; meshed: boolean; remove: boolean }[] = [];
     for (const chunk of this.world.allChunks()) {
-      if (ringDistance(chunk.cx - this.centerCx, chunk.cz - this.centerCz) > keep) {
-        far.push({ cx: chunk.cx, cz: chunk.cz, meshed: chunk.meshed });
+      const distance = ringDistance(chunk.cx - this.centerCx, chunk.cz - this.centerCz);
+      if (distance > this.radius + 2) {
+        far.push({ cx: chunk.cx, cz: chunk.cz, meshed: chunk.meshed, remove: true });
+      } else if (distance > this.radius + 1 && chunk.meshed) {
+        far.push({ cx: chunk.cx, cz: chunk.cz, meshed: true, remove: false });
+        chunk.meshed = false;
       }
     }
-    for (const { cx, cz, meshed } of far) {
-      this.world.removeChunk(cx, cz);
+    for (const { cx, cz, meshed, remove } of far) {
+      if (remove) this.world.removeChunk(cx, cz);
       if (meshed) {
         this.meshedTotal--;
+        this.urgent.delete(chunkKey(cx, cz));
         this.listener.onUnload(cx, cz);
       }
     }
@@ -151,46 +226,59 @@ export class ChunkManager {
     this.next = 0;
   }
 
-  /** The first chunk of the 3×3 block around (cx, cz) that is not generated, or null. */
-  private missingNeighbour(cx: number, cz: number): { cx: number; cz: number } | null {
-    // The chunk itself first, then direct neighbours, then diagonals (AO reads them).
-    if (!this.world.hasChunk(cx, cz)) return { cx, cz };
-    for (let dz = -1; dz <= 1; dz++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (!this.world.hasChunk(cx + dx, cz + dz)) return { cx: cx + dx, cz: cz + dz };
+  /**
+   * Does one job towards meshing chunk (cx, cz), whose 3 × 3 chunks must be lit: lights
+   * one of them, or generates a chunk that lighting needs. Returns false if nothing is
+   * missing.
+   */
+  private prepare(cx: number, cz: number): boolean {
+    const world = this.world;
+    for (const [dx, dz] of NEIGHBOURHOOD) {
+      const lx = cx + dx;
+      const lz = cz + dz;
+      if (world.getChunk(lx, lz)?.light) continue;
+      for (const [ex, ez] of NEIGHBOURHOOD) {
+        if (world.hasChunk(lx + ex, lz + ez)) continue;
+        world.generate(lx + ex, lz + ez);
+        this.jobs.generate++;
+        return true;
       }
+      world.light(lx, lz);
+      this.jobs.light++;
+      return true;
     }
-    return null;
+    return false;
   }
 
   private buildMesh(cx: number, cz: number): ChunkMeshData {
     const world = this.world;
     const center = world.getChunk(cx, cz);
     if (!center) throw new Error(`Chunk ${cx},${cz} is not generated`);
-    return meshChunk(center.blocks, (dx, dz) => world.getChunk(cx + dx, cz + dz)?.blocks ?? null);
+    return meshChunk(
+      center.blocks,
+      (dx, dz) => world.getChunk(cx + dx, cz + dz)?.blocks ?? null,
+      (dx, dz) => world.getChunk(cx + dx, cz + dz)?.light ?? null,
+    );
   }
 
-  /** Runs one generation or meshing job. Returns false when nothing is left to do. */
+  /** Runs one generation, lighting or meshing job. Returns false when nothing is left. */
   private runNextJob(): boolean {
     const count = this.targetCount;
     while (this.next < count) {
       const cx = this.centerCx + this.offsets[this.next * 2];
       const cz = this.centerCz + this.offsets[this.next * 2 + 1];
-      const chunk = this.world.getChunk(cx, cz);
-      if (chunk?.meshed) {
+      if (this.world.getChunk(cx, cz)?.meshed) {
         this.next++;
         continue;
       }
-      const missing = this.missingNeighbour(cx, cz);
-      if (missing) {
-        this.world.generate(missing.cx, missing.cz);
-        return true;
-      }
+      if (this.prepare(cx, cz)) return true;
       const data = this.buildMesh(cx, cz);
-      // `chunk` is defined here: missingNeighbour checks the centre chunk first.
+      const chunk = this.world.getChunk(cx, cz);
+      // `prepare` generated and lit the chunk itself first.
       if (chunk) chunk.meshed = true;
       this.meshedInRange++;
       this.meshedTotal++;
+      this.jobs.mesh++;
       this.next++;
       this.listener.onMesh(cx, cz, data);
       return true;

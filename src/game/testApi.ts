@@ -74,6 +74,16 @@ export interface GameState {
     meshed: number;
     /** All chunks with block data in memory. */
     generated: number;
+    /** All chunks with light in memory. */
+    lit: number;
+    /** Meshed chunks that wait for a new mesh because an edit changed their light. */
+    relight: number;
+  };
+  /** Performance over the last ten seconds; a long frame takes more than 33 ms. */
+  perf: { chunkWorkAvgMs: number; chunkWorkMaxMs: number; longFrames: number; frames: number };
+  settings: {
+    /** The Brightness setting, 0..1. */
+    brightness: number;
   };
   render: {
     drawCalls: number;
@@ -103,7 +113,10 @@ export interface PlayerPatch {
 export interface TestApi {
   /** True once all chunks within the load radius are meshed and one frame was rendered. */
   isReady(): boolean;
-  /** Resolves when no chunk jobs are pending and a frame was rendered after that. */
+  /**
+   * Resolves when no chunk jobs are pending, no mesh waits for changed light, and a frame
+   * was rendered after that.
+   */
   whenIdle(): Promise<void>;
   getState(): GameState;
   /** Teleport / orient / set walk or fly mode. Velocity is reset. Angles in radians. */
@@ -122,6 +135,15 @@ export interface TestApi {
   surfaceY(x: number, z: number): number;
   /** Checksum over the generated terrain around the origin (see `terrainChecksum`). */
   terrainChecksum(): number;
+  /** Sky light and block light (0–15) of a cell, or null in a chunk that is not lit. */
+  getLight(x: number, y: number, z: number): { sky: number; block: number } | null;
+  /**
+   * Number of cells in lit chunks whose stored light differs from the slow reference
+   * (`lightCheck`): 0 is correct. Slow; for tests.
+   */
+  verifyLight(): number;
+  /** Checksum over the light of the 3 × 3 chunks around the origin (see `lightChecksumOf`). */
+  lightChecksum(): number;
   setTime(t: number): void;
   /** Resolves when everything unsaved is written to the store. */
   save(): Promise<void>;

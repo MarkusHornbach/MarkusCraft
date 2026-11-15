@@ -6,12 +6,14 @@ import {
   FACE_SHADE_EAST_WEST,
   FACE_SHADE_NORTH_SOUTH,
   FACE_SHADE_TOP,
+  LIGHT_MAX,
   WATER_SURFACE_DROP,
   WORLD_HEIGHT,
 } from '../../game/config';
 import {
   BLOCK_CASTS_AO,
   BLOCK_MERGES_FACES,
+  BLOCK_OPACITY,
   BLOCK_RENDER,
   BLOCK_TILE_BOTTOM,
   BLOCK_TILE_SIDE,
@@ -22,6 +24,7 @@ import {
   RENDER_OPAQUE,
   RENDER_TRANSLUCENT,
 } from '../blocks';
+import { LIGHT_OPEN_SKY } from '../light/lightRules';
 import { TILE_UVS } from './atlasLayout';
 
 export interface MeshBuffers {
@@ -29,7 +32,10 @@ export interface MeshBuffers {
   positions: Float32Array;
   /** uv per vertex, in atlas space. */
   uvs: Float32Array;
-  /** rgb per vertex: face shade × ambient occlusion. */
+  /**
+   * rgb per vertex. Red: face shade × ambient occlusion. Green: sky light, blue: block
+   * light, both as level ÷ 15 and averaged over the cells that touch the vertex.
+   */
   colors: Float32Array;
   indices: Uint32Array;
 }
@@ -97,6 +103,16 @@ const PAD_X = CHUNK_SIZE + 2;
 const PAD_Y = WORLD_HEIGHT + 2;
 const PAD_LAYER = PAD_X * PAD_X;
 const padded = new Uint8Array(PAD_LAYER * PAD_Y);
+/** Light of the same cells (see `packLight`). */
+const paddedLight = new Uint8Array(PAD_LAYER * PAD_Y);
+/** 1 ÷ (cells × 15) for the average of one to four light levels. */
+const LIGHT_SCALE = [
+  0,
+  1 / LIGHT_MAX,
+  1 / (2 * LIGHT_MAX),
+  1 / (3 * LIGHT_MAX),
+  1 / (4 * LIGHT_MAX),
+];
 
 function padDelta(d: readonly [number, number, number]): number {
   return d[0] + d[2] * PAD_X + d[1] * PAD_LAYER;
@@ -185,15 +201,26 @@ function grow(source: Float32Array, length: number): Float32Array<ArrayBuffer> {
   return bigger;
 }
 
+const OPEN_SKY = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT).fill(LIGHT_OPEN_SKY);
+/**
+ * Keeps ambient occlusion in the choice of a quad's diagonal where there is no light at
+ * all; small enough for the light to decide wherever there is some.
+ */
+const LIGHT_FLOOR = 1 / 16;
+
 const builders = [new MeshBuilder(), new MeshBuilder(), new MeshBuilder()];
 const cornerBrightness = new Float32Array(4);
 
-/** Fills the padded volume from the chunk and its eight neighbours. Returns the top used y. */
-function fillPadded(center: Uint8Array, neighbour: NeighbourLookup): number {
-  // Below the world lies bedrock (no bottom faces at y = 0); above it is air.
-  padded.fill(Block.BEDROCK, 0, PAD_LAYER);
-  padded.fill(Block.AIR, PAD_LAYER);
-  let maxY = 0;
+/** Copies a chunk and the touching strips of its eight neighbours into a padded volume. */
+function fillPadded(
+  target: Uint8Array,
+  center: Uint8Array,
+  neighbour: NeighbourLookup,
+  below: number,
+  missing: number,
+): void {
+  target.fill(below, 0, PAD_LAYER);
+  target.fill(missing, PAD_LAYER);
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
       const source = dx === 0 && dz === 0 ? center : neighbour(dx, dz);
@@ -209,30 +236,42 @@ function fillPadded(center: Uint8Array, neighbour: NeighbourLookup): number {
           const pz = dz * CHUNK_SIZE + z + 1;
           const to = px + pz * PAD_X + (y + 1) * PAD_LAYER;
           if (dx === 0) {
-            padded.set(source.subarray(from, from + CHUNK_SIZE), to);
+            target.set(source.subarray(from, from + CHUNK_SIZE), to);
           } else {
-            padded[to] = source[from];
+            target[to] = source[from];
           }
         }
       }
     }
   }
-  // Highest non-air layer of the centre chunk bounds the meshing loop.
+}
+
+/** The highest layer of a chunk that is not all air: it bounds the meshing loop. */
+function topLayer(center: Uint8Array): number {
   for (let i = center.length - 1; i >= 0; i--) {
-    if (center[i] !== Block.AIR) {
-      maxY = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
-      break;
-    }
+    if (center[i] !== Block.AIR) return Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
   }
-  return maxY;
+  return 0;
 }
 
 /**
  * Builds the three render passes of a chunk. Only faces next to a non-occluding block
- * are emitted; vertex colours carry face shade × ambient occlusion.
+ * are emitted; vertex colours carry face shade × ambient occlusion and the light.
+ *
+ * `light` gives the light of the same chunks (the centre chunk's for 0, 0). Without it
+ * everything counts as lit by the open sky: that is the mesher as it was before light,
+ * kept for tests and dev tools that compare with it.
  */
-export function meshChunk(center: Uint8Array, neighbour: NeighbourLookup): ChunkMeshData {
-  const maxY = fillPadded(center, neighbour);
+export function meshChunk(
+  center: Uint8Array,
+  neighbour: NeighbourLookup,
+  light?: NeighbourLookup,
+): ChunkMeshData {
+  // Below the world lies bedrock (no bottom faces at y = 0); above it is air.
+  fillPadded(padded, center, neighbour, Block.BEDROCK, Block.AIR);
+  const lit = light !== undefined;
+  if (light) fillPadded(paddedLight, light(0, 0) ?? OPEN_SKY, light, 0, LIGHT_OPEN_SKY);
+  const maxY = topLayer(center);
   for (const builder of builders) builder.reset();
 
   for (let y = 0; y <= maxY; y++) {
@@ -248,7 +287,8 @@ export function meshChunk(center: Uint8Array, neighbour: NeighbourLookup): Chunk
           kind === RENDER_TRANSLUCENT && padded[p + PAD_LAYER] !== id ? WATER_SURFACE_DROP : 0;
 
         for (let f = 0; f < 6; f++) {
-          const other = padded[p + FACE_DELTA[f]];
+          const front = p + FACE_DELTA[f];
+          const other = padded[front];
           if (kind === RENDER_TRANSLUCENT) {
             if (other !== Block.AIR) continue;
           } else {
@@ -271,15 +311,59 @@ export function meshChunk(center: Uint8Array, neighbour: NeighbourLookup): Chunk
           builder.reserveQuad();
           const base = builder.vertexCount;
           const shade = FACE_SHADES[f];
+          const frontLight = lit ? paddedLight[front] : 0;
+          const frontSky = frontLight >> 4;
+          const frontGlow = frontLight & 15;
           for (let k = 0; k < 4; k++) {
             const t = (f * 4 + k) * 3;
-            const side1 = BLOCK_CASTS_AO[padded[p + AO_DELTA[t]]];
-            const side2 = BLOCK_CASTS_AO[padded[p + AO_DELTA[t + 1]]];
-            const diagonal = BLOCK_CASTS_AO[padded[p + AO_DELTA[t + 2]]];
+            // The three cells next to the corner, in front of the face: read once, used
+            // for ambient occlusion and for light.
+            const i1 = p + AO_DELTA[t];
+            const i2 = p + AO_DELTA[t + 1];
+            const i3 = p + AO_DELTA[t + 2];
+            const b1 = padded[i1];
+            const b2 = padded[i2];
+            const b3 = padded[i3];
+            const side1 = BLOCK_CASTS_AO[b1];
+            const side2 = BLOCK_CASTS_AO[b2];
+            const diagonal = BLOCK_CASTS_AO[b3];
             // Two occluding sides hide the diagonal: darkest level.
             const level = side1 === 1 && side2 === 1 ? 3 : side1 + side2 + diagonal;
             const brightness = shade * AO_LEVELS[level];
-            cornerBrightness[k] = brightness;
+            let sky = 1;
+            let glow = 0;
+            if (lit) {
+              // Smooth light: the average over the cells in front of the face that touch
+              // the vertex. Opaque cells hold no light and are left out, and so is the
+              // diagonal cell when both side cells are opaque: nothing connects it.
+              let skySum = frontSky;
+              let glowSum = frontGlow;
+              let cells = 1;
+              const open1 = BLOCK_OPACITY[b1] !== LIGHT_MAX;
+              const open2 = BLOCK_OPACITY[b2] !== LIGHT_MAX;
+              if (open1) {
+                const packed = paddedLight[i1];
+                skySum += packed >> 4;
+                glowSum += packed & 15;
+                cells++;
+              }
+              if (open2) {
+                const packed = paddedLight[i2];
+                skySum += packed >> 4;
+                glowSum += packed & 15;
+                cells++;
+              }
+              if ((open1 || open2) && BLOCK_OPACITY[b3] !== LIGHT_MAX) {
+                const packed = paddedLight[i3];
+                skySum += packed >> 4;
+                glowSum += packed & 15;
+                cells++;
+              }
+              sky = skySum * LIGHT_SCALE[cells];
+              glow = glowSum * LIGHT_SCALE[cells];
+            }
+            // What decides the diagonal below: how bright the corner will look, roughly.
+            cornerBrightness[k] = brightness * (LIGHT_FLOOR + (sky > glow ? sky : glow));
 
             const vi = base + k;
             const cy = CORNER_POS[t + 1];
@@ -289,11 +373,12 @@ export function meshChunk(center: Uint8Array, neighbour: NeighbourLookup): Chunk
             builder.uvs[vi * 2] = CORNER_U[k] === 1 ? u1 : u0;
             builder.uvs[vi * 2 + 1] = CORNER_V[k] === 1 ? v1 : v0;
             builder.colors[vi * 3] = brightness;
-            builder.colors[vi * 3 + 1] = brightness;
-            builder.colors[vi * 3 + 2] = brightness;
+            builder.colors[vi * 3 + 1] = sky;
+            builder.colors[vi * 3 + 2] = glow;
           }
 
-          // Split along the brighter diagonal; otherwise interpolation makes AO lopsided.
+          // Split along the brighter diagonal; otherwise interpolation makes ambient
+          // occlusion and light lopsided.
           const ii = builder.indexCount;
           const indices = builder.indices;
           if (

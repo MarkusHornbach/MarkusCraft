@@ -10,6 +10,10 @@ export const RENDER_DISTANCE_MIN = 2;
 export const RENDER_DISTANCE_MAX = 16;
 export const TEST_RENDER_DISTANCE = 4;
 export const CHUNK_BUDGET_MS = 6;
+/** The debug overlay's performance numbers cover this long. */
+export const PERF_WINDOW_MS = 10_000;
+/** A frame that takes longer than this is counted as a long frame (below 30 per second). */
+export const LONG_FRAME_MS = 33;
 
 export const FOG_START_FACTOR = 0.6;
 export const UNDERWATER_FOG_NEAR = 1;
@@ -43,6 +47,23 @@ export const FACE_SHADE_EAST_WEST = 0.65;
 export const FACE_SHADE_BOTTOM = 0.5;
 export const AO_LEVELS: readonly number[] = [1.0, 0.8, 0.65, 0.5];
 export const WATER_SURFACE_DROP = 1 / 8;
+
+/** Brightest light level of a cell; sky light and block light both run from 0 to this. */
+export const LIGHT_MAX = 15;
+/** Light lost in a leaf or water block, on top of the one level every step costs. */
+export const LEAVES_OPACITY = 1;
+export const WATER_OPACITY = 1;
+/** Brightness of a light level on screen: (level ÷ 15) to this power. */
+export const LIGHT_GAMMA = 1.5;
+/** Colour of block light at full strength: warm, like fire. */
+export const TORCH_TINT: readonly [number, number, number] = [1.0, 0.86, 0.62];
+/**
+ * The darkest a place gets on screen, as a share of full daylight. The Brightness setting
+ * moves it between the two ends; the light values themselves never change with it.
+ */
+export const MIN_LIGHT_DARKEST = 0.02;
+export const MIN_LIGHT_BRIGHTEST = 0.2;
+export const BRIGHTNESS_DEFAULT = 0.5;
 
 export const PLAYER_WIDTH = 0.6;
 export const PLAYER_HEIGHT = 1.8;

@@ -210,6 +210,24 @@ A wooden tool halves the time, a stone tool takes a quarter and an iron tool an 
 stone takes 3 s by hand, 1.5 s with a wooden, 0.75 s with a stone and under 0.4 s with an
 iron pickaxe. A tool of the wrong kind is as slow as the hand.
 
+### Light and darkness
+
+The world has light. Daylight falls from the sky straight down every open column and
+fades by one step per block where something is above: a tunnel dug sideways into a hill
+gets darker with every block and is black after about fifteen, a closed room is dark, also
+at noon. A hole in the roof or a window of glass lets the light back in; leaves and water
+dim it a little, so it is shady under trees and dim at the bottom of a deep lake. A shaft
+that is open to the sky is bright by day all the way down.
+
+Torches come with the next update. Until then the **Brightness** slider in the settings
+(pause menu) is the remedy for places that are too dark: it changes how bright the darkest
+places are drawn, on this device only. It does not change the world.
+
+The debug overlay (F3, or the switch in the pause menu) shows the light at your eyes, and
+numbers that tell how smoothly the game runs on a device: the time spent per frame on
+loading terrain ("Chunk work", average and largest of the last ten seconds) and how many
+frames took longer than 33 ms ("long").
+
 ### One-time setup for deployment
 
 The owner must set **Settings → Pages → Source** to **GitHub Actions** once. After that,
@@ -242,4 +260,5 @@ npm run dev
 Browser tests need Chromium for Playwright: `npx playwright install chromium` on a local
 machine (cloud sessions ship a matching browser; see `CLAUDE.md`).
 
-Project conventions live in `CLAUDE.md`, phase plans and reports in `docs/`.
+Project conventions live in `CLAUDE.md`, phase plans and reports in `docs/`. What only a
+person with a real device can judge is collected in `docs/device-tests.md`.

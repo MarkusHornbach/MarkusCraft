@@ -102,11 +102,12 @@ describe('ChunkManager (AC7.3)', () => {
     const { manager, world } = setup(2);
     manager.setCenter(0, 0);
     runToIdle(manager);
-    // Radius 2 meshes 5×5 and needs data for 7×7.
-    expect(world.chunkCount).toBe(49);
+    // Radius 2 meshes 5×5, lights 7×7 and needs data for 9×9.
+    expect(world.chunkCount).toBe(81);
+    expect(world.litCount).toBe(49);
   });
 
-  it('unloads chunks farther than radius + 1 and keeps the hysteresis ring', () => {
+  it('unloads meshes farther than radius + 1, data farther than radius + 2', () => {
     const { manager, world, recorder } = setup(2);
     manager.setCenter(0, 0);
     runToIdle(manager);
@@ -118,11 +119,11 @@ describe('ChunkManager (AC7.3)', () => {
     runToIdle(manager);
     expect(manager.loaded).toBe(25);
     expect(manager.meshed).toBe(30);
-    // Another chunk east: column -2 is at distance 4 and goes away.
+    // Another chunk east: column -2 is at distance 4 and loses its meshes, column -3 its data.
     manager.setCenter(2, 0);
     expect(recorder.unloaded.sort()).toEqual(['-2,-1', '-2,-2', '-2,0', '-2,1', '-2,2']);
     expect(world.hasChunk(-3, 0)).toBe(false);
-    expect(world.hasChunk(-1, 0)).toBe(true);
+    expect(world.hasChunk(-2, 0)).toBe(true);
     runToIdle(manager);
     expect(manager.meshed).toBe(30);
 
@@ -133,7 +134,7 @@ describe('ChunkManager (AC7.3)', () => {
     expect(world.chunkCount).toBe(0);
     runToIdle(manager);
     expect(manager.loaded).toBe(25);
-    expect(world.chunkCount).toBe(49);
+    expect(world.chunkCount).toBe(81);
   });
 
   it('follows radius changes', () => {
@@ -146,7 +147,7 @@ describe('ChunkManager (AC7.3)', () => {
     expect(manager.loaded).toBe(9);
     expect(manager.pending).toBe(0);
     expect(manager.meshed).toBe(25);
-    expect(world.chunkCount).toBe(25);
+    expect(world.chunkCount).toBe(49);
     manager.setRadius(2);
     expect(manager.pending).toBe(0);
     manager.setRadius(3);

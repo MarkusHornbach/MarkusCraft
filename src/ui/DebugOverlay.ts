@@ -11,6 +11,15 @@ export interface DebugInfo {
   chunkZ: number;
   loaded: number;
   pending: number;
+  /** Chunk jobs done since the world was opened. */
+  jobs: { generate: number; light: number; mesh: number };
+  /** Chunk work per frame and frames over the last ten seconds (see `PerfStats`). */
+  chunkWorkAvgMs: number;
+  chunkWorkMaxMs: number;
+  frames: number;
+  longFrames: number;
+  /** Light of the cell of the player's eye, or null where nothing is lit. */
+  light: { sky: number; block: number } | null;
   drawCalls: number;
   triangles: number;
   seed: number;
@@ -27,6 +36,10 @@ const ROWS = [
   'facing',
   'chunk',
   'chunks',
+  'jobs',
+  'work',
+  'frames',
+  'light',
   'render',
   'seed',
   'time',
@@ -41,6 +54,10 @@ const LABELS: Record<Row, string> = {
   facing: 'Facing',
   chunk: 'Chunk',
   chunks: 'Chunks',
+  jobs: 'Jobs',
+  work: 'Chunk work',
+  frames: 'Frames',
+  light: 'Light',
   render: 'Render',
   seed: 'Seed',
   time: 'Time',
@@ -121,6 +138,16 @@ export class DebugOverlay {
     );
     this.set('chunk', `${info.chunkX} / ${info.chunkZ}`);
     this.set('chunks', `${info.loaded} loaded, ${info.pending} pending`);
+    this.set(
+      'jobs',
+      `${info.jobs.generate} generated, ${info.jobs.light} lit, ${info.jobs.mesh} meshed`,
+    );
+    this.set(
+      'work',
+      `avg ${info.chunkWorkAvgMs.toFixed(1)} ms, max ${info.chunkWorkMaxMs.toFixed(1)} ms per frame`,
+    );
+    this.set('frames', `${info.frames} in 10 s, ${info.longFrames} long`);
+    this.set('light', info.light ? `sky ${info.light.sky}, block ${info.light.block}` : 'none');
     this.set('render', `${info.drawCalls} draw calls, ${info.triangles} triangles`);
     this.set('seed', String(info.seed));
     this.set('time', `${info.time.toFixed(3)} (${timeName(info.time)})`);

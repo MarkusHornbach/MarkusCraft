@@ -39,10 +39,13 @@ import { WorldMenu } from '../ui/WorldMenu';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
+import { PerfStats } from './perfStats';
 import { chunkKey, toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
+import { lightChecksumOf } from '../world/light/lightChunk';
+import { blockOf, skyOf } from '../world/light/lightRules';
 import { type RayHit, raycast } from '../world/raycast';
 import { World, chunksAffectedByEdit } from '../world/World';
 import { Autosave, type SaveBatch } from './autosave';
@@ -154,6 +157,9 @@ export class Game {
   private touchHud: TouchHud | null = null;
   /** Smoothed frames per second for the debug overlay. */
   private fps = 0;
+  private readonly perf = new PerfStats();
+  /** Time spent on chunk jobs since the last frame was recorded. */
+  private chunkWorkMs = 0;
   private fpsFrames = 0;
   private fpsTime = 0;
   private readonly root: HTMLElement;
@@ -210,6 +216,7 @@ export class Game {
       ? { ...DEFAULT_SETTINGS, renderDistance: TEST_RENDER_DISTANCE }
       : loadSettings(browserStorage());
     this.renderer.setFov(this.settings.fov);
+    this.renderer.setBrightness(this.settings.brightness);
     const radius = this.settings.renderDistance;
     this.renderer.setRenderDistance(radius);
 
@@ -983,9 +990,10 @@ export class Game {
   private useSettings(settings: Settings): void {
     this.settings = settings;
     this.renderer.setFov(settings.fov);
+    this.renderer.setBrightness(settings.brightness);
     this.renderer.setRenderDistance(settings.renderDistance);
     this.chunkManager.setRadius(settings.renderDistance);
-    if (this.chunkManager.pending > 0) this.framesSinceIdle = 0;
+    if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
   private setDebugVisible(visible: boolean): void {
@@ -1021,6 +1029,9 @@ export class Game {
 
   private frame(ms: number): void {
     requestAnimationFrame((next) => this.frame(next));
+    // The time since the last frame, with the chunk work that was done since then.
+    if (this.meta) this.perf.record(ms, ms - this.lastFrameMs, this.chunkWorkMs);
+    this.chunkWorkMs = 0;
     const elapsed = Math.max(0, Math.min((ms - this.lastFrameMs) / 1000, 0.25));
     this.lastFrameMs = ms;
     this.fpsFrames++;
@@ -1062,7 +1073,7 @@ export class Game {
     }
     this.draw(this.params.test ? 1 : this.accumulator / SIM_DT);
 
-    if (this.chunkManager.pending === 0) {
+    if (this.chunksIdle()) {
       this.framesSinceIdle++;
       const waiters = this.idleWaiters;
       this.idleWaiters = [];
@@ -1299,9 +1310,22 @@ export class Game {
     this.markMetaDirty();
   }
 
+  /** Sky light and block light of the cell around a point, or null where nothing is lit. */
+  private lightAt(x: number, y: number, z: number): { sky: number; block: number } | null {
+    const light = this.world.getLight(Math.floor(x), Math.floor(y), Math.floor(z));
+    return light === null ? null : { sky: skyOf(light), block: blockOf(light) };
+  }
+
+  /** Nothing left to load, and no mesh waits for the light an edit changed. */
+  private chunksIdle(): boolean {
+    return this.chunkManager.pending === 0 && this.chunkManager.relight === 0;
+  }
+
   private updateChunks(): void {
+    const start = performance.now();
     this.chunkManager.setCenter(toChunkCoord(this.player.x), toChunkCoord(this.player.z));
     this.chunkManager.update(() => performance.now(), CHUNK_BUDGET_MS);
+    this.chunkWorkMs += performance.now() - start;
   }
 
   /** Renders one frame; `alpha` blends from the previous to the current simulation state. */
@@ -1341,6 +1365,9 @@ export class Game {
       chunkZ: toChunkCoord(p.z),
       loaded: this.chunkManager.loaded,
       pending: this.chunkManager.pending,
+      jobs: this.chunkManager.jobs,
+      ...this.perf.summary(performance.now()),
+      light: this.lightAt(p.x, p.y + PLAYER_EYE_HEIGHT, p.z),
       drawCalls: stats.drawCalls,
       triangles: stats.triangles,
       seed: this.world.seed,
@@ -1361,9 +1388,15 @@ export class Game {
     return y - by < 1 - WATER_SURFACE_DROP || this.world.getBlock(bx, by + 1, bz) === Block.WATER;
   }
 
-  /** Edits remesh immediately, outside the per-frame budget. */
+  /**
+   * Edits remesh immediately, outside the per-frame budget. Other chunks whose light the
+   * edit changed wait in the chunk manager's queue and follow in the next frames.
+   */
   private remeshAround(x: number, z: number): void {
+    const start = performance.now();
     for (const { cx, cz } of chunksAffectedByEdit(x, z)) this.chunkManager.remesh(cx, cz);
+    this.chunkWorkMs += performance.now() - start;
+    if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
   /** Test tool: sets a block directly, past the action layer. */
@@ -1449,7 +1482,11 @@ export class Game {
         pending: this.chunkManager.pending,
         meshed: this.chunkManager.meshed,
         generated: this.world.chunkCount,
+        lit: this.world.litCount,
+        relight: this.chunkManager.relight,
       },
+      perf: this.perf.summary(performance.now()),
+      settings: { brightness: this.settings.brightness },
       render: {
         drawCalls: stats.drawCalls,
         triangles: stats.triangles,
@@ -1498,13 +1535,12 @@ export class Game {
 
   private updateChunkCenter(): void {
     this.chunkManager.setCenter(toChunkCoord(this.player.x), toChunkCoord(this.player.z));
-    if (this.chunkManager.pending > 0) this.framesSinceIdle = 0;
+    if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
   private createTestApi(): TestApi {
     return {
-      isReady: () =>
-        this.meta !== null && this.chunkManager.pending === 0 && this.framesSinceIdle > 0,
+      isReady: () => this.meta !== null && this.chunksIdle() && this.framesSinceIdle > 0,
       whenIdle: () =>
         new Promise<void>((resolve) => {
           this.idleWaiters.push(resolve);
@@ -1523,6 +1559,9 @@ export class Game {
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
       terrainChecksum: () => terrainChecksum(this.world.seed, this.world.generatorVersion),
+      getLight: (x, y, z) => this.lightAt(x, y, z),
+      verifyLight: () => this.world.verifyLight(),
+      lightChecksum: () => lightChecksumOf((cx, cz) => this.world.lightOf(cx, cz)),
       setTime: (t) => {
         this.time = wrapTime(t);
         this.markMetaDirty();
