@@ -1,5 +1,6 @@
 // The chunk manager with light: slow, because the light is compared with the reference.
 import { describe, expect, it } from 'vitest';
+import { TIMING_ENFORCED } from '../testing/timing';
 import { mulberry32, randInt } from '../util/rng';
 import { Block } from './blocks';
 import { ChunkManager } from './ChunkManager';
@@ -117,17 +118,23 @@ describe('ChunkManager with light (Phase 4)', () => {
     const expected = lightMap(reference);
     expect(reference.verifyLight()).toBe(0);
     const rng = mulberry32(42);
-    for (let order = 0; order < 20; order++) {
+    // Coverage slows lighting and meshing several times over: a quarter of the orders then.
+    const orders = TIMING_ENFORCED ? 20 : 5;
+    for (let order = 0; order < orders; order++) {
       const path: [number, number][] = [];
       for (let i = 0; i < 6; i++) path.push([randInt(rng, 7) - 3, randInt(rng, 7) - 3]);
       const world = build(path);
       for (let cz = -2; cz <= 2; cz++) {
         for (let cx = -2; cx <= 2; cx++) {
-          expect(world.getChunk(cx, cz)?.light, `${cx},${cz}`).toEqual(expected.get(`${cx},${cz}`));
+          // Compared as bytes: a deep comparison of 25 arrays of 32 768 cells is slow.
+          const light = world.getChunk(cx, cz)?.light;
+          const want = expected.get(`${cx},${cz}`);
+          if (!light || !want) throw new Error(`chunk ${cx},${cz} is not lit`);
+          expect(Buffer.compare(light, want), `${cx},${cz}`).toBe(0);
         }
       }
     }
-  });
+  }, 180_000);
 
   it('AC2.2: unloading and reloading a chunk gives the same light, also with edits in it', () => {
     const { manager, world } = setup(2);

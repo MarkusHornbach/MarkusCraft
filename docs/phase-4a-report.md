@@ -213,6 +213,10 @@ Node 22, cloud container, seed 1337.
 - **Light across the rim of the loaded area** is correct but costs more after an edit
   there (deviation 5). Not reachable in play.
 - The unit tests now take about half a minute (the 2 000 checked edits).
+- **The coverage run has four minutes per test** instead of one, and the order test
+  (AC2.2) and the edits at the top of the world do a part of their rounds under coverage:
+  on the CI machine coverage makes the slow tests about 2.5 times slower than here, and
+  one CI run failed on the one-minute limit. `npm test` runs them in full.
 - **`e2e/world.spec.ts` (AC7.2, ten loads of 81 chunks) has three minutes instead of
   one.** On the CI machine it took just under or just over a minute once loading cost
   more; one CI run failed on that limit. Nothing else about the test changed.
