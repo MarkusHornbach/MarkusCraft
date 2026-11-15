@@ -254,7 +254,11 @@ export class ChunkManager {
     const world = this.world;
     const center = world.getChunk(cx, cz);
     if (!center) throw new Error(`Chunk ${cx},${cz} is not generated`);
-    return meshChunk(center.blocks, (dx, dz) => world.getChunk(cx + dx, cz + dz)?.blocks ?? null);
+    return meshChunk(
+      center.blocks,
+      (dx, dz) => world.getChunk(cx + dx, cz + dz)?.blocks ?? null,
+      (dx, dz) => world.getChunk(cx + dx, cz + dz)?.light ?? null,
+    );
   }
 
   /** Runs one generation, lighting or meshing job. Returns false when nothing is left. */

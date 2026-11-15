@@ -265,6 +265,8 @@ test('Phase 3 AC9.2: 500 random actions of all kinds change the item count only 
   }
   expect(count('break:ok')).toBeGreaterThan(20);
   expect(Object.keys(result.counts).filter((key) => key.endsWith(':none'))).toEqual([]);
+  // Phase 4 AC5.1: after all those breaks and places the stored light is still right.
+  expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
 });
 
 // --- Step 13: from bare hands to a stone pickaxe, through the recipe list ----------------
@@ -680,4 +682,6 @@ test('Phase 3 AC13.2: 1 000 random actions of all kinds, crafting included, chan
   if (result.heapBefore !== null && result.heapAfter !== null) {
     expect(result.heapAfter - result.heapBefore).toBeLessThan(50 * 1024 * 1024);
   }
+  // Phase 4 AC5.1: the stored light is still right.
+  expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
 });

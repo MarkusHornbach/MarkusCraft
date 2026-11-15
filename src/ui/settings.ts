@@ -1,5 +1,6 @@
 // Player settings: defaults, validation and persistence in localStorage.
 import {
+  BRIGHTNESS_DEFAULT,
   FOV_DEFAULT,
   FOV_MAX,
   FOV_MIN,
@@ -24,6 +25,11 @@ export interface Settings {
   fov: number;
   /** Multiplier on the look speed of a touch drag. */
   touchSensitivity: number;
+  /**
+   * How bright the darkest places are drawn, 0..1. It changes the picture only, never
+   * the light of the world.
+   */
+  brightness: number;
 }
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
@@ -31,6 +37,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   mouseSensitivity: MOUSE_SENSITIVITY_DEFAULT,
   fov: FOV_DEFAULT,
   touchSensitivity: TOUCH_SENSITIVITY_DEFAULT,
+  brightness: BRIGHTNESS_DEFAULT,
 };
 
 /** The part of the Storage interface that is used; lets tests pass a fake. */
@@ -69,6 +76,7 @@ export function validateSettings(raw: unknown): Settings {
       TOUCH_SENSITIVITY_MAX,
       DEFAULT_SETTINGS.touchSensitivity,
     ),
+    brightness: numberInRange(source.brightness, 0, 1, DEFAULT_SETTINGS.brightness),
   };
 }
 
@@ -97,11 +105,15 @@ export function hasStoredSettings(storage: SettingsStorage | null): boolean {
 export function saveSettings(storage: SettingsStorage | null, settings: Settings): void {
   if (!storage) return;
   try {
-    const { touchSensitivity, ...rest } = validateSettings(settings);
-    // The touch sensitivity is only written once it was changed, so the stored text of
-    // players who never used touch stays as it was before the setting existed.
-    const stored =
-      touchSensitivity === DEFAULT_SETTINGS.touchSensitivity ? rest : { ...rest, touchSensitivity };
+    const { touchSensitivity, brightness, ...rest } = validateSettings(settings);
+    // The touch sensitivity and the brightness are only written once they were changed,
+    // so the stored text of players who never touched them stays as it was before the
+    // settings existed.
+    const stored: Partial<Settings> = rest;
+    if (touchSensitivity !== DEFAULT_SETTINGS.touchSensitivity) {
+      stored.touchSensitivity = touchSensitivity;
+    }
+    if (brightness !== DEFAULT_SETTINGS.brightness) stored.brightness = brightness;
     storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(stored));
   } catch {
     // Storage can be full or blocked (private mode); the game works without it.

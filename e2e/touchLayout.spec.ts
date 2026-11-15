@@ -117,11 +117,35 @@ for (const [device, view] of [
     expectInside(menuButtons, view);
     expectFingerSized(menuButtons);
     const inputs = await boxes(page, '.pause-screen input');
-    expect(inputs.length).toBeGreaterThanOrEqual(4);
+    expect(inputs.length).toBeGreaterThanOrEqual(5);
     expectInside(inputs, view);
     expectNoOverlap([...menuButtons, ...inputs]);
     // Nothing of the menu is cut off: the panel fits without scrolling.
     expectInside(await boxes(page, '.pause-panel'), view);
+    expect(await page.evaluate(() => document.scrollingElement?.scrollTop)).toBe(0);
+
+    // Phase 4 AC4.3: the Brightness slider is as large as the other sliders and follows
+    // a finger: a tap at three quarters of its length sets about 75 %.
+    const brightness = inputs.find((box) => box.name.endsWith('setting-brightness'));
+    const other = inputs.find((box) => box.name.endsWith('setting-fov'));
+    if (!brightness || !other) throw new Error('slider missing');
+    expect(brightness.width).toBe(other.width);
+    expect(brightness.height).toBe(other.height);
+    expect((await getState(page)).settings.brightness).toBe(0.5);
+    await page.touchscreen.tap(
+      brightness.x + brightness.width * 0.75,
+      brightness.y + brightness.height / 2,
+    );
+    const chosen = (await getState(page)).settings.brightness;
+    expect(chosen).toBeGreaterThan(0.65);
+    expect(chosen).toBeLessThan(0.85);
+    await expect(page.locator('#setting-brightness')).toHaveValue(String(chosen));
+    expect(
+      await page.evaluate(
+        (key) => JSON.parse(window.localStorage.getItem(key) ?? '{}'),
+        STORAGE_KEY,
+      ),
+    ).toMatchObject({ brightness: chosen });
 
     await tapPlay(page);
     const buttons = await boxes(page, '.touch-button');

@@ -28,6 +28,7 @@ describe('settings', () => {
       mouseSensitivity: 1,
       fov: 75,
       touchSensitivity: 1,
+      brightness: 0.5,
     });
     expect(SETTINGS_STORAGE_KEY).toBe('markuscraft.settings.v1');
   });
@@ -38,12 +39,14 @@ describe('settings', () => {
       mouseSensitivity: 2.5,
       fov: 110,
       touchSensitivity: 1,
+      brightness: 0.5,
     });
     expect(validateSettings({ renderDistance: 99, mouseSensitivity: 0, fov: 10 })).toEqual({
       renderDistance: 16,
       mouseSensitivity: 0.2,
       fov: 60,
       touchSensitivity: 1,
+      brightness: 0.5,
     });
     expect(validateSettings({ touchSensitivity: 2 }).touchSensitivity).toBe(2);
     expect(validateSettings({ touchSensitivity: 9 }).touchSensitivity).toBe(3);
@@ -65,7 +68,13 @@ describe('settings', () => {
     const storage = fakeStorage();
     expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
     expect(hasStoredSettings(storage)).toBe(false);
-    const chosen = { renderDistance: 5, mouseSensitivity: 1.5, fov: 90, touchSensitivity: 1 };
+    const chosen = {
+      renderDistance: 5,
+      mouseSensitivity: 1.5,
+      fov: 90,
+      touchSensitivity: 1,
+      brightness: 0.5,
+    };
     saveSettings(storage, chosen);
     expect(hasStoredSettings(storage)).toBe(true);
     expect(loadSettings(storage)).toEqual(chosen);
@@ -77,10 +86,42 @@ describe('settings', () => {
     });
     saveSettings(storage, { ...chosen, touchSensitivity: 2.5 });
     expect(JSON.parse(storage.data.get(SETTINGS_STORAGE_KEY) ?? '')).toEqual({
-      ...chosen,
+      renderDistance: 5,
+      mouseSensitivity: 1.5,
+      fov: 90,
       touchSensitivity: 2.5,
     });
     expect(loadSettings(storage).touchSensitivity).toBe(2.5);
+  });
+
+  it('Phase 4 AC4.1: Brightness defaults when missing or broken and is clamped to 0–1', () => {
+    expect(validateSettings({}).brightness).toBe(0.5);
+    for (const broken of ['bright', null, NaN, Infinity, {}, []]) {
+      expect(validateSettings({ brightness: broken }).brightness).toBe(0.5);
+    }
+    expect(validateSettings({ brightness: 0 }).brightness).toBe(0);
+    expect(validateSettings({ brightness: 1 }).brightness).toBe(1);
+    expect(validateSettings({ brightness: 0.35 }).brightness).toBe(0.35);
+    expect(validateSettings({ brightness: -2 }).brightness).toBe(0);
+    expect(validateSettings({ brightness: 7 }).brightness).toBe(1);
+  });
+
+  it('Phase 4 AC4.1: settings stored before this phase load unchanged otherwise', () => {
+    const stored = '{"renderDistance":5,"mouseSensitivity":1.5,"fov":90,"touchSensitivity":2}';
+    const storage = fakeStorage(stored);
+    expect(loadSettings(storage)).toEqual({
+      renderDistance: 5,
+      mouseSensitivity: 1.5,
+      fov: 90,
+      touchSensitivity: 2,
+      brightness: 0.5,
+    });
+    // Writing them back without a change of Brightness gives the same text.
+    saveSettings(storage, loadSettings(storage));
+    expect(storage.data.get(SETTINGS_STORAGE_KEY)).toBe(stored);
+    saveSettings(storage, { ...loadSettings(storage), brightness: 0.8 });
+    expect(JSON.parse(storage.data.get(SETTINGS_STORAGE_KEY) ?? '').brightness).toBe(0.8);
+    expect(loadSettings(storage).brightness).toBe(0.8);
   });
 
   it('survives corrupt or unavailable storage', () => {

@@ -39,7 +39,7 @@ test('flying 2 000 blocks keeps chunk counts and memory stable (AC12.1)', async 
   expect(end.player.x - start.player.x).toBeGreaterThanOrEqual(2000);
   expect(end.chunks.loaded).toBe(81);
   expect(end.chunks.pending).toBe(0);
-  // Data exists for the 11×11 area only; meshes for the radius plus the hysteresis ring.
+  // Data exists for the 13×13 area only; meshes for the radius plus the hysteresis ring.
   expect(end.chunks.generated).toBe(169);
   expect(result.maxMeshed).toBeLessThanOrEqual(121);
   // At most three geometries per meshed chunk, plus sky, sun, moon, stars and outline.
@@ -170,4 +170,6 @@ test('500 random actions with autosave and a world switch survive a reload (Phas
   expect(new Set(result.blocks).size).toBeGreaterThan(6);
   expect(after.state.selectedSlot).toBe(result.state.selectedSlot);
   expect(after.state.player.mode).toBe('fly');
+  // Phase 4 AC5.1: the light of the reloaded world is what its blocks say.
+  expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
 });

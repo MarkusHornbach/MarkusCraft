@@ -30,6 +30,7 @@ export default defineConfig({
         'src/render/textures/cracks.ts',
         'src/input/TouchTracker.ts',
         'src/game/autosave.ts',
+        'src/game/perfStats.ts',
       ],
       exclude: ['**/*.test.ts'],
       thresholds: { lines: 85 },

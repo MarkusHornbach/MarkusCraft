@@ -39,6 +39,6 @@ describe('repository hygiene (AC12.4)', () => {
     // Nineteen reference screenshots: nine from Phases 1 and 2, `rocky-hill` and `world-menu`
     // from Phase 3 part A, `gathering-hud`, `inventory`, `palette` and `inventory-touch`
     // from part B, `recipe-list`, `recipe-list-touch`, `item-icons` and `stations` from part C.
-    expect(assets.length).toBe(19);
+    expect(assets.length).toBe(22);
   });
 });

@@ -186,8 +186,27 @@ export class PauseScreen {
         change();
       },
     });
-    this.sliders = { renderDistance, mouseSensitivity, touchSensitivity, fov };
-    settings.append(renderDistance.row, mouseSensitivity.row, touchSensitivity.row, fov.row);
+    const brightness = this.slider({
+      id: 'setting-brightness',
+      label: 'Brightness',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      value: this.settings.brightness,
+      format: (v) => `${Math.round(v * 100)} %`,
+      apply: (v) => {
+        this.settings.brightness = v;
+        change();
+      },
+    });
+    this.sliders = { renderDistance, mouseSensitivity, touchSensitivity, fov, brightness };
+    settings.append(
+      renderDistance.row,
+      mouseSensitivity.row,
+      touchSensitivity.row,
+      fov.row,
+      brightness.row,
+    );
 
     // Touch devices have no F3 key; this switch replaces it.
     const debugRow = element('label', 'setting-row switch-row');

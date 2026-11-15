@@ -79,6 +79,12 @@ export interface GameState {
     /** Meshed chunks that wait for a new mesh because an edit changed their light. */
     relight: number;
   };
+  /** Performance over the last ten seconds; a long frame takes more than 33 ms. */
+  perf: { chunkWorkAvgMs: number; chunkWorkMaxMs: number; longFrames: number; frames: number };
+  settings: {
+    /** The Brightness setting, 0..1. */
+    brightness: number;
+  };
   render: {
     drawCalls: number;
     triangles: number;

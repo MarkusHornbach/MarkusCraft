@@ -1,12 +1,26 @@
 // Shared chunk materials: one shader for the opaque, cutout and translucent passes.
 import * as THREE from 'three';
+import {
+  BRIGHTNESS_DEFAULT,
+  LIGHT_GAMMA,
+  MIN_LIGHT_BRIGHTEST,
+  MIN_LIGHT_DARKEST,
+  TORCH_TINT,
+} from '../game/config';
 import type { Atlas } from './textures/atlas';
+
+/** The darkest a place gets on screen for a Brightness setting of 0..1. */
+export function minLightFor(brightness: number): number {
+  return MIN_LIGHT_DARKEST + (MIN_LIGHT_BRIGHTEST - MIN_LIGHT_DARKEST) * brightness;
+}
 
 export interface ChunkUniforms {
   [name: string]: THREE.IUniform;
   uMap: THREE.IUniform<THREE.Texture>;
   /** World brightness multiplier (1 = day). Applied in display space like the face shades. */
   uDaylight: THREE.IUniform<number>;
+  /** The darkest a place gets (see `minLightFor`), in the same display space. */
+  uMinLight: THREE.IUniform<number>;
   uFogColor: THREE.IUniform<THREE.Color>;
   uFogNear: THREE.IUniform<number>;
   uFogFar: THREE.IUniform<number>;
@@ -20,14 +34,29 @@ export interface ChunkMaterials {
   dispose(): void;
 }
 
+// The light of a vertex is turned into a colour factor in the vertex shader, so a pixel
+// costs what it did before there was light: one `pow` for the face shade. Between the
+// vertices of a face the light is therefore blended as linear light, the shade (as
+// before) as a perceptual value.
 const VERTEX_SHADER = /* glsl */ `
+  uniform float uDaylight;
+  uniform float uMinLight;
+
   varying vec2 vUv;
   varying float vShade;
+  varying vec3 vLight;
   varying float vFogDepth;
 
   void main() {
     vUv = uv;
     vShade = color.r;
+    // Sky light counts as much as there is daylight; block light is warm and does not
+    // care about the time of day. The brighter of the two lights a place, and no place
+    // is darker than the Brightness setting allows. All of this is perceptual (0.5 looks
+    // half as bright), like the face shades; the last step converts to linear light.
+    float sky = pow(color.g, LIGHT_GAMMA) * uDaylight;
+    vec3 lit = max(vec3(sky), pow(color.b, LIGHT_GAMMA) * TORCH_TINT);
+    vLight = pow(max(lit, vec3(uMinLight)), vec3(2.2));
     vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
     vFogDepth = length(viewPosition.xyz);
     gl_Position = projectionMatrix * viewPosition;
@@ -36,13 +65,13 @@ const VERTEX_SHADER = /* glsl */ `
 
 const FRAGMENT_SHADER = /* glsl */ `
   uniform sampler2D uMap;
-  uniform float uDaylight;
   uniform vec3 uFogColor;
   uniform float uFogNear;
   uniform float uFogFar;
 
   varying vec2 vUv;
   varying float vShade;
+  varying vec3 vLight;
   varying float vFogDepth;
 
   void main() {
@@ -52,8 +81,7 @@ const FRAGMENT_SHADER = /* glsl */ `
     #endif
     // Shade values are meant perceptually (0.5 looks half as bright), the texture is
     // linear here, so the multiplier is converted to linear light.
-    float light = pow(vShade * uDaylight, 2.2);
-    vec3 color = texel.rgb * light;
+    vec3 color = texel.rgb * (pow(vShade, 2.2) * vLight);
     float fog = clamp((vFogDepth - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     color = mix(color, uFogColor, fog);
     #ifdef TRANSLUCENT
@@ -91,21 +119,26 @@ export function createChunkMaterials(atlas: Atlas): ChunkMaterials {
   const uniforms: ChunkUniforms = {
     uMap: { value: texture },
     uDaylight: { value: 1 },
+    uMinLight: { value: minLightFor(BRIGHTNESS_DEFAULT) },
     uFogColor: { value: new THREE.Color(1, 1, 1) },
     uFogNear: { value: 10 },
     uFogFar: { value: 100 },
   };
   const base = {
     uniforms,
+    defines: {
+      LIGHT_GAMMA: LIGHT_GAMMA.toFixed(4),
+      TORCH_TINT: `vec3(${TORCH_TINT.map((v) => v.toFixed(4)).join(', ')})`,
+    },
     vertexShader: VERTEX_SHADER,
     fragmentShader: FRAGMENT_SHADER,
     vertexColors: true,
   };
   const opaque = new THREE.ShaderMaterial(base);
-  const cutout = new THREE.ShaderMaterial({ ...base, defines: { CUTOUT: 1 } });
+  const cutout = new THREE.ShaderMaterial({ ...base, defines: { ...base.defines, CUTOUT: 1 } });
   const translucent = new THREE.ShaderMaterial({
     ...base,
-    defines: { TRANSLUCENT: 1 },
+    defines: { ...base.defines, TRANSLUCENT: 1 },
     transparent: true,
     depthWrite: false,
     // The water surface must be visible from below as well.

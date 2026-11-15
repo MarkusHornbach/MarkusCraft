@@ -96,7 +96,8 @@ src/
   main.ts            entry point: reads URL params, checks WebGL2, starts the game
   game/              Game.ts (loop, wiring, screens, world loading), config.ts (all constants),
                      testApi.ts, urlParams.ts, autosave.ts (pure: when to write what),
-                     idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world)
+                     idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world),
+                     perfStats.ts (pure: frames and chunk work of the last ten seconds)
   actions/           the action layer (pure): actions.ts (types, decodeAction), apply.ts
                      (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
   items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
@@ -108,6 +109,9 @@ src/
                      raycast.ts, dayNight.ts (time → sun, sky colours, daylight)
     generation/      terrain.ts (heights, rock, layers, checksum), ores.ts (veins, clay),
                      trees.ts, spawn.ts
+    light/           lightRules.ts (levels, packing, the step rule), lightChunk.ts (light of
+                     a chunk from scratch), lightUpdate.ts (after an edit), lightCheck.ts
+                     (slow reference; tests and `verifyLight`)
     meshing/         mesher.ts (pure: block data in, typed arrays out), atlasLayout.ts
   player/            player.ts (state), physics.ts, interaction.ts (break/place rules)
   input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch as well
@@ -125,11 +129,16 @@ src/
                      PauseScreen.ts (pause menu of a world; also the settings page),
                      activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint)
   util/              rng.ts, noise.ts, math.ts
-  testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts
+  testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts,
+                     lightChecksum.ts, lightScenes.ts (tables with emitters, artificial
+                     volumes), lightEdits.ts (a lit test world, random edits)
 e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, sites.ts
-                     (tree, beach and rock near the start point), screenshots/
+                     (tree, beach and rock near the start point), lightScenes.ts (tunnel,
+                     room with a window, roof over a chunk corner), screenshots/
 scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item
                      icons), terrainStats.ts (terrain statistics and generation time), perf.ts
+                     (generation, light, meshing, edits), compareShots.mjs (old reference
+                     next to new)
 docs/                phase plans and phase reports
 .github/workflows/   ci.yml, deploy.yml
 ```
@@ -145,8 +154,9 @@ under coverage, which distorts timings. CI runs both.
   `no-restricted-imports` rule). They are tested in Node. Only `render/`, `ui/`, `input/`
   and `game/` may use Three.js and browser APIs. The same rule covers
   `render/textures/tiles.ts`, `itemIcons.ts` and `cracks.ts`. The core may import `game/config.ts`.
-  `input/TouchTracker.ts` and `game/autosave.ts` follow the same discipline (no DOM,
-  unit-tested in Node, in the coverage scope) although they live in the shell.
+  `input/TouchTracker.ts`, `game/autosave.ts` and `game/perfStats.ts` follow the same
+  discipline (no DOM, unit-tested in Node, in the coverage scope) although they live in
+  the shell.
 - **One pipeline for changes (action layer).** `Game` and the UI never change blocks, the
   selected slot or the inventory themselves. They build a plain action
   (`{ kind, ... }`, JSON-safe) and call `session.submit(action)`; the world and the screen
@@ -163,6 +173,34 @@ under coverage, which distorts timings. CI runs both.
   carries a short reason (`reach`, `unbreakable`, `occupied`, `full`, `early`, `missing`,
   `mode`, `station`, `invalid`) that the UI maps to a text; `ActionResult.notices` is a
   list of `{ item, count }`, not of strings.
+- **Light.** Every cell has sky light and block light, each 0–15, in one byte
+  (`Chunk.light`, null until the chunk is lit). The rules are in `light/lightRules.ts`: a
+  step into a neighbour costs one level plus the neighbour's `opacity` (air and glass 0,
+  leaves and water 1, everything else 15); full sky light going straight down into a
+  clear cell stays full. Light is a pure function of the blocks: it is never saved, and
+  needs no save format or generator version. **The invariant:** after any edits, loads and
+  unloads the stored light of every lit chunk equals what the slow reference
+  (`lightCheck.ts`) works out from the blocks. `World.verifyLight()` counts the cells
+  that differ; tests of anything that touches blocks or chunks end with it being 0. If
+  fast code and reference disagree, the reference decides. Stored light is written only
+  by `World.light` (the lighting job, `lightChunk`) and `World.setBlock` (`updateLight`,
+  or `lightChunk` again where a chunk around the edit is not lit); `pipeline.test.ts`
+  guards that. The block table has no emitter yet (the torch is Part B); tests pass
+  `TEST_LIGHT` (`src/testing/lightScenes.ts`) with a lamp and a glowing rock through
+  `World.lightTables`. `LIGHT_CHECKSUM_1337_V1` changes only with the rules or an opacity.
+- **Chunk stages.** generated → lit (needs its 3 × 3 chunks generated) → meshed (needs its
+  3 × 3 chunks lit). To mesh radius `R`, radius `R + 1` is lit and `R + 2` generated;
+  meshes are dropped beyond `R + 1`, data beyond `R + 2`. One job handles one chunk.
+  `World.setBlock` reports chunks whose mesh shows changed light through
+  `World.onLightChange`; the chunk manager remeshes them before it loads anything
+  (`relight`), the chunks of `chunksAffectedByEdit` are remeshed in the same frame as
+  before. `whenIdle` and `isReady` wait for both.
+- **Light on screen.** Vertex colour: red = face shade × ambient occlusion, green = sky
+  light, blue = block light (level ÷ 15, averaged over the up to four clear cells that
+  touch the vertex in front of the face). The vertex shader turns light into a colour
+  factor (`LIGHT_GAMMA`, daylight, `TORCH_TINT`, the floor `uMinLight` from the
+  Brightness setting); the fragment shader multiplies. `meshChunk` without its third
+  argument is the mesher from before light (everything open sky), kept for tests.
 - **Game modes.** A world is Creative or Gathering for ever (`WorldMeta.mode`). Creative:
   flying, unlimited blocks, instant breaking, the palette. Gathering: no flying (key, touch
   button, `setPlayer` and controls list), placing takes the item from the selected slot,
@@ -284,6 +322,13 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   `recipes [{ id, name, craftable, missing, stationMissing }]` in the order of the list,
   and `smelting { recipe, progress } | null`. `setBlock`, `give` and `clearInventory` are
   direct tools past the action layer.
+- Light (Phase 4): `getLight(x, y, z)` → `{ sky, block }` or null in a chunk that is not
+  lit; `verifyLight()` → number of wrong cells (0 is correct; slow); `lightChecksum()`;
+  `getState()` has `chunks.lit`, `chunks.relight`, `settings.brightness` and
+  `perf { chunkWorkAvgMs, chunkWorkMaxMs, longFrames, frames }` (last ten seconds).
+  Light scenes are built by `e2e/lightScenes.ts`. Brightness of pixels is compared as
+  gamma-encoded values (`meanLuminance`) or as linear light (`linearBrightness`); say
+  which. A test that changes blocks should end with `verifyLight()` being 0.
 - Recipe-list tests: a click on "Craft" of another recipe within 15 steps of the last
   craft is ignored (see "Crafting"): step in between. `Fingers` waits until the page has
   seen each finger position and therefore hangs on a gesture the browser takes over for
@@ -311,10 +356,20 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   wait with `whenIdle` before reading the angles.
 - Every visual feature gets both a rule-based assertion (measurable pixel or state facts)
   and, where useful, a reference screenshot comparison (`e2e/screenshots/`).
+- **Regenerating references of the world** (anything that changes light, the mesher or the
+  shader): first copy `e2e/screenshots/` out of the repository, regenerate with
+  `npx playwright test --update-snapshots=all`, then
+  `node scripts/compareShots.mjs <old copy> <sheet folder>` writes one sheet per reference
+  with the old picture left and the new one right, and prints how many pixels changed.
+  Open every sheet with the Read tool and judge it against the checklist of
+  `docs/phase-4-plan.md`, section 6.5; the report gets one line per reference. A change
+  the checklist does not explain is a defect, not a new reference.
 - After changing anything visual, the implementing session must also open the produced
   screenshots with the Read tool and judge them by eye. For a quick look at any pose:
   `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
-- The full e2e run takes about seven minutes; run long commands in the background.
+- The full e2e run takes about eleven minutes; run long commands in the background. The
+  unit tests take about half a minute: the four `lightEdits*.test.ts` files check the
+  light against the slow reference after each of 2 000 random edits.
 
 ## Definition of Done (per phase or phase part)
 
@@ -355,9 +410,14 @@ hold:
     before changing recipes, tools, the break rules or the recipe list.
   - Phase 3 is complete with parts A–C. Its part D (Web Workers) was never started; the
     topic is now Phase 4 part C. Do not implement Phase 3 part D as written.
-- Phase 4 (Light & Torches): planned (`docs/phase-4-plan.md`), not yet implemented. Parts
-  A (light) and B (torch) are implemented in separate sessions; part C (Web Workers) is
-  optional and is built only when the owner's starting prompt asks for it.
+- Phase 4 (Light & Torches): plan `docs/phase-4-plan.md`.
+  - Phase 4 part A (light: engine, chunk pipeline, rendering, Brightness setting,
+    measurement): implemented (report: `docs/phase-4a-report.md`). Read its "Decisions and
+    deviations" before changing light, the chunk manager, the mesher, the chunk shader or
+    the reference screenshots.
+  - Part B (torch, darker night) is not yet implemented; it starts after Part A is merged.
+    Part C (Web Workers) is optional and is built only when the owner's starting prompt
+    asks for it.
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.

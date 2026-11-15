@@ -12,7 +12,7 @@ import { daylightFactor } from '../world/dayNight';
 import type { ChunkMeshData } from '../world/meshing/mesher';
 import { BreakOverlay } from './BreakOverlay';
 import { ChunkMeshes } from './ChunkMeshes';
-import { type ChunkMaterials, createChunkMaterials } from './materials';
+import { type ChunkMaterials, createChunkMaterials, minLightFor } from './materials';
 import { Sky } from './Sky';
 import { type Atlas, buildAtlas } from './textures/atlas';
 
@@ -119,6 +119,11 @@ export class Renderer {
 
   get pixelRatio(): number {
     return this.webgl.getPixelRatio();
+  }
+
+  /** The Brightness setting (0..1): how bright places without light are drawn. */
+  setBrightness(brightness: number): void {
+    this.materials.uniforms.uMinLight.value = minLightFor(brightness);
   }
 
   setFov(fov: number): void {
