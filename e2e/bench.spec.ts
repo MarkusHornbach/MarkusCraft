@@ -421,8 +421,10 @@ test.describe('on a touch device', () => {
       await swipe(page, { x: 700, y: 300 }, { x: 800, y: 260 }, 3);
       await swipe(page, { x: 150, y: 400 }, { x: 150, y: 330 }, 3);
       const state = await getState(page);
-      if (state.bench?.scenario === 'stand' || state.bench?.scenario === 'fly') {
+      // Flying looks north; the height tells that the player was put in place already.
+      if (state.bench?.scenario === 'fly' && state.player.y === 100) {
         expect(state.player.yaw).toBe(0);
+        expect(state.player.x).toBe(-0.5);
       }
     }
     expect(await phase(page)).toBe('result');

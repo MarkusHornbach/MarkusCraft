@@ -136,11 +136,11 @@ rendering, the chunk pipeline or `PerfStats`.
 
 ## Reference screenshots
 
-| Reference      | Change                                                                           |
-| -------------- | -------------------------------------------------------------------------------- |
-| `bench-start`  | New: title, six hints, "Start" and "Back". Looked at                             |
-| `bench-result` | New: the sample result with nine rows, lights G / Y / R, five buttons. Looked at |
-| `world-menu`   | WORLD_MENU_LINE                                                                  |
+| Reference      | Change                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------ |
+| `bench-start`  | New: title, six hints, "Start" and "Back". Looked at                                             |
+| `bench-result` | New: the sample result with nine rows, lights G / Y / R, five buttons. Looked at                 |
+| `world-menu`   | Fourth button "Performance test" in the row under the play button; nothing else moved. Looked at |
 
 All other references were regenerated in the same run and are unchanged byte for byte.
 

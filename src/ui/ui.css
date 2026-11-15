@@ -301,7 +301,8 @@ canvas {
   text-align: center;
 }
 
-.pause-title {
+.pause-title,
+.bench-title {
   margin: 0 0 8px;
   font-size: 34px;
   font-weight: 800;

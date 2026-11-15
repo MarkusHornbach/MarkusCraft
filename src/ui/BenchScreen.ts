@@ -59,7 +59,7 @@ export class BenchScreen {
 
     // --- start page ---
     const start = element('div', 'bench-view bench-start');
-    this.startTitle = element('h1', 'pause-title bench-title', 'Performance test');
+    this.startTitle = element('h1', 'bench-title', 'Performance test');
     start.appendChild(this.startTitle);
     const hints = element('ul', 'bench-hints');
     for (const hint of BENCH_HINTS) hints.appendChild(element('li', 'bench-hint', hint));
