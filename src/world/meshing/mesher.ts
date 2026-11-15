@@ -311,11 +311,22 @@ export function meshChunk(
           builder.reserveQuad();
           const base = builder.vertexCount;
           const shade = FACE_SHADES[f];
+          const frontLight = lit ? paddedLight[front] : 0;
+          const frontSky = frontLight >> 4;
+          const frontGlow = frontLight & 15;
           for (let k = 0; k < 4; k++) {
             const t = (f * 4 + k) * 3;
-            const side1 = BLOCK_CASTS_AO[padded[p + AO_DELTA[t]]];
-            const side2 = BLOCK_CASTS_AO[padded[p + AO_DELTA[t + 1]]];
-            const diagonal = BLOCK_CASTS_AO[padded[p + AO_DELTA[t + 2]]];
+            // The three cells next to the corner, in front of the face: read once, used
+            // for ambient occlusion and for light.
+            const i1 = p + AO_DELTA[t];
+            const i2 = p + AO_DELTA[t + 1];
+            const i3 = p + AO_DELTA[t + 2];
+            const b1 = padded[i1];
+            const b2 = padded[i2];
+            const b3 = padded[i3];
+            const side1 = BLOCK_CASTS_AO[b1];
+            const side2 = BLOCK_CASTS_AO[b2];
+            const diagonal = BLOCK_CASTS_AO[b3];
             // Two occluding sides hide the diagonal: darkest level.
             const level = side1 === 1 && side2 === 1 ? 3 : side1 + side2 + diagonal;
             const brightness = shade * AO_LEVELS[level];
@@ -325,26 +336,25 @@ export function meshChunk(
               // Smooth light: the average over the cells in front of the face that touch
               // the vertex. Opaque cells hold no light and are left out, and so is the
               // diagonal cell when both side cells are opaque: nothing connects it.
-              let packed = paddedLight[front];
-              let skySum = packed >> 4;
-              let glowSum = packed & 15;
+              let skySum = frontSky;
+              let glowSum = frontGlow;
               let cells = 1;
-              const open1 = BLOCK_OPACITY[padded[p + AO_DELTA[t]]] !== LIGHT_MAX;
-              const open2 = BLOCK_OPACITY[padded[p + AO_DELTA[t + 1]]] !== LIGHT_MAX;
+              const open1 = BLOCK_OPACITY[b1] !== LIGHT_MAX;
+              const open2 = BLOCK_OPACITY[b2] !== LIGHT_MAX;
               if (open1) {
-                packed = paddedLight[p + AO_DELTA[t]];
+                const packed = paddedLight[i1];
                 skySum += packed >> 4;
                 glowSum += packed & 15;
                 cells++;
               }
               if (open2) {
-                packed = paddedLight[p + AO_DELTA[t + 1]];
+                const packed = paddedLight[i2];
                 skySum += packed >> 4;
                 glowSum += packed & 15;
                 cells++;
               }
-              if ((open1 || open2) && BLOCK_OPACITY[padded[p + AO_DELTA[t + 2]]] !== LIGHT_MAX) {
-                packed = paddedLight[p + AO_DELTA[t + 2]];
+              if ((open1 || open2) && BLOCK_OPACITY[b3] !== LIGHT_MAX) {
+                const packed = paddedLight[i3];
                 skySum += packed >> 4;
                 glowSum += packed & 15;
                 cells++;

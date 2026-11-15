@@ -149,11 +149,13 @@ Unit tests live next to the code as `*.test.ts`. Wall-clock limits in tests go t
 `expectFasterThan` (`src/testing/timing.ts`): they are enforced by `npm test` and skipped
 under coverage, which distorts timings. CI runs both.
 
-Tests that are slow because they compare with the light reference are named
-`*.slow.test.ts`. `npm test` runs them in a second pass, after all other files: next to
-them, tests with tight time limits (generation at most 20 % slower, meshing with light at
-most 25 %) fail now and then. Put heavy tests without a tight limit into a slow file; take
-the best of many rounds, the two sides in turn, where two times are compared.
+`npm test` runs three passes. First all ordinary files side by side. Then the files named
+`*.solo.test.ts`, one after the other with nothing next to them: comparisons of two times
+with a tight limit (generation at most 20 % slower than Phase 1, meshing with light), which
+a busy machine shifts. Last the files named `*.slow.test.ts`: heavy tests without a tight
+limit, mostly comparisons with the light reference. Put a new test into the kind of file
+it belongs to; in a solo file warm both sides up and take the best of many rounds, the two
+sides in turn.
 
 ## Architecture and code conventions
 
@@ -293,7 +295,7 @@ the best of many rounds, the two sides in turn, where two times are compared.
 | `npm run typecheck`       | `tsc --noEmit`                                             |
 | `npm run lint`            | ESLint + Prettier check                                    |
 | `npm run format`          | Apply Prettier                                             |
-| `npm test`                | Vitest unit tests: the quick files, then `*.slow.test.ts`  |
+| `npm test`                | Vitest unit tests: ordinary, then solo, then slow files    |
 | `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI) |
 | `npm run test:e2e`        | Build, then Playwright tests against the preview server    |
 | `npm run test:e2e:update` | Same, regenerating reference screenshots                   |

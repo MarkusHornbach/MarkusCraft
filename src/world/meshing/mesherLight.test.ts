@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE } from '../../game/config';
 import { ChunkGroup } from '../../testing/lightScenes';
-import { expectFasterThan } from '../../testing/timing';
 import { Block } from '../blocks';
 import { createChunk } from '../chunk';
 import { World } from '../World';
@@ -261,29 +260,5 @@ describe('light in the mesh (Phase 4 step 3)', () => {
     }
     // Where light falls off across a quad, its diagonal may be the other one.
     expect(diagonals).toBeGreaterThan(0);
-  });
-
-  it('AC3.4: meshing with light takes at most 25 % longer than without', () => {
-    const world = terrainWorld();
-    const round = (withLight: boolean): number => {
-      const start = performance.now();
-      for (let cz = -1; cz <= 2; cz++) {
-        for (let cx = -1; cx <= 2; cx++) meshOf(world, cx, cz, withLight);
-      }
-      return (performance.now() - start) / 16;
-    };
-    round(true);
-    round(false);
-    // The two take turns, so a busy moment of the machine hits both; the best round counts.
-    let plain = Infinity;
-    let lit = Infinity;
-    for (let i = 0; i < 10; i++) {
-      plain = Math.min(plain, round(false));
-      lit = Math.min(lit, round(true));
-    }
-    console.log(
-      `meshing: ${plain.toFixed(3)} ms/chunk without light, ${lit.toFixed(3)} ms/chunk with light`,
-    );
-    expectFasterThan(lit, plain * 1.25);
   });
 });

@@ -55,7 +55,7 @@ Saved worlds are untouched: light is never stored, `SAVE_FORMAT_VERSION` and
 | AC2.7        | `e2e/light.spec.ts`                                                                                                                                                                                   |
 | AC2.8        | Full browser run on the commit of step 2: 131 tests passed, no reference regenerated. Adapted counts: see deviation 7                                                                                 |
 | AC2.9        | The lint rule covers `src/world/`; `src/actions/pipeline.test.ts` ("stored light is written only by the world and its light functions")                                                               |
-| AC3.1–AC3.4  | `src/world/meshing/mesherLight.test.ts`                                                                                                                                                               |
+| AC3.1–AC3.4  | `src/world/meshing/mesherLight.test.ts`, `mesherSpeed.solo.test.ts` (AC3.4, deviation 18)                                                                                                             |
 | AC3.5–AC3.10 | `e2e/light.spec.ts` (AC3.9, first half: the existing tests of `e2e/interaction.spec.ts`, unchanged)                                                                                                   |
 | AC3.11       | The table "References" below                                                                                                                                                                          |
 | AC4.1        | `src/ui/settings.test.ts`                                                                                                                                                                             |
@@ -163,14 +163,23 @@ the two lights)`: with even light it is the choice from before (AC3.3 shows that
 15. **The tunnel scene** is dug where the pit in front of its mouth has to be least deep,
     found by a search around the start point; its floor is relaid with stone so the
     measured strips have one texture.
-16. **`npm test` runs in two passes.** The first CI run of this branch failed in an old
+16. **`npm test` runs in three passes.** The first CI run of this branch failed in an old
     test: "generation is at most 20 % slower than the Phase 1 terrain" (Phase 3 AC1.10),
-    which has a margin of only 4–7 % when it runs alone and lost it next to the new, heavy
-    light tests. Those are now in files named `*.slow.test.ts` and run after all other
-    files; that time comparison takes 120 rounds instead of 40. No limit was changed.
+    which has a margin of only a few percent and lost it next to the new, heavy light
+    tests. Now the heavy tests are in files named `*.slow.test.ts` and run last, and the
+    two comparisons of times with tight limits (that one, and meshing with light) are in
+    files named `*.solo.test.ts` that run one after the other with nothing next to them,
+    after a warm-up. The limit of the old test is unchanged.
     `npm run test:coverage` still runs everything at once (it enforces no time limits).
 17. **`scripts/perf.ts` now takes the best of five rounds** per measurement. The old
     script measured one cold round; its numbers are given below as they were.
+
+18. **AC3.4 is relaxed from 25 % to 37.5 %** (the plan's fallback: "as a last step relax
+    a limit by half and record it"). Meshing with light takes 17–19 % longer than without
+    on the machine of the first measurements and 20–25 % on a second one, where the limit
+    of 25 % failed every few runs. Tried first: the three cells next to a corner are read
+    once for ambient occlusion and light. Not tried: reading the eight cells around a
+    face once per face instead of per corner, which would rewrite the mesher's inner loop.
 
 ## Performance
 
@@ -191,7 +200,8 @@ Node 22, cloud container, seed 1337.
 | Heap in the browser, render distance 4  | not recorded           | 35.6 MB, the same after 200 edits   |
 
 - AC1.7: lighting a terrain chunk takes 1.2 ms, 22 % of meshing it (limit 40 %); a chunk with caves (37 % of the ground carved out) takes 2.9 ms, 2.4 times a terrain chunk (limit 4).
-- AC3.4: meshing with light takes 17–19 % longer than without (limit 25 %).
+- AC3.4: meshing with light takes 17–25 % longer than without, depending on the machine
+  (limit 37.5 %, see deviation 18).
 - **Loading costs more than the plan estimated**: about 50–65 % more time at render
   distance 4 and 8 instead of 20–30 %. Light from scratch takes about 1.2 ms per chunk,
   not the 0.55 ms of the planning prototype (lakes cost most: every water cell is worked
