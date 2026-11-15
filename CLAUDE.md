@@ -24,7 +24,8 @@ game in a procedurally generated world"; everything in it is original work.
   4. **Light & Torches** – sky light and block light per block cell, derived from the
      blocks and never saved; dark tunnels and rooms, a darker night, a Brightness setting,
      and the torch, the first block that is not a cube. Three parts with separate pull
-     requests: A light, B torch, C Web Workers (optional) (plan: `docs/phase-4-plan.md`)
+     requests: A light, B torch, C Web Workers (optional) (plan: `docs/phase-4-plan.md`;
+     report of part A: `docs/phase-4a-report.md`)
   5. **Gamepad controls** (not yet planned)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
