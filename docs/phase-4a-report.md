@@ -213,6 +213,9 @@ Node 22, cloud container, seed 1337.
 - **Light across the rim of the loaded area** is correct but costs more after an edit
   there (deviation 5). Not reachable in play.
 - The unit tests now take about half a minute (the 2 000 checked edits).
+- **`e2e/world.spec.ts` (AC7.2, ten loads of 81 chunks) has three minutes instead of
+  one.** On the CI machine it took just under or just over a minute once loading cost
+  more; one CI run failed on that limit. Nothing else about the test changed.
 
 ## For the owner to try (plan section 9, after Part A)
 

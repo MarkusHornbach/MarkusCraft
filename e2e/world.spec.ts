@@ -15,6 +15,9 @@ test('loads the 9×9 chunks around the spawn (AC7.1, AC7.4)', async ({ page }) =
 });
 
 test('unloads and reloads chunks without leaking GPU resources (AC7.2)', async ({ page }) => {
+  // Ten loads of 81 chunks: with light (one more ring of chunks, lighting) that takes
+  // longer than the default minute on a slow machine.
+  test.setTimeout(180_000);
   await openGame(page);
   const start = await getState(page);
   const home = { x: start.player.x, z: start.player.z };
