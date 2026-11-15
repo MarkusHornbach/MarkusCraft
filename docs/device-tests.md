@@ -26,7 +26,7 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 4 part P (performance test).
+Last updated: Phase 4 part E (edits without hitches).
 
 ---
 
@@ -63,6 +63,10 @@ Once, before the first run:
       visible stutter where a light is red, smooth where it is green; does terrain appear
       late in the flying scenario where "Loading" is yellow or red)? This checks the
       thresholds against a person's eye. Result:
+- [ ] **PERF-6** (4E) After Part E is deployed: run the performance test again on the phone
+      and the tablet and submit the issues. Is `edit` at render distance 5 green or yellow
+      now (it was red in #13, #15 and #16)? _Phone, Tablet._
+      Result: (issue numbers)
 - [ ] **PERF-3** (1) PC only: 60 FPS at render distance 8 on a mid-range laptop? Try 16 as
       well (render distance 16 is not part of the performance test; use the debug overlay,
       F3). Result:
@@ -92,6 +96,10 @@ Once, before the first run:
 - [ ] **LOOK-2** (3A) Rocky hills: is the change from grass to rock natural? Are the black
       nuggets of coal ore easy to spot from some blocks away? Is the blue-grey clay in a
       lake recognisable? Result:
+- [ ] **EDIT-1** (4E) Build and break blocks along a chunk border (the debug overlay shows
+      the chunk you stand in; walk until the number changes). Since Part E the chunk on the
+      other side of the border gets its new mesh a frame or two later: do you see a
+      flicker, a hole for a moment, or shading that jumps late? _Phone, PC._ Result:
 
 ## 4. Mouse and keyboard
 

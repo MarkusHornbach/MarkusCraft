@@ -27,7 +27,7 @@ game in a procedurally generated world"; everything in it is original work.
      requests: A light, P performance test run on real devices, B torch, C Web Workers
      (optional), and E edits without hitches, added after P (plan: `docs/phase-4-plan.md`,
      for part P `docs/phase-4p-plan.md`, for part E `docs/phase-4e-plan.md`;
-     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`)
+     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`, `docs/phase-4e-report.md`)
   5. **Gamepad controls** (not yet planned)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
@@ -216,8 +216,10 @@ sides in turn.
   meshes are dropped beyond `R + 1`, data beyond `R + 2`. One job handles one chunk.
   `World.setBlock` reports chunks whose mesh shows changed light through
   `World.onLightChange`; the chunk manager remeshes them before it loads anything
-  (`relight`), the chunks of `chunksAffectedByEdit` are remeshed in the same frame as
-  before. `whenIdle` and `isReady` wait for both.
+  (`relight`). After an edit only the edited block's own chunk is remeshed in the same
+  frame (`ChunkManager.remeshAfterEdit`); the other chunks of `chunksAffectedByEdit` join
+  that queue (`queueRemesh`), and the frame of an edit gives the chunk manager only what
+  is left of `CHUNK_BUDGET_MS` (Phase 4 part E). `whenIdle` and `isReady` wait for both.
 - **Light on screen.** Vertex colour: red = face shade × ambient occlusion, green = sky
   light, blue = block light (level ÷ 15, averaged over the up to four clear cells that
   touch the vertex in front of the face). The vertex shader turns light into a colour
@@ -505,9 +507,10 @@ hold:
     performance test, `Input`, or how `Game` switches screens; "How a later session reads
     the results" and "For Part B: adding a scenario" are in the report too. The label
     `perf-run` exists in the repository.
-  - Part E (edits without hitches: only the edited block's chunk is remeshed in the frame
-    of an edit, its neighbours follow through the urgent queue): planned, not yet
-    implemented (plan: `docs/phase-4e-plan.md`). It comes before Part B.
+  - Phase 4 part E (edits without hitches: only the edited block's chunk is remeshed in
+    the frame of an edit, its neighbours follow through the urgent queue): implemented
+    (plan: `docs/phase-4e-plan.md`, report: `docs/phase-4e-report.md`). Read its
+    "Decisions and deviations" before changing how edits are remeshed or the chunk budget.
   - Part B (torch, darker night) is not yet implemented; it starts after Part E is merged
     and adds the scenario `torches` to the performance test (suite version 2). Part C (Web Workers) is optional and is
     built only when the owner's starting prompt asks for it; the performance test on the
