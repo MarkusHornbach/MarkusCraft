@@ -23,9 +23,10 @@ game in a procedurally generated world"; everything in it is original work.
      Workers) was never started and is replaced by Phase 4 part C
   4. **Light & Torches** – sky light and block light per block cell, derived from the
      blocks and never saved; dark tunnels and rooms, a darker night, a Brightness setting,
-     and the torch, the first block that is not a cube. Four parts with separate pull
+     and the torch, the first block that is not a cube. Five parts with separate pull
      requests: A light, P performance test run on real devices, B torch, C Web Workers
-     (optional) (plan: `docs/phase-4-plan.md`, for part P `docs/phase-4p-plan.md`;
+     (optional), and E edits without hitches, added after P (plan: `docs/phase-4-plan.md`,
+     for part P `docs/phase-4p-plan.md`, for part E `docs/phase-4e-plan.md`;
      reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`)
   5. **Gamepad controls** (not yet planned)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
@@ -504,20 +505,22 @@ hold:
     performance test, `Input`, or how `Game` switches screens; "How a later session reads
     the results" and "For Part B: adding a scenario" are in the report too. The label
     `perf-run` exists in the repository.
-  - Part B (torch, darker night) is not yet implemented; it starts after Part P is merged
+  - Part E (edits without hitches: only the edited block's chunk is remeshed in the frame
+    of an edit, its neighbours follow through the urgent queue): planned, not yet
+    implemented (plan: `docs/phase-4e-plan.md`). It comes before Part B.
+  - Part B (torch, darker night) is not yet implemented; it starts after Part E is merged
     and adds the scenario `torches` to the performance test (suite version 2). Part C (Web Workers) is optional and is
     built only when the owner's starting prompt asks for it; the performance test on the
     owner's phone is what decides (`docs/phase-4p-plan.md`, section 5.6).
-  - **Performance on real devices has not been measured yet.** The owner runs the
-    performance test on computer, phone and tablet (PERF-4 and PERF-5 in
-    `docs/device-tests.md`); at the start of a session look for issues with the label
-    `perf-run`. The baseline before light can no longer be taken. Numbers from software
+  - **Performance on real devices** is measured by the owner with the performance test on
+    computer, phone and tablet (PERF-4 and PERF-5 in `docs/device-tests.md`); at the start
+    of a session look for issues with the label `perf-run`. The baseline before light can no longer be taken. Numbers from software
     WebGL (cloud sessions, CI) are never evidence of performance.
   - **First runs (issues #13–#16, build aef8349):** everything green except `edit` on
     phone and tablet, which alone makes the Web Workers line say "recommended". The cause
     is remeshing up to four whole chunk columns in the frame of an edit, not light, and
     Part C as planned would not fix it: `docs/phase-4-edit-cost.md` (analysis and
-    options; the owner decides).
+    options). The owner chose option 1: Part E.
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
