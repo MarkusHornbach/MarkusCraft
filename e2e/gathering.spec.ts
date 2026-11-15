@@ -598,8 +598,8 @@ test('Phase 3 AC13.2: 1 000 random actions of all kinds, crafting included, chan
       else if (pick < 16) action = { kind: 'discard', slot: int(36) };
       else if (pick < 17) action = { kind: 'setBarSlot', slot: int(9), item: 1 + int(18) };
       else if (pick < 18) action = { kind: 'selectSlot', slot: int(9) };
-      // Recipe 0 and 21 do not exist.
-      else if (pick < 24) action = { kind: 'craft', recipe: int(22) };
+      // Recipe 0 does not exist (20, the torch, does since Phase 4 part B).
+      else if (pick < 24) action = { kind: 'craft', recipe: int(21) };
       else action = junk[int(junk.length)];
 
       const known =

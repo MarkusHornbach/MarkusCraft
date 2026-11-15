@@ -49,19 +49,24 @@ test('Phase 4 AC9.2: 1 000 seeded actions with torches keep every item count rig
     const counts: Record<string, number> = {};
     const problems: string[] = [];
     let carried = 0;
+    let placedTorches = 0;
     let started: { x: number; y: number; z: number } | null = null;
     for (let i = 0; i < 1000; i++) {
-      const pick = int(20);
+      const pick = int(21);
       let action: { kind: string; [key: string]: unknown };
       // Bar slots 1 to 5 hold torches, dirt, stone, sticks and coal.
       if (pick < 6) action = { kind: 'place', ...cell(), slot: int(5) };
-      else if (pick < 7) action = { kind: 'place', ...cell(), slot: 0 };
-      else if (pick < 9) action = { kind: 'startBreak', ...cell() };
-      else if (pick < 12) {
+      else if (pick < 9) {
+        // A torch on the ground near the player (the surface may be leaves or water).
+        const c = cell();
+        action = { kind: 'place', x: c.x, y: mc.surfaceY(c.x, c.z) + 1, z: c.z, slot: 0 };
+      }
+      else if (pick < 10) action = { kind: 'startBreak', ...cell() };
+      else if (pick < 13) {
         const where = started && random() < 0.8 ? started : cell();
         if (random() < 0.7) mc.step(45);
         action = { kind: 'break', ...where };
-      } else if (pick < 15 && torches.length > 0) {
+      } else if (pick < 16 && torches.length > 0) {
         // The block under a torch: start, wait, break.
         const t = torches[int(torches.length)];
         const under = { x: t.x, y: t.y - 1, z: t.z };
@@ -70,8 +75,8 @@ test('Phase 4 AC9.2: 1 000 seeded actions with torches keep every item count rig
           (counts[`startBreak:${start?.ok ? 'ok' : start?.reason}`] ?? 0) + 1;
         mc.step(45);
         action = { kind: 'break', ...under };
-      } else if (pick < 17) action = { kind: 'craft', recipe: 20 };
-      else if (pick < 18) action = { kind: 'selectSlot', slot: int(5) };
+      } else if (pick < 18) action = { kind: 'craft', recipe: 20 };
+      else if (pick < 19) action = { kind: 'selectSlot', slot: int(5) };
       else action = { kind: 'moveStack', from: int(9), to: int(9) };
 
       const before = items();
@@ -94,7 +99,10 @@ test('Phase 4 AC9.2: 1 000 seeded actions with torches keep every item count rig
         if (action.kind === 'place') {
           const placed = mc.getBlock(at.x, at.y, at.z);
           add(placed, -1);
-          if (placed === torch) torches.push({ x: at.x, y: at.y, z: at.z });
+          if (placed === torch) {
+            torches.push({ x: at.x, y: at.y, z: at.z });
+            placedTorches++;
+          }
         }
         if (action.kind === 'craft') {
           add(257, -1);
@@ -118,7 +126,7 @@ test('Phase 4 AC9.2: 1 000 seeded actions with torches keep every item count rig
       if (i % 7 === 0) mc.step(2);
     }
     await mc.whenIdle();
-    return { counts, problems, carried, wrong: mc.verifyLight(), standing: torches.length };
+    return { counts, problems, carried, placedTorches, wrong: mc.verifyLight() };
   }, TORCH);
 
   expect(result.problems).toEqual([]);
@@ -136,7 +144,7 @@ test('Phase 4 AC9.2: 1 000 seeded actions with torches keep every item count rig
     expect(count(key), key).toBeGreaterThan(0);
   }
   expect(result.carried).toBeGreaterThan(3);
-  expect(result.standing).toBeGreaterThan(0);
+  expect(result.placedTorches).toBeGreaterThan(20);
 });
 
 test('Phase 4 AC9.3: a world with torches survives a reload, with the same light', async ({
@@ -148,7 +156,7 @@ test('Phase 4 AC9.3: a world with torches survives a reload, with the same light
   const pz = Math.floor(player.z);
   expect(await submit(page, { kind: 'setBarSlot', slot: 0, item: TORCH })).toBe(true);
   const placed = await page.evaluate(
-    ([x0, z0]) => {
+    ([x0, y0, z0]) => {
       const mc = window.__mc;
       const cells: { x: number; y: number; z: number }[] = [];
       for (const [dx, dz] of [
@@ -158,13 +166,17 @@ test('Phase 4 AC9.3: a world with torches survives a reload, with the same light
       ]) {
         const x = x0 + dx;
         const z = z0 + dz;
-        const y = mc.surfaceY(x, z) + 1;
+        // A stone to stand on and air above it, at the height of the player's feet.
+        const y = y0;
+        mc.setBlock(x, y - 1, z, 3);
+        mc.setBlock(x, y, z, 0);
+        mc.setBlock(x, y + 1, z, 0);
         const answer = mc.submit({ kind: 'place', x, y, z, slot: 0 });
         if (answer?.ok) cells.push({ x, y, z });
       }
       return cells;
     },
-    [px, pz],
+    [px, Math.floor(player.y), pz],
   );
   expect(placed.length).toBe(3);
   await page.evaluate(() => window.__mc.whenIdle());

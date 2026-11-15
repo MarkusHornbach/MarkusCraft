@@ -640,15 +640,16 @@ test('Phase 3 AC12.7: matches the recipe-list reference (craftable rows, the fur
 
 test('Phase 3 AC12.7: matches the item-icons reference (every item once)', async ({ page }) => {
   await openGame(page, { mode: 'gathering' });
-  // The sixteen placeable blocks, then coal, stick, iron ingot and the nine tools.
-  const blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18];
+  // The seventeen placeable blocks (the torch with its painted icon), then coal, stick,
+  // iron ingot and the nine tools.
+  const blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19];
   const items = Array.from({ length: 12 }, (_, index) => COAL + index);
   for (const item of [...blocks, ...items]) await give(page, item, 1);
   const slots = await inventory(page);
-  expect(slots.filter((s) => s !== null)).toHaveLength(28);
+  expect(slots.filter((s) => s !== null)).toHaveLength(29);
   await page.keyboard.press('KeyE');
   await expect(page.locator('.inv-slot[data-item="unknown"]')).toHaveCount(0);
-  await expect(page.locator('.inventory-grid .inv-slot canvas')).toHaveCount(19);
+  await expect(page.locator('.inventory-grid .inv-slot canvas')).toHaveCount(20);
   // The icons are the subject: no world behind the panel.
   await page.locator('canvas.game-canvas').evaluate((node) => {
     (node as HTMLElement).style.visibility = 'hidden';
