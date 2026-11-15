@@ -34,7 +34,7 @@ const IRON_SHOVEL = 267;
 const LOG = 5;
 const COAL = 256;
 const STICK = 257;
-const RECIPE_COUNT = 19;
+const RECIPE_COUNT = 20;
 const COAL_RECIPE = 11;
 
 /** A Gathering world; the player stands on a platform of `block`, looking at the cell ahead. */

@@ -1,4 +1,5 @@
 // Item icons for the bar and the inventory: a cube for blocks, a painted icon otherwise.
+// The torch, a block that is no cube, has a painted icon.
 import { getItemDef } from '../items/items';
 import { ITEM_ICON_SIZE, paintItemIcon } from '../render/textures/itemIcons';
 import { ICON_SIZE, createBlockIcon } from './blockIcon';
@@ -9,11 +10,12 @@ import { ICON_SIZE, createBlockIcon } from './blockIcon';
  */
 export function createItemIcon(item: number, tiles: Uint8ClampedArray[]): HTMLCanvasElement {
   const block = getItemDef(item)?.block ?? null;
-  if (block !== null) return createBlockIcon(block, tiles);
+  // A block is a cube of its tiles unless it has a painted icon (the torch).
+  const pixels = paintItemIcon(item);
+  if (block !== null && !pixels) return createBlockIcon(block, tiles);
   const canvas = document.createElement('canvas');
   canvas.width = ICON_SIZE;
   canvas.height = ICON_SIZE;
-  const pixels = paintItemIcon(item);
   const context = canvas.getContext('2d');
   if (!pixels || !context) return canvas;
   const source = document.createElement('canvas');

@@ -40,6 +40,6 @@ describe('repository hygiene (AC12.4)', () => {
     // from Phase 3 part A, `gathering-hud`, `inventory`, `palette` and `inventory-touch`
     // from part B, `recipe-list`, `recipe-list-touch`, `item-icons` and `stations` from part C.
     // Phase 4 part A added three of the light; part P `bench-start` and `bench-result`.
-    expect(assets.length).toBe(24);
+    expect(assets.length).toBe(25);
   });
 });

@@ -57,10 +57,11 @@ export const WATER_OPACITY = 1;
 export const TORCH_LIGHT = 14;
 /**
  * The box a torch is aimed at with (and its target outline), in blocks: wider than the
- * drawn stick so a finger can hit it. It stands on the cell's floor, centred.
+ * drawn stick so a finger can hit it, and as high as the flame. It stands on the cell's
+ * floor, centred.
  */
 export const TORCH_AIM_WIDTH = 6 / 16;
-export const TORCH_AIM_HEIGHT = 12 / 16;
+export const TORCH_AIM_HEIGHT = 14 / 16;
 /** Brightness of a light level on screen: (level ÷ 15) to this power. */
 export const LIGHT_GAMMA = 1.5;
 /** Colour of block light at full strength: warm, like fire. */
@@ -136,7 +137,8 @@ export const NOTICE_MS = 1500;
 
 export const DAY_LENGTH_SECONDS = 20 * 60;
 export const START_TIME_OF_DAY = 0.1;
-export const DAYLIGHT_MIN = 0.25;
+/** Daylight at midnight (Phase 4 part B: 0.25 → 0.10, the night is really dark). */
+export const DAYLIGHT_MIN = 0.1;
 
 export const TEST_VIEW_WIDTH = 960;
 export const TEST_VIEW_HEIGHT = 540;

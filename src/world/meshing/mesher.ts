@@ -15,6 +15,7 @@ import {
   BLOCK_MERGES_FACES,
   BLOCK_OPACITY,
   BLOCK_RENDER,
+  BLOCK_SHAPE,
   BLOCK_TILE_BOTTOM,
   BLOCK_TILE_SIDE,
   BLOCK_TILE_TOP,
@@ -23,6 +24,7 @@ import {
   RENDER_NONE,
   RENDER_OPAQUE,
   RENDER_TRANSLUCENT,
+  SHAPE_TORCH,
 } from '../blocks';
 import { LIGHT_OPEN_SKY } from '../light/lightRules';
 import { TILE_UVS } from './atlasLayout';
@@ -156,6 +158,99 @@ for (let f = 0; f < 6; f++) {
   }
 }
 
+/**
+ * The torch: a stick with a flame on top, as boxes in sixteenths of a block. Each box
+ * lists its faces with the part of the tile they show (u0, v0, u1, v1 as fractions of the
+ * tile, v from its bottom). The stick's top lies under the flame and its bottom on the
+ * block below, so neither is drawn: ten quads.
+ */
+const TORCH_BOXES: readonly {
+  min: readonly [number, number, number];
+  max: readonly [number, number, number];
+  faces: readonly (readonly [number, number, number, number] | null)[];
+}[] = (() => {
+  const stickSide = [7 / 16, 0, 9 / 16, 10 / 16] as const;
+  const flameSide = [6 / 16, 10 / 16, 10 / 16, 14 / 16] as const;
+  const flameTop = [6 / 16, 12 / 16, 10 / 16, 1] as const;
+  return [
+    {
+      min: [7, 0, 7],
+      max: [9, 10, 9],
+      faces: [stickSide, stickSide, null, null, stickSide, stickSide],
+    },
+    {
+      min: [6, 10, 6],
+      max: [10, 14, 10],
+      faces: [flameSide, flameSide, flameTop, flameSide, flameSide, flameSide],
+    },
+  ];
+})();
+
+/** Quads of the torch: per quad 4 corners × xyz (block units), 4 × uv (tile fractions), face. */
+const TORCH_QUADS: { positions: Float32Array; uvs: Float32Array; face: number }[] = [];
+for (const box of TORCH_BOXES) {
+  for (let f = 0; f < 6; f++) {
+    const uv = box.faces[f];
+    if (!uv) continue;
+    const positions = new Float32Array(12);
+    const uvs = new Float32Array(8);
+    for (let k = 0; k < 4; k++) {
+      for (let axis = 0; axis < 3; axis++) {
+        const t = CORNER_POS[(f * 4 + k) * 3 + axis];
+        positions[k * 3 + axis] = (box.min[axis] + t * (box.max[axis] - box.min[axis])) / 16;
+      }
+      uvs[k * 2] = CORNER_U[k] === 1 ? uv[2] : uv[0];
+      uvs[k * 2 + 1] = CORNER_V[k] === 1 ? uv[3] : uv[1];
+    }
+    TORCH_QUADS.push({ positions, uvs, face: f });
+  }
+}
+
+/**
+ * Emits the torch in cell (x, y, z). It casts and receives no ambient occlusion, and all
+ * its vertices carry the light of its own cell: it is too thin to show a gradient.
+ */
+function emitTorch(
+  builder: MeshBuilder,
+  tile: number,
+  x: number,
+  y: number,
+  z: number,
+  packed: number,
+): void {
+  const u0 = TILE_UVS[tile * 4];
+  const v0 = TILE_UVS[tile * 4 + 1];
+  const du = TILE_UVS[tile * 4 + 2] - u0;
+  const dv = TILE_UVS[tile * 4 + 3] - v0;
+  const sky = (packed >> 4) / LIGHT_MAX;
+  const glow = (packed & 15) / LIGHT_MAX;
+  for (const quad of TORCH_QUADS) {
+    builder.reserveQuad();
+    const base = builder.vertexCount;
+    const shade = FACE_SHADES[quad.face];
+    for (let k = 0; k < 4; k++) {
+      const vi = base + k;
+      builder.positions[vi * 3] = x + quad.positions[k * 3];
+      builder.positions[vi * 3 + 1] = y + quad.positions[k * 3 + 1];
+      builder.positions[vi * 3 + 2] = z + quad.positions[k * 3 + 2];
+      builder.uvs[vi * 2] = u0 + quad.uvs[k * 2] * du;
+      builder.uvs[vi * 2 + 1] = v0 + quad.uvs[k * 2 + 1] * dv;
+      builder.colors[vi * 3] = shade;
+      builder.colors[vi * 3 + 1] = sky;
+      builder.colors[vi * 3 + 2] = glow;
+    }
+    const ii = builder.indexCount;
+    builder.indices[ii] = base;
+    builder.indices[ii + 1] = base + 1;
+    builder.indices[ii + 2] = base + 2;
+    builder.indices[ii + 3] = base;
+    builder.indices[ii + 4] = base + 2;
+    builder.indices[ii + 5] = base + 3;
+    builder.vertexCount += 4;
+    builder.indexCount += 6;
+  }
+}
+
 /** Growable vertex/index storage, reused between calls to avoid garbage. */
 class MeshBuilder {
   positions = new Float32Array(4096 * 3);
@@ -282,6 +377,10 @@ export function meshChunk(
         const kind = BLOCK_RENDER[id];
         if (kind === RENDER_NONE) continue;
         const builder = builders[kind - 1];
+        if (BLOCK_SHAPE[id] === SHAPE_TORCH) {
+          emitTorch(builder, BLOCK_TILE_SIDE[id], x, y, z, lit ? paddedLight[p] : LIGHT_OPEN_SKY);
+          continue;
+        }
         // Water that has no water above it gets a lowered surface.
         const topDrop =
           kind === RENDER_TRANSLUCENT && padded[p + PAD_LAYER] !== id ? WATER_SURFACE_DROP : 0;
