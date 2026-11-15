@@ -23,14 +23,14 @@ Nothing else changed: light, the mesher's output, the shader, the performance te
 
 ## Acceptance criteria
 
-| AC    | How it is checked                                                                                                                                                                                                                          | Result  |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| AC1.1 | `ChunkManager.test.ts`: corner edit meshes `-1,-1` only, `relight` is 3, the queue comes before loading. `ChunkManagerLight.slow.test.ts`: after ten edits on chunk borders every mesh equals one built from scratch, `verifyLight()` is 0 | passed  |
-| AC1.2 | `ChunkManager.test.ts`: an edit inside a chunk meshes that chunk and queues nothing                                                                                                                                                        | passed  |
-| AC1.3 | `ChunkManager.test.ts`: `queueRemesh` ignores unknown and unmeshed chunks, and a chunk queued twice counts once                                                                                                                            | passed  |
-| AC1.4 | `e2e/light.spec.ts`: place and break on a chunk corner — `chunks.relight` is 3 right after each edit, 0 after `whenIdle`; `verifyLight()` is 0                                                                                             | passed  |
-| AC1.5 | The full browser suite with the existing references, no regeneration                                                                                                                                                                       | running |
-| AC1.6 | `npm run check:all`                                                                                                                                                                                                                        | running |
+| AC    | How it is checked                                                                                                                                                                                                                          | Result |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| AC1.1 | `ChunkManager.test.ts`: corner edit meshes `-1,-1` only, `relight` is 3, the queue comes before loading. `ChunkManagerLight.slow.test.ts`: after ten edits on chunk borders every mesh equals one built from scratch, `verifyLight()` is 0 | passed |
+| AC1.2 | `ChunkManager.test.ts`: an edit inside a chunk meshes that chunk and queues nothing                                                                                                                                                        | passed |
+| AC1.3 | `ChunkManager.test.ts`: `queueRemesh` ignores unknown and unmeshed chunks, and a chunk queued twice counts once                                                                                                                            | passed |
+| AC1.4 | `e2e/light.spec.ts`: place and break on a chunk corner — `chunks.relight` is 3 right after each edit, 0 after `whenIdle`; `verifyLight()` is 0                                                                                             | passed |
+| AC1.5 | The full browser suite with the existing references, no regeneration (155 passed in 11.6 min)                                                                                                                                              | passed |
+| AC1.6 | `npm run check:all`                                                                                                                                                                                                                        | passed |
 
 ## Decisions and deviations
 
