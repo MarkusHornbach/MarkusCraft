@@ -260,4 +260,5 @@ npm run dev
 Browser tests need Chromium for Playwright: `npx playwright install chromium` on a local
 machine (cloud sessions ship a matching browser; see `CLAUDE.md`).
 
-Project conventions live in `CLAUDE.md`, phase plans and reports in `docs/`.
+Project conventions live in `CLAUDE.md`, phase plans and reports in `docs/`. What only a
+person with a real device can judge is collected in `docs/device-tests.md`.

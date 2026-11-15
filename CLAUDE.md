@@ -140,7 +140,8 @@ scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet
                      icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
                      next to new)
-docs/                phase plans and phase reports
+docs/                phase plans and phase reports; device-tests.md (the one checklist of tests
+                     on real devices, filled out by the owner)
 .github/workflows/   ci.yml, deploy.yml
 ```
 
@@ -378,6 +379,23 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   unit tests take about half a minute: the four `lightEdits*.slow.test.ts` files check
   the light against the slow reference after each of 2 000 random edits.
 
+## Tests on real devices
+
+`docs/device-tests.md` is the one list of everything only a person with a real device can
+judge (frame rate, feel, readability, whether a child understands something). The owner
+fills it out; it is used for all phases.
+
+- A phase part adds its new tests there, in the section they belong to, with an id
+  (`LIGHT-9`, `TOUCH-12`, …) and its origin (`4B`). The part's report names the ids it
+  added instead of carrying a list of its own.
+- A test that a change makes pointless moves to the section "Obsolete" with one line of
+  reason. Ids are never reused.
+- Never change or remove what the owner wrote after "Result:" or into a table. If the
+  subject of a test changed, add a new test and move the old one, with its result, to
+  "Obsolete".
+- Read the results at the start of a session: they are the owner's feedback on earlier
+  parts. Update the line "Last updated" when you change the file.
+
 ## Definition of Done (per phase or phase part)
 
 A phase, or a part of a phase that its plan defines, is done when all of the following
@@ -392,6 +410,8 @@ hold:
 7. `CLAUDE.md` reflects the current structure, commands and conventions.
 8. `docs/phase-N-report.md` (for a part: `docs/phase-Na-report.md`, `-Nb-`, …) exists: what was built, decisions and deviations from the
    plan, known issues, measured performance numbers, and suggestions for the next phase.
+   Its tests for real devices are in `docs/device-tests.md`, and tests that became
+   pointless were moved to "Obsolete" there.
 9. Hard rule 1 has been checked: no third-party assets or protected names anywhere.
 10. One pull request into `main` is open, describing the result and linking the report.
 

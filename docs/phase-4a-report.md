@@ -216,6 +216,11 @@ Node 22, cloud container, seed 1337.
 
 ## For the owner to try (plan section 9, after Part A)
 
+These items are now in [`device-tests.md`](device-tests.md), the one checklist for all
+tests on real devices (PERF-1, PERF-2, LIGHT-1 to LIGHT-8), together with the open lists
+of the earlier phases. Fill that file out; the list below is the record of what this part
+asked for.
+
 The baseline (item 1) belongs to the build **before** this part is merged: debug overlay
 on, render distance 5 and 8, note the FPS standing, walking and flying fast for a minute.
 
