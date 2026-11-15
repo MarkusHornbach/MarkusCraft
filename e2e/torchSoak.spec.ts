@@ -60,8 +60,7 @@ test('Phase 4 AC9.2: 1 000 seeded actions with torches keep every item count rig
         // A torch on the ground near the player (the surface may be leaves or water).
         const c = cell();
         action = { kind: 'place', x: c.x, y: mc.surfaceY(c.x, c.z) + 1, z: c.z, slot: 0 };
-      }
-      else if (pick < 10) action = { kind: 'startBreak', ...cell() };
+      } else if (pick < 10) action = { kind: 'startBreak', ...cell() };
       else if (pick < 13) {
         const where = started && random() < 0.8 ? started : cell();
         if (random() < 0.7) mc.step(45);
