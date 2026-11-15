@@ -53,6 +53,14 @@ export const LIGHT_MAX = 15;
 /** Light lost in a leaf or water block, on top of the one level every step costs. */
 export const LEAVES_OPACITY = 1;
 export const WATER_OPACITY = 1;
+/** Block light of a torch in its own cell; it reaches 13 cells further. */
+export const TORCH_LIGHT = 14;
+/**
+ * The box a torch is aimed at with (and its target outline), in blocks: wider than the
+ * drawn stick so a finger can hit it. It stands on the cell's floor, centred.
+ */
+export const TORCH_AIM_WIDTH = 6 / 16;
+export const TORCH_AIM_HEIGHT = 12 / 16;
 /** Brightness of a light level on screen: (level ÷ 15) to this power. */
 export const LIGHT_GAMMA = 1.5;
 /** Colour of block light at full strength: warm, like fire. */

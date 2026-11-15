@@ -10,13 +10,21 @@ import {
   RENDER_TRANSLUCENT,
   TILE_COUNT,
   TILE_NAMES,
+  BLOCK_NEEDS_SUPPORT,
+  BLOCK_SHAPE,
+  BLOCK_TARGETABLE,
+  SHAPE_CUBE,
+  SHAPE_TORCH,
+  Tile,
   getBlockDef,
+  isPlaceable,
   isSolid,
+  isSupport,
 } from './blocks';
 
 describe('block registry (AC3.3)', () => {
   it('has complete properties for every id, in id order', () => {
-    expect(BLOCKS.length).toBe(19);
+    expect(BLOCKS.length).toBe(20);
     BLOCKS.forEach((def, index) => {
       expect(def.id).toBe(index);
       expect(def.name).toMatch(/^[a-z_]+$/);
@@ -71,6 +79,7 @@ describe('block registry (AC3.3)', () => {
       'furnace',
       'stone_bricks',
       'iron_block',
+      'torch',
     ]);
     expect(HOTBAR_BLOCKS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(isSolid(Block.AIR)).toBe(false);
@@ -109,6 +118,7 @@ describe('block registry (AC3.3)', () => {
       FURNACE: 16,
       STONE_BRICKS: 17,
       IRON_BLOCK: 18,
+      TORCH: 19,
     });
     expect(BLOCKS.map((b) => [b.id, b.name])).toEqual(
       Object.entries(Block).map(([key, id]) => [id, key.toLowerCase()]),
@@ -141,5 +151,69 @@ describe('block registry (AC3.3)', () => {
   it('treats unknown ids like air', () => {
     expect(getBlockDef(200).name).toBe('air');
     expect(isSolid(200)).toBe(false);
+  });
+});
+
+describe('block flags (Phase 4 AC6.1, AC6.2)', () => {
+  it('pins solid, targetable, shape and needsSupport of every block', () => {
+    const table = Object.fromEntries(
+      BLOCKS.map((b) => [b.name, [b.solid, b.targetable, b.shape, b.needsSupport]]),
+    );
+    const cube = (solid: boolean, targetable: boolean) => [solid, targetable, 'cube', false];
+    expect(table).toEqual({
+      air: cube(false, false),
+      grass: cube(true, true),
+      dirt: cube(true, true),
+      stone: cube(true, true),
+      sand: cube(true, true),
+      log: cube(true, true),
+      leaves: cube(true, true),
+      planks: cube(true, true),
+      bricks: cube(true, true),
+      glass: cube(true, true),
+      water: cube(false, false),
+      bedrock: cube(true, true),
+      coal_ore: cube(true, true),
+      iron_ore: cube(true, true),
+      clay: cube(true, true),
+      workbench: cube(true, true),
+      furnace: cube(true, true),
+      stone_bricks: cube(true, true),
+      iron_block: cube(true, true),
+      torch: [false, true, 'torch', true],
+    });
+    for (const def of BLOCKS) {
+      expect(BLOCK_TARGETABLE[def.id]).toBe(def.targetable ? 1 : 0);
+      expect(BLOCK_NEEDS_SUPPORT[def.id]).toBe(def.needsSupport ? 1 : 0);
+      expect(BLOCK_SHAPE[def.id]).toBe(def.shape === 'cube' ? SHAPE_CUBE : SHAPE_TORCH);
+    }
+  });
+
+  it('describes the torch as block 19 with tile 22, opacity 0 and emission 14', () => {
+    const torch = getBlockDef(Block.TORCH);
+    expect(torch.id).toBe(19);
+    expect(torch.label).toBe('Torch');
+    expect(torch.tiles).toEqual({ top: Tile.TORCH, side: Tile.TORCH, bottom: Tile.TORCH });
+    expect(Tile.TORCH).toBe(22);
+    expect([torch.opacity, torch.emission]).toEqual([0, 14]);
+    expect(torch.render).toBe('cutout');
+    expect(torch.castsAo).toBe(false);
+    expect(torch.breakable).toBe(true);
+    expect(torch.replaceable).toBe(false);
+  });
+
+  it('makes the torch placeable and leaves every other block as it was', () => {
+    const placeable = BLOCKS.filter((b) => isPlaceable(b.id)).map((b) => b.id);
+    expect(placeable).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19]);
+  });
+
+  it('lets only solid full cubes carry a torch', () => {
+    const supports = BLOCKS.filter((b) => isSupport(b.id)).map((b) => b.name);
+    expect(supports).not.toContain('torch');
+    expect(supports).not.toContain('water');
+    expect(supports).not.toContain('air');
+    expect(supports).toContain('glass');
+    expect(supports).toContain('leaves');
+    expect(supports.length).toBe(17);
   });
 });

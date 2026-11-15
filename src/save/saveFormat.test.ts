@@ -342,6 +342,56 @@ describe('a world saved by Part B (Phase 3 AC10.6)', () => {
   });
 });
 
+describe('worlds with torches (Phase 4 AC6.9)', () => {
+  // Written by the game as of Phase 4 part A (format version 1, no torch yet).
+  const LIGHT_META =
+    '{"id":"wp4a-fixture01","name":"Light world","seed":1337,"mode":"gathering","generatorVersion":1,"formatVersion":1,"createdMs":1800000000000,"playedMs":1800000900000,"time":0.8,"pose":{"x":3.5,"y":52,"z":-7.5,"yaw":1.25,"pitch":-0.5},"moveMode":"walk","player":{"slots":[{"item":265,"count":1},{"item":257,"count":6},{"item":256,"count":4},null,null,null,null,null,null,{"item":3,"count":80},null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"selectedSlot":0,"breaking":null}}';
+  const LIGHT_CHUNK =
+    '{"key":"wp4a-fixture01|0,-1","worldId":"wp4a-fixture01","cx":0,"cz":-1,"edits":[12850,0,13106,0,13362,9]}';
+
+  it('loads a world saved by Phase 4 part A unchanged', () => {
+    const decoded = decodeWorld(JSON.parse(LIGHT_META), [JSON.parse(LIGHT_CHUNK)]);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.meta.player.slots[0]).toEqual({ item: 265, count: 1 });
+    expect([...(decoded.value.edits.get('0,-1') ?? [])]).toEqual([
+      [12850, 0],
+      [13106, 0],
+      [13362, 9],
+    ]);
+    expect(JSON.stringify(encodeMeta(decoded.value.meta))).toBe(LIGHT_META);
+  });
+
+  it('keeps torches in the world and in the inventory through encode and decode', () => {
+    const meta = sampleMeta({ mode: 'gathering' });
+    const slots = [...meta.player.slots];
+    slots[0] = { item: 19, count: 37 };
+    const withTorch = { ...meta, player: { ...meta.player, slots } };
+    const edits: WorldEdits = new Map([
+      [
+        '2,-3',
+        new Map([
+          [100, 19],
+          [356, 19],
+          [99, 0],
+        ]),
+      ],
+    ]);
+    const decoded = decodeWorld(
+      throughJson(encodeMeta(withTorch)),
+      encodeChunks(withTorch.id, edits).map(throughJson),
+    );
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.meta).toEqual(withTorch);
+    expect([...(decoded.value.edits.get('2,-3') ?? [])]).toEqual([
+      [100, 19],
+      [356, 19],
+      [99, 0],
+    ]);
+  });
+});
+
 describe('names, seeds and ids (Phase 3 AC3.3)', () => {
   it('trims names, strips control characters, cuts to 24 and falls back when empty', () => {
     expect(normalizeName('  Castle  ')).toBe('Castle');

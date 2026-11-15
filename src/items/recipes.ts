@@ -101,6 +101,17 @@ export const RECIPES: readonly Recipe[] = [
     [Block.BRICKS, 2],
   ),
   recipe(19, 'iron_block', 'workbench', [[Item.IRON_INGOT, 9]], [Block.IRON_BLOCK, 1]),
+  // No station: torches are needed underground, where no workbench stands.
+  recipe(
+    20,
+    'torch',
+    null,
+    [
+      [Item.STICK, 1],
+      [Item.COAL, 1],
+    ],
+    [Block.TORCH, 4],
+  ),
 ];
 
 const BY_ID = new Map(RECIPES.map((r) => [r.id, r]));

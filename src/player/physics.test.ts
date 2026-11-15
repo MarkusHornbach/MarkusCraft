@@ -9,6 +9,9 @@ import {
   stepPlayer,
 } from './physics';
 import { type PlayerState, applyLook, createPlayer, eyeY, viewDirection } from './player';
+import { flatGroup, worldOf } from '../testing/lightEdits';
+import { Block } from '../world/blocks';
+import type { World } from '../world/World';
 
 /** A tiny world: flat solid ground below `groundY`, plus individual solid and water cells. */
 class TestWorld implements PhysicsWorld {
@@ -415,5 +418,34 @@ describe('look', () => {
     expect(p.yaw).toBeCloseTo(-Math.PI / 2, 10);
     applyLook(p, -Math.PI * 3, 0);
     expect(p.yaw).toBeCloseTo(Math.PI / 2, 10);
+  });
+});
+
+describe('the torch has no collision (Phase 4 AC6.2)', () => {
+  /** Stone up to y = 10 in 5 × 5 chunks, with real block data. */
+  function torchWorld(): World {
+    const world = worldOf(flatGroup());
+    world.setBlock(40, 11, 37, Block.TORCH);
+    world.setBlock(44, 11, 44, Block.TORCH);
+    return world;
+  }
+
+  it('lets a player walk through its cell', () => {
+    const world = torchWorld();
+    expect(world.isSolidAt(40, 11, 37)).toBe(false);
+    const p = standing(world, 40.5, 40.5, 11);
+    run(p, world, 90, FORWARD);
+    expect(p.z).toBeLessThan(36);
+    expect(Math.abs(p.x - 40.5)).toBeLessThan(1e-6);
+    expect(p.againstWall).toBe(false);
+  });
+
+  it('lets a player fall through its cell onto the block below', () => {
+    const world = torchWorld();
+    const p = createPlayer(44.5, 14, 44.5);
+    run(p, world, 120);
+    expect(p.onGround).toBe(true);
+    expect(p.y).toBeCloseTo(11, 6);
+    expect(playerIntersectsBlock(p, 44, 11, 44)).toBe(true);
   });
 });

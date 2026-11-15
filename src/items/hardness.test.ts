@@ -22,6 +22,7 @@ describe('break times (Phase 3 AC7.1)', () => {
       furnace: 3.0,
       stone_bricks: 3.0,
       iron_block: 5.0,
+      torch: 0,
     };
     const table = Object.fromEntries(
       BLOCKS.filter((def) => def.breakable).map((def) => [def.name, breakTimeMs(def.id)]),
@@ -36,7 +37,9 @@ describe('break times (Phase 3 AC7.1)', () => {
       const time = breakTimeMs(def.id);
       if (def.breakable) {
         expect(time, def.name).not.toBeNull();
-        expect(time ?? 0).toBeGreaterThan(0);
+        // Phase 4 AC6.4: the torch comes off at once.
+        if (def.id === Block.TORCH) expect(time).toBe(0);
+        else expect(time ?? 0).toBeGreaterThan(0);
       } else {
         expect(time, def.name).toBeNull();
       }
@@ -88,6 +91,7 @@ describe('tools (Phase 3 AC11.1)', () => {
     coal_ore: 'pickaxe',
     iron_ore: 'pickaxe',
     iron_block: 'pickaxe',
+    torch: null,
   };
 
   it('every breakable block has the tool class of the plan', () => {
@@ -117,8 +121,8 @@ describe('tools (Phase 3 AC11.1)', () => {
         checked++;
       }
     }
-    // 16 breakable blocks × (hand + 28 items + an unknown id).
-    expect(checked).toBe(16 * 30);
+    // 17 breakable blocks × (hand + 29 items + an unknown id).
+    expect(checked).toBe(17 * 31);
     expect(breakTimeMs(Block.STONE, Item.STONE_PICKAXE)).toBe(750);
     expect(breakTimeMs(Block.IRON_BLOCK, Item.IRON_PICKAXE)).toBe(625);
     expect(breakTimeMs(Block.LOG, Item.WOODEN_AXE)).toBe(1000);

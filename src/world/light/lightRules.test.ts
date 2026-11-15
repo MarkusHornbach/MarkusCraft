@@ -25,6 +25,7 @@ describe('light rules', () => {
       furnace: [15, 0],
       stone_bricks: [15, 0],
       iron_block: [15, 0],
+      torch: [0, 14],
     });
   });
 

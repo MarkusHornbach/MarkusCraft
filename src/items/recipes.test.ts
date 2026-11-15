@@ -63,6 +63,7 @@ describe('recipe table (Phase 3 AC10.1)', () => {
         'furnace: 2 sand + 1 coal -> 2 glass',
         'furnace: 2 clay + 1 coal -> 2 bricks',
         'furnace: 2 log -> 1 coal',
+        '-: 1 stick + 1 coal -> 4 torch',
       ].sort(),
     );
   });
@@ -88,6 +89,7 @@ describe('recipe table (Phase 3 AC10.1)', () => {
       glass: 17,
       bricks: 18,
       iron_block: 19,
+      torch: 20,
     });
     for (const recipe of RECIPES) expect(getRecipe(recipe.id)).toBe(recipe);
     expect(getRecipe(0)).toBeUndefined();

@@ -12,14 +12,15 @@ import { playerIntersectsBlock } from '../player/physics';
 import { addItems, emptySlot, fits, moveStack, removeItems, setSlot } from '../items/inventory';
 import { getItemDef } from '../items/items';
 import { getRecipe, stationsNear, takeIngredients } from '../items/recipes';
-import { BLOCK_REPLACEABLE } from '../world/blocks';
+import { BLOCK_NEEDS_SUPPORT, BLOCK_REPLACEABLE, BLOCK_SOLID, isSupport } from '../world/blocks';
 import type { Action } from './actions';
 import type { GameMode, PlayerRecord } from './playerRecord';
 
 /**
  * Why an action was refused. Short identifiers; the user interface maps them to texts.
  * `missing` also stands for an empty slot and for ingredients a recipe is short of;
- * `station` for a recipe whose workbench or furnace is not within reach.
+ * `station` for a recipe whose workbench or furnace is not within reach; `support` for a
+ * block that needs a solid cube below it (the torch).
  */
 export type RejectReason =
   | 'reach'
@@ -29,6 +30,7 @@ export type RejectReason =
   | 'early'
   | 'missing'
   | 'station'
+  | 'support'
   | 'mode'
   | 'invalid';
 
@@ -136,6 +138,12 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       const replacement = breakResult(ctx.world, x, y, z);
       if (replacement === null) return reject('unbreakable');
       const blocks: BlockChange[] = [{ x, y, z, id: replacement }];
+      // A block standing on this one (a torch) comes off with it, after it.
+      const above = y + 1 < WORLD_HEIGHT ? ctx.world.getBlock(x, y + 1, z) : 0;
+      const carried = BLOCK_NEEDS_SUPPORT[above] === 1;
+      if (carried) {
+        blocks.push({ x, y: y + 1, z, id: breakResult(ctx.world, x, y + 1, z) ?? 0 });
+      }
       if (ctx.mode === 'creative') return { ok: true, blocks, player: null, notices: [] };
       // Gathering: the same cell as the last `startBreak` (selecting another slot or
       // rearranging items cleared it), and held for the block's break time.
@@ -155,6 +163,16 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
         slots = added.slots;
         notices.push({ item: drop.item, count: drop.count });
       }
+      // The carried block goes into the inventory if it fits; otherwise it is lost. It
+      // never stops the break.
+      const carriedDrop = carried ? dropOf(above) : null;
+      if (carriedDrop) {
+        const added = addItems(slots, carriedDrop.item, carriedDrop.count);
+        if (added.left === 0) {
+          slots = added.slots;
+          notices.push({ item: carriedDrop.item, count: carriedDrop.count });
+        }
+      }
       return { ok: true, blocks, player: { ...ctx.record, slots, breaking: null }, notices };
     }
     case 'place': {
@@ -166,8 +184,14 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       const block = getItemDef(stack.item)?.block ?? null;
       if (block === null) return reject('invalid');
       if (BLOCK_REPLACEABLE[ctx.world.getBlock(x, y, z)] !== 1) return reject('occupied');
-      for (const player of ctx.players) {
-        if (playerIntersectsBlock(player, x, y, z)) return reject('occupied');
+      if (BLOCK_NEEDS_SUPPORT[block] === 1 && !isSupport(ctx.world.getBlock(x, y - 1, z))) {
+        return reject('support');
+      }
+      // Only blocks the player collides with are kept out of the cells players stand in.
+      if (BLOCK_SOLID[block] === 1) {
+        for (const player of ctx.players) {
+          if (playerIntersectsBlock(player, x, y, z)) return reject('occupied');
+        }
       }
       // Creative blocks are never used up; in Gathering one item leaves the slot.
       let player: PlayerRecord | null = null;
