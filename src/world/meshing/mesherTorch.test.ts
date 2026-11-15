@@ -92,3 +92,17 @@ describe('the torch in the mesher (Phase 4 AC7.2)', () => {
     expect(lit).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe('a torch in water', () => {
+  it('lets the water around it show its faces towards the torch', () => {
+    const world = worldOf(flatGroup());
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) world.setBlock(TX + dx, 11, TZ + dz, Block.WATER);
+    }
+    const before = meshOf(world, 2, 2).translucent;
+    world.setBlock(TX, 11, TZ, Block.TORCH);
+    const after = meshOf(world, 2, 2).translucent;
+    // The water cell is gone (its top), the four neighbours each show a face towards it.
+    expect(quads(after) - quads(before)).toBe(4 - 1);
+  });
+});

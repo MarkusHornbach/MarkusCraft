@@ -24,6 +24,7 @@ import {
   RENDER_NONE,
   RENDER_OPAQUE,
   RENDER_TRANSLUCENT,
+  SHAPE_CUBE,
   SHAPE_TORCH,
 } from '../blocks';
 import { LIGHT_OPEN_SKY } from '../light/lightRules';
@@ -389,7 +390,9 @@ export function meshChunk(
           const front = p + FACE_DELTA[f];
           const other = padded[front];
           if (kind === RENDER_TRANSLUCENT) {
-            if (other !== Block.AIR) continue;
+            // Water shows towards air, and towards a torch standing in it: the torch's
+            // cell holds no water, and without these faces it would be a dark hole.
+            if (other !== Block.AIR && BLOCK_SHAPE[other] === SHAPE_CUBE) continue;
           } else {
             if (BLOCK_RENDER[other] === RENDER_OPAQUE) continue;
             // Leaves keep their inner faces (denser canopy); glass panes merge.

@@ -114,8 +114,8 @@ Once, before the first run:
 - [ ] **TORCH-6** (4B) Dig for iron with torches (as in CRAFT-6): is mining
       more fun now? Result:
 - [ ] **TORCH-7** (4B) A torch under water, a torch on glass and on leaves: does anything
-      look broken? (A torch in the top layer of a lake leaves a small hole in the water's
-      surface; see the Part B report.) Result:
+      look broken? (A torch in the top layer of a shallow lake stands in a small square well:
+      its cell holds no water; see the Part B report.) Result:
 - [ ] **TORCH-8** (4B) The inventory opens with the bag button on the phone in a Creative
       world and stays open (it used to be possible that the same tap closed it again).
       _Phone._ Result:
