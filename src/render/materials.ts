@@ -5,13 +5,23 @@ import {
   LIGHT_GAMMA,
   MIN_LIGHT_BRIGHTEST,
   MIN_LIGHT_DARKEST,
+  MIN_LIGHT_DEFAULT,
   TORCH_TINT,
 } from '../game/config';
 import type { Atlas } from './textures/atlas';
 
-/** The darkest a place gets on screen for a Brightness setting of 0..1. */
+/**
+ * The darkest a place gets on screen for a Brightness setting of 0..1: linear from the
+ * darkest end to the default in the lower half of the slider, and from the default to the
+ * brightest end in the upper half.
+ */
 export function minLightFor(brightness: number): number {
-  return MIN_LIGHT_DARKEST + (MIN_LIGHT_BRIGHTEST - MIN_LIGHT_DARKEST) * brightness;
+  const b = Math.max(0, Math.min(1, brightness));
+  if (b <= BRIGHTNESS_DEFAULT) {
+    return MIN_LIGHT_DARKEST + ((MIN_LIGHT_DEFAULT - MIN_LIGHT_DARKEST) * b) / BRIGHTNESS_DEFAULT;
+  }
+  const t = (b - BRIGHTNESS_DEFAULT) / (1 - BRIGHTNESS_DEFAULT);
+  return MIN_LIGHT_DEFAULT + (MIN_LIGHT_BRIGHTEST - MIN_LIGHT_DEFAULT) * t;
 }
 
 export interface ChunkUniforms {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPlayerRecord } from '../actions/playerRecord';
 import { LocalSession } from '../actions/Session';
 import type { ActionResult } from '../actions/apply';
-import { BENCH_SEED, BENCH_WARMUP_STEPS, SIM_DT } from '../game/config';
+import { BENCH_SEED, BENCH_SUITE_VERSION, BENCH_WARMUP_STEPS, SIM_DT } from '../game/config';
 import { stepPlayer } from '../player/physics';
 import { type PlayerState, applyLook, createPlayer } from '../player/player';
 import { Block } from '../world/blocks';
@@ -16,6 +16,8 @@ import {
   FLY_HEIGHT,
   SCENARIOS,
   type Scenario,
+  TORCH_CELLS,
+  TORCH_HOVER,
   buildSuite,
   getScenario,
 } from './scenarios';
@@ -182,6 +184,93 @@ describe('scenario scripts', () => {
   });
 });
 
+describe('the torches scenario (Phase 4 AC9.8)', () => {
+  /** Plays a window of `torches` with the real physics, world and action layer. */
+  function playTorches(steps: number) {
+    const torches = scenarioOf('torches');
+    const world = new World(BENCH_SEED, 1);
+    for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) world.generate(cx, cz);
+    for (let cz = -2; cz <= 2; cz++) for (let cx = -2; cx <= 2; cx++) world.light(cx, cz);
+    const before = new Map<string, Uint8Array>();
+    for (const chunk of world.allChunks())
+      before.set(`${chunk.cx},${chunk.cz}`, chunk.blocks.slice());
+    const reported = new Set<string>();
+    world.onLightChange = (cx, cz) => reported.add(`${cx},${cz}`);
+    const results: ActionResult[] = [];
+    const player = playerAt(torches);
+    const session = new LocalSession(
+      { world, mode: 'creative', pose: () => player, nowMs: () => 0 },
+      createPlayerRecord('creative'),
+      { onBlocks: () => {}, onPlayer: () => {}, onResult: (_, result) => results.push(result) },
+    );
+    const kinds: string[] = [];
+    let lightChanges = 0;
+    let moved = { x: player.x, z: player.z };
+    for (let step = -BENCH_WARMUP_STEPS; step < steps; step++) {
+      const action = torches.action(step, steps);
+      if (action) {
+        expect(step).toBeGreaterThanOrEqual(0);
+        reported.clear();
+        session.submit(action);
+        kinds.push(action.kind);
+        if (reported.size > 0) lightChanges++;
+      }
+      if (step === 0) moved = { x: player.x, z: player.z };
+      generateAround(world, player.x, player.z);
+      stepPlayer(player, torches.input(step, steps), world, SIM_DT);
+    }
+    return { world, results, kinds, lightChanges, player, moved, before };
+  }
+
+  it('starts at midnight above a line of open grass across a chunk border', () => {
+    const torches = scenarioOf('torches');
+    expect(torches.time).toBe(0.75);
+    expect(torches.start).toMatchObject({ ...TORCH_HOVER, mode: 'fly' });
+    const world = new World(BENCH_SEED, 1);
+    for (let cz = -1; cz <= 1; cz++) for (let cx = -1; cx <= 1; cx++) world.generate(cx, cz);
+    for (const cell of TORCH_CELLS) {
+      expect(world.getBlock(cell.x, cell.y, cell.z), `${cell.x}`).toBe(Block.AIR);
+      expect(world.getBlock(cell.x, cell.y - 1, cell.z), `${cell.x}`).toBe(Block.GRASS);
+    }
+    const chunks = new Set(TORCH_CELLS.map((c) => toChunkCoord(c.x)));
+    expect([...chunks].sort()).toEqual([-1, 0]);
+  });
+
+  it('accepts every action, changes light, keeps the light correct and ends with the line placed', () => {
+    const run = playTorches(1200);
+    // The torch into the bar, then 119 places and breaks.
+    expect(run.kinds.length).toBe(120);
+    expect(run.kinds[0]).toBe('setBarSlot');
+    expect(run.results.filter((result) => !result.ok)).toEqual([]);
+    expect(run.lightChanges).toBeGreaterThanOrEqual(110);
+    expect(run.world.verifyLight()).toBe(0);
+    for (const cell of TORCH_CELLS) {
+      expect(run.world.getBlock(cell.x, cell.y, cell.z)).toBe(Block.TORCH);
+    }
+    // Nothing else of the world changed.
+    let changed = 0;
+    for (const chunk of run.world.allChunks()) {
+      const old = run.before.get(`${chunk.cx},${chunk.cz}`);
+      if (!old) continue;
+      for (let i = 0; i < old.length; i++) if (old[i] !== chunk.blocks[i]) changed++;
+    }
+    expect(changed).toBe(TORCH_CELLS.length);
+    // Then the player moves past the line: north and up, over it.
+    expect(run.player.z).toBeLessThan(TORCH_CELLS[0].z - 10);
+    expect(Math.abs(run.player.x - TORCH_HOVER.x)).toBeLessThan(1e-9);
+    // The same route every time.
+    const again = playTorches(1200).player;
+    expect([again.x, again.y, again.z]).toEqual([run.player.x, run.player.y, run.player.z]);
+  });
+
+  it('the quick window places a part of the line, all accepted', () => {
+    const run = playTorches(60);
+    expect(run.kinds).toEqual(['setBarSlot', 'place', 'place', 'place', 'place', 'place']);
+    expect(run.results.every((result) => result.ok)).toBe(true);
+    expect(run.world.verifyLight()).toBe(0);
+  });
+});
+
 describe('the scenario table (Phase 4P AC1.5)', () => {
   it('is pinned: ids, versions and steps', () => {
     expect(SCENARIOS.map((s) => [s.id, s.version, s.steps, s.label])).toEqual([
@@ -189,8 +278,10 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       ['walk', 1, 1200, 'walking'],
       ['fly', 1, 1200, 'flying'],
       ['edit', 1, 900, 'building'],
+      ['torches', 1, 1200, 'torches at night'],
     ]);
-    expect(getScenario('torches')).toBeUndefined();
+    expect(SCENARIOS.map((s) => s.time ?? null)).toEqual([null, null, null, null, 0.75]);
+    expect(BENCH_SUITE_VERSION).toBe(2);
   });
 
   it('the full suite: both render distances, then standing once more', () => {
@@ -200,13 +291,17 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       'walk@5',
       'fly@5',
       'edit@5',
+      'torches@5',
       'stand@8',
       'walk@8',
       'fly@8',
       'edit@8',
+      'torches@8',
       'stand@5',
     ]);
-    expect(full.map((e) => e.steps)).toEqual([600, 1200, 1200, 900, 600, 1200, 1200, 900, 600]);
+    expect(full.map((e) => e.steps)).toEqual([
+      600, 1200, 1200, 900, 1200, 600, 1200, 1200, 900, 1200, 600,
+    ]);
     expect(full.every((e) => e.warmup === 120)).toBe(true);
     // A fresh world per block.
     expect(full.map((e) => e.fresh)).toEqual([
@@ -214,7 +309,9 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       false,
       false,
       false,
+      false,
       true,
+      false,
       false,
       false,
       false,
@@ -227,8 +324,8 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
     const quick = buildSuite('quick');
     expect(quick.map((e) => e.scenario.id)).toEqual(full.map((e) => e.scenario.id));
     expect(quick.map((e) => e.fresh)).toEqual(full.map((e) => e.fresh));
-    expect(quick.map((e) => e.renderDistance)).toEqual([2, 2, 2, 2, 3, 3, 3, 3, 2]);
-    expect(quick.map((e) => e.steps)).toEqual([30, 60, 60, 45, 30, 60, 60, 45, 30]);
+    expect(quick.map((e) => e.renderDistance)).toEqual([2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 2]);
+    expect(quick.map((e) => e.steps)).toEqual([30, 60, 60, 45, 60, 30, 60, 60, 45, 60, 30]);
     expect(quick.every((e) => e.warmup === 6)).toBe(true);
   });
 });

@@ -844,6 +844,9 @@ export class Game {
         this.touchHud?.setCovered(true);
       },
       setPlayer: (pose) => this.setPlayer(pose),
+      setTime: (time) => {
+        this.time = wrapTime(time);
+      },
       setInput: (input) => this.input.setScript(input),
       submit: (action) => this.session.submit(action),
       chunksIdle: () => this.chunksIdle(),

@@ -398,7 +398,7 @@ test('light that an edit changes in the next chunk follows within eight frames (
   expect(meanLuminance(await capture(page), ROOM_VIEW)).toBeGreaterThan(before * 3);
 });
 
-test('open ground is as bright as before light, at noon and at midnight (Phase 4 AC3.6, AC3.10)', async ({
+test('open ground is as bright as before light at noon; darker at midnight since Part B (Phase 4 AC3.6, AC3.10, AC8.2)', async ({
   page,
 }) => {
   const lowerHalf = async () => {
@@ -414,9 +414,13 @@ test('open ground is as bright as before light, at noon and at midnight (Phase 4
   expect(Math.abs((await lowerHalf()) / BEFORE_LIGHT.spawnNoon - 1)).toBeLessThan(0.04);
   await overview();
   expect(Math.abs((await lowerHalf()) / BEFORE_LIGHT.overviewNoon - 1)).toBeLessThan(0.04);
+  // The night of Part A (25 % daylight) was pinned here; Part B lowers it to 10 %, and
+  // the default Brightness floor (11 %) decides. AC8.2 (e2e/night.spec.ts) pins the ratio.
   await openGame(page, { time: 0.75 });
   await overview();
-  expect(Math.abs((await lowerHalf()) / BEFORE_LIGHT.overviewMidnight - 1)).toBeLessThan(0.04);
+  const midnight = await lowerHalf();
+  expect(midnight).toBeLessThan(BEFORE_LIGHT.overviewMidnight * 0.75);
+  expect(midnight).toBeGreaterThan(BEFORE_LIGHT.overviewMidnight * 0.3);
 });
 
 test('the shade under a tree (reference tree-shade)', async ({ page }) => {

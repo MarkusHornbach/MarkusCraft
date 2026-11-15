@@ -71,7 +71,14 @@ export const TORCH_TINT: readonly [number, number, number] = [1.0, 0.86, 0.62];
  * moves it between the two ends; the light values themselves never change with it.
  */
 export const MIN_LIGHT_DARKEST = 0.02;
-export const MIN_LIGHT_BRIGHTEST = 0.2;
+/** The floor at the default Brightness (the middle of the slider). */
+export const MIN_LIGHT_DEFAULT = 0.11;
+/**
+ * The floor with the slider at its top (Phase 4 part B: 0.20 → 0.35). Dark values lose
+ * more on screen than the factor says (the sRGB curve is linear near black), and a phone
+ * at night needs the top of the slider to show about a fifth of daylight (AC8.2).
+ */
+export const MIN_LIGHT_BRIGHTEST = 0.35;
 export const BRIGHTNESS_DEFAULT = 0.5;
 
 export const PLAYER_WIDTH = 0.6;
@@ -137,8 +144,11 @@ export const NOTICE_MS = 1500;
 
 export const DAY_LENGTH_SECONDS = 20 * 60;
 export const START_TIME_OF_DAY = 0.1;
-/** Daylight at midnight (Phase 4 part B: 0.25 → 0.10, the night is really dark). */
-export const DAYLIGHT_MIN = 0.1;
+/**
+ * Daylight at midnight (Phase 4 part B: 0.25 → 0.14). On screen open ground then has about
+ * 7 % of its noon brightness, a little above an unlit cave at the default Brightness.
+ */
+export const DAYLIGHT_MIN = 0.14;
 
 export const TEST_VIEW_WIDTH = 960;
 export const TEST_VIEW_HEIGHT = 540;
@@ -174,7 +184,7 @@ export const SAVE_DATABASE = 'markuscraft';
 // --- Performance test (Phase 4 part P) ---
 
 /** Raised when a scenario is added or the order of the suite changes. */
-export const BENCH_SUITE_VERSION = 1;
+export const BENCH_SUITE_VERSION = 2;
 /** Version of the result record and of the issue text built from it. */
 export const BENCH_FORMAT_VERSION = 1;
 export const BENCH_SEED = 1337;
@@ -204,6 +214,8 @@ export const BENCH_CHUNK_EDGES: readonly number[] = [1, 2, 4, 6, 8, 12, 16, 30, 
 export const BENCH_EDIT_INTERVAL = 6;
 /** The `fly` scenario lets go of the keys this many steps before its window ends. */
 export const BENCH_FLY_STOP_STEPS = 20;
+/** `torches`: the share of the window at its end in which the player moves past the line. */
+export const BENCH_TORCH_MOVE_SHARE = 0.4;
 /** Smoothness light: share of long frames and 99th percentile, for green and for yellow. */
 export const BENCH_LONG_SHARE_GREEN = 0.01;
 export const BENCH_LONG_SHARE_YELLOW = 0.05;

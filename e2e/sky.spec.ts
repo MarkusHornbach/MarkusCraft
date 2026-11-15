@@ -31,9 +31,11 @@ test('noon is at least twice as bright as midnight, which stays playable (AC10.3
   const midnight = await capture(page);
   expect(meanLuminance(noon)).toBeGreaterThanOrEqual(2 * meanLuminance(midnight));
   // Terrain fills the lower half of this view; it must remain distinguishable at night.
+  // Phase 4 part B made the night darker (10 % daylight): the floor of 12 became 8, and
+  // AC8.3 (e2e/night.spec.ts) checks that horizon and trees stay visible.
   const lowerHalf: Region = { x: 0, y: 270, width: 960, height: 270 };
-  expect(meanLuminance(midnight, lowerHalf)).toBeGreaterThan(12);
-  expect(shareOf(midnight, (r, g, b) => r + g + b > 60, lowerHalf)).toBeGreaterThan(0.2);
+  expect(meanLuminance(midnight, lowerHalf)).toBeGreaterThan(8);
+  expect(shareOf(midnight, (r, g, b) => r + g + b > 45, lowerHalf)).toBeGreaterThan(0.2);
 });
 
 test('the sun is visible at noon and the moon at midnight (AC10.4)', async ({ page }) => {

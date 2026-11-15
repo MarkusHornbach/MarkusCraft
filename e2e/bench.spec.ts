@@ -11,7 +11,19 @@ import { TOUCH_DEVICE, swipe, withoutFullscreen } from './touch';
 const SETTINGS_KEY = 'markuscraft.settings.v1';
 const RESULT_KEY = 'markuscraft.lastPerfRun.v1';
 const STORED_SETTINGS = JSON.stringify({ renderDistance: 2, mouseSensitivity: 1, fov: 75 });
-const ORDER = ['stand', 'walk', 'fly', 'edit', 'stand', 'walk', 'fly', 'edit', 'stand'];
+const ORDER = [
+  'stand',
+  'walk',
+  'fly',
+  'edit',
+  'torches',
+  'stand',
+  'walk',
+  'fly',
+  'edit',
+  'torches',
+  'stand',
+];
 const HINTS = [
   'Takes about 4 minutes',
   'Plug in the charger',
@@ -43,7 +55,7 @@ async function untilPhase(page: Page, wanted: string, timeout = 200_000): Promis
 
 /** Waits until the run has loaded its world: from then on the rules of 5.5 watch it. */
 async function untilMeasuring(page: Page): Promise<void> {
-  await expect(page.locator('.bench-progress')).toContainText('scenario 1 of 9', {
+  await expect(page.locator('.bench-progress')).toContainText('scenario 1 of 11', {
     timeout: 60_000,
   });
 }
@@ -176,22 +188,22 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5: the quick
   expect(lines.length).toBeGreaterThanOrEqual(5);
   for (const text of lines) {
     expect(text).toMatch(
-      /^Performance test – scenario [1-9] of 9: (standing|walking|flying|building)$/,
+      /^Performance test – scenario \d+ of 11: (standing|walking|flying|building|torches at night)$/,
     );
   }
-  const numbers = lines.map((text) => Number(/scenario (\d)/.exec(text)?.[1]));
+  const numbers = lines.map((text) => Number(/scenario (\d+)/.exec(text)?.[1]));
   expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
-  expect(numbers[numbers.length - 1]).toBe(9);
+  expect(numbers[numbers.length - 1]).toBe(11);
 
   // AC2.5: a complete, valid record.
   const result = await page.evaluate(() => window.__mc.benchResult());
   if (!result) throw new Error('no result');
   expect(result.quick).toBe(true);
   expect(result.format).toBe(1);
-  expect(result.suite).toBe(1);
+  expect(result.suite).toBe(2);
   expect(result.workers).toBe('quick');
   expect(result.scenarios.map((s) => s.id)).toEqual(ORDER);
-  expect(result.scenarios.map((s) => s.rd)).toEqual([2, 2, 2, 2, 3, 3, 3, 3, 2]);
+  expect(result.scenarios.map((s) => s.rd)).toEqual([2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 2]);
   for (const s of result.scenarios) {
     expect(s.frames, s.id).toBeGreaterThan(0);
     expect(s.ms, s.id).toBeGreaterThan(0);
@@ -223,12 +235,12 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5: the quick
 
   // AC3.2: the result screen.
   const rows = page.locator('.bench-row');
-  await expect(rows).toHaveCount(9);
+  await expect(rows).toHaveCount(11);
   expect(
     await rows.evaluateAll((list) => list.map((r) => (r as HTMLElement).dataset.scenario)),
   ).toEqual(ORDER);
   const lights = await page.locator('.bench-row .bench-light').allTextContents();
-  expect(lights.length).toBe(9);
+  expect(lights.length).toBe(11);
   for (const light of lights) expect(light).toMatch(/^[GYR]( \(cut off\))?$/);
   await expect(page.locator('.bench-workers')).toHaveText(
     'Web Workers (Part C): not a measurement',
@@ -303,7 +315,7 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5: the quick
   await page.locator('.bench-last-button').click();
   expect(await phase(page)).toBe('result');
   expect(await page.evaluate(() => window.__mc.benchResult())).toEqual(result);
-  await expect(page.locator('.bench-row')).toHaveCount(9);
+  await expect(page.locator('.bench-row')).toHaveCount(11);
   // An interrupted run does not replace it.
   await page.locator('.bench-again-button').click();
   await untilPhase(page, 'running');
@@ -489,7 +501,7 @@ test.describe('on a touch device', () => {
       };
 
       // The result screen: five buttons, all on screen; the panel inside the view.
-      await expect(page.locator('.bench-row')).toHaveCount(9);
+      await expect(page.locator('.bench-row')).toHaveCount(11);
       expect(await pageFits()).toBe(true);
       const resultButtons = await boxes('.bench-result-buttons > *');
       expect(resultButtons.map((b) => b.name)).toEqual([
@@ -540,7 +552,7 @@ test('Phase 4P AC3.8: the start page and the result screen match their reference
   page,
 }) => {
   await openBench(page, 'sample');
-  await expect(page.locator('.bench-row')).toHaveCount(9);
+  await expect(page.locator('.bench-row')).toHaveCount(11);
   await expect(page).toHaveScreenshot('bench-result.png', { maxDiffPixelRatio: 0.05 });
   await page.locator('.bench-result-back').click();
   await page.locator('.world-bench-button:visible').click();

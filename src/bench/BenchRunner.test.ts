@@ -23,6 +23,7 @@ class FakeHost implements BenchHost {
   steps = 0;
   /** Calls of `setInput`: one per scenario when it is prepared, then one per scripted step. */
   inputCalls = 0;
+  times: number[] = [];
 
   loadWorld(renderDistance: number): void {
     this.loads.push(renderDistance);
@@ -33,6 +34,9 @@ class FakeHost implements BenchHost {
     this.poses.push(pose);
     this.log.push(`player ${pose.mode}`);
     this.busy = Math.max(this.busy, this.settleFrames);
+  }
+  setTime(time: number): void {
+    this.times.push(time);
   }
   setInput(input: MoveInput): void {
     this.input = input;
@@ -122,12 +126,14 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
       suite.map((e) => [e.scenario.id, e.renderDistance, e.scenario.version]),
     );
     expect(run.progress.map((p) => [p.index, p.total, p.scenario])).toEqual(
-      suite.map((e, i) => [i + 1, 9, e.scenario.id]),
+      suite.map((e, i) => [i + 1, 11, e.scenario.id]),
     );
     expect(run.progress[2].label).toBe('flying');
     // A fresh world per block, and the player put in place for every scenario.
     expect(run.host.loads).toEqual([2, 3, 2]);
     expect(run.host.poses).toEqual(suite.map((e) => e.scenario.start));
+    // Every scenario sets its time of day: noon, and midnight for the torches.
+    expect(run.host.times).toEqual(suite.map((e) => (e.scenario.id === 'torches' ? 0.75 : 0.25)));
     expect(run.host.log.slice(0, 3)).toEqual(['load 2', 'player walk', 'player walk']);
     // One frame per step: a window of n steps is n frames of 16 ms.
     expect(result.scenarios.map((s) => s.frames)).toEqual(suite.map((e) => e.steps));
@@ -145,7 +151,7 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
     });
     expect(result.env).toEqual({ ...SAMPLE_RESULT.env, input: 'mouse', hz: 63 });
     expect(run.runner.running).toBe(false);
-    expect(run.runner.total).toBe(9);
+    expect(run.runner.total).toBe(11);
     // The record is one the issue format carries.
     expect(parseIssueBody(issueText(result))).toEqual(result);
   });
@@ -158,10 +164,26 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
     // before its window closes. Nothing moves outside warm-up and window.
     const walking = 6 + 60;
     const flying = 6 + 60 - 20;
-    expect(run.host.movingSteps).toBe(2 * (walking + flying));
-    // The edit scenario: three cells placed and broken per block, none in the warm-up.
+    // The torches move past their line in the last 24 of their 60 steps.
+    const passing = 24;
+    expect(run.host.movingSteps).toBe(2 * (walking + flying + passing));
+    // The edit scenario: three cells placed and broken per block, none in the warm-up;
+    // the torches: the torch into the bar, then five placed.
     expect(run.host.actions.map((a) => a.kind)).toEqual(
-      [0, 1].flatMap(() => ['place', 'place', 'place', 'break', 'break', 'break']),
+      [0, 1].flatMap(() => [
+        'place',
+        'place',
+        'place',
+        'break',
+        'break',
+        'break',
+        'setBarSlot',
+        'place',
+        'place',
+        'place',
+        'place',
+        'place',
+      ]),
     );
     expect(run.host.input).toMatchObject({ forward: 0, jump: false, sprint: false });
     // With three steps per frame a window is a third of the frames.
@@ -191,7 +213,9 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
       null,
       null,
       null,
+      null,
       0,
+      null,
       null,
       null,
     ]);
@@ -218,9 +242,9 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
 
   it('a slower last scenario sets the throttling flag', () => {
     const run = start('quick');
-    run.play(() => run.runner.progress.index === 9);
+    run.play(() => run.runner.progress.index === 11);
     const slow = start('quick');
-    slow.play(() => slow.runner.progress.index === 9);
+    slow.play(() => slow.runner.progress.index === 11);
     // The same run, but the last scenario with frames of 20 ms instead of 16.
     let now = slow.now();
     while (slow.runner.running) {
@@ -242,7 +266,7 @@ describe('BenchRunner cut-offs (Phase 4P AC2.2)', () => {
     run.play();
     const result = run.result;
     if (!result) throw new Error('no result');
-    expect(result.scenarios.length).toBe(9);
+    expect(result.scenarios.length).toBe(11);
     expect(result.scenarios.every((s) => s.cut)).toBe(true);
     const stand = result.scenarios[0];
     expect(stand.ms).toBeGreaterThan(1500);
@@ -250,7 +274,7 @@ describe('BenchRunner cut-offs (Phase 4P AC2.2)', () => {
     // Exactly three times is not cut.
     const edge = start('quick', 50);
     edge.play();
-    expect(edge.result?.scenarios.map((s) => s.cut)).toEqual(new Array(9).fill(false));
+    expect(edge.result?.scenarios.map((s) => s.cut)).toEqual(new Array(11).fill(false));
   });
 
   it('gives up waiting for idle chunks after 120 s and marks the scenario', () => {

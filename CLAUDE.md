@@ -27,7 +27,8 @@ game in a procedurally generated world"; everything in it is original work.
      requests: A light, P performance test run on real devices, B torch, C Web Workers
      (optional), and E edits without hitches, added after P (plan: `docs/phase-4-plan.md`,
      for part P `docs/phase-4p-plan.md`, for part E `docs/phase-4e-plan.md`;
-     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`, `docs/phase-4e-report.md`)
+     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`, `docs/phase-4e-report.md`,
+     `docs/phase-4b-report.md`)
   5. **Gamepad controls** (not yet planned)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
@@ -194,8 +195,25 @@ sides in turn.
 - **Actions and reasons.** `break`, `place`, `selectSlot`, `startBreak`, `moveStack`,
   `discard`, `setBarSlot` (Creative only), `craft { recipe }` (Gathering only). A refusal
   carries a short reason (`reach`, `unbreakable`, `occupied`, `full`, `early`, `missing`,
-  `mode`, `station`, `invalid`) that the UI maps to a text; `ActionResult.notices` is a
-  list of `{ item, count }`, not of strings.
+  `mode`, `station`, `support`, `invalid`) that the UI maps to a text; `ActionResult.notices`
+  is a list of `{ item, count }`, not of strings. A `break` may return two block changes:
+  the broken cell, then the cell above it if a block that needs support stands there.
+- **Block flags and shapes.** `solid` means "collides with the player" (physics,
+  `isSolidAt`); `targetable` means "the crosshair can hit it" (raycast, break, place
+  against); `shape` is `cube` or `torch`; `needsSupport` marks blocks that stand on the
+  block below. `isPlaceable` = targetable and breakable; `isSupport` = solid and a cube.
+  The torch (block 19) is the one block that is targetable but not solid, not a cube, and
+  needs support. **The support rule:** placing a block with `needsSupport` needs a solid
+  cube directly below (otherwise `support`, "Needs a block underneath"); breaking the
+  block under it removes it in the same action (to air, or water by the water rule), and
+  in Gathering it goes into the inventory if it fits, otherwise it is lost; the `full`
+  checks look at the broken block's own item only. Blocks that are not solid may be
+  placed into a cell a player stands in. A block that is not a cube is aimed at through
+  its box (`aimBox` in `world/raycast.ts`: the torch 6/16 × 14/16); a ray that misses the
+  box goes on, and the target outline has the box's size. The mesher draws a torch with
+  `emitTorch` (ten quads, the light of its own cell, no ambient occlusion). Its icon is
+  painted (`itemIcons.ts`); `createItemIcon` prefers a painted icon over the cube.
+  Break time 0: `Game` submits `break` in the step in which the `startBreak` was accepted.
 - **Light.** Every cell has sky light and block light, each 0–15, in one byte
   (`Chunk.light`, null until the chunk is lit). The rules are in `light/lightRules.ts`: a
   step into a neighbour costs one level plus the neighbour's `opacity` (air and glass 0,
@@ -208,7 +226,7 @@ sides in turn.
   fast code and reference disagree, the reference decides. Stored light is written only
   by `World.light` (the lighting job, `lightChunk`) and `World.setBlock` (`updateLight`,
   or `lightChunk` again where a chunk around the edit is not lit); `pipeline.test.ts`
-  guards that. The block table has no emitter yet (the torch is Part B); tests pass
+  guards that. The torch emits 14 (`TORCH_LIGHT`); tests of other emitters pass
   `TEST_LIGHT` (`src/testing/lightScenes.ts`) with a lamp and a glowing rock through
   `World.lightTables`. `LIGHT_CHECKSUM_1337_V1` changes only with the rules or an opacity.
 - **Chunk stages.** generated → lit (needs its 3 × 3 chunks generated) → meshed (needs its
@@ -224,7 +242,10 @@ sides in turn.
   light, blue = block light (level ÷ 15, averaged over the up to four clear cells that
   touch the vertex in front of the face). The vertex shader turns light into a colour
   factor (`LIGHT_GAMMA`, daylight, `TORCH_TINT`, the floor `uMinLight` from the
-  Brightness setting); the fragment shader multiplies. `meshChunk` without its third
+  Brightness setting); the fragment shader multiplies. Daylight is `DAYLIGHT_MIN` (0.14)
+  at midnight; the Brightness floor runs 0.02 → 0.11 (default) → 0.35 in two linear halves
+  (`minLightFor`). Dark values lose more in pixels than the factor says (sRGB is linear
+  near black): open ground at midnight is about 7 % of noon (AC8.2 in `e2e/night.spec.ts`). `meshChunk` without its third
   argument is the mesher from before light (everything open sky), kept for tests.
 - **Performance test.** `Game` runs it as a screen of its own next to menu, game and
   pause (`benchPhase`: `start`, `running`, `result`, `interrupted`). A run is a
@@ -270,7 +291,7 @@ sides in turn.
   pickaxe, iron ore only with a stone or iron one; without it the block breaks at hand
   speed, yields nothing and is not refused by a full inventory. The HUD then shows "Needs
   a pickaxe" / "Needs a stone pickaxe". Tools have stack size 1 and cannot be placed.
-- **Crafting.** `items/recipes.ts` is the one recipe table (ids 1–19, append-only like
+- **Crafting.** `items/recipes.ts` is the one recipe table (ids 1–20, append-only like
   item ids, pinned by `recipes.test.ts`). A recipe has ingredients, one result and
   optionally a station (`workbench`, `furnace`): a placed block whose centre lies within
   `STATION_REACH` (5) of the eye. `craft` answers `invalid` (unknown recipe), then
@@ -365,7 +386,7 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   by its own buttons (`.bench-start-button`, `.bench-cancel-button`, …). Tests of a run
   wait on `getState().bench`, give themselves four minutes and never assert on a
   measured time or a light; the rules that throw a run away apply once the progress line
-  shows "scenario 1 of 9" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by
+  shows "scenario 1 of 11" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by
   hand: `node scripts/benchRun.mjs [1|quick] [folder]` against the preview server (the
   full suite takes about three minutes in a cloud session).
 - With `test=1` the world lives in memory (`MemoryStore`) and is never stored.
@@ -511,10 +532,13 @@ hold:
     the frame of an edit, its neighbours follow through the urgent queue): implemented
     (plan: `docs/phase-4e-plan.md`, report: `docs/phase-4e-report.md`). Read its
     "Decisions and deviations" before changing how edits are remeshed or the chunk budget.
-  - Part B (torch, darker night) is not yet implemented; it starts after Part E is merged
-    and adds the scenario `torches` to the performance test (suite version 2). Part C (Web Workers) is optional and is
-    built only when the owner's starting prompt asks for it; the performance test on the
-    owner's phone is what decides (`docs/phase-4p-plan.md`, section 5.6).
+  - Phase 4 part B (torch: block flags, the support rule, shape, aiming box, recipe 20;
+    the darker night; the scenario `torches`, suite version 2): implemented (report:
+    `docs/phase-4b-report.md`). Read its "Decisions and deviations" before changing the
+    torch, the block flags, the night or the Brightness floor.
+  - Part C (Web Workers) is optional and is built only when the owner's starting prompt
+    asks for it; the performance test on the owner's phone is what decides
+    (`docs/phase-4p-plan.md`, section 5.6). If it is never started, Phase 4 is complete.
   - **Performance on real devices** is measured by the owner with the performance test on
     computer, phone and tablet (PERF-4 and PERF-5 in `docs/device-tests.md`); at the start
     of a session look for issues with the label `perf-run`. The baseline before light can no longer be taken. Numbers from software
@@ -523,7 +547,8 @@ hold:
     phone and tablet, which alone makes the Web Workers line say "recommended". The cause
     is remeshing up to four whole chunk columns in the frame of an edit, not light, and
     Part C as planned would not fix it: `docs/phase-4-edit-cost.md` (analysis and
-    options). The owner chose option 1: Part E.
+    options). The owner chose option 1: Part E. After Part E (issue #18, tablet, build
+    20dd67c) every scenario is green and the line says "not needed".
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.

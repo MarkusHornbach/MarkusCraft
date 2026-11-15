@@ -34,11 +34,11 @@ describe('day/night model (AC10.1)', () => {
 
   it('is fully bright at noon and at the minimum at midnight (Phase 4 AC8.1)', () => {
     expect(daylightFactor(0.25)).toBe(1);
-    expect(daylightFactor(0.75)).toBe(0.1);
-    expect(DAYLIGHT_MIN).toBe(0.1);
+    expect(daylightFactor(0.75)).toBe(0.14);
+    expect(DAYLIGHT_MIN).toBe(0.14);
     for (let i = 0; i < 1000; i++) {
       const f = daylightFactor(i * STEP);
-      expect(f).toBeGreaterThanOrEqual(0.1);
+      expect(f).toBeGreaterThanOrEqual(0.14);
       expect(f).toBeLessThanOrEqual(1);
     }
     // The start time is a bright morning.

@@ -402,8 +402,9 @@ test('Phase 3 AC12.2: short ingredients are marked; station recipes need a workb
     ingredient(page, pickaxe, item).evaluate((node) => getComputedStyle(node).color);
   expect(await color('planks')).toBe('rgb(255, 138, 120)');
   expect(await color('stick')).not.toBe('rgb(255, 138, 120)');
-  // Sticks need no station: two planks are enough for them.
-  expect(await withButton(page)).toEqual(['sticks']);
+  // Sticks need no station: two planks are enough for them. Torches need none either
+  // (Phase 4 part B), and a stick and the coal are there.
+  expect(await withButton(page)).toEqual(['sticks', 'torch']);
 
   // Enough planks, but still no workbench.
   await give(page, PLANKS, 1);

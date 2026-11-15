@@ -69,7 +69,7 @@ function worstCase(scenarios: number): BenchResult {
       '1699000000) (Date:11/03/23)) | Vulkan 1.3.128 "driver" & <more> ' +
       'y'.repeat(120),
   );
-  const ids = ['stand', 'walk', 'fly', 'edit'];
+  const ids = ['stand', 'walk', 'fly', 'edit', 'torches'];
   return {
     ...SAMPLE_RESULT,
     commit: 'abcdef1',
@@ -182,7 +182,7 @@ describe('issue text and parser (Phase 4P AC1.7)', () => {
     expect(text).toContain('|stand|5|G|60|17.2|18.1|0|1.2|–|');
     expect(text).toContain('- Browser: Sample browser (not a real run)');
     expect(text).toContain('- Input: touch, 8 cores, 4 GB, 60 Hz, wake lock yes');
-    expect(lines.filter((line) => line.startsWith('|')).length).toBe(11);
+    expect(lines.filter((line) => line.startsWith('|')).length).toBe(13);
     expect(text.indexOf(ISSUE_MARKER)).toBeGreaterThan(text.indexOf('- GPU:'));
     expect(text.endsWith('\n```')).toBe(true);
     expect(tableRow({ ...SAMPLE_RESULT.scenarios[0], cut: true })[2]).toBe('R (cut off)');
@@ -289,8 +289,8 @@ describe('the issue link (Phase 4P AC1.8)', () => {
     expect(bodyOf(issueUrl(SAMPLE_RESULT))).toBe(issueText(SAMPLE_RESULT));
   });
 
-  it('a worst-case result of nine scenarios fits into 7 000 characters and parses back', () => {
-    const result = worstCase(9);
+  it('a worst-case result of eleven scenarios fits into 7 000 characters and parses back', () => {
+    const result = worstCase(11);
     expect(result.env.ua.length).toBe(200);
     expect(result.env.gpu.length).toBe(200);
     const url = issueUrl(result);
