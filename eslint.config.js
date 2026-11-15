@@ -37,6 +37,7 @@ export default tseslint.config(
       'src/actions/**',
       'src/items/**',
       'src/save/**',
+      'src/bench/**',
       'src/render/textures/tiles.ts',
       'src/render/textures/itemIcons.ts',
       'src/render/textures/cracks.ts',
