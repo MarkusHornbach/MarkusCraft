@@ -1,6 +1,7 @@
 // Test API on `window.__mc`: lets headless tests observe and drive the game deterministically.
 import type { ActionResult } from '../actions/apply';
 import type { GameMode, ItemStack } from '../actions/playerRecord';
+import type { BenchResult } from '../bench/benchReport';
 import type { MoveMode } from '../player/player';
 
 export interface TargetInfo {
@@ -12,6 +13,11 @@ export interface TargetInfo {
   /** Outward normal of the face that was hit. */
   face: [number, number, number];
 }
+
+/** The screens of the performance test, and the run itself. */
+export type BenchPhase = 'start' | 'running' | 'result' | 'interrupted';
+/** Why a run of the performance test was thrown away. */
+export type BenchStop = 'hidden' | 'portrait' | 'resize' | 'cancel';
 
 export interface GameState {
   seed: number;
@@ -36,7 +42,7 @@ export interface GameState {
   touch: boolean;
   /** What covers the view: a menu, the inventory, or nothing (`play`). */
   ui: {
-    screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory';
+    screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'bench';
     /** The open page of the inventory screen, or null while it is closed. */
     tab: 'items' | 'crafting' | null;
   };
@@ -54,6 +60,18 @@ export interface GameState {
   }[];
   /** The furnace recipe whose progress bar runs (0..1), or null. */
   smelting: { recipe: number; progress: number } | null;
+  /**
+   * The performance test, or null while it is not open: its phase, the suite, the
+   * scenario of a run (counted from 1) and why a run was interrupted.
+   */
+  bench: {
+    phase: BenchPhase;
+    suite: 'full' | 'quick';
+    index: number;
+    total: number;
+    scenario: string | null;
+    reason: BenchStop | null;
+  } | null;
   player: {
     x: number;
     y: number;
@@ -157,6 +175,8 @@ export interface TestApi {
   give(item: number, count: number): void;
   /** Empties the inventory directly (test tool). */
   clearInventory(): void;
+  /** The result record on the performance test's result screen, or null. */
+  benchResult(): BenchResult | null;
   /** Advance exactly `n` fixed simulation steps and render once. */
   step(n: number): void;
 }

@@ -12,6 +12,8 @@ export interface WorldMenuOptions {
   onCreate: (name: string, seedText: string, mode: GameMode, via: InputMode | null) => void;
   onDelete: (id: string) => void;
   onSettings: () => void;
+  /** Open the performance test. */
+  onBench: () => void;
 }
 
 type View = 'list' | 'form' | 'confirm';
@@ -77,7 +79,7 @@ export class WorldMenu {
     this.deleteButton.addEventListener('click', () => this.setView('confirm'));
     const settings = button('menu-button world-settings-button', 'Settings');
     settings.addEventListener('click', () => options.onSettings());
-    row.append(newButton, this.deleteButton, settings);
+    row.append(newButton, this.deleteButton, settings, this.benchButton(options));
     this.listView.appendChild(row);
     panel.appendChild(this.listView);
 
@@ -116,7 +118,7 @@ export class WorldMenu {
     this.backButton.addEventListener('click', () => this.setView('list'));
     const formSettings = button('menu-button world-form-settings-button', 'Settings');
     formSettings.addEventListener('click', () => options.onSettings());
-    formRow.append(create, this.backButton, formSettings);
+    formRow.append(create, this.backButton, formSettings, this.benchButton(options));
     this.formView.appendChild(formRow);
     // Enter in a text field creates the world; the input mode stays as it is.
     this.formView.addEventListener('submit', (e) => {
@@ -154,6 +156,12 @@ export class WorldMenu {
     parent.appendChild(this.element);
     this.setMode(options.mode);
     this.setView('form');
+  }
+
+  private benchButton(options: WorldMenuOptions): HTMLButtonElement {
+    const bench = button('menu-button world-bench-button', 'Performance test');
+    bench.addEventListener('click', () => options.onBench());
+    return bench;
   }
 
   private field(id: string, label: string, maxLength: number): HTMLInputElement {

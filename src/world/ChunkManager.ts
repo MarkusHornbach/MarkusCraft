@@ -84,6 +84,27 @@ export class ChunkManager {
     return this.radius;
   }
 
+  /**
+   * How far the world is complete around the centre: the Chebyshev distance in chunks to
+   * the nearest chunk inside the load radius that has no mesh, or the radius + 1 if all
+   * have one. Read-only; the performance test calls it once per frame.
+   */
+  missingMeshDistance(): number {
+    if (this.pending === 0) return this.radius + 1;
+    for (let d = 0; d <= this.radius; d++) {
+      // The ring of chunks at distance d: its two rows, then the rest of its two columns.
+      for (let i = -d; i <= d; i++) {
+        if (!this.hasMesh(i, -d) || !this.hasMesh(i, d)) return d;
+        if (!this.hasMesh(-d, i) || !this.hasMesh(d, i)) return d;
+      }
+    }
+    return this.radius + 1;
+  }
+
+  private hasMesh(dx: number, dz: number): boolean {
+    return this.world.getChunk(this.centerCx + dx, this.centerCz + dz)?.meshed === true;
+  }
+
   setRadius(radius: number): void {
     if (radius === this.radius) return;
     this.radius = radius;

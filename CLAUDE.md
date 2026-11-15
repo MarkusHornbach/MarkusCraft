@@ -26,7 +26,7 @@ game in a procedurally generated world"; everything in it is original work.
      and the torch, the first block that is not a cube. Four parts with separate pull
      requests: A light, P performance test run on real devices, B torch, C Web Workers
      (optional) (plan: `docs/phase-4-plan.md`, for part P `docs/phase-4p-plan.md`;
-     report of part A: `docs/phase-4a-report.md`)
+     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`)
   5. **Gamepad controls** (not yet planned)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
@@ -99,7 +99,14 @@ src/
   game/              Game.ts (loop, wiring, screens, world loading), config.ts (all constants),
                      testApi.ts, urlParams.ts, autosave.ts (pure: when to write what),
                      idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world),
-                     perfStats.ts (pure: frames and chunk work of the last ten seconds)
+                     perfStats.ts (pure: frames and chunk work of the last ten seconds),
+                     benchEnv.ts (browser, GPU and screen for a performance test result)
+  bench/             the performance test (pure): scenarios.ts (scenario table, scripts,
+                     suites), benchStats.ts (numbers of one measurement window),
+                     verdict.ts (lights, throttling flag, Web Workers line), benchReport.ts
+                     (result record ⇄ issue text, issue link, `parseIssueBody`),
+                     BenchRunner.ts (state machine of a run, `BenchHost`), sampleResult.ts
+                     (what `bench=sample` shows), compare.ts (table of several runs)
   actions/           the action layer (pure): actions.ts (types, decodeAction), apply.ts
                      (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
   items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
@@ -129,7 +136,9 @@ src/
                      RecipeList.ts (the "Crafting" tab: one row per recipe),
                      WorldMenu.ts (start screen: list of worlds, new world, delete),
                      PauseScreen.ts (pause menu of a world; also the settings page),
-                     activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint)
+                     activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint),
+                     BenchScreen.ts (performance test: start page, progress line, result,
+                     "Interrupted")
   util/              rng.ts, noise.ts, math.ts
   testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts,
                      lightChecksum.ts, lightScenes.ts (tables with emitters, artificial
@@ -140,7 +149,8 @@ e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.t
 scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item
                      icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
-                     next to new)
+                     next to new), benchRun.mjs (plays the performance test headlessly),
+                     perfRuns.ts (comparison table from saved `perf-run` issues)
 docs/                phase plans and phase reports; device-tests.md (the one checklist of tests
                      on real devices, filled out by the owner)
 .github/workflows/   ci.yml, deploy.yml
@@ -160,8 +170,8 @@ sides in turn.
 
 ## Architecture and code conventions
 
-- **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/` and
-  `items/` must not import `three` or touch the DOM (enforced by an ESLint
+- **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/`, `items/`
+  and `bench/` must not import `three` or touch the DOM (enforced by an ESLint
   `no-restricted-imports` rule). They are tested in Node. Only `render/`, `ui/`, `input/`
   and `game/` may use Three.js and browser APIs. The same rule covers
   `render/textures/tiles.ts`, `itemIcons.ts` and `cracks.ts`. The core may import `game/config.ts`.
@@ -212,6 +222,35 @@ sides in turn.
   factor (`LIGHT_GAMMA`, daylight, `TORCH_TINT`, the floor `uMinLight` from the
   Brightness setting); the fragment shader multiplies. `meshChunk` without its third
   argument is the mesher from before light (everything open sky), kept for tests.
+- **Performance test.** `Game` runs it as a screen of its own next to menu, game and
+  pause (`benchPhase`: `start`, `running`, `result`, `interrupted`). A run is a
+  `BenchRunner` that `Game` feeds twice: `runner.step()` before every simulation step
+  (sets the scripted input through `Input.setScript` and submits the step's action
+  through the session) and `runner.frame(now, frameMs, chunkWorkMs)` once per rendered
+  frame, with the values `PerfStats` gets. Scenarios are counted in simulation steps, so
+  every device takes the same route. While a script is set, `Input` ignores keys, mouse
+  and fingers. The run plays in a fresh Creative world of seed 1337 (`BENCH_` constants in
+  `config.ts`) with default settings and its own render distances. **It must stay free of
+  side effects:** the autosave writes nothing while `Game.bench` is set, no world lock is
+  taken, the stored settings are neither read into the run nor written, and the settings
+  in use before come back when it ends. The only thing kept is the text of the last
+  finished result in local storage (`markuscraft.lastPerfRun.v1`). A hidden page, portrait
+  in touch mode, a changed canvas size or "Cancel" throws the run away as a whole.
+- **Performance results.** Performance on real devices is measured by the performance
+  test and reported as GitHub issues with the label `perf-run` and a title starting
+  "Performance run:". A session reads them with the GitHub tools, saves each issue (JSON
+  or body text) as a file and uses `parseIssueBody` or
+  `npx vite-node scripts/perfRuns.ts <folder>`. The issue body ends with the marker
+  `<!-- markuscraft-perf v1 -->` and one `json` block holding the whole record
+  (`BenchResult`); lights are not stored but worked out from the numbers (`verdict.ts`),
+  so old runs can be judged by new thresholds. The thresholds of the lights are the
+  owner's decision. Numbers from software WebGL (cloud sessions, CI) are never evidence.
+- **Scenarios and versions.** A phase part that adds something with a cost of its own (a
+  new kind of block, creatures, workers) adds a scenario: one entry in `SCENARIOS` with
+  its script, and its row appears by itself. A changed scenario (script, steps, warm-up)
+  gets a new version; adding a scenario or changing the order raises
+  `BENCH_SUITE_VERSION`. Results of different versions of a scenario are never compared
+  (`compare.ts` keeps them in separate rows). `scenarios.test.ts` pins the table.
 - **Game modes.** A world is Creative or Gathering for ever (`WorldMeta.mode`). Creative:
   flying, unlimited blocks, instant breaking, the palette. Gathering: no flying (key, touch
   button, `setPlayer` and controls list), placing takes the item from the selected slot,
@@ -313,6 +352,18 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   the clock, `?test=1` runs without menus and pointer lock and with fixed settings,
   `?touch=1` forces touch mode (shows the touch controls without a touch on the play
   button).
+- `?bench=1` (never with `test=1`, where it is ignored) opens the start page of the
+  performance test instead of the world menu, `bench=quick` the same with the quick suite
+  (render distances 2 and 3, a twentieth of the steps; what the browser tests run),
+  `bench=sample` the result screen with the built-in `SAMPLE_RESULT`. `getState().bench`
+  is null outside the test, otherwise `{ phase, suite, index, total, scenario, reason }`;
+  `__mc.benchResult()` returns the record on the result screen or null. The run is driven
+  by its own buttons (`.bench-start-button`, `.bench-cancel-button`, …). Tests of a run
+  wait on `getState().bench`, give themselves four minutes and never assert on a
+  measured time or a light; the rules that throw a run away apply once the progress line
+  shows "scenario 1 of 9" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by
+  hand: `node scripts/benchRun.mjs [1|quick] [folder]` against the preview server (the
+  full suite takes about three minutes in a cloud session).
 - With `test=1` the world lives in memory (`MemoryStore`) and is never stored.
   `save=1` (with `test=1`) uses IndexedDB and opens the world named by `world=<name>`
   (default "Test"), creating it from `seed`. Each Playwright test has its own browser
@@ -378,7 +429,7 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
 - After changing anything visual, the implementing session must also open the produced
   screenshots with the Read tool and judge them by eye. For a quick look at any pose:
   `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
-- The full e2e run takes about eleven minutes; run long commands in the background. The
+- The full e2e run takes about twelve minutes; run long commands in the background. The
   unit tests take about half a minute: the four `lightEdits*.slow.test.ts` files check
   the light against the slow reference after each of 2 000 random edits.
 
@@ -447,16 +498,20 @@ hold:
     the reference screenshots.
   - Phase 4 part P (performance test run: fixed scenarios played by the real game loop,
     started by hand on a device, results as pre-filled GitHub issues with the label
-    `perf-run`): planned (`docs/phase-4p-plan.md`), not yet implemented. It was added
-    after Part A and comes before Part B.
+    `perf-run`): implemented (plan: `docs/phase-4p-plan.md`, report:
+    `docs/phase-4p-report.md`). Read its "Decisions and deviations" before changing the
+    performance test, `Input`, or how `Game` switches screens; "How a later session reads
+    the results" and "For Part B: adding a scenario" are in the report too. The label
+    `perf-run` exists in the repository.
   - Part B (torch, darker night) is not yet implemented; it starts after Part P is merged
-    and adds a scenario to the performance test. Part C (Web Workers) is optional and is
+    and adds the scenario `torches` to the performance test (suite version 2). Part C (Web Workers) is optional and is
     built only when the owner's starting prompt asks for it; the performance test on the
     owner's phone is what decides (`docs/phase-4p-plan.md`, section 5.6).
-  - **Performance on real devices was never measured by hand** (PERF-1 and PERF-2 in
-    `docs/device-tests.md` are empty) and the baseline before light can no longer be
-    taken. Numbers from software WebGL (cloud sessions, CI) are never evidence of
-    performance.
+  - **Performance on real devices has not been measured yet.** The owner runs the
+    performance test on computer, phone and tablet (PERF-4 and PERF-5 in
+    `docs/device-tests.md`); at the start of a session look for issues with the label
+    `perf-run`. The baseline before light can no longer be taken. Numbers from software
+    WebGL (cloud sessions, CI) are never evidence of performance.
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.

@@ -228,6 +228,39 @@ numbers that tell how smoothly the game runs on a device: the time spent per fra
 loading terrain ("Chunk work", average and largest of the last ten seconds) and how many
 frames took longer than 33 ms ("long").
 
+### Performance test
+
+The game can measure itself on your device. Open the world menu and press **Performance
+test**, or open the game with `?bench=1` at the end of its address (a bookmark of
+`https://markushornbach.github.io/MarkusCraft/?bench=1` is handy on a phone). A start
+page lists what to do first – plug in the charger, close other apps and tabs, switch the
+battery saver off – and nothing is measured before you press **Start**.
+
+The test then plays by itself for about four minutes: standing, walking, flying and
+building in a throwaway world, at render distance 5 and at 8. Do not touch the screen and
+do not switch away: hiding the page, turning the device upright, resizing the window or
+leaving fullscreen ends the run with "Interrupted – nothing was recorded". **Cancel** (or
+Esc) stops it as well.
+
+The result screen shows a traffic light per scenario (G, Y or R), the numbers behind it
+and one line about whether the game needs Web Workers on this device. From there:
+
+- **Open GitHub issue** opens a pre-filled issue in this repository in a new tab; you only
+  press "Submit". You have to be logged in to GitHub in that browser.
+- **Copy result** copies the same text, in case the issue page did not open as it should.
+- **Show text** shows exactly what would be sent.
+
+**What is sent, and that it is public:** nothing leaves the device unless you submit the
+issue yourself. The issue, like the repository, is public. It holds the measured frame
+times and loading numbers, the build of the game, the date, and a description of the
+device: the browser's user agent, the name of the graphics chip, the screen size and
+pixel ratio, the number of processor cores and the amount of memory the browser reports.
+No world, no name and no account data is part of it.
+
+The test stores no world and does not change your settings. The browser keeps the text of
+the last finished result ("Show last result" on the start page) until the next run
+replaces it.
+
 ### One-time setup for deployment
 
 The owner must set **Settings → Pages → Source** to **GitHub Actions** once. After that,

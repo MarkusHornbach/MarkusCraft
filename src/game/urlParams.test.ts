@@ -15,6 +15,7 @@ describe('parseParams', () => {
       save: false,
       world: 'Test',
       mode: 'creative',
+      bench: 'off',
     });
   });
   it('reads all parameters', () => {
@@ -31,6 +32,7 @@ describe('parseParams', () => {
       save: true,
       world: 'Second',
       mode: 'creative',
+      bench: 'off',
     });
   });
   it('normalises seeds to unsigned 32-bit and ignores invalid input', () => {
@@ -50,5 +52,17 @@ describe('parseParams', () => {
       test: false,
       touch: false,
     });
+  });
+
+  it('Phase 4P: bench opens the performance test, but never in test mode', () => {
+    const bench = (search: string): string => parseParams(search, () => 1).bench;
+    expect(bench('')).toBe('off');
+    expect(bench('?bench=1')).toBe('full');
+    expect(bench('?bench=quick')).toBe('quick');
+    expect(bench('?bench=sample')).toBe('sample');
+    expect(bench('?bench=0')).toBe('off');
+    expect(bench('?bench=yes')).toBe('off');
+    expect(bench('?bench=1&test=1')).toBe('off');
+    expect(bench('?test=1&bench=quick')).toBe('off');
   });
 });
