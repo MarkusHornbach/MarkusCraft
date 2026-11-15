@@ -6,14 +6,15 @@ and deviations". This plan is executed autonomously: do not ask the owner questi
 this plan leaves a detail open, choose the simplest option and note it in the report of the
 part being implemented.
 
-**The phase has four parts, each implemented in its own cloud session with its own branch,
+**The phase has five parts, each implemented in its own cloud session with its own branch,
 report and pull request:**
 
 | Part | Content                                                                   | Steps | Report                    | Starts when                                     |
 | ---- | ------------------------------------------------------------------------- | ----- | ------------------------- | ----------------------------------------------- |
 | A    | Light: engine, chunk pipeline, rendering, Brightness setting, measurement | 1–5   | `docs/phase-4a-report.md` | Now, from `main`                                |
 | P    | Performance test run on real devices (own plan: `docs/phase-4p-plan.md`)  | P1–P4 | `docs/phase-4p-report.md` | After Part A is merged                          |
-| B    | Torch: block, recipe, warm light, darker night, tuning                    | 6–9   | `docs/phase-4b-report.md` | After Part P is merged                          |
+| E    | Edits without hitches (own plan: `docs/phase-4e-plan.md`)                 | E1–E2 | `docs/phase-4e-report.md` | After Part P is merged                          |
+| B    | Torch: block, recipe, warm light, darker night, tuning                    | 6–9   | `docs/phase-4b-report.md` | After Part E is merged                          |
 | C    | Web Workers for generation, light and meshing (optional)                  | 10–11 | `docs/phase-4c-report.md` | Only if the owner's starting prompt asks for it |
 
 A session implements exactly one part; the owner's starting prompt says which. The
@@ -26,10 +27,16 @@ whose results decide about Part C. Its four steps are in its own plan (called P1
 here; its tests name their criteria "Phase 4P AC…"), so the step numbers of this plan
 stay as they are.
 
-Rules for parts P, B and C:
+**Part E was added after Part P** (planned with the owner, see `docs/phase-4e-plan.md`,
+"Changes to the original scope"). The first device runs showed a red `edit` on phone and
+tablet, caused by remeshing up to four chunks in the frame of an edit
+(`docs/phase-4-edit-cost.md`). Part E remeshes only the edited block's chunk in that frame.
+
+Rules for parts P, E, B and C:
 
 - Precondition: the report of the previous required part exists on the session's branch (P
-  needs `phase-4a-report.md`; B needs `phase-4a-report.md` and `phase-4p-report.md`; C
+  needs `phase-4a-report.md`; E needs `phase-4p-report.md`; B needs `phase-4a-report.md`, `phase-4p-report.md` and
+  `phase-4e-report.md`; C
   needs `phase-4a-report.md` and `phase-4p-report.md`). If it does not, write that into
   the own report, commit it and stop.
 - Read the reports of the earlier parts first, in particular "Decisions and deviations".

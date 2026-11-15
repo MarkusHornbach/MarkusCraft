@@ -4,6 +4,7 @@ import { TIMING_ENFORCED } from '../testing/timing';
 import { mulberry32, randInt } from '../util/rng';
 import { Block } from './blocks';
 import { ChunkManager } from './ChunkManager';
+import { type ChunkMeshData, meshChunk } from './meshing/mesher';
 import { World } from './World';
 
 interface Recorder {
@@ -176,6 +177,49 @@ describe('ChunkManager with light (Phase 4)', () => {
     expect(manager.relight).toBe(0);
     expect(recorder.meshed.slice(0, 4).sort()).toEqual(['-1,-1', '-1,0', '0,-1', '0,0']);
     runToIdle(manager);
+    expect(world.verifyLight()).toBe(0);
+  });
+
+  it('Phase 4E AC1.1: after the edits of a chunk corner every mesh equals a fresh one', () => {
+    const world = new World(1337);
+    const meshes = new Map<string, ChunkMeshData>();
+    const manager = new ChunkManager(
+      world,
+      {
+        onMesh: (cx, cz, data) => meshes.set(`${cx},${cz}`, data),
+        onUnload: (cx, cz) => meshes.delete(`${cx},${cz}`),
+      },
+      2,
+    );
+    manager.setCenter(0, 0);
+    runToIdle(manager);
+    // Place and break on the corner of four chunks, at the surface where light changes.
+    const cells: [number, number][] = [
+      [0, 0],
+      [-1, 0],
+      [0, -1],
+      [-1, -1],
+      [15, 3],
+    ];
+    for (const [x, z] of cells) {
+      const y = world.surfaceY(x, z) + 1;
+      world.setBlock(x, y, z, Block.STONE);
+      manager.remeshAfterEdit(x, z);
+      manager.update(fakeClock(10), 6);
+      world.setBlock(x, y - 1, z, Block.AIR);
+      manager.remeshAfterEdit(x, z);
+    }
+    while (manager.relight > 0) manager.update(fakeClock(1), 6);
+    for (let cz = -2; cz <= 2; cz++) {
+      for (let cx = -2; cx <= 2; cx++) {
+        const fresh = meshChunk(
+          world.getChunk(cx, cz)?.blocks ?? new Uint8Array(),
+          (dx, dz) => world.getChunk(cx + dx, cz + dz)?.blocks ?? null,
+          (dx, dz) => world.getChunk(cx + dx, cz + dz)?.light ?? null,
+        );
+        expect(meshes.get(`${cx},${cz}`), `${cx},${cz}`).toEqual(fresh);
+      }
+    }
     expect(world.verifyLight()).toBe(0);
   });
 

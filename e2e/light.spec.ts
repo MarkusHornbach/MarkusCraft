@@ -1,5 +1,6 @@
 // Light in the browser (Phase 4 part A): the stored light, the invariant, the picture.
 import { LIGHT_CHECKSUM_1337_V1 } from '../src/testing/lightChecksum';
+import { Block } from '../src/world/blocks';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import {
@@ -120,6 +121,28 @@ test('100 edits that change light leave the light right and the memory steady (P
     );
     expect(result.after - result.before).toBeLessThan(50 * 1024 * 1024);
   }
+});
+
+test('an edit on a chunk corner meshes its own chunk at once, the other three later (Phase 4E AC1.4)', async ({
+  page,
+}) => {
+  await openGame(page);
+  const result = await page.evaluate(async (bricks) => {
+    const mc = window.__mc;
+    const counts: number[] = [];
+    // Placed and broken high in the air on the corner of chunks (-1, -1), (0, -1), (-1, 0)
+    // and (0, 0): no frame runs between the edit and the reading.
+    for (const id of [bricks, 0]) {
+      mc.setBlock(-1, 120, -1, id);
+      counts.push(mc.getState().chunks.relight);
+      await mc.whenIdle();
+      counts.push(mc.getState().chunks.relight);
+    }
+    return { counts, wrong: mc.verifyLight(), block: mc.getBlock(-1, 120, -1) };
+  }, Block.BRICKS);
+  expect(result.counts).toEqual([3, 0, 3, 0]);
+  expect(result.wrong).toBe(0);
+  expect(result.block).toBe(0);
 });
 
 // Written by the game as of Phase 3 part C: a Gathering world with items that are no

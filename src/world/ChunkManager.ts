@@ -1,8 +1,8 @@
 // Chunk manager: decides which chunks to generate, light, mesh and unload around a centre,
 // spending a limited time budget per frame. Pure: the renderer listens via callbacks.
-import { chunkKey } from './chunk';
+import { chunkKey, toChunkCoord } from './chunk';
 import { type ChunkMeshData, meshChunk } from './meshing/mesher';
-import type { World } from './World';
+import { type World, chunksAffectedByEdit } from './World';
 
 export interface ChunkListener {
   /** A (new or updated) mesh for a chunk is ready. */
@@ -159,10 +159,31 @@ export class ChunkManager {
     this.dropMesh(cx, cz);
   }
 
+  /**
+   * Queues a meshed chunk for a new mesh before any loading job: the neighbours of an
+   * edit, so that one frame never builds more than the edited block's own chunk. Chunks
+   * without a mesh are ignored, as in `remesh`.
+   */
+  queueRemesh(cx: number, cz: number): void {
+    if (this.world.getChunk(cx, cz)?.meshed) this.urgent.set(chunkKey(cx, cz), { cx, cz });
+  }
+
+  /**
+   * After an edit of block (x, z): its own chunk gets a new mesh at once; the other chunks
+   * whose mesh shows the block (across a border) wait in the urgent queue.
+   */
+  remeshAfterEdit(x: number, z: number): void {
+    const own = { cx: toChunkCoord(x), cz: toChunkCoord(z) };
+    for (const { cx, cz } of chunksAffectedByEdit(x, z)) {
+      if (cx === own.cx && cz === own.cz) this.remesh(cx, cz);
+      else this.queueRemesh(cx, cz);
+    }
+  }
+
   /** The world reports a chunk whose mesh no longer shows its light. */
   private lightChanged(cx: number, cz: number, lit: boolean): void {
     if (lit) {
-      if (this.world.getChunk(cx, cz)?.meshed) this.urgent.set(chunkKey(cx, cz), { cx, cz });
+      this.queueRemesh(cx, cz);
       return;
     }
     // The chunk has no light any more: no mesh that reads it can stay.

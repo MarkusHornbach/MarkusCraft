@@ -23,10 +23,11 @@ game in a procedurally generated world"; everything in it is original work.
      Workers) was never started and is replaced by Phase 4 part C
   4. **Light & Torches** – sky light and block light per block cell, derived from the
      blocks and never saved; dark tunnels and rooms, a darker night, a Brightness setting,
-     and the torch, the first block that is not a cube. Four parts with separate pull
+     and the torch, the first block that is not a cube. Five parts with separate pull
      requests: A light, P performance test run on real devices, B torch, C Web Workers
-     (optional) (plan: `docs/phase-4-plan.md`, for part P `docs/phase-4p-plan.md`;
-     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`)
+     (optional), and E edits without hitches, added after P (plan: `docs/phase-4-plan.md`,
+     for part P `docs/phase-4p-plan.md`, for part E `docs/phase-4e-plan.md`;
+     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`, `docs/phase-4e-report.md`)
   5. **Gamepad controls** (not yet planned)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
@@ -150,7 +151,8 @@ scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet
                      icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
                      next to new), benchRun.mjs (plays the performance test headlessly),
-                     perfRuns.ts (comparison table from saved `perf-run` issues)
+                     perfRuns.ts (comparison table from saved `perf-run` issues), editCost.ts
+                     (where an edit's time goes on the `edit` route; run it bundled)
 docs/                phase plans and phase reports; device-tests.md (the one checklist of tests
                      on real devices, filled out by the owner)
 .github/workflows/   ci.yml, deploy.yml
@@ -214,8 +216,10 @@ sides in turn.
   meshes are dropped beyond `R + 1`, data beyond `R + 2`. One job handles one chunk.
   `World.setBlock` reports chunks whose mesh shows changed light through
   `World.onLightChange`; the chunk manager remeshes them before it loads anything
-  (`relight`), the chunks of `chunksAffectedByEdit` are remeshed in the same frame as
-  before. `whenIdle` and `isReady` wait for both.
+  (`relight`). After an edit only the edited block's own chunk is remeshed in the same
+  frame (`ChunkManager.remeshAfterEdit`); the other chunks of `chunksAffectedByEdit` join
+  that queue (`queueRemesh`), and the frame of an edit gives the chunk manager only what
+  is left of `CHUNK_BUDGET_MS` (Phase 4 part E). `whenIdle` and `isReady` wait for both.
 - **Light on screen.** Vertex colour: red = face shade × ambient occlusion, green = sky
   light, blue = block light (level ÷ 15, averaged over the up to four clear cells that
   touch the vertex in front of the face). The vertex shader turns light into a colour
@@ -503,15 +507,23 @@ hold:
     performance test, `Input`, or how `Game` switches screens; "How a later session reads
     the results" and "For Part B: adding a scenario" are in the report too. The label
     `perf-run` exists in the repository.
-  - Part B (torch, darker night) is not yet implemented; it starts after Part P is merged
+  - Phase 4 part E (edits without hitches: only the edited block's chunk is remeshed in
+    the frame of an edit, its neighbours follow through the urgent queue): implemented
+    (plan: `docs/phase-4e-plan.md`, report: `docs/phase-4e-report.md`). Read its
+    "Decisions and deviations" before changing how edits are remeshed or the chunk budget.
+  - Part B (torch, darker night) is not yet implemented; it starts after Part E is merged
     and adds the scenario `torches` to the performance test (suite version 2). Part C (Web Workers) is optional and is
     built only when the owner's starting prompt asks for it; the performance test on the
     owner's phone is what decides (`docs/phase-4p-plan.md`, section 5.6).
-  - **Performance on real devices has not been measured yet.** The owner runs the
-    performance test on computer, phone and tablet (PERF-4 and PERF-5 in
-    `docs/device-tests.md`); at the start of a session look for issues with the label
-    `perf-run`. The baseline before light can no longer be taken. Numbers from software
+  - **Performance on real devices** is measured by the owner with the performance test on
+    computer, phone and tablet (PERF-4 and PERF-5 in `docs/device-tests.md`); at the start
+    of a session look for issues with the label `perf-run`. The baseline before light can no longer be taken. Numbers from software
     WebGL (cloud sessions, CI) are never evidence of performance.
+  - **First runs (issues #13–#16, build aef8349):** everything green except `edit` on
+    phone and tablet, which alone makes the Web Workers line say "recommended". The cause
+    is remeshing up to four whole chunk columns in the frame of an edit, not light, and
+    Part C as planned would not fix it: `docs/phase-4-edit-cost.md` (analysis and
+    options). The owner chose option 1: Part E.
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
