@@ -146,7 +146,15 @@ All other references were regenerated in the same run and are unchanged byte for
 
 ## The full suite in the cloud session (AC4.2)
 
-FULL_RUN_TEXT
+`node scripts/benchRun.mjs 1` played the full suite once in headless Chromium with software
+WebGL (960 × 540, mouse mode). It ran through all nine scenarios without a console message
+and ended on the result screen after **209 seconds**; no window was cut off. Its issue
+link is **3 710 characters** long (limit 7 000) and its text parses back to the record.
+The quick suite takes 13 seconds alone and 20 to 30 seconds inside the browser suite. The
+worst case of the unit test (nine scenarios with the widest numbers, browser and GPU names
+of 200 characters) stays below the limit as well.
+
+The browser suite has 154 tests (13 of them new) and takes 10 to 11.5 minutes, as before.
 
 Its frame times and lights come from software WebGL and are no findings.
 
