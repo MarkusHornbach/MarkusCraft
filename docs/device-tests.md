@@ -26,47 +26,46 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 4 part A (pull request 10, not yet merged).
+Last updated: Phase 4 part P (performance test).
 
 ---
 
 ## 1. Performance (decides about Web Workers, Phase 4 part C)
 
-Seed 1337, Creative world, debug overlay on. Fly test: fly mode, rise above the trees, fly
-straight in one direction (the overlay shows the facing) for a minute.
+Performance is measured by the game itself: the **performance test** plays fixed scenarios
+(standing, walking, flying, building; at render distance 5 and 8) in a throwaway world,
+judges them with traffic lights and hands the numbers over as a pre-filled GitHub issue.
+Nothing has to be read off the debug overlay any more.
 
-### 1.1 Baseline, on the version before light (the deployed game until pull request 10 is merged)
+**What decides about Part C (Web Workers):** the line "Web Workers (Part C): recommended /
+borderline / not needed" of the **phone's** run (PERF-4), together with your own
+impression while watching it (PERF-5). Runs on the computer and the tablet are recorded
+for comparison; their line reads "decided on phones and tablets" on the computer.
 
-- [ ] **PERF-1** (4A) FPS standing, walking, flying fast, at render distance 5 and at 8.
-      Does the picture stutter when new terrain appears? _PC, Phone, Tablet._
+Once, before the first run:
 
-  | Device | Distance | Standing | Walking | Flying | Stutter? |
-  | ------ | -------- | -------- | ------- | ------ | -------- |
-  | PC     | 5        |          |         |        |          |
-  | PC     | 8        |          |         |        |          |
-  | Phone  | 5        |          |         |        |          |
-  | Phone  | 8        |          |         |        |          |
-  | Tablet | 5        |          |         |        |          |
-  | Tablet | 8        |          |         |        |          |
+- The label `perf-run` must exist in the repository (Issues → Labels). It does: it was
+  created before Part P was built. Without it the issues would arrive without a label and
+  be found by their title "Performance run: …" only.
+- The browser must be logged in to GitHub: log in once in Chrome on the phone and on the
+  tablet. Otherwise GitHub shows its login page first; the pre-filled text usually
+  survives that, and "Copy result" is the way out if it does not (paste the text into a
+  new issue by hand).
+- Bookmark `https://markushornbach.github.io/MarkusCraft/?bench=1` on each device.
 
-### 1.2 With light (Phase 4 part A)
-
-- [ ] **PERF-2** (4A) The same test. Also note from the overlay "Chunk work: avg, max" and
-      "Frames: … in 10 s, … long", and whether new terrain appears later than before.
-      Part C is needed if flying stutters clearly more than in PERF-1, or the largest
-      chunk work is regularly above 30 ms on the phone. _PC, Phone, Tablet._
-
-  | Device | Distance | Standing | Walking | Flying | Chunk work avg / max | Long frames | Stutter? |
-  | ------ | -------- | -------- | ------- | ------ | -------------------- | ----------- | -------- |
-  | PC     | 5        |          |         |        |                      |             |          |
-  | PC     | 8        |          |         |        |                      |             |          |
-  | Phone  | 5        |          |         |        |                      |             |          |
-  | Phone  | 8        |          |         |        |                      |             |          |
-  | Tablet | 5        |          |         |        |                      |             |          |
-  | Tablet | 8        |          |         |        |                      |             |          |
-
+- [ ] **PERF-4** (4P) Run the performance test (world menu → "Performance test", or the
+      bookmark `…/?bench=1`) with the charger in and other apps closed, and leave the
+      device alone for about four minutes. On the result screen press "Open GitHub issue"
+      and submit it. The issue is public; the result screen shows its exact text under
+      "Show text" before anything leaves the device. _PC, Phone, Tablet._
+      Result: (issue numbers)
+- [ ] **PERF-5** (4P) Watch one run on the phone: does what you see match the lights (a
+      visible stutter where a light is red, smooth where it is green; does terrain appear
+      late in the flying scenario where "Loading" is yellow or red)? This checks the
+      thresholds against a person's eye. Result:
 - [ ] **PERF-3** (1) PC only: 60 FPS at render distance 8 on a mid-range laptop? Try 16 as
-      well. Result:
+      well (render distance 16 is not part of the performance test; use the debug overlay,
+      F3). Result:
 
 ## 2. Light (Phase 4 part A)
 
@@ -222,3 +221,10 @@ Tests that no longer need doing, with the reason.
 - (3A) "Frame rate and hitches – this decides whether Part D (Web Workers) is started."
   Reason: Phase 3 part D was never started; the question is now Phase 4 part C and is
   answered by PERF-1 and PERF-2.
+- **PERF-1** (4A) "FPS standing, walking, flying fast, at render distance 5 and at 8, on
+  the version before light. Does the picture stutter when new terrain appears?" Never
+  filled in. Reason: light is merged and deployed, so the baseline before light can no
+  longer be measured; the performance test judges each run by its own numbers instead.
+- **PERF-2** (4A) "The same test with light, plus 'Chunk work: avg, max' and 'Frames: … in
+  10 s, … long' from the overlay." Never filled in. Reason: these numbers are taken by the
+  performance test (PERF-4), on the same route on every device.

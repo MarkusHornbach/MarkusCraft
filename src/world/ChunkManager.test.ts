@@ -206,3 +206,81 @@ describe('ChunkManager performance (AC12.2)', () => {
     expectFasterThan(elapsed, 3000);
   });
 });
+
+describe('ChunkManager.missingMeshDistance (Phase 4P AC2.4)', () => {
+  it('is the radius + 1 once everything is meshed, and 0 before anything is', () => {
+    const { manager } = setup(3);
+    // No centre yet: nothing is meshed, not even the chunk the player is in.
+    expect(manager.missingMeshDistance()).toBe(0);
+    manager.setCenter(0, 0);
+    expect(manager.missingMeshDistance()).toBe(0);
+    runToIdle(manager);
+    expect(manager.missingMeshDistance()).toBe(4);
+  });
+
+  it('grows ring by ring while the area loads', () => {
+    const { manager } = setup(3);
+    manager.setCenter(0, 0);
+    let last = 0;
+    while (manager.pending > 0) {
+      manager.update(fakeClock(1), 1);
+      const distance = manager.missingMeshDistance();
+      expect(distance).toBeGreaterThanOrEqual(last);
+      // A ring is complete when (2d + 1)² chunks have a mesh; loading goes nearest first.
+      if (manager.pending > 0) expect((2 * distance + 1) ** 2).toBeGreaterThan(manager.loaded);
+      last = distance;
+    }
+    expect(last).toBe(4);
+  });
+
+  it('gives the distance to the new chunks after the centre moved', () => {
+    const { manager } = setup(3);
+    manager.setCenter(0, 0);
+    runToIdle(manager);
+    // One chunk on: the far column (distance 3) is new; the hysteresis ring had no mesh.
+    manager.setCenter(1, 0);
+    expect(manager.missingMeshDistance()).toBe(3);
+    // Two chunks from the start: columns at distance 2 and 3 are new.
+    manager.setCenter(2, 0);
+    expect(manager.missingMeshDistance()).toBe(2);
+    // Five chunks: the old area ended at x = 3, so the centre itself has no mesh.
+    manager.setCenter(5, 0);
+    expect(manager.missingMeshDistance()).toBe(0);
+    // Far away nothing is left either, and a diagonal step counts as one.
+    manager.setCenter(40, 40);
+    expect(manager.missingMeshDistance()).toBe(0);
+    runToIdle(manager);
+    manager.setCenter(41, 41);
+    expect(manager.missingMeshDistance()).toBe(3);
+  });
+
+  it('never changes the manager or the world', () => {
+    const { manager, world, recorder } = setup(2);
+    manager.setCenter(0, 0);
+    for (let i = 0; i < 7; i++) manager.update(fakeClock(1), 6);
+    const before = {
+      pending: manager.pending,
+      loaded: manager.loaded,
+      meshed: manager.meshed,
+      relight: manager.relight,
+      jobs: { ...manager.jobs },
+      chunks: world.chunkCount,
+      lit: world.litCount,
+      calls: recorder.meshed.length + recorder.unloaded.length,
+    };
+    for (let i = 0; i < 50; i++) manager.missingMeshDistance();
+    expect({
+      pending: manager.pending,
+      loaded: manager.loaded,
+      meshed: manager.meshed,
+      relight: manager.relight,
+      jobs: { ...manager.jobs },
+      chunks: world.chunkCount,
+      lit: world.litCount,
+      calls: recorder.meshed.length + recorder.unloaded.length,
+    }).toEqual(before);
+    // The run goes on as if nobody had looked.
+    runToIdle(manager);
+    expect(manager.missingMeshDistance()).toBe(3);
+  });
+});

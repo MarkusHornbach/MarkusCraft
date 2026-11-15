@@ -20,6 +20,11 @@ export interface GameParams {
   world: string;
   /** With `test`: game mode of a world the page creates (default Creative). */
   mode: GameMode;
+  /**
+   * The performance test (never with `test`): `full` and `quick` open its start page
+   * with that suite, `sample` shows the result screen with a built-in result.
+   */
+  bench: 'off' | 'full' | 'quick' | 'sample';
 }
 
 /** Parses the query string. `randomSeed` supplies the seed when the URL has none. */
@@ -36,16 +41,26 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
   const parsedTime = timeText !== null && timeText.trim() !== '' ? Number(timeText) : NaN;
   const time = Number.isFinite(parsedTime) ? ((parsedTime % 1) + 1) % 1 : START_TIME_OF_DAY;
 
+  const test = query.get('test') === '1';
+  const benchText = query.get('bench');
+  const bench =
+    benchText === '1'
+      ? 'full'
+      : benchText === 'quick' || benchText === 'sample'
+        ? benchText
+        : 'off';
+
   return {
     seed,
     seedFromUrl,
     time,
     freeze: query.get('freeze') === '1',
-    test: query.get('test') === '1',
+    test,
     touch: query.get('touch') === '1',
     timeFromUrl: Number.isFinite(parsedTime),
     save: query.get('save') === '1',
     world: normalizeName(query.get('world') ?? '', 'Test'),
     mode: query.get('mode') === 'gathering' ? 'gathering' : 'creative',
+    bench: test ? 'off' : bench,
   };
 }

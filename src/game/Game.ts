@@ -4,6 +4,10 @@ import { type ActionResult, type BlockChange, heldItem } from '../actions/apply'
 import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
 import { type PlayerRecord } from '../actions/playerRecord';
 import { LocalSession } from '../actions/Session';
+import { type BenchResult, issueText, parseIssueBody } from '../bench/benchReport';
+import { type BenchHost, BenchRunner } from '../bench/BenchRunner';
+import { SAMPLE_RESULT } from '../bench/sampleResult';
+import type { SuiteKind } from '../bench/scenarios';
 import { Input, type PressAction } from '../input/Input';
 import { breakTimeMs, missingTool } from '../items/hardness';
 import { addItems } from '../items/inventory';
@@ -22,6 +26,7 @@ import {
   seedFromText,
 } from '../save/saveFormat';
 import { MemoryStore, type WorldStore } from '../save/WorldStore';
+import { BenchScreen } from '../ui/BenchScreen';
 import { DebugOverlay } from '../ui/DebugOverlay';
 import { Hud } from '../ui/Hud';
 import { InventoryScreen } from '../ui/InventoryScreen';
@@ -49,8 +54,14 @@ import { blockOf, skyOf } from '../world/light/lightRules';
 import { type RayHit, raycast } from '../world/raycast';
 import { World, chunksAffectedByEdit } from '../world/World';
 import { Autosave, type SaveBatch } from './autosave';
+import { heapMb, readBenchEnv } from './benchEnv';
 import {
   ACTION_REPEAT_MS,
+  BENCH_GENERATOR_VERSION,
+  BENCH_SEED,
+  BENCH_START_DELAY_MS,
+  BENCH_STORAGE_KEY,
+  BENCH_TIME,
   CHUNK_BUDGET_MS,
   CRAFT_REPEAT_MS,
   GENERATOR_VERSION,
@@ -75,7 +86,14 @@ import {
   WATER_SURFACE_DROP,
 } from './config';
 import { IdbStore } from './idbStore';
-import { type GameState, type PlayerPatch, type TestApi, installTestApi } from './testApi';
+import {
+  type BenchPhase,
+  type BenchStop,
+  type GameState,
+  type PlayerPatch,
+  type TestApi,
+  installTestApi,
+} from './testApi';
 import type { GameParams } from './urlParams';
 import { type ReleaseLock, acquireWorldLock } from './worldLock';
 
@@ -88,7 +106,30 @@ const FULLSCREEN_SETTLE_MS = 500;
 const STATION_CHECK_STEPS = 15;
 
 /** What covers the view outside test mode: a menu, or nothing while playing. */
-type Screen = 'worlds' | 'settings' | 'pause' | 'play';
+type Screen = 'worlds' | 'settings' | 'pause' | 'play' | 'bench';
+
+/** Why a performance test run was thrown away, as the "Interrupted" screen says it. */
+const BENCH_STOP_TEXT: Record<BenchStop, string> = {
+  hidden: 'The page was hidden: the tab was switched, the screen went off or the app left.',
+  portrait: 'The device was turned upright.',
+  resize: 'The size of the view changed: the window was resized or fullscreen was left.',
+  cancel: 'The test was cancelled.',
+};
+
+/** A performance test run in progress, with what it has to put back afterwards. */
+interface BenchRun {
+  runner: BenchRunner;
+  /** Nothing is loaded or measured before this time: the view may still settle. */
+  startAt: number;
+  /** Canvas size the run started with; 0 until its first frame. */
+  width: number;
+  height: number;
+  /** Settings and debug overlay as they were before the run. */
+  settings: Settings;
+  debug: boolean;
+  wake: WakeLockSentinel | null;
+  wakeGranted: boolean;
+}
 
 /** A problem the world menu tells the player about. */
 class MenuProblem extends Error {}
@@ -138,6 +179,15 @@ export class Game {
   /** The start screen with the list of worlds; like the pause screen not in test mode. */
   private readonly worldMenu: WorldMenu | null = null;
   private screen: Screen = 'play';
+  /** Screens of the performance test; like the menus not in test mode. */
+  private readonly benchScreen: BenchScreen | null = null;
+  /** Where the performance test is: on one of its screens, running, or not open (null). */
+  private benchPhase: BenchPhase | null = null;
+  private benchSuite: SuiteKind = 'full';
+  private bench: BenchRun | null = null;
+  /** The result on the result screen. */
+  private benchResult: BenchResult | null = null;
+  private benchStop: BenchStop | null = null;
   private readonly inventoryScreen: InventoryScreen;
   /** The inventory covers the view. Unlike the menus it does not pause the world. */
   private inventoryOpen = false;
@@ -265,6 +315,11 @@ export class Game {
     // E opens and closes the inventory, Esc closes it. Not while a text field is typed in.
     window.addEventListener('keydown', (e) => {
       if (e.repeat || e.target instanceof HTMLInputElement) return;
+      if (this.bench) {
+        // A run takes no keys but the one that cancels it.
+        if (e.code === 'Escape') this.interruptBench('cancel');
+        return;
+      }
       if (e.code === 'KeyE') {
         if (this.inventoryOpen) this.closeInventory();
         else this.openInventory();
@@ -297,9 +352,19 @@ export class Game {
           void this.startWorld(() => this.createStoredWorld(name, seedText, mode), via),
         onDelete: (id) => void this.deleteWorld(id),
         onSettings: () => this.showScreen('settings'),
+        onBench: () => this.openBench(),
       });
+      this.benchScreen = new BenchScreen(this.root, {
+        onStart: (via) => this.startBench(via),
+        onBack: () => this.closeBench(),
+        onCancel: () => this.interruptBench('cancel'),
+        onShowLast: () => this.showBenchResult(this.storedBenchResult()),
+      });
+      if (params.bench === 'quick') this.benchSuite = 'quick';
       this.paused = true;
       this.showScreen('worlds');
+      if (params.bench === 'sample') this.showBenchResult(SAMPLE_RESULT);
+      else if (params.bench !== 'off') this.openBench();
       document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
       document.addEventListener('pointerlockerror', () => this.onPointerLockError());
       void this.openStore();
@@ -324,7 +389,9 @@ export class Game {
     });
     // Leaving or hiding the page may be the last chance to save.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') void this.saveNow();
+      if (document.visibilityState !== 'hidden') return;
+      this.interruptBench('hidden');
+      void this.saveNow();
     });
     window.addEventListener('pagehide', () => void this.saveNow());
     installTestApi(this.createTestApi());
@@ -421,7 +488,8 @@ export class Game {
     const store = this.store;
     return new Autosave(async (batch: SaveBatch) => {
       const meta = this.meta;
-      if (!meta || this.world !== world) return;
+      // The world of the performance test is never stored.
+      if (!meta || this.world !== world || this.bench) return;
       const start = performance.now();
       // Both calls take their snapshot at once, before anything is awaited.
       const chunks = store.saveChunks(meta.id, world.edits, batch.chunks);
@@ -652,6 +720,188 @@ export class Game {
     await this.openNamedWorld(this.params.world, this.params.seed, this.params.mode);
   }
 
+  // --- performance test (not in test mode) ---------------------------------------------
+
+  /** Shows the start page of the performance test. */
+  private openBench(): void {
+    if (this.menuBusy || this.bench || !this.benchScreen) return;
+    this.benchPhase = 'start';
+    this.showScreen('bench');
+    this.benchScreen.showStart(this.storedBenchResult() !== null, this.benchSuite === 'quick');
+  }
+
+  /** "Back": from any screen of the performance test to the world menu. */
+  private closeBench(): void {
+    if (this.bench) return;
+    this.benchPhase = null;
+    this.benchResult = null;
+    this.benchScreen?.hide();
+    this.showScreen('worlds');
+  }
+
+  private showBenchResult(result: BenchResult | null): void {
+    if (!result || this.bench || !this.benchScreen) return;
+    this.benchResult = result;
+    this.benchPhase = 'result';
+    this.showScreen('bench');
+    this.benchScreen.showResult(result);
+  }
+
+  /** The result of the last finished run, if the browser kept a valid one. */
+  private storedBenchResult(): BenchResult | null {
+    try {
+      return parseIssueBody(window.localStorage.getItem(BENCH_STORAGE_KEY));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * "Start" was activated: a run begins. Like a play button, the way it was pressed
+   * selects mouse or touch mode, and touch mode enters fullscreen inside the tap. The
+   * run uses default settings and its own render distances; the stored ones stay as
+   * they are and come back when it ends.
+   */
+  private startBench(via: InputMode | null): void {
+    if (this.menuBusy || this.bench || !this.benchScreen) return;
+    if (via && via !== this.mode && !this.params.touch) this.setMode(via);
+    if (this.mode === 'touch') this.enterFullscreen();
+    const suite = this.benchSuite;
+    const run: BenchRun = {
+      runner: new BenchRunner({
+        suite,
+        host: this.benchHost(),
+        onProgress: (p) =>
+          this.benchScreen?.showRunning(
+            `Performance test – scenario ${p.index} of ${p.total}: ${p.label}`,
+          ),
+        info: () => ({
+          commit: __BUILD_COMMIT__,
+          date: new Date().toISOString(),
+          env: readBenchEnv(
+            this.renderer.canvas,
+            this.renderer.pixelRatio,
+            this.mode,
+            run.wakeGranted,
+          ),
+        }),
+        onDone: (result) => this.finishBench(result),
+      }),
+      startAt: performance.now() + BENCH_START_DELAY_MS,
+      width: 0,
+      height: 0,
+      settings: this.settings,
+      debug: this.debug.visible,
+      wake: null,
+      wakeGranted: false,
+    };
+    this.bench = run;
+    this.benchPhase = 'running';
+    this.benchResult = null;
+    this.benchStop = null;
+    this.setDebugVisible(false);
+    this.benchScreen.showRunning('Performance test – starting');
+    this.requestWakeLock(run);
+    // Fullscreen may take a moment; an upright device shows before anything is measured.
+    if (this.isPortrait()) this.interruptBench('portrait');
+  }
+
+  /** Keeps the screen on during a run, where the browser can. A refusal changes nothing. */
+  private requestWakeLock(run: BenchRun): void {
+    const wakeLock = (navigator as Navigator & { wakeLock?: WakeLock }).wakeLock;
+    if (!wakeLock) return;
+    try {
+      wakeLock.request('screen').then(
+        (sentinel) => {
+          if (this.bench !== run) {
+            void sentinel.release().catch(() => {});
+            return;
+          }
+          run.wake = sentinel;
+          run.wakeGranted = true;
+        },
+        () => {},
+      );
+    } catch {
+      // Some browsers throw instead of rejecting.
+    }
+  }
+
+  /** What the runner may do with the game: the real world, physics and action layer. */
+  private benchHost(): BenchHost {
+    return {
+      loadWorld: (renderDistance) => {
+        this.useSettings({ ...DEFAULT_SETTINGS, renderDistance });
+        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative');
+        this.loadWorld({ ...meta, generatorVersion: BENCH_GENERATOR_VERSION }, new Map());
+        // The loop runs the simulation; no pointer lock is asked for.
+        this.paused = false;
+        this.showScreen('play');
+        this.touchHud?.setCovered(true);
+      },
+      setPlayer: (pose) => this.setPlayer(pose),
+      setInput: (input) => this.input.setScript(input),
+      submit: (action) => this.session.submit(action),
+      chunksIdle: () => this.chunksIdle(),
+      pendingChunks: () => this.chunkManager.pending,
+      missingMeshDistance: () => this.chunkManager.missingMeshDistance(),
+      heapMb,
+    };
+  }
+
+  /** One frame of a run: the rules that throw it away, then the runner. */
+  private benchFrame(ms: number, frameMs: number, chunkWorkMs: number): void {
+    const run = this.bench;
+    if (!run || ms < run.startAt) return;
+    const canvas = this.renderer.canvas;
+    if (run.width === 0) {
+      run.width = canvas.width;
+      run.height = canvas.height;
+    } else if (canvas.width !== run.width || canvas.height !== run.height) {
+      this.interruptBench('resize');
+      return;
+    }
+    run.runner.frame(ms, frameMs, chunkWorkMs);
+  }
+
+  /** Throws the run away: nothing of it is kept. */
+  private interruptBench(reason: BenchStop): void {
+    const run = this.bench;
+    if (!run) return;
+    run.runner.interrupt();
+    this.endBench(run);
+    this.benchPhase = 'interrupted';
+    this.benchStop = reason;
+    this.benchScreen?.showInterrupted(BENCH_STOP_TEXT[reason]);
+  }
+
+  private finishBench(result: BenchResult): void {
+    const run = this.bench;
+    if (!run) return;
+    this.endBench(run);
+    try {
+      // The one thing the test keeps: the text of its last result.
+      window.localStorage.setItem(BENCH_STORAGE_KEY, issueText(result));
+    } catch {
+      // Storage can be full or blocked; the result is on screen all the same.
+    }
+    this.showBenchResult(result);
+  }
+
+  /** Leaves the test world and puts settings, input and overlay back. */
+  private endBench(run: BenchRun): void {
+    this.bench = null;
+    void run.wake?.release().catch(() => {});
+    this.input.setScript(null);
+    this.touch?.tracker.reset();
+    this.touchHud?.setCovered(false);
+    this.paused = true;
+    this.useSettings(run.settings);
+    this.closeWorld();
+    this.setDebugVisible(run.debug);
+    this.showScreen('bench');
+  }
+
   /** Bar slot of the confirmed player record, 1-based as on the keyboard. */
   private get selectedSlot(): number {
     return this.session.record.selectedSlot + 1;
@@ -777,7 +1027,7 @@ export class Game {
    * while it is open; in mouse mode the mouse is set free for it.
    */
   private openInventory(): void {
-    if (!this.meta || this.paused || this.inventoryOpen) return;
+    if (!this.meta || this.paused || this.inventoryOpen || this.bench) return;
     this.inventoryOpen = true;
     this.touch?.tracker.reset();
     this.input.reset();
@@ -874,7 +1124,7 @@ export class Game {
       this.touch = new TouchControls({
         root: this.root,
         sink: this.input,
-        isActive: () => !this.paused && !this.inventoryOpen,
+        isActive: () => !this.paused && !this.inventoryOpen && !this.bench,
       });
     } else if (!touch) {
       this.touch?.dispose();
@@ -945,7 +1195,7 @@ export class Game {
   }
 
   private onPointerLockChange(): void {
-    if (this.mode === 'touch') return;
+    if (this.mode === 'touch' || this.benchPhase) return;
     // While a world is still being opened, `startWorld` looks at the lock when it is there.
     if (!this.meta) return;
     // The inventory sets the mouse free without pausing.
@@ -1012,7 +1262,9 @@ export class Game {
     // looked at again when it has settled.
     const portrait = this.isPortrait() && performance.now() >= this.orientationQuietUntil;
     this.touchHud?.setRotateVisible(portrait);
-    if (portrait && !this.paused) this.setPaused(true);
+    // A run of the performance test is thrown away instead of paused.
+    if (portrait && this.bench) this.interruptBench('portrait');
+    else if (portrait && !this.paused) this.setPaused(true);
   }
 
   private resize(): void {
@@ -1030,7 +1282,9 @@ export class Game {
   private frame(ms: number): void {
     requestAnimationFrame((next) => this.frame(next));
     // The time since the last frame, with the chunk work that was done since then.
-    if (this.meta) this.perf.record(ms, ms - this.lastFrameMs, this.chunkWorkMs);
+    const frameMs = ms - this.lastFrameMs;
+    if (this.meta) this.perf.record(ms, frameMs, this.chunkWorkMs);
+    if (this.bench) this.benchFrame(ms, frameMs, this.chunkWorkMs);
     this.chunkWorkMs = 0;
     const elapsed = Math.max(0, Math.min((ms - this.lastFrameMs) / 1000, 0.25));
     this.lastFrameMs = ms;
@@ -1054,7 +1308,7 @@ export class Game {
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
     }
 
-    if (!this.paused && !this.inventoryOpen) {
+    if (!this.paused && !this.inventoryOpen && !this.bench) {
       const look = this.input.consumeLook();
       this.applyLookPixels(look.dx, look.dy);
       if (this.touch) {
@@ -1085,6 +1339,8 @@ export class Game {
 
   /** One fixed simulation step. */
   private simulate(): void {
+    // A performance test sets the input of this step and submits its action.
+    this.bench?.runner.step();
     this.rememberPosition();
     stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
@@ -1094,7 +1350,8 @@ export class Game {
     this.continueCrafting();
     // Pose and time of day are part of the world's record.
     this.markMetaDirty();
-    this.time = advanceTime(this.time, SIM_DT, this.params.freeze);
+    // The clock of a performance test stands still.
+    this.time = advanceTime(this.time, SIM_DT, this.params.freeze || this.bench !== null);
   }
 
   /**
@@ -1467,6 +1724,7 @@ export class Game {
         stationMissing: status.stationMissing,
       })),
       smelting: this.smeltView(),
+      bench: this.benchState(),
       player: {
         x: p.x,
         y: p.y,
@@ -1506,6 +1764,19 @@ export class Game {
             face: this.target.face,
           }
         : null,
+    };
+  }
+
+  private benchState(): GameState['bench'] {
+    if (!this.benchPhase) return null;
+    const progress = this.bench?.runner.progress;
+    return {
+      phase: this.benchPhase,
+      suite: this.benchSuite,
+      index: progress?.index ?? 0,
+      total: progress?.total ?? 0,
+      scenario: progress?.scenario ?? null,
+      reason: this.benchPhase === 'interrupted' ? this.benchStop : null,
     };
   }
 
@@ -1569,6 +1840,7 @@ export class Game {
       save: () => this.saveNow(),
       give: (item, count) => this.testGive(item, count),
       clearInventory: () => this.testClearInventory(),
+      benchResult: () => (this.benchPhase === 'result' ? this.benchResult : null),
       openWorld: (name, seed, mode) => this.openNamedWorld(name, seed, mode ?? this.params.mode),
       step: (n) => {
         for (let i = 0; i < n; i++) this.simulate();

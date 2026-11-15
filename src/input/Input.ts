@@ -29,6 +29,15 @@ const KEY_HELD: Record<string, HeldAction> = {
 
 const MOUSE_HELD: Record<number, 'break' | 'place'> = { 0: 'break', 2: 'place' };
 
+/** Input that a script holds instead of the player (the performance test). */
+export interface ScriptedInput {
+  forward: number;
+  strafe: number;
+  jump: boolean;
+  sprint: boolean;
+  descend: boolean;
+}
+
 export interface InputOptions {
   /** Element that receives mouse buttons and owns the pointer lock. */
   element: HTMLElement;
@@ -44,13 +53,15 @@ export class Input {
   private analogForward = 0;
   private analogStrafe = 0;
   private mouseEnabled = true;
+  /** While a script is set, it alone is the input: keys, mouse and fingers are ignored. */
+  private script: ScriptedInput | null = null;
   private readonly element: HTMLElement;
-  private readonly isActive: () => boolean;
+  private readonly sourceActive: () => boolean;
   private readonly onPress: (action: PressAction) => void;
 
   constructor(options: InputOptions) {
     this.element = options.element;
-    this.isActive = options.isActive;
+    this.sourceActive = options.isActive;
     this.onPress = options.onPress;
 
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -64,7 +75,27 @@ export class Input {
     this.element.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
   }
 
+  /** Whether keys, mouse and fingers count right now. */
+  private isActive(): boolean {
+    return this.script === null && this.sourceActive();
+  }
+
+  /**
+   * Hands the input to a script, or back to the player with null. What was held before
+   * is forgotten either way.
+   */
+  setScript(script: ScriptedInput | null): void {
+    if (this.script === null || script === null) this.reset();
+    this.script = script;
+  }
+
   isHeld(action: HeldAction): boolean {
+    const script = this.script;
+    if (script) {
+      if (action === 'jump') return script.jump;
+      if (action === 'sprint') return script.sprint;
+      return action === 'descend' && script.descend;
+    }
     return this.held.has(action);
   }
 
@@ -88,6 +119,7 @@ export class Input {
 
   /** Movement axes in [-1, 1]: keys and the analog stick combined. */
   moveAxes(): { forward: number; strafe: number } {
+    if (this.script) return { forward: this.script.forward, strafe: this.script.strafe };
     const keysForward = (this.held.has('forward') ? 1 : 0) - (this.held.has('back') ? 1 : 0);
     const keysStrafe = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0);
     return {
