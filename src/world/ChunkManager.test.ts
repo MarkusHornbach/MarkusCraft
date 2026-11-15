@@ -170,6 +170,49 @@ describe('ChunkManager (AC7.3)', () => {
     expect(recorder.meshed).toEqual(['0,0']);
   });
 
+  it('Phase 4E AC1.2: an edit inside a chunk remeshes that chunk and queues nothing', () => {
+    const { manager, world, recorder } = setup(2);
+    manager.setCenter(0, 0);
+    runToIdle(manager);
+    recorder.meshed.length = 0;
+    // High above the ground: the block changes no light, so only the mesh rule counts.
+    world.setBlock(5, 120, 5, Block.BRICKS);
+    manager.remeshAfterEdit(5, 5);
+    expect(recorder.meshed).toEqual(['0,0']);
+    expect(manager.relight).toBe(0);
+  });
+
+  it('Phase 4E AC1.1: an edit on a chunk corner meshes its own chunk and queues three', () => {
+    const { manager, world, recorder } = setup(2);
+    manager.setCenter(0, 0);
+    runToIdle(manager);
+    recorder.meshed.length = 0;
+    world.setBlock(-1, 120, -1, Block.BRICKS);
+    manager.remeshAfterEdit(-1, -1);
+    expect(recorder.meshed).toEqual(['-1,-1']);
+    expect(manager.relight).toBe(3);
+    // The waiting chunks come before any loading job, one per job.
+    manager.setCenter(1, 0);
+    expect(manager.update(fakeClock(10), 6)).toBe(1);
+    expect(manager.relight).toBe(2);
+    runToIdle(manager);
+    expect(manager.relight).toBe(0);
+    expect(recorder.meshed.slice(0, 4).sort()).toEqual(['-1,-1', '-1,0', '0,-1', '0,0']);
+  });
+
+  it('Phase 4E AC1.3: queueRemesh ignores chunks without a mesh', () => {
+    const { manager } = setup(2);
+    manager.setCenter(0, 0);
+    runToIdle(manager);
+    manager.queueRemesh(50, 50);
+    // Generated and lit, but outside the meshed area.
+    manager.queueRemesh(4, 0);
+    expect(manager.relight).toBe(0);
+    manager.queueRemesh(1, 1);
+    manager.queueRemesh(1, 1);
+    expect(manager.relight).toBe(1);
+  });
+
   it('drops and requeues a mesh whose neighbours are gone', () => {
     const { manager, world, recorder } = setup(2);
     manager.setCenter(0, 0);

@@ -52,7 +52,7 @@ import { getTerrain, terrainChecksum } from '../world/generation/terrain';
 import { lightChecksumOf } from '../world/light/lightChunk';
 import { blockOf, skyOf } from '../world/light/lightRules';
 import { type RayHit, raycast } from '../world/raycast';
-import { World, chunksAffectedByEdit } from '../world/World';
+import { World } from '../world/World';
 import { Autosave, type SaveBatch } from './autosave';
 import { heapMb, readBenchEnv } from './benchEnv';
 import {
@@ -1581,7 +1581,9 @@ export class Game {
   private updateChunks(): void {
     const start = performance.now();
     this.chunkManager.setCenter(toChunkCoord(this.player.x), toChunkCoord(this.player.z));
-    this.chunkManager.update(() => performance.now(), CHUNK_BUDGET_MS);
+    // An edit earlier in this frame already spent part of the budget, perhaps all of it.
+    const left = CHUNK_BUDGET_MS - this.chunkWorkMs;
+    if (left > 0) this.chunkManager.update(() => performance.now(), left);
     this.chunkWorkMs += performance.now() - start;
   }
 
@@ -1646,12 +1648,14 @@ export class Game {
   }
 
   /**
-   * Edits remesh immediately, outside the per-frame budget. Other chunks whose light the
-   * edit changed wait in the chunk manager's queue and follow in the next frames.
+   * The edited block's chunk is remeshed immediately, outside the per-frame budget. Its
+   * neighbours across a border and other chunks whose light the edit changed wait in the
+   * chunk manager's queue and follow in the next frames (Phase 4 part E): one frame never
+   * builds more than one chunk because of an edit.
    */
   private remeshAround(x: number, z: number): void {
     const start = performance.now();
-    for (const { cx, cz } of chunksAffectedByEdit(x, z)) this.chunkManager.remesh(cx, cz);
+    this.chunkManager.remeshAfterEdit(x, z);
     this.chunkWorkMs += performance.now() - start;
     if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }

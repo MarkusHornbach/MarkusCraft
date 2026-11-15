@@ -1,13 +1,16 @@
 // Dev tool: where the time of an edit goes, on the route of the performance test's `edit`
-// scenario (seed 1337, corner of four chunks). Run: npx vite-node scripts/editCost.ts
+// scenario (seed 1337, corner of four chunks). Run it bundled (see docs/phase-4-edit-cost.md);
+// an optional argument replaces the chunk budget in ms, e.g. 0.6 to act like a device ten
+// times slower than this one.
 import { BENCH_SEED, CHUNK_BUDGET_MS } from '../src/game/config';
 import { EDIT_CELLS, EDIT_HOVER } from '../src/bench/scenarios';
 import { Block } from '../src/world/blocks';
 import { ChunkManager } from '../src/world/ChunkManager';
-import { World, chunksAffectedByEdit } from '../src/world/World';
+import { World } from '../src/world/World';
 
 const RADIUS = 5;
 const ROUNDS = 5;
+const BUDGET = Number(process.argv[2] ?? CHUNK_BUDGET_MS);
 const y = EDIT_HOVER.y - 2;
 const edits = [
   ...EDIT_CELLS.map((c) => ({ ...c, id: Block.STONE })),
@@ -21,7 +24,7 @@ interface Sample {
   urgent: number;
   urgentN: number;
   frame: number;
-  maxQueued: number;
+  frameMeshes: number;
 }
 const best: Sample[] = edits.map(() => ({
   light: 1e9,
@@ -30,7 +33,7 @@ const best: Sample[] = edits.map(() => ({
   urgent: 1e9,
   urgentN: 0,
   frame: 1e9,
-  maxQueued: 1e9,
+  frameMeshes: 0,
 }));
 let meshCount = 0;
 
@@ -47,29 +50,31 @@ for (let round = 0; round < ROUNDS; round++) {
     const t0 = performance.now();
     world.setBlock(e.x, y, e.z, e.id);
     const t1 = performance.now();
-    const affected = chunksAffectedByEdit(e.x, e.z);
-    for (const { cx, cz } of affected) manager.remesh(cx, cz);
-    const t2 = performance.now();
-    const queued = manager.relight;
     const before = meshCount;
-    // The following frames: the urgent queue under the normal budget, until empty.
+    // As `Game` does it: the edited block's chunk at once, its neighbours queued.
+    manager.remeshAfterEdit(e.x, e.z);
+    const t2 = performance.now();
+    const direct = meshCount - before;
+    // The rest of the edit's frame gets what is left of the budget, then the next frames.
     let firstFrame = 0;
-    let frames = 0;
-    while (manager.relight > 0) {
+    let frameMeshes = direct;
+    const left = BUDGET - (t2 - t0);
+    if (left > 0 && manager.relight > 0) {
       const s = performance.now();
-      manager.update(() => performance.now(), CHUNK_BUDGET_MS);
-      if (frames++ === 0) firstFrame = performance.now() - s;
+      manager.update(() => performance.now(), left);
+      firstFrame = performance.now() - s;
+      frameMeshes = meshCount - before;
     }
+    while (manager.relight > 0) manager.update(() => performance.now(), BUDGET);
     const t3 = performance.now();
     const b = best[i];
     b.light = Math.min(b.light, t1 - t0);
     b.direct = Math.min(b.direct, t2 - t1);
-    b.directN = affected.length;
+    b.directN = direct;
     b.urgent = Math.min(b.urgent, t3 - t2);
-    b.urgentN = meshCount - before;
-    // Same frame as the edit: light + direct remesh + the first budgeted update.
+    b.urgentN = meshCount - before - direct;
     b.frame = Math.min(b.frame, t2 - t0 + firstFrame);
-    b.maxQueued = queued;
+    b.frameMeshes = frameMeshes;
   });
 }
 
@@ -77,7 +82,7 @@ const sum = (f: (s: Sample) => number) => best.reduce((a, s) => a + f(s), 0);
 const max = (f: (s: Sample) => number) => Math.max(...best.map(f));
 const n = best.length;
 const meshMs = sum((s) => s.direct) / sum((s) => s.directN);
-console.log(`${n} edits, best of ${ROUNDS} rounds, render distance ${RADIUS}`);
+console.log(`${n} edits, best of ${ROUNDS} rounds, render distance ${RADIUS}, budget ${BUDGET} ms`);
 console.log(
   `light update:   avg ${(sum((s) => s.light) / n).toFixed(2)} ms, max ${max((s) => s.light).toFixed(2)} ms`,
 );
@@ -90,12 +95,12 @@ console.log(
     `chunks per edit avg ${(sum((s) => s.urgentN) / n).toFixed(2)}, max ${max((s) => s.urgentN)}`,
 );
 console.log(
-  `edit frame (light + direct + first budgeted update): avg ${(sum((s) => s.frame) / n).toFixed(2)} ms, max ${max((s) => s.frame).toFixed(2)} ms`,
+  `edit frame (light + direct + rest of the budget): avg ${(sum((s) => s.frame) / n).toFixed(2)} ms, max ${max((s) => s.frame).toFixed(2)} ms`,
 );
 const hist = new Map<number, number>();
-for (const s of best) hist.set(s.directN, (hist.get(s.directN) ?? 0) + 1);
+for (const s of best) hist.set(s.frameMeshes, (hist.get(s.frameMeshes) ?? 0) + 1);
 console.log(
-  `edits by chunks remeshed directly: ${[...hist]
+  `edits by chunks meshed in their frame: ${[...hist]
     .sort()
     .map(([k, v]) => `${k}→${v}`)
     .join(', ')}`,
