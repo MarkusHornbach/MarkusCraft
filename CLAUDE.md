@@ -150,7 +150,8 @@ scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet
                      icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
                      next to new), benchRun.mjs (plays the performance test headlessly),
-                     perfRuns.ts (comparison table from saved `perf-run` issues)
+                     perfRuns.ts (comparison table from saved `perf-run` issues), editCost.ts
+                     (where an edit's time goes on the `edit` route; run it bundled)
 docs/                phase plans and phase reports; device-tests.md (the one checklist of tests
                      on real devices, filled out by the owner)
 .github/workflows/   ci.yml, deploy.yml
@@ -512,6 +513,11 @@ hold:
     `docs/device-tests.md`); at the start of a session look for issues with the label
     `perf-run`. The baseline before light can no longer be taken. Numbers from software
     WebGL (cloud sessions, CI) are never evidence of performance.
+  - **First runs (issues #13–#16, build aef8349):** everything green except `edit` on
+    phone and tablet, which alone makes the Web Workers line say "recommended". The cause
+    is remeshing up to four whole chunk columns in the frame of an edit, not light, and
+    Part C as planned would not fix it: `docs/phase-4-edit-cost.md` (analysis and
+    options; the owner decides).
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
