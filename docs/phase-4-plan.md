@@ -6,29 +6,40 @@ and deviations". This plan is executed autonomously: do not ask the owner questi
 this plan leaves a detail open, choose the simplest option and note it in the report of the
 part being implemented.
 
-**The phase has three parts, each implemented in its own cloud session with its own branch,
+**The phase has four parts, each implemented in its own cloud session with its own branch,
 report and pull request:**
 
 | Part | Content                                                                   | Steps | Report                    | Starts when                                     |
 | ---- | ------------------------------------------------------------------------- | ----- | ------------------------- | ----------------------------------------------- |
 | A    | Light: engine, chunk pipeline, rendering, Brightness setting, measurement | 1–5   | `docs/phase-4a-report.md` | Now, from `main`                                |
-| B    | Torch: block, recipe, warm light, darker night, tuning                    | 6–9   | `docs/phase-4b-report.md` | After Part A is merged                          |
+| P    | Performance test run on real devices (own plan: `docs/phase-4p-plan.md`)  | P1–P4 | `docs/phase-4p-report.md` | After Part A is merged                          |
+| B    | Torch: block, recipe, warm light, darker night, tuning                    | 6–9   | `docs/phase-4b-report.md` | After Part P is merged                          |
 | C    | Web Workers for generation, light and meshing (optional)                  | 10–11 | `docs/phase-4c-report.md` | Only if the owner's starting prompt asks for it |
 
 A session implements exactly one part; the owner's starting prompt says which. The
 Definition of Done in `CLAUDE.md` applies to each part separately.
 
-Rules for parts B and C:
+**Part P was added after Part A** (planned with the owner, see `docs/phase-4p-plan.md`,
+"Changes to the original scope"). It builds no light and no torch: it is the standardized
+performance test that replaces the manual measurements of section 9, items 1 and 2, and
+whose results decide about Part C. Its four steps are in its own plan (called P1–P4
+here; its tests name their criteria "Phase 4P AC…"), so the step numbers of this plan
+stay as they are.
 
-- Precondition: the report of the previous required part exists on the session's branch (B
-  needs `phase-4a-report.md`, C needs `phase-4a-report.md`). If it does not, write that
-  into the own report, commit it and stop.
+Rules for parts P, B and C:
+
+- Precondition: the report of the previous required part exists on the session's branch (P
+  needs `phase-4a-report.md`; B needs `phase-4a-report.md` and `phase-4p-report.md`; C
+  needs `phase-4a-report.md` and `phase-4p-report.md`). If it does not, write that into
+  the own report, commit it and stop.
 - Read the reports of the earlier parts first, in particular "Decisions and deviations".
 - Before opening the pull request, merge the current `main` into the branch and run
   `npm run check:all` again.
 - Part C replaces Phase 3 Part D, which was never started. The owner starts it only if a
-  real device shows hitches (manual list, section 9). If it is never started, Phase 4 is
-  complete with Part B.
+  real device shows hitches: a run of the performance test on the phone whose line "Web
+  Workers (Part C)" says "recommended" (`docs/phase-4p-plan.md`, section 5.6), or the
+  owner's own judgment. If it is never started, Phase 4 is complete with Part B.
+- Part B adds the scenario `torches` to the performance test (step 9, AC9.8).
 
 **Size, estimated honestly.** The phase is about as large as Phase 3 parts B and C
 together, and each of those needed two sessions. Part A is the delicate one: it touches the
@@ -62,7 +73,7 @@ simply have light. Everything works with keyboard and mouse and with the touch c
 | Open shafts      | Full sky light falls straight down any open column. A vertical shaft is bright at noon and dark at night; tunnels, staircases and roofed rooms are dark by day                                                                       |
 | Storage          | Light is derived from the blocks and never saved. No new save format version, no new generator version                                                                                                                               |
 | Performance      | Light runs on the main thread inside the existing per-frame budget, written as pure functions that fit a worker unchanged. Workers are built only if device numbers ask for them                                                     |
-| Measurement      | The debug overlay shows chunk-work time and long frames, so the owner's device test yields numbers                                                                                                                                   |
+| Measurement      | The debug overlay shows chunk-work time and long frames, so the owner's device test yields numbers. Since Part P the numbers are taken by the performance test and arrive as GitHub issues with the label `perf-run`                 |
 | Edits            | The chunk of an edit is remeshed in the same frame, as today. Other chunks whose light changed follow in the next frames                                                                                                             |
 | Torch            | Floor only: it stands on top of a solid block. No wall torches, no block orientation                                                                                                                                                 |
 | Torch support    | Breaking the block under a torch removes the torch in the same action. In Gathering it goes into the breaker's inventory if there is room, otherwise it is lost                                                                      |
@@ -632,6 +643,12 @@ of leaves and water. References of 6.4 for Part B.
   written, with the full manual list of section 9, measured numbers, and "Notes for
   later phases" (section 10, updated).
 - AC9.7 CI is green on the final commit and one pull request into `main` is open.
+- AC9.8 (added with Part P) The performance test has the scenario `torches` (midnight;
+  scripted actions place torches along a fixed line and break them again, then the player
+  walks past them), as `docs/phase-4p-plan.md`, section 11, describes: suite version 2,
+  the scenario pinned by unit tests like the others (all actions accepted, light changes,
+  `verifyLight()` = 0 afterwards), one more row on the result screen, the quick run in
+  the browser tests still passes, `bench-result` regenerated.
 
 ### Part C – Web Workers (steps 10–11, optional)
 
@@ -665,7 +682,9 @@ go to workers; `workers=0`, a failing worker start and Node use the main-thread 
   largest value is at most 3 ms with workers; both numbers are in the report.
 - AC11.2 E2E: the time until `isReady()` is not longer than without workers (± 10 %).
 - AC11.3 `CLAUDE.md` and `docs/phase-4c-report.md` are updated, with the device
-  measurement of section 9, item 2, before and after.
+  measurement before and after: since Part P that is two runs of the performance test on
+  the owner's phone (one with `workers=0`), each submitted as an issue; the result record
+  says whether workers were on.
 - AC11.4 CI is green on the final commit and one pull request into `main` is open.
 
 ## 8. Risks and fallbacks
@@ -690,6 +709,12 @@ go to workers; `workers=0`, a failing worker start and Node use the main-thread 
 | Workers (Part C): the worker build fails under `base: './'`, or copies cost more  | As in the Phase 3 plan: try the `?worker` import form; if it does not work within the step, stop Part C, write the finding into its report and open no pull request                                                           |
 
 ## 9. Manual test list for real devices
+
+**Since Part P, items 1 and 2 are replaced by the performance test**
+(`docs/phase-4p-plan.md`): the baseline of item 1 can no longer be measured, because Part
+A is deployed, and the numbers of item 2 are taken by the test run. The rule for starting
+Part C is the one in that plan, section 5.6. The other items stay; the list that is filled
+out is `docs/device-tests.md`.
 
 The reports repeat the items of their part. The lists of Phase 3 (`phase-3a-report.md`,
 `phase-3b-report.md`, `phase-3c-report.md`, each "For the owner to try") are still open

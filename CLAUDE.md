@@ -23,8 +23,9 @@ game in a procedurally generated world"; everything in it is original work.
      Workers) was never started and is replaced by Phase 4 part C
   4. **Light & Torches** – sky light and block light per block cell, derived from the
      blocks and never saved; dark tunnels and rooms, a darker night, a Brightness setting,
-     and the torch, the first block that is not a cube. Three parts with separate pull
-     requests: A light, B torch, C Web Workers (optional) (plan: `docs/phase-4-plan.md`;
+     and the torch, the first block that is not a cube. Four parts with separate pull
+     requests: A light, P performance test run on real devices, B torch, C Web Workers
+     (optional) (plan: `docs/phase-4-plan.md`, for part P `docs/phase-4p-plan.md`;
      report of part A: `docs/phase-4a-report.md`)
   5. **Gamepad controls** (not yet planned)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
@@ -444,9 +445,18 @@ hold:
     measurement): implemented (report: `docs/phase-4a-report.md`). Read its "Decisions and
     deviations" before changing light, the chunk manager, the mesher, the chunk shader or
     the reference screenshots.
-  - Part B (torch, darker night) is not yet implemented; it starts after Part A is merged.
-    Part C (Web Workers) is optional and is built only when the owner's starting prompt
-    asks for it.
+  - Phase 4 part P (performance test run: fixed scenarios played by the real game loop,
+    started by hand on a device, results as pre-filled GitHub issues with the label
+    `perf-run`): planned (`docs/phase-4p-plan.md`), not yet implemented. It was added
+    after Part A and comes before Part B.
+  - Part B (torch, darker night) is not yet implemented; it starts after Part P is merged
+    and adds a scenario to the performance test. Part C (Web Workers) is optional and is
+    built only when the owner's starting prompt asks for it; the performance test on the
+    owner's phone is what decides (`docs/phase-4p-plan.md`, section 5.6).
+  - **Performance on real devices was never measured by hand** (PERF-1 and PERF-2 in
+    `docs/device-tests.md` are empty) and the baseline before light can no longer be
+    taken. Numbers from software WebGL (cloud sessions, CI) are never evidence of
+    performance.
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
