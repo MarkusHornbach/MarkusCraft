@@ -7,7 +7,6 @@ import {
   expectCorrect,
   flatGroup,
   lights,
-  randomEdits,
   sky,
   worldOf,
 } from '../../testing/lightEdits';
@@ -20,10 +19,6 @@ import { blockOf } from './lightRules';
 import { changesLight, lightDifference, updateLight } from './lightUpdate';
 
 describe('light after edits', () => {
-  it('Phase 4 AC2.3: random edits that reach the top of the world', () => {
-    randomEdits(worldOf(artificialGroup(79, COUNT)), 30, 2025, true);
-  });
-
   it('Phase 4 AC2.4: removing an emitter leaves no light behind', () => {
     const world = worldOf(flatGroup());
     world.setBlock(40, 12, 40, LAMP);

@@ -392,7 +392,9 @@ describe('generation speed', () => {
     run(NO_FEATURES);
     let plain = Infinity;
     let full = Infinity;
-    for (let round = 0; round < 40; round++) {
+    // Other test files run next to this one and can slow one of the two for a while:
+    // enough rounds that both get a quiet moment (the best round of each counts).
+    for (let round = 0; round < 120; round++) {
       plain = Math.min(plain, run(NO_FEATURES));
       full = Math.min(full, run(ALL_FEATURES));
     }

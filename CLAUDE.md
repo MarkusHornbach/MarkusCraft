@@ -148,6 +148,12 @@ Unit tests live next to the code as `*.test.ts`. Wall-clock limits in tests go t
 `expectFasterThan` (`src/testing/timing.ts`): they are enforced by `npm test` and skipped
 under coverage, which distorts timings. CI runs both.
 
+Tests that are slow because they compare with the light reference are named
+`*.slow.test.ts`. `npm test` runs them in a second pass, after all other files: next to
+them, tests with tight time limits (generation at most 20 % slower, meshing with light at
+most 25 %) fail now and then. Put heavy tests without a tight limit into a slow file; take
+the best of many rounds, the two sides in turn, where two times are compared.
+
 ## Architecture and code conventions
 
 - **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/` and
@@ -286,7 +292,7 @@ under coverage, which distorts timings. CI runs both.
 | `npm run typecheck`       | `tsc --noEmit`                                             |
 | `npm run lint`            | ESLint + Prettier check                                    |
 | `npm run format`          | Apply Prettier                                             |
-| `npm test`                | Vitest unit tests, single run                              |
+| `npm test`                | Vitest unit tests: the quick files, then `*.slow.test.ts`  |
 | `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI) |
 | `npm run test:e2e`        | Build, then Playwright tests against the preview server    |
 | `npm run test:e2e:update` | Same, regenerating reference screenshots                   |
@@ -369,8 +375,8 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   screenshots with the Read tool and judge them by eye. For a quick look at any pose:
   `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
 - The full e2e run takes about eleven minutes; run long commands in the background. The
-  unit tests take about half a minute: the four `lightEdits*.test.ts` files check the
-  light against the slow reference after each of 2 000 random edits.
+  unit tests take about half a minute: the four `lightEdits*.slow.test.ts` files check
+  the light against the slow reference after each of 2 000 random edits.
 
 ## Definition of Done (per phase or phase part)
 

@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"src/**/*.slow.test.ts\" && vitest run .slow.test",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:update": "npm run build && playwright test --update-snapshots",

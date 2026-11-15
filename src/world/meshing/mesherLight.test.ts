@@ -21,11 +21,17 @@ function meshOf(world: World, cx: number, cz: number, withLight = true): ChunkMe
   );
 }
 
-/** The terrain of seed 1337 around the origin: chunks -3..4 generated, -2..3 lit. */
+let terrain: World | null = null;
+/**
+ * The terrain of seed 1337 around the origin: chunks -3..4 generated, -2..3 lit. Built
+ * once for all tests of this file; none of them changes it.
+ */
 function terrainWorld(): World {
+  if (terrain) return terrain;
   const world = new World(1337);
   for (let cz = -3; cz <= 4; cz++) for (let cx = -3; cx <= 4; cx++) world.generate(cx, cz);
   for (let cz = -2; cz <= 3; cz++) for (let cx = -2; cx <= 3; cx++) world.light(cx, cz);
+  terrain = world;
   return world;
 }
 
@@ -259,19 +265,22 @@ describe('light in the mesh (Phase 4 step 3)', () => {
 
   it('AC3.4: meshing with light takes at most 25 % longer than without', () => {
     const world = terrainWorld();
-    const each = (withLight: boolean) => {
-      let best = Infinity;
-      for (let round = 0; round < 8; round++) {
-        const start = performance.now();
-        for (let cz = -1; cz <= 2; cz++)
-          for (let cx = -1; cx <= 2; cx++) meshOf(world, cx, cz, withLight);
-        best = Math.min(best, performance.now() - start);
+    const round = (withLight: boolean): number => {
+      const start = performance.now();
+      for (let cz = -1; cz <= 2; cz++) {
+        for (let cx = -1; cx <= 2; cx++) meshOf(world, cx, cz, withLight);
       }
-      return best / 16;
+      return (performance.now() - start) / 16;
     };
-    each(true);
-    const plain = each(false);
-    const lit = each(true);
+    round(true);
+    round(false);
+    // The two take turns, so a busy moment of the machine hits both; the best round counts.
+    let plain = Infinity;
+    let lit = Infinity;
+    for (let i = 0; i < 10; i++) {
+      plain = Math.min(plain, round(false));
+      lit = Math.min(lit, round(true));
+    }
     console.log(
       `meshing: ${plain.toFixed(3)} ms/chunk without light, ${lit.toFixed(3)} ms/chunk with light`,
     );

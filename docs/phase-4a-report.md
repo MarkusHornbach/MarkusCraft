@@ -44,31 +44,31 @@ Saved worlds are untouched: light is never stored, `SAVE_FORMAT_VERSION` and
 
 ## Acceptance criteria
 
-| Criteria     | Where                                                                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1.1        | `src/world/light/lightRules.test.ts`                                                                                                                                 |
-| AC1.2        | `src/world/light/lightCheck.test.ts` (one test per rule), `lightRules.test.ts` (the exception)                                                                       |
-| AC1.3–AC1.7  | `src/world/light/lightChunk.test.ts`; the checksum constant is in `src/testing/lightChecksum.ts`                                                                     |
-| AC2.1, AC2.2 | `src/world/ChunkManager.test.ts` ("ChunkManager with light")                                                                                                         |
-| AC2.3, AC2.5 | `src/world/light/lightEdits1…4.test.ts` (500 edits each, see deviation 4), `lightUpdate.test.ts` (30 more edits that reach the top of the world, and single cases)   |
-| AC2.4, AC2.6 | `src/world/light/lightUpdate.test.ts`                                                                                                                                |
-| AC2.7        | `e2e/light.spec.ts`                                                                                                                                                  |
-| AC2.8        | Full browser run on the commit of step 2: 131 tests passed, no reference regenerated. Adapted counts: see deviation 7                                                |
-| AC2.9        | The lint rule covers `src/world/`; `src/actions/pipeline.test.ts` ("stored light is written only by the world and its light functions")                              |
-| AC3.1–AC3.4  | `src/world/meshing/mesherLight.test.ts`                                                                                                                              |
-| AC3.5–AC3.10 | `e2e/light.spec.ts` (AC3.9, first half: the existing tests of `e2e/interaction.spec.ts`, unchanged)                                                                  |
-| AC3.11       | The table "References" below                                                                                                                                         |
-| AC4.1        | `src/ui/settings.test.ts`                                                                                                                                            |
-| AC4.2        | `e2e/light.spec.ts`                                                                                                                                                  |
-| AC4.3        | `e2e/light.spec.ts` (mouse), `e2e/touchLayout.spec.ts` (finger, 640 × 360 and 1280 × 800, sizes); `pause-screen` regenerated and looked at                           |
-| AC4.4        | `src/game/perfStats.test.ts`, `e2e/light.spec.ts`                                                                                                                    |
-| AC4.5        | `scripts/perf.ts`; numbers below                                                                                                                                     |
-| AC5.1        | `e2e/soak.spec.ts` (Phase 3 AC5.2), `e2e/gathering.spec.ts` (Phase 3 AC9.2 and AC13.2): each ends with `verifyLight()` = 0                                           |
-| AC5.2        | `e2e/light.spec.ts` (a literal Part C record with edits in three chunks)                                                                                             |
-| AC5.3        | Unchanged tests: `src/world/generation/terrainV1.test.ts`, `e2e/terrain.spec.ts`                                                                                     |
-| AC5.4        | `e2e/light.spec.ts` (with deviation 14)                                                                                                                              |
-| AC5.5        | `repoHygiene.test.ts` passes with 22 images. Checked by hand: nothing new but code, tests and three screenshots of the game itself; no asset, name or look of others |
-| AC5.6, AC5.7 | `README.md`, `CLAUDE.md`, this file; the pull request                                                                                                                |
+| Criteria     | Where                                                                                                                                                                                                 |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1.1        | `src/world/light/lightRules.test.ts`                                                                                                                                                                  |
+| AC1.2        | `src/world/light/lightCheck.slow.test.ts` (one test per rule), `lightRules.test.ts` (the exception)                                                                                                   |
+| AC1.3–AC1.7  | `src/world/light/lightChunk.slow.test.ts`; the checksum constant is in `src/testing/lightChecksum.ts`                                                                                                 |
+| AC2.1, AC2.2 | `src/world/ChunkManagerLight.slow.test.ts`                                                                                                                                                            |
+| AC2.3, AC2.5 | `src/world/light/lightEdits1…4.slow.test.ts` (500 edits each, see deviation 4), `lightEdits4.slow.test.ts` (30 more edits that reach the top of the world), `lightUpdate.slow.test.ts` (single cases) |
+| AC2.4, AC2.6 | `src/world/light/lightUpdate.slow.test.ts`                                                                                                                                                            |
+| AC2.7        | `e2e/light.spec.ts`                                                                                                                                                                                   |
+| AC2.8        | Full browser run on the commit of step 2: 131 tests passed, no reference regenerated. Adapted counts: see deviation 7                                                                                 |
+| AC2.9        | The lint rule covers `src/world/`; `src/actions/pipeline.test.ts` ("stored light is written only by the world and its light functions")                                                               |
+| AC3.1–AC3.4  | `src/world/meshing/mesherLight.test.ts`                                                                                                                                                               |
+| AC3.5–AC3.10 | `e2e/light.spec.ts` (AC3.9, first half: the existing tests of `e2e/interaction.spec.ts`, unchanged)                                                                                                   |
+| AC3.11       | The table "References" below                                                                                                                                                                          |
+| AC4.1        | `src/ui/settings.test.ts`                                                                                                                                                                             |
+| AC4.2        | `e2e/light.spec.ts`                                                                                                                                                                                   |
+| AC4.3        | `e2e/light.spec.ts` (mouse), `e2e/touchLayout.spec.ts` (finger, 640 × 360 and 1280 × 800, sizes); `pause-screen` regenerated and looked at                                                            |
+| AC4.4        | `src/game/perfStats.test.ts`, `e2e/light.spec.ts`                                                                                                                                                     |
+| AC4.5        | `scripts/perf.ts`; numbers below                                                                                                                                                                      |
+| AC5.1        | `e2e/soak.spec.ts` (Phase 3 AC5.2), `e2e/gathering.spec.ts` (Phase 3 AC9.2 and AC13.2): each ends with `verifyLight()` = 0                                                                            |
+| AC5.2        | `e2e/light.spec.ts` (a literal Part C record with edits in three chunks)                                                                                                                              |
+| AC5.3        | Unchanged tests: `src/world/generation/terrainV1.test.ts`, `e2e/terrain.spec.ts`                                                                                                                      |
+| AC5.4        | `e2e/light.spec.ts` (with deviation 14)                                                                                                                                                               |
+| AC5.5        | `repoHygiene.test.ts` passes with 22 images. Checked by hand: nothing new but code, tests and three screenshots of the game itself; no asset, name or look of others                                  |
+| AC5.6, AC5.7 | `README.md`, `CLAUDE.md`, this file; the pull request                                                                                                                                                 |
 
 ## References (AC3.11)
 
@@ -163,7 +163,13 @@ the two lights)`: with even light it is the choice from before (AC3.3 shows that
 15. **The tunnel scene** is dug where the pit in front of its mouth has to be least deep,
     found by a search around the start point; its floor is relaid with stone so the
     measured strips have one texture.
-16. **`scripts/perf.ts` now takes the best of five rounds** per measurement. The old
+16. **`npm test` runs in two passes.** The first CI run of this branch failed in an old
+    test: "generation is at most 20 % slower than the Phase 1 terrain" (Phase 3 AC1.10),
+    which has a margin of only 4–7 % when it runs alone and lost it next to the new, heavy
+    light tests. Those are now in files named `*.slow.test.ts` and run after all other
+    files; that time comparison takes 120 rounds instead of 40. No limit was changed.
+    `npm run test:coverage` still runs everything at once (it enforces no time limits).
+17. **`scripts/perf.ts` now takes the best of five rounds** per measurement. The old
     script measured one cold round; its numbers are given below as they were.
 
 ## Performance
