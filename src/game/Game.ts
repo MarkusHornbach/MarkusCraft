@@ -416,7 +416,10 @@ export class Game {
       this.showScreen('worlds');
       if (params.bench === 'sample') this.showBenchResult(SAMPLE_RESULT);
       else if (params.bench !== 'off') this.openBench();
-      this.backGuard = new BackGuard(() => this.onBrowserBack());
+      this.backGuard = new BackGuard(
+        () => this.onBrowserBack(),
+        () => this.wantsBackGuard(),
+      );
       document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
       document.addEventListener('pointerlockerror', () => this.onPointerLockError());
       void this.openStore();
@@ -1404,7 +1407,7 @@ export class Game {
     this.draw(this.params.test ? 1 : this.accumulator / SIM_DT);
     // The focus frame follows its element (lists reorder, content scrolls).
     this.focus.update();
-    this.backGuard?.setArmed(this.wantsBackGuard());
+    this.backGuard?.update();
 
     if (this.chunksIdle()) {
       this.framesSinceIdle++;

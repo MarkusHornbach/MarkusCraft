@@ -385,6 +385,8 @@ sides in turn.
   B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press only
   re-arms. Back on the world list leaves the entry in place (no navigation of its own,
   which could collide with a reload); a Back that pops it there goes back once more.
+  Whether it is armed is asked at each `popstate` (`Game.wantsBackGuard`); `update()` per
+  frame only pushes the entry.
 - **Determinism.** No `Math.random()` and no `Date.now()` in `world/`, `player/`, `util/`
   or texture generation. Randomness comes from the seeded RNG; time comes in as a parameter.
   The same seed must always produce the same world and the same textures.

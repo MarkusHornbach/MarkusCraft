@@ -142,7 +142,7 @@ Plan: `docs/phase-5-plan.md`, Part A (steps 1–4). Branch: `claude/hopeful-hypa
     shows again it leaves its entry in place; a first version took it back with
     `history.back()`, which collided with a reload right after (an existing test,
     `inventory.spec.ts` AC6.5, caught it). A Back that pops the stale entry on the world
-    list goes back once more (in a task of its own: Chromium drops a `history.back()` started inside the `popstate` handler), so one Back still leaves the page. Back in play also releases
+    list goes back once more (in a task of its own: Chromium drops a `history.back()` started inside the `popstate` handler), so one Back still leaves the page. Whether the guard is armed is asked at the moment of the `popstate`, not taken from the last frame: under load a Back can come before the next frame (CI caught this). Back in play also releases
     the pointer lock, as Esc does; otherwise the pause menu could not be clicked. Back on
     the pause menu in mouse mode continues, but the browser cannot capture the mouse
     without a click: the menu then shows its existing "Please click again" hint.

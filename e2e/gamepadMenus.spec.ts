@@ -368,6 +368,8 @@ test.describe('the back guard', () => {
   test('Phase 5 AC3.7: Back pauses the game, returns from the form, leaves from the list', async ({
     page,
   }) => {
+    // A page before the game, so that leaving it has somewhere to go.
+    await page.goto('data:text/html,<title>before</title>');
     await openMenu(page);
     const url = page.url();
     await createWorld(page);
@@ -391,7 +393,7 @@ test.describe('the back guard', () => {
     expect(page.url()).toBe(url);
     // On the list Back leaves the page (past the guard's entry, which it no longer needs).
     await page.goBack();
-    await page.waitForURL((u) => u.toString() !== url);
+    await page.waitForURL((u) => u.protocol === 'data:');
   });
 
   test('Phase 5 AC3.7: B followed within 150 ms by a browser Back acts once', async ({ page }) => {

@@ -4,27 +4,30 @@
 import { BACK_PAIR_MS } from './config';
 
 export class BackGuard {
-  /** Whether Back should act in the game. */
-  private armed = false;
   /** Whether our entry is on the history stack. */
   private pushed = false;
   /** When the controller's B was pressed last. */
   private padBackAt = -Infinity;
 
+  /**
+   * `armed` says whether Back should act in the game right now; it is asked at the moment
+   * of each Back, so a screen that changed since the last frame counts.
+   */
   constructor(
     private readonly onBack: () => void,
+    private readonly armed: () => boolean,
     private readonly now: () => number = () => performance.now(),
   ) {
     window.addEventListener('popstate', () => this.onPop());
   }
 
   /**
-   * Armed, the guard holds its entry. Disarmed it leaves the entry where it is: taking it
-   * back would be a navigation of its own that could collide with a reload or a link.
+   * Called once per frame: while armed the guard holds its entry. Disarmed it leaves the
+   * entry where it is: taking it back would be a navigation of its own that could collide
+   * with a reload or a link.
    */
-  setArmed(armed: boolean): void {
-    this.armed = armed;
-    if (armed && !this.pushed) this.push();
+  update(): void {
+    if (this.armed() && !this.pushed) this.push();
   }
 
   /** The controller's B was pressed: a "Back" right after it is the same press. */
@@ -45,7 +48,7 @@ export class BackGuard {
   private onPop(): void {
     // The player went back: our entry is gone.
     this.pushed = false;
-    if (!this.armed) {
+    if (!this.armed()) {
       // The world list: Back means leaving. Our entry was in the way; go on past it, after
       // the traversal that fired this event (one started inside it is dropped).
       window.setTimeout(() => {
