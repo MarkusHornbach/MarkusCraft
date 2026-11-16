@@ -26,8 +26,8 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 5 part A (controller: play, menus, back guard); 2026-11-16 (no tests
-with children: TORCH-5 and CRAFT-1 obsolete).
+Last updated: polishing session 1 (recipe list in fixed order, hold delay: CRAFT-12 and
+CRAFT-13 added, CRAFT-3 and CRAFT-8 obsolete); 2026-11-16.
 
 ---
 
@@ -222,8 +222,6 @@ Once, before the first run:
 
 - [ ] **CRAFT-2** (3C) Is the recipe list understood without reading: icons, "2 / 3" in
       red, the greyed rows, "Needs a workbench nearby", that the list scrolls? Result:
-- [ ] **CRAFT-3** (3C) The list reorders after every craft (what can be made moves up).
-      Helpful or confusing? Result:
 - [ ] **CRAFT-4** (3C) "Needs a pickaxe": is the hint noticed before the three seconds are
       spent? Should stone without a pickaxe not break at all instead? Result:
 - [ ] **CRAFT-5** (3C) Is coal findable (dark specks in bare rock on hills)? If not: is it
@@ -233,8 +231,6 @@ Once, before the first run:
       is dark at the sides; torches come with Phase 4 part B.) Result:
 - [ ] **CRAFT-7** (3C) The furnace's two seconds: does the bar feel like "it is cooking"?
       Is it understood that closing the bag cancels it and that holding goes on? Result:
-- [ ] **CRAFT-8** (3C) Holding "Craft", by mouse and by finger: four per second. Too fast
-      for the player? Result:
 - [ ] **CRAFT-9** (3C) The recipe list on the phone: are tabs, rows and buttons easy to
       hit, does scrolling work without crafting something, is the text readable? Result:
 - [ ] **CRAFT-10** (3C) The icons: are pickaxe, axe and shovel told apart in the bar on
@@ -242,6 +238,14 @@ Once, before the first run:
       what they are once placed? Result:
 - [ ] **CRAFT-11** (3C) Building blocks: are stone bricks, glass, bricks and the iron
       block worth their recipes? Result:
+- [ ] **CRAFT-12** (P1) The recipe list keeps one fixed order; what can be made is green
+      and counted on the tab ("Crafting 3"). PC, Phone: are the craftable rows found,
+      also those further down (furnace rows, torch)? Is the number on the tab noticed and
+      understood? Result:
+- [ ] **CRAFT-13** (P1) Holding "Craft" now makes the first item after half a second, then
+      four per second. By mouse (PC) and by finger (Phone): does a short press still feel
+      immediate? Does scrolling the list on the phone, starting on a "Craft" button, never
+      craft? Result:
 
 ## 9. Controller (Phase 5)
 
@@ -311,3 +315,9 @@ Tests that no longer need doing, with the reason.
   tree and look into the bag"? Do they find the "Crafting" tab, understand the green rows,
   put the workbench down and stand next to it?" Never filled in. Reason: Dropped
   2026-11-16: no tests with children.
+- **CRAFT-3** (3C) "The list reorders after every craft (what can be made moves up).
+  Helpful or confusing?" Never filled in. Reason: polishing session 1 keeps the list in
+  table order; CRAFT-12 asks about the fixed order.
+- **CRAFT-8** (3C) "Holding "Craft", by mouse and by finger: four per second. Too fast for
+  the player?" Never filled in. Reason: polishing session 1 delays the first repeat to
+  half a second; CRAFT-13 asks about the new timing.

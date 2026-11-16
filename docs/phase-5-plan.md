@@ -436,7 +436,10 @@ Acceptance criteria:
 ### Part B – Inventory, palette, recipe list (steps 5–7)
 
 Starts after Part A is merged and after the polishing session of the inventory and recipe
-list is merged, or when the owner says there will be none.
+list is merged, or when the owner says there will be none. That session is planned in
+`docs/polish-1-plan.md` (section 8 there lists what it changed below): the recipe list
+keeps a fixed order, the "Crafting" tab shows a count, and a held "Craft" first repeats
+after `CRAFT_HOLD_DELAY_MS`.
 
 ### Step 5 – Inventory and Creative palette
 
@@ -464,20 +467,24 @@ Acceptance criteria:
 ### Step 6 – Crafting tab
 
 - `RecipeList` listens to `padpress` / `padrelease` on "Craft" exactly as to
-  `pointerdown` / pointer release, so holding A repeats every `CRAFT_REPEAT_MS` and the click
-  after a hold that already crafted does not craft once more (existing rule).
-- The focus follows the "Craft" button when the list reorders; when the focused button hides
-  (no longer craftable, furnace bar) the focus goes to the nearest one. The right stick
-  scrolls the list (also to recipes that cannot be made, which have no button).
+  `pointerdown` / pointer release, so holding A repeats (first after `CRAFT_HOLD_DELAY_MS`,
+  then every `CRAFT_REPEAT_MS`) and the click after a hold that already crafted does not
+  craft once more (existing rule).
+- The list keeps a fixed order (polishing session 1), so the focus stays on the "Craft"
+  button after a craft; when the focused button hides (no longer craftable, furnace bar)
+  the focus goes to the nearest one. Moving down from one "Craft" button skips the rows in
+  between that cannot be made; the right stick scrolls the list (also to recipes that
+  cannot be made, which have no button). The tab's accessible name stays "Crafting" with
+  its count.
 
 Acceptance criteria:
 
-- **AC6.1** A on "Craft" makes the recipe once; holding A for the time of three repeats makes
-  it four times; releasing makes nothing more.
+- **AC6.1** A on "Craft" makes the recipe once; holding A for `CRAFT_HOLD_DELAY_MS` plus two
+  times `CRAFT_REPEAT_MS` makes it three times; releasing makes nothing more.
 - **AC6.2** A furnace recipe starts the bar with A; the bar fills; closing with Y cancels it as
   with the mouse.
-- **AC6.3** After a craft that reorders the list the focus is still on the same recipe's
-  button, or on the nearest button if it disappeared; the frame is on screen.
+- **AC6.3** After a craft the focus is still on the same recipe's button (the list does not
+  move), or on the nearest button if it disappeared; the frame is on screen.
 - **AC6.4** References `pad-inventory` and `pad-recipe-list` created and looked at; all
   others unchanged.
 

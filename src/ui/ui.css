@@ -380,7 +380,9 @@ canvas {
 
 .setting-row {
   display: grid;
-  grid-template-columns: 120px 1fr 74px;
+  /* Room for "Controller sensitivity" on one line (126 px in Inter), with some to spare
+     for other fonts. */
+  grid-template-columns: 136px 1fr 74px;
   align-items: center;
   gap: 8px;
   margin-bottom: 5px;
@@ -608,7 +610,7 @@ canvas {
 }
 
 .switch-row {
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 136px 1fr;
 }
 
 .setting-switch {
@@ -638,6 +640,12 @@ canvas {
 
 .touch-mode .setting-row {
   min-height: 30px;
+}
+
+/* A narrower value column ("16 chunks" is the longest) leaves the slider room for a
+   finger next to the wider labels. */
+.touch-mode .setting-row:not(.switch-row) {
+  grid-template-columns: 136px 1fr 66px;
 }
 
 /* Phones in landscape: everything has to fit into about 360 px of height. */
@@ -1135,6 +1143,26 @@ canvas {
   min-width: 72px;
 }
 
+/* The number of recipes that can be made now, after "Crafting". */
+.tab-count {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 6px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: #4d8f3a;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab-count[hidden] {
+  display: none;
+}
+
 /* ---- Recipe list ---- */
 
 .recipe-list {
@@ -1158,10 +1186,12 @@ canvas {
 
 .recipe-row {
   flex: none;
-  min-height: 48px;
+  /* One fixed height and fixed columns, whatever a row shows: crafting never moves a row
+     (polishing session 1). */
+  height: 48px;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 44px 128px 1fr auto;
+  grid-template-columns: 44px 128px 1fr 112px;
   align-items: center;
   gap: 8px;
   padding: 2px 6px;
@@ -1205,8 +1235,9 @@ canvas {
 
 .recipe-ingredients {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
 }
 
 .recipe-ingredient {
@@ -1240,7 +1271,9 @@ canvas {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-width: 76px;
+  width: 112px;
+  height: 100%;
+  overflow: hidden;
 }
 
 .recipe-craft {
@@ -1262,13 +1295,32 @@ canvas {
   display: none;
 }
 
+/* A player who walks away from the furnace while it works: the bar alone fills the
+   action column (the note and the bar together would not fit its height). */
+.recipe-row.smelting .recipe-note {
+  display: none;
+}
+
 .touch-mode .recipe-craft {
   min-width: 76px;
   min-height: 48px;
 }
 
+/* The finger-sized "Craft" button sets the height of every row in touch mode; the list
+   grows with it, so that it still shows five rows and part of the sixth. */
+.touch-mode .recipe-row {
+  height: 52px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.touch-mode .recipe-list {
+  height: 300px;
+}
+
 .recipe-note {
-  max-width: 108px;
+  /* Up to two lines inside the action column. */
+  max-width: 112px;
   font-size: 12px;
   line-height: 1.2;
   text-align: right;
@@ -1302,8 +1354,14 @@ canvas {
     gap: 6px;
   }
 
+  /* Five rows and part of the sixth here too; in touch mode the panel then fills almost
+     all of a phone's 360 px. */
   .recipe-list {
-    height: 246px;
+    height: 278px;
+  }
+
+  .touch-mode .recipe-list {
+    height: 288px;
   }
 }
 

@@ -2,6 +2,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { getState, whenIdle } from './game';
+import { expectPartOfSixthRow, expectRowsNeverMove } from './recipeRows';
 import { TOUCH_DEVICE, Fingers, centerOf, openTouchGame, swipe, withoutFullscreen } from './touch';
 
 test.use(TOUCH_DEVICE);
@@ -652,13 +653,18 @@ for (const [device, view] of [
     });
     await page.locator('.touch-bag').tap();
     await page.locator('.inventory-tab[data-tab="crafting"]').tap();
+    const list = page.locator('.recipe-list');
     const listBox = (await boxes(page, '.recipe-list'))[0];
-    // Craftable recipes stand first: the torch is the only one, so it is on top.
+    // The list keeps table order (polishing session 1): the torch is its last row, and
+    // scrolling to the end brings its button into the list's view.
+    await expect(page.locator('.inventory-tab[data-tab="crafting"] .tab-count')).toHaveText('1');
+    await list.evaluate((node) => node.scrollTo(0, node.scrollHeight));
     const craft = page.locator('.recipe-row[data-recipe="torch"] .recipe-craft');
     const button = await boxes(page, '.recipe-row[data-recipe="torch"] .recipe-craft');
     expect(button).toHaveLength(1);
     expectFingerSized(button);
     expectInside(button, view);
+    expect(button[0].y).toBeGreaterThanOrEqual(listBox.y);
     expect(button[0].y + button[0].height).toBeLessThanOrEqual(listBox.y + listBox.height);
     await craft.tap();
     await expect
@@ -694,5 +700,35 @@ for (const [device, view] of [
     expectInside(slot, view);
     await torch.tap();
     await expect(page.locator('.inv-slot[data-index="0"]')).toHaveAttribute('data-item', 'torch');
+  });
+}
+
+// --- Polishing session 1: rows that never move, on a phone and a tablet ----------------
+
+for (const [device, view] of [
+  ['phone', PHONE],
+  ['tablet', TABLET],
+] as const) {
+  test(`Polish 1 AC1.3 and AC1.5: the recipe rows keep their places and the list shows part of a sixth row on a ${view.width} × ${view.height} ${device}`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(view);
+    await page.addInitScript(
+      ([key, value]) => window.localStorage.setItem(key, value),
+      [STORAGE_KEY, JSON.stringify({ renderDistance: 2, mouseSensitivity: 1, fov: 75 })],
+    );
+    await openOnDevice(page);
+    await tapCreate(page, 'gathering');
+    await page.locator('.touch-bag').tap();
+    await page.locator('.inventory-tab[data-tab="crafting"]').tap();
+    await expect(page.locator('.recipe-list')).toBeVisible();
+    await expectPartOfSixthRow(page);
+    if (device === 'phone') {
+      // One height for every row, set by the finger-sized "Craft" button.
+      expect(await expectRowsNeverMove(page)).toBeCloseTo(52, 0);
+      // The panel still fits the screen with the bar running.
+      expectInside(await boxes(page, '.inventory-panel'), view);
+    }
   });
 }

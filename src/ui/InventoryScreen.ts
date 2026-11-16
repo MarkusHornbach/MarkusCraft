@@ -84,6 +84,7 @@ export class InventoryScreen {
   private readonly tiles: Uint8ClampedArray[];
   private readonly tabBar: HTMLElement;
   private readonly tabButtons = new Map<InventoryTab, HTMLButtonElement>();
+  private readonly craftCount: HTMLElement;
   /** Everything of the items page: slots or palette, bar, bin and hint. */
   private readonly itemsPage: HTMLElement;
   private readonly recipes: RecipeList;
@@ -130,6 +131,8 @@ export class InventoryScreen {
       const choice = button('menu-button inventory-tab', label);
       choice.dataset.tab = tab;
       choice.setAttribute('role', 'tab');
+      // The name stays the label when a count follows it ("Crafting 3").
+      choice.setAttribute('aria-label', label);
       choice.addEventListener('click', () => {
         if (this.tab === tab) return;
         this.setTab(tab);
@@ -138,6 +141,11 @@ export class InventoryScreen {
       this.tabButtons.set(tab, choice);
       this.tabBar.appendChild(choice);
     }
+    // How many recipes can be made now: the list keeps its order, so a craftable row may
+    // lie below the visible part. Hidden at 0.
+    this.craftCount = element('span', 'tab-count', '');
+    this.craftCount.hidden = true;
+    this.tabButtons.get('crafting')?.appendChild(this.craftCount);
     const close = button('menu-button inventory-close', 'Close');
     onActivate(close, (via) => options.onClose(via));
     header.append(this.title, this.tabBar, close);
@@ -227,6 +235,8 @@ export class InventoryScreen {
     // Creative has every block already: no recipes, and so no tabs.
     this.tabBar.hidden = mode !== 'gathering';
     this.setTab('items');
+    // A world was loaded: its list starts at the top.
+    this.recipes.scrollToTop();
   }
 
   /** Shows the items page or the recipe list. Creative always shows its blocks. */
@@ -239,7 +249,8 @@ export class InventoryScreen {
     }
     this.itemsPage.hidden = this.tab !== 'items';
     this.recipes.element.hidden = this.tab !== 'crafting';
-    if (this.tab === 'crafting') this.recipes.scrollToTop();
+    // The list keeps its scroll position while a world is open.
+    if (this.tab === 'crafting' && this.visible) this.recipes.restoreScroll();
     this.setPicked(null);
   }
 
@@ -247,9 +258,13 @@ export class InventoryScreen {
     return this.tab;
   }
 
-  /** The recipes in the order of the list, with what the player has for each. */
+  /** The recipes in table order, with what the player has for each; the count on the tab. */
   setRecipes(statuses: readonly RecipeStatus[]): void {
     this.recipes.update(statuses);
+    const count = statuses.filter((status) => status.craftable).length;
+    const text = count > 0 ? String(count) : '';
+    if (this.craftCount.textContent !== text) this.craftCount.textContent = text;
+    this.craftCount.hidden = count === 0;
   }
 
   /** The furnace's progress bar in the row of a recipe; null hides it. */
@@ -291,6 +306,7 @@ export class InventoryScreen {
     if (visible && !this.visible) this.armed = false;
     this.visible = visible;
     this.element.classList.toggle('hidden', !visible);
+    if (visible && this.tab === 'crafting') this.recipes.restoreScroll();
     this.setPicked(null);
   }
 }

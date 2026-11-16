@@ -9,6 +9,7 @@ import {
   NO_STATIONS,
   RECIPES,
   type Recipe,
+  type StationsNear,
   STATION_BLOCKS,
   craftable,
   getRecipe,
@@ -215,23 +216,31 @@ describe('recipe status', () => {
     expect(craftable(planks, full, NO_STATIONS)).toBe(true);
   });
 
-  it('lists craftable recipes first, each group in table order', () => {
-    const order = (slots: Slots, stations = NO_STATIONS): string[] =>
-      listRecipes(slots, stations).map((s) => getRecipe(s.id)?.name ?? '?');
-    const table = RECIPES.map((r) => r.name);
-    expect(order(slotsWith())).toEqual(table);
-    const oneLog = order(slotsWith([Block.LOG, 1]));
-    expect(oneLog[0]).toBe('planks');
-    expect(oneLog.slice(1)).toEqual(table.filter((n) => n !== 'planks'));
-    const listed = listRecipes(slotsWith([Block.PLANKS, 4], [Block.STONE, 8]), {
-      workbench: true,
-      furnace: false,
-    });
-    const names = listed.filter((s) => s.craftable).map((s) => getRecipe(s.id)?.name);
-    expect(names).toEqual(['sticks', 'workbench', 'furnace', 'stone_bricks']);
-    expect(listed.length).toBe(RECIPES.length);
-    expect(listed.slice(0, 4).every((s) => s.craftable)).toBe(true);
-    expect(listed.slice(4).some((s) => s.craftable)).toBe(false);
+  it('Polish 1 AC1.1: lists the recipes in table order, whatever can be made', () => {
+    const ids = RECIPES.map((r) => r.id);
+    expect(ids).toEqual(Array.from({ length: 20 }, (_, index) => index + 1));
+    // Every ingredient there is, 99 of each: with both stations everything can be made.
+    const ingredients = [...new Set(RECIPES.flatMap((r) => r.ingredients.map((i) => i.item)))];
+    const everything = slotsWith(...ingredients.map((item): [number, number] => [item, 99]));
+    const cases: [Slots, StationsNear][] = [
+      [slotsWith(), NO_STATIONS],
+      [slotsWith([Block.LOG, 1]), NO_STATIONS],
+      [slotsWith([Block.PLANKS, 4], [Block.STONE, 8]), { workbench: true, furnace: false }],
+      [everything, { workbench: true, furnace: true }],
+    ];
+    for (const [slots, stations] of cases) {
+      const listed = listRecipes(slots, stations);
+      expect(listed.map((s) => s.id)).toEqual(ids);
+      expect(listed).toEqual(RECIPES.map((r) => recipeStatus(r, slots, stations)));
+    }
+    const craftableIn = ([slots, stations]: [Slots, StationsNear]): string[] =>
+      listRecipes(slots, stations)
+        .filter((s) => s.craftable)
+        .map((s) => getRecipe(s.id)?.name ?? '?');
+    expect(craftableIn(cases[0])).toEqual([]);
+    expect(craftableIn(cases[1])).toEqual(['planks']);
+    expect(craftableIn(cases[2])).toEqual(['sticks', 'workbench', 'furnace', 'stone_bricks']);
+    expect(craftableIn(cases[3])).toEqual(RECIPES.map((r) => r.name));
   });
 });
 

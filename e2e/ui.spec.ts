@@ -5,11 +5,14 @@ import {
   createWorld,
   getState,
   openGame,
+  openMenu,
   pauseWithMouse,
   setPlayer,
   untilPlaying,
   whenIdle,
 } from './game';
+import { BUTTON, Pad, installFakePads } from './gamepad';
+import { TOUCH_DEVICE, withoutFullscreen } from './touch';
 
 const STORAGE_KEY = 'markuscraft.settings.v1';
 
@@ -287,4 +290,67 @@ test('shows a readable message when WebGL2 is unavailable', async ({ page }) => 
   await expect(page.locator('.fatal-message')).toBeVisible();
   await expect(page.locator('.fatal-message')).toContainText('WebGL2');
   await expect(page.locator('canvas')).toHaveCount(0);
+});
+
+// --- Polishing session 1: the controller's two settings rows ---------------------------
+
+/** Height of each controller label against its computed line height. */
+async function padLabelLines(page: Page): Promise<{ text: string; ratio: number }[]> {
+  return page.locator('.setting-label').evaluateAll((nodes) =>
+    nodes
+      .filter((node) => /controller/i.test(node.textContent ?? ''))
+      .map((node) => {
+        const style = getComputedStyle(node);
+        const line =
+          style.lineHeight === 'normal'
+            ? parseFloat(style.fontSize) * 1.2
+            : parseFloat(style.lineHeight);
+        return { text: node.textContent ?? '', ratio: node.getBoundingClientRect().height / line };
+      }),
+  );
+}
+
+async function expectPadLabelsOnOneLine(page: Page): Promise<void> {
+  const labels = await padLabelLines(page);
+  expect(labels.map((l) => l.text).sort()).toEqual([
+    'Controller sensitivity',
+    'Invert controller look',
+  ]);
+  for (const label of labels) expect(label.ratio, label.text).toBeLessThanOrEqual(1.3);
+}
+
+test('Polish 1 AC4.1: "Controller sensitivity" and "Invert controller look" fit on one line (mouse, 960 × 540)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await installFakePads(page);
+  await openMenu(page);
+  await createWorld(page, { seed: '1337' });
+  const pad = new Pad(page);
+  await pad.connect();
+  await pad.tap(BUTTON.START);
+  await page.waitForFunction(() => window.__mc.getState().paused);
+  await expect(page.locator('#setting-pad-sensitivity')).toBeVisible();
+  await expectPadLabelsOnOneLine(page);
+});
+
+test.describe('touch', () => {
+  test.use(TOUCH_DEVICE);
+
+  test('Polish 1 AC4.1: "Controller sensitivity" and "Invert controller look" fit on one line (touch, 640 × 360)', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 640, height: 360 });
+    await withoutFullscreen(page);
+    await installFakePads(page);
+    await openMenu(page, '?touch=1');
+    await createWorld(page, { seed: '1337', tap: true });
+    const pad = new Pad(page);
+    await pad.connect();
+    await pad.tap(BUTTON.START);
+    await page.waitForFunction(() => window.__mc.getState().paused);
+    await expect(page.locator('#setting-pad-sensitivity')).toBeVisible();
+    await expectPadLabelsOnOneLine(page);
+  });
 });

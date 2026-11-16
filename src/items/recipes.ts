@@ -219,10 +219,10 @@ export function missing(recipe: Recipe, slots: Slots): ItemStack[] {
 }
 
 /**
- * The recipes as the list shows them: craftable ones first, then the others, each group
- * in table order.
+ * The recipes as the list shows them: always in table order, so that crafting never moves
+ * a row under the pointer (polishing session 1). Craftable rows are found by their
+ * highlight and by the count on the tab.
  */
 export function listRecipes(slots: Slots, stations: StationsNear): RecipeStatus[] {
-  const all = RECIPES.map((r) => recipeStatus(r, slots, stations));
-  return [...all.filter((s) => s.craftable), ...all.filter((s) => !s.craftable)];
+  return RECIPES.map((r) => recipeStatus(r, slots, stations));
 }
