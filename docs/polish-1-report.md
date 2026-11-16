@@ -84,7 +84,13 @@ Plan: `docs/polish-1-plan.md`. Branch: `ccr-4139afb8-0yh9ba`.
    (before: 80 px), and the Brightness tap test of AC3.1 landed on 85 %. With 136 px and a
    value column of 66 px in touch mode ("16 chunks" is 62 px) they are 72 px wide; in
    mouse mode 119 px (before: 131 px).
-8. **The pause panel with the controller rows does not fit 640 × 360.** With the two
+8. **A station note hides while the furnace bar runs.** AC1.3 found that a player who
+   walks away from the furnace while it works gets the note "Needs a furnace nearby" and
+   the bar at once; together they do not fit the fixed row height (the note took three
+   lines). The bar now shows alone (`.recipe-row.smelting .recipe-note`); when the bar is
+   full the craft is refused (`station`) as before and the note returns. AC1.3 checks
+   this state as well.
+9. **The pause panel with the controller rows does not fit 640 × 360.** With the two
    controller rows (a pad was used) the touch pause panel is about 400 px high and scrolls
    (`.pause-panel` is built to stay reachable then). This was so before the session too,
    where the labels took two lines; AC4.2 is about the existing layout tests, which run
@@ -109,7 +115,20 @@ Plan: `docs/polish-1-plan.md`. Branch: `ccr-4139afb8-0yh9ba`.
 
 ## Reference screenshots
 
-REFERENCES
+Regenerated with `--update-snapshots=all`, compared with `scripts/compareShots.mjs`, every
+sheet opened and judged. All other references: 0.0 % of pixels changed.
+
+- `recipe-list` (6.5 %): scrolled to the furnace rows (decision 5): stone shovel and
+  furnace with "Needs a workbench nearby" and red counts, coal with its bar at half, the
+  iron ingot highlighted with "Craft", the tab "Crafting 4". Rows of one height.
+- `recipe-list-touch` (41.6 %): rows 52 px instead of 56 px and a taller list, so five rows
+  and part of the sixth show; the tab "Crafting 2". Same rows, same order (planks and
+  sticks were first before too).
+- `pad-pause` (7.2 %): "Controller sensitivity" and "Invert controller look" on one line;
+  the settings column is shorter by those two lines; sliders start 16 px further right.
+- `pause-screen` (0.3 %): the sliders start 16 px further right (label column 136 px).
+- `inventory` (3.7 %): the "Crafting" tab shows the count "1" (the items in it make one
+  recipe craftable). Not named in the plan; explained by the tab count.
 
 ## Known issues
 

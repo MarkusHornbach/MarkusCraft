@@ -1295,6 +1295,12 @@ canvas {
   display: none;
 }
 
+/* A player who walks away from the furnace while it works: the bar alone fills the
+   action column (the note and the bar together would not fit its height). */
+.recipe-row.smelting .recipe-note {
+  display: none;
+}
+
 .touch-mode .recipe-craft {
   min-width: 76px;
   min-height: 48px;

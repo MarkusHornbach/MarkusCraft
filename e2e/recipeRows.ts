@@ -125,9 +125,8 @@ export async function expectRowsNeverMove(page: Page): Promise<number> {
   ).toHaveText('2304 / 3');
   await check('four-digit counts');
 
-  // A furnace nearby, and its bar running in the coal row.
-  await clear();
-  await give(LOG, 2);
+  // A furnace nearby, and its bar running in the coal row. The furnace is set past the
+  // action layer; giving the logs afterwards brings the list up to date with it.
   await page.evaluate((id) => {
     const { player } = window.__mc.getState();
     window.__mc.setBlock(
@@ -137,10 +136,28 @@ export async function expectRowsNeverMove(page: Page): Promise<number> {
       id,
     );
   }, FURNACE);
+  await clear();
+  await give(LOG, 2);
   await expect.poll(async () => (await craftableNow(page)).includes('coal')).toBe(true);
   await pressCraft(page, 'coal');
   await expect(page.locator('.recipe-row[data-recipe="coal"] .recipe-progress')).toBeVisible();
+  await expect(page.locator('.recipe-row[data-recipe="coal"] .recipe-note')).toBeHidden();
   await check('furnace bar running');
+
+  // The furnace taken away while its bar runs: the station note and the bar would not fit
+  // together, so the bar shows alone (in the real loop the bar may have ended by now).
+  await page.evaluate(() => {
+    const { player } = window.__mc.getState();
+    window.__mc.setBlock(
+      Math.floor(player.x),
+      Math.floor(player.y) + 1,
+      Math.floor(player.z) + 2,
+      0,
+    );
+  });
+  await give(STICK, 1);
+  await expect.poll(async () => (await getState(page)).recipes[10].stationMissing).toBe(true);
+  await check('furnace bar running, furnace out of reach');
   return height;
 }
 
