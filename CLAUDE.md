@@ -633,4 +633,11 @@ hold:
     polishing session of the inventory and recipe list are merged (or the owner says there
     will be none). Part A already lets B and Y close the inventory and Start pause from
     it; Part B replaces that with the focus system on the inventory.
+- Polishing session 1 (inventory and recipe list, between Phase 5 parts A and B): planned
+  in `docs/polish-1-plan.md`, not yet implemented. The recipe list keeps a fixed order
+  with craftable rows highlighted and a count on the "Crafting" tab, the quarter-second
+  rule after a craft goes, rows get a fixed height, the scroll position is kept, a held
+  "Craft" first repeats after 500 ms, and two pause menu labels fit on one line. Esc stays
+  as it is. One branch, one pull request; report `docs/polish-1-report.md`. Its tests
+  name their criterion as "Polish 1 AC1.1"; device tests it adds have the origin "P1".
 - Phases 6 (multiplayer) and 7 (personalization): not yet planned.
