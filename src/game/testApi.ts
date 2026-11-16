@@ -46,10 +46,11 @@ export interface GameState {
     /** The open page of the inventory screen, or null while it is closed. */
     tab: 'items' | 'crafting' | null;
     /**
-     * The element the controller's focus is on (its `aria-label`, its text or its id), or
-     * null while the controller is not the active source or no screen is open.
+     * The element the controller's focus is on (its `aria-label`, its text or its id).
+     * Left out while there is none (the controller is not the active source, or no screen
+     * is open), so that tests of earlier phases that compare `ui` as a whole still match.
      */
-    focus: string | null;
+    focus?: string;
   };
   /**
    * Every recipe in the order of the recipe list (craftable ones first): whether it can

@@ -18,7 +18,7 @@ test.describe.configure({ timeout: 180_000 });
 
 /** What the controller's focus is on. */
 async function focusOf(page: Page): Promise<string | null> {
-  return (await getState(page)).ui.focus;
+  return (await getState(page)).ui.focus ?? null;
 }
 
 /** Moves the focus with the D-pad until it is on `name`; fails after `limit` moves. */
@@ -94,7 +94,7 @@ test('Phase 5 AC3.1: the pad alone creates a world, plays, pauses, goes back and
   let state = await getState(page);
   expect(state.world?.name).toBe('My world');
   expect(state.mode).toBe('gathering');
-  expect(state.ui.focus).toBeNull();
+  expect(state.ui.focus).toBeUndefined();
 
   await pad.tap(BUTTON.START);
   state = await getState(page);
@@ -136,7 +136,7 @@ test('Phase 5 AC3.2: the focus frame lies over the focused element while the pad
   await expect(page.locator('.pad-hints')).toHaveCount(0);
   const state = await getState(page);
   expect(state.pad.active).toBe(false);
-  expect(state.ui.focus).toBeNull();
+  expect(state.ui.focus).toBeUndefined();
   await expect(page.locator('.world-form')).toBeVisible();
 });
 
@@ -337,7 +337,7 @@ test('Phase 5 AC3.6: the performance test with the pad: start, cancel, start aga
   await pad.stick('right', 0, 0);
   let state = await getState(page);
   expect(state.bench?.phase).toBe('running');
-  expect(state.ui.focus).toBeNull();
+  expect(state.ui.focus).toBeUndefined();
   await expect(page.locator('.pad-focus-frame')).toHaveCount(0);
   await pad.tap(BUTTON.B);
   state = await getState(page);
@@ -384,13 +384,12 @@ test.describe('the back guard', () => {
 
     await page.locator('.world-new-button').click();
     await expect(page.locator('.world-form')).toBeVisible();
-    // The guard holds its entry again (after taking its own back on the list).
+    // The guard holds its entry.
     await page.waitForFunction(() => window.history.state !== null);
     await page.goBack();
     await expect(page.locator('.world-list-view')).toBeVisible();
     expect(page.url()).toBe(url);
-    // On the list no entry is held (the guard took its own back): Back leaves the page.
-    await page.waitForFunction(() => window.history.state === null);
+    // On the list Back leaves the page (past the guard's entry, which it no longer needs).
     await page.goBack();
     await page.waitForURL((u) => u.toString() !== url);
   });

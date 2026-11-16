@@ -4,12 +4,10 @@
 import { BACK_PAIR_MS } from './config';
 
 export class BackGuard {
-  /** Whether the guard should hold its entry. */
+  /** Whether Back should act in the game. */
   private armed = false;
   /** Whether our entry is on the history stack. */
   private pushed = false;
-  /** Our own `history.back()` is on its way; its `popstate` is not the player's. */
-  private leaving = false;
   /** When the controller's B was pressed last. */
   private padBackAt = -Infinity;
 
@@ -20,10 +18,13 @@ export class BackGuard {
     window.addEventListener('popstate', () => this.onPop());
   }
 
+  /**
+   * Armed, the guard holds its entry. Disarmed it leaves the entry where it is: taking it
+   * back would be a navigation of its own that could collide with a reload or a link.
+   */
   setArmed(armed: boolean): void {
-    if (armed === this.armed) return;
     this.armed = armed;
-    this.sync();
+    if (armed && !this.pushed) this.push();
   }
 
   /** The controller's B was pressed: a "Back" right after it is the same press. */
@@ -31,33 +32,32 @@ export class BackGuard {
     this.padBackAt = this.now();
   }
 
-  private sync(): void {
-    if (this.leaving) return;
+  private push(): void {
     try {
-      if (this.armed && !this.pushed) {
-        // The same address: only the history gets one more entry.
-        history.pushState({ markuscraft: 'guard' }, '', window.location.href);
-        this.pushed = true;
-      } else if (!this.armed && this.pushed) {
-        this.pushed = false;
-        this.leaving = true;
-        history.back();
-      }
+      // The same address: only the history gets one more entry.
+      history.pushState({ markuscraft: 'guard' }, '', window.location.href);
+      this.pushed = true;
     } catch {
       // A browser may limit history calls; Back then leaves the page as before.
     }
   }
 
   private onPop(): void {
-    if (this.leaving) {
-      this.leaving = false;
-      this.sync();
+    // The player went back: our entry is gone.
+    this.pushed = false;
+    if (!this.armed) {
+      // The world list: Back means leaving. Our entry was in the way; go on past it, after
+      // the traversal that fired this event (one started inside it is dropped).
+      window.setTimeout(() => {
+        try {
+          history.back();
+        } catch {
+          // Then the next Back leaves.
+        }
+      }, 0);
       return;
     }
-    // The player went back: our entry is gone. Hold it again, then act like B.
-    this.pushed = false;
-    this.sync();
-    if (!this.armed) return;
+    this.push();
     if (this.now() - this.padBackAt < BACK_PAIR_MS) return;
     this.onBack();
   }

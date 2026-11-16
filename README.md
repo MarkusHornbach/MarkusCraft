@@ -79,6 +79,47 @@ starts mouse mode. Adding `?touch=1` to the address forces touch mode. The touch
 react to fingers only, so on a computer this needs a touch screen or the device emulation
 of the browser's developer tools.
 
+### Controller
+
+A controller with the common layout (two sticks, A/B/X/Y, two bumpers, two triggers,
+D-pad, Start) works next to mouse and keyboard and next to touch, on desktop browsers and
+in Chrome on Android, by USB or Bluetooth. Browsers report a controller only after its
+first button press: press any button once ("Controller connected" appears), then play.
+That first press does nothing in the game.
+
+| Input              | Action                                               |
+| ------------------ | ---------------------------------------------------- |
+| Left stick         | Move                                                 |
+| Left stick click   | Sprint until the stick is let go                     |
+| Right stick        | Look around (held fully sideways, turning speeds up) |
+| A                  | Jump / swim up / fly up                              |
+| B                  | Fly down (Creative only)                             |
+| X                  | Toggle fly mode (Creative only)                      |
+| RT (right trigger) | Break; in a Gathering world hold it                  |
+| LT (left trigger)  | Place; hold to keep placing                          |
+| LB / RB, D-pad ◄ ► | Previous / next slot of the bar                      |
+| Y                  | Open the inventory (B or Y closes it)                |
+| Start              | Pause                                                |
+
+In the menus the D-pad or the left stick moves a white frame between the buttons, **A**
+selects, **B** goes back, the right stick scrolls, and left/right change a slider. A bar
+at the bottom of each menu shows the buttons. The pause menu then lists the controller's
+buttons and has two more settings: **Controller sensitivity** and **Invert controller
+look**.
+
+The controller is an extra source, not a mode of its own: a computer stays in mouse mode
+(the game just stops capturing the mouse while the controller plays) and a phone stays in
+touch mode (the on-screen controls hide). A **click** on the game hands control back to
+the mouse, a **finger** on the screen back to the touch controls; moving the mouse or
+touching a menu only hides the frame. If the controller in use is switched off or
+disconnected during play, the game pauses. Controllers that the browser does not report
+with the common layout show "This controller is not supported".
+
+While a world, a menu page other than the world list, or the performance test is shown,
+the browser's **Back** (and a phone's back gesture) stays in the game: it pauses, closes
+the inventory, continues from the pause menu or goes back one page. From the world list it
+leaves the page as usual.
+
 ### Worlds and saving
 
 The game starts with the **world menu**. A world has a name, a seed (the number the

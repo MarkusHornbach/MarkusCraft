@@ -1987,7 +1987,7 @@ export class Game {
       ui: {
         screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play',
         tab: this.inventoryOpen ? this.inventoryScreen.currentTab : null,
-        focus: this.focus.description,
+        ...(this.focus.description !== null ? { focus: this.focus.description } : {}),
       },
       recipes: this.recipeStatuses().map((status) => ({
         id: status.id,

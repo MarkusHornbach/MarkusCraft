@@ -109,7 +109,8 @@ src/
                      testApi.ts, urlParams.ts, autosave.ts (pure: when to write what),
                      idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world),
                      perfStats.ts (pure: frames and chunk work of the last ten seconds),
-                     benchEnv.ts (browser, GPU and screen for a performance test result)
+                     benchEnv.ts (browser, GPU and screen for a performance test result),
+                     backGuard.ts (one history entry, so the browser's Back stays in the game)
   bench/             the performance test (pure): scenarios.ts (scenario table, scripts,
                      suites), benchStats.ts (numbers of one measurement window),
                      verdict.ts (lights, throttling flag, Web Workers line), benchReport.ts
@@ -132,9 +133,14 @@ src/
                      (slow reference; tests and `verifyLight`)
     meshing/         mesher.ts (pure: block data in, typed arrays out), atlasLayout.ts
   player/            player.ts (state), physics.ts, interaction.ts (break/place rules)
-  input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch as well
+  input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch and the
+                     controller as well
                      TouchTracker.ts (pure: finger events → stick, look, buttons),
-                     TouchControls.ts (pointer events of fingers → TouchTracker → Input)
+                     TouchControls.ts (pointer events of fingers → TouchTracker → Input),
+                     padMapping.ts (pure: `PadMapper`, one pad snapshot → `PadFrame`),
+                     focusMove.ts (pure: `nextFocus`, `nearestFocus`, `NavRepeat`),
+                     GamepadSource.ts (polls `navigator.getGamepads`, chooses the pad,
+                     feeds Input in play, hands the frame to `Game` otherwise)
   render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts,
                      BreakOverlay.ts (cracks on the block being broken, one draw call)
     textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts,
@@ -147,14 +153,17 @@ src/
                      PauseScreen.ts (pause menu of a world; also the settings page),
                      activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint),
                      BenchScreen.ts (performance test: start page, progress line, result,
-                     "Interrupted")
+                     "Interrupted"), FocusManager.ts (the controller's focus on a screen,
+                     the focus frame), PadHints.ts (the hint bar), padGlyphs.ts (button
+                     glyphs drawn on canvases)
   util/              rng.ts, noise.ts, math.ts
   testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts,
                      lightChecksum.ts, lightScenes.ts (tables with emitters, artificial
                      volumes), lightEdits.ts (a lit test world, random edits)
 e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, sites.ts
                      (tree, beach and rock near the start point), lightScenes.ts (tunnel,
-                     room with a window, roof over a chunk corner), screenshots/
+                     room with a window, roof over a chunk corner), gamepad.ts (the fake
+                     controller), screenshots/
 scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item
                      icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
@@ -185,9 +194,9 @@ sides in turn.
   `no-restricted-imports` rule). They are tested in Node. Only `render/`, `ui/`, `input/`
   and `game/` may use Three.js and browser APIs. The same rule covers
   `render/textures/tiles.ts`, `itemIcons.ts` and `cracks.ts`. The core may import `game/config.ts`.
-  `input/TouchTracker.ts`, `game/autosave.ts` and `game/perfStats.ts` follow the same
-  discipline (no DOM, unit-tested in Node, in the coverage scope) although they live in
-  the shell.
+  `input/TouchTracker.ts`, `input/padMapping.ts`, `input/focusMove.ts`,
+  `game/autosave.ts` and `game/perfStats.ts` follow the same discipline (no DOM,
+  unit-tested in Node, in the coverage scope) although they live in the shell.
 - **One pipeline for changes (action layer).** `Game` and the UI never change blocks, the
   selected slot or the inventory themselves. They build a plain action
   (`{ kind, ... }`, JSON-safe) and call `session.submit(action)`; the world and the screen
@@ -342,6 +351,40 @@ sides in turn.
   phones and tablets (`pointer: coarse`) start in touch mode; `touch=1` forces it. The
   touch controls exist in the document only in touch mode. Game logic never asks for the
   mode: both feed `Input`.
+- **The controller (Phase 5) is an active source on top of the mode, not a third mode.**
+  `GamepadSource` polls once per rendered frame (`Game.frame`, before the steps) and is the
+  only place that reads `navigator.getGamepads`. The first standard-mapping pad on which
+  something is pressed becomes the pad; a button already down in its first snapshot does
+  nothing until released (the wake-up press). While the game is played (`padTarget` is
+  `play`) the source feeds `Input` with `setMove`, `setHeld`, `press` and `addTurn`
+  (radians, consumed per frame like the mouse), **sending only changes**, so keys and
+  fingers that hold the same action keep it; otherwise `Game.onPadFrame` gets the frame
+  (inventory: B/Y close, Start pauses; a run: B/Start cancel; menus: `FocusManager`). A
+  change of target blocks every held button until it is released (`PadMapper.blockHeld`).
+  `Game.padActive` is set by a press or a stick beyond 0.5: the touch controls are covered,
+  mouse mode plays **without pointer lock** (losing the lock does not pause; Esc pauses),
+  menus show the focus frame. A mouse press on the canvas (capture listener on the root)
+  or a finger on the game view hands control back and does nothing else; moving the mouse
+  or touching in a menu only clears `padActive`. Keys never change it. Disconnecting the
+  pad in use releases everything and pauses a played world (not in test mode).
+- **The focus system.** `FocusManager` works on the topmost open screen (`Game.focusScreen`:
+  world menu, pause/settings, performance test screens; not during a run; the inventory
+  joins in Part B). Focusable: `button`, `input[type=range]`, `input[type=checkbox]`,
+  `[data-pad-focus]`; enabled, with a size, not inside `[hidden]` or `[data-pad-skip]`;
+  never text fields. It is looked up anew on every move. A screen takes part with at most
+  `data-pad-default` (where its view starts; a new visible default means a new view and
+  moves the focus there), `data-pad-back` (what B clicks) and `padpress`/`padrelease`
+  listeners (A down / A up, then `click()`). Each screen root remembers its last focus
+  (used when the view is the same). Focus is virtual: class `pad-focused` and the frame
+  `.pad-focus-frame`; DOM `focus()` is never called. Moving is `nextFocus`
+  (`focusMove.ts`): elements overlapping in the direction first, then the nearest by
+  `13 × gap² + gap across²`; an unexpected neighbour is fixed there with a unit test,
+  never per screen. Start on the pause menu continues.
+- **Back guard.** Outside test mode, while anything but the world list is shown, the page
+  holds one history entry (`backGuard.ts`); a `popstate` re-arms it and acts like the pad's
+  B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press only
+  re-arms. Back on the world list leaves the entry in place (no navigation of its own,
+  which could collide with a reload); a Back that pops it there goes back once more.
 - **Determinism.** No `Math.random()` and no `Date.now()` in `world/`, `player/`, `util/`
   or texture generation. Randomness comes from the seeded RNG; time comes in as a parameter.
   The same seed must always produce the same world and the same textures.
@@ -408,13 +451,25 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   several rounds.
 - `mode=gathering` or `mode=creative` (with `test=1`; default Creative) sets the game mode
   of the test world.
+- **Controller tests** call `installFakePads(page)` (`e2e/gamepad.ts`) before `goto`; it
+  replaces `navigator.getGamepads` with pads in `window.__fakePads`. `new Pad(page)` has
+  `connect()` (with a wake-up tap of Select, as a real browser reports a pad only after a
+  press; `connect({ holding })` connects with buttons down, `wake: false` without the tap),
+  `disconnect()`, `press`, `release`, `tap`, `trigger(button, value)` and
+  `stick('left' | 'right', x, y)` (y down). Each call applies the change and reads the poll
+  count in one page call, then waits until `getState().pad.polls` grew by two. `BUTTON`
+  has the standard indices. Menu tests read `getState().ui.focus`; a focus move is one
+  `tap` of the D-pad.
 - Test API beyond Phase 2: `submit(action)` (returns the session's answer),
   `save()`, `openWorld(name, seed, mode?)` (switch worlds in place), `terrainChecksum()`,
   `give(item, count)`, `clearInventory()`; `getState()` has `mode`, `world`,
   `save { dirty, lastError, lastSaveMs, lastLoadMs }`, `inventory`,
   `breaking { x, y, z, progress } | null`, `ui { screen, tab }`,
   `recipes [{ id, name, craftable, missing, stationMissing }]` in the order of the list,
-  and `smelting { recipe, progress } | null`. `setBlock`, `give` and `clearInventory` are
+  and `smelting { recipe, progress } | null`. Phase 5: `getState().pad { connected,
+active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused element;
+  the key is left out while there is no focus, so older `toEqual` checks of `ui` hold), `settings.padSensitivity` and `settings.padInvertY`;
+  `glyphSheet()` shows all controller glyphs (reference `pad-glyphs`). `setBlock`, `give` and `clearInventory` are
   direct tools past the action layer.
 - Light (Phase 4): `getLight(x, y, z)` → `{ sky, block }` or null in a chunk that is not
   lit; `verifyLight()` → number of wrong cells (0 is correct; slow); `lightChecksum()`;
@@ -559,8 +614,13 @@ hold:
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
-- Phase 5 (gamepad controls): planned (`docs/phase-5-plan.md`), not started. Part A comes
-  first; Part B starts after Part A and after the polishing session of the inventory and
-  recipe list are merged (or the owner says there will be none). Read the plan's sections
-  2, 3 and 5 before changing `Input`, the input modes or the screens.
+- Phase 5 (gamepad controls): plan `docs/phase-5-plan.md`.
+  - Phase 5 part A (the pad in play, the focus system, all screens but the inventory, the
+    back guard): implemented (report: `docs/phase-5a-report.md`). Read its "Decisions and
+    deviations" before changing `Input`, the controller, the focus system, the menus or
+    the back guard.
+  - Part B (inventory, Creative palette, Crafting tab) starts after Part A and after the
+    polishing session of the inventory and recipe list are merged (or the owner says there
+    will be none). Part A already lets B and Y close the inventory and Start pause from
+    it; Part B replaces that with the focus system on the inventory.
 - Phases 6 (multiplayer) and 7 (personalization): not yet planned.

@@ -97,12 +97,26 @@ export interface PadFrame {
   used: boolean;
 }
 
-/** Applies the radial dead zone: zero inside, the rest rescaled to 0..1, direction kept. */
-export function applyDeadzone(x: number, y: number, deadzone: number): { x: number; y: number } {
-  const length = Math.hypot(x, y);
-  if (length <= deadzone) return { x: 0, y: 0 };
-  const scaled = Math.min(1, (length - deadzone) / (1 - deadzone));
-  return { x: (x / length) * scaled, y: (y / length) * scaled };
+/**
+ * Applies the radial dead zone: zero inside, the rest rescaled to 0..1, direction kept.
+ * Writes into `out` when given (the mapper's hot path allocates nothing).
+ */
+export function applyDeadzone(
+  x: number,
+  y: number,
+  deadzone: number,
+  out: { x: number; y: number } = { x: 0, y: 0 },
+): { x: number; y: number } {
+  const length = Math.sqrt(x * x + y * y);
+  if (length <= deadzone) {
+    out.x = 0;
+    out.y = 0;
+    return out;
+  }
+  const scaled = Math.min(1, (length - deadzone) / (1 - deadzone)) / length;
+  out.x = x * scaled;
+  out.y = y * scaled;
+  return out;
 }
 
 export class PadMapper {
@@ -118,6 +132,8 @@ export class PadMapper {
   private sensitivity = 1;
   private invertY = false;
   private readonly nav = new NavRepeat();
+  private readonly left = { x: 0, y: 0 };
+  private readonly right = { x: 0, y: 0 };
   private readonly frame: PadFrame = {
     forward: 0,
     strafe: 0,
@@ -209,14 +225,10 @@ export class PadMapper {
     const ly = axes.length > 1 ? axes[1] : 0;
     const rx = axes.length > 2 ? axes[2] : 0;
     const ry = axes.length > 3 ? axes[3] : 0;
-    if (
-      Math.hypot(lx, ly) > PAD_ACTIVATE_THRESHOLD ||
-      Math.hypot(rx, ry) > PAD_ACTIVATE_THRESHOLD
-    ) {
-      f.used = true;
-    }
+    const threshold = PAD_ACTIVATE_THRESHOLD * PAD_ACTIVATE_THRESHOLD;
+    if (lx * lx + ly * ly > threshold || rx * rx + ry * ry > threshold) f.used = true;
 
-    const left = applyDeadzone(lx, ly, PAD_DEADZONE);
+    const left = applyDeadzone(lx, ly, PAD_DEADZONE, this.left);
     // Stick y grows downwards; pushing the stick up means forward. `0 - y` avoids -0.
     f.forward = 0 - left.y;
     f.strafe = left.x;
@@ -227,8 +239,8 @@ export class PadMapper {
     this.leftOutside = outside;
     if (this.sprint) f.held.add('sprint');
 
-    const right = applyDeadzone(rx, ry, PAD_DEADZONE);
-    const magnitude = Math.hypot(right.x, right.y);
+    const right = applyDeadzone(rx, ry, PAD_DEADZONE, this.right);
+    const magnitude = Math.sqrt(right.x * right.x + right.y * right.y);
     if (magnitude === 0) {
       f.lookX = 0;
       f.lookY = 0;
