@@ -5,6 +5,8 @@ import {
   FOV_MIN,
   MOUSE_SENSITIVITY_MAX,
   MOUSE_SENSITIVITY_MIN,
+  PAD_SENSITIVITY_MAX,
+  PAD_SENSITIVITY_MIN,
   RENDER_DISTANCE_MAX,
   RENDER_DISTANCE_MIN,
   TOUCH_SENSITIVITY_MAX,
@@ -12,7 +14,7 @@ import {
 } from '../game/config';
 import type { GameMode } from '../actions/playerRecord';
 import { type InputMode, button, element, onActivate } from './activate';
-import type { Settings } from './settings';
+import type { NumberSetting, Settings } from './settings';
 
 export type { InputMode } from './activate';
 
@@ -83,7 +85,12 @@ export class PauseScreen {
   private readonly hint: HTMLElement;
   private readonly playButton: HTMLButtonElement;
   private readonly controlsList: HTMLElement;
-  private readonly sliders: Record<keyof Settings, SliderHandle>;
+  private readonly sliders: Record<NumberSetting, SliderHandle>;
+  /** "Invert controller look", a switch row like the debug overlay. */
+  private readonly invertRow: HTMLElement;
+  private readonly invertSwitch: HTMLInputElement;
+  /** A controller was used during this visit: its two settings rows are shown. */
+  private padSeen = false;
   /** Parts of the menu that only exist for touch mode. */
   private readonly touchOnly: HTMLElement[] = [];
   private readonly debugSwitch: HTMLInputElement;
@@ -199,7 +206,27 @@ export class PauseScreen {
         change();
       },
     });
-    this.sliders = { renderDistance, mouseSensitivity, touchSensitivity, fov, brightness };
+    const padSensitivity = this.slider({
+      id: 'setting-pad-sensitivity',
+      label: 'Controller sensitivity',
+      min: PAD_SENSITIVITY_MIN,
+      max: PAD_SENSITIVITY_MAX,
+      step: 0.1,
+      value: this.settings.padSensitivity,
+      format: (v) => `${v.toFixed(1)}×`,
+      apply: (v) => {
+        this.settings.padSensitivity = v;
+        change();
+      },
+    });
+    this.sliders = {
+      renderDistance,
+      mouseSensitivity,
+      touchSensitivity,
+      padSensitivity,
+      fov,
+      brightness,
+    };
     settings.append(
       renderDistance.row,
       mouseSensitivity.row,
@@ -208,17 +235,22 @@ export class PauseScreen {
       brightness.row,
     );
 
+    const invert = this.switchRow('setting-pad-invert', 'Invert controller look');
+    this.invertRow = invert.row;
+    this.invertSwitch = invert.input;
+    this.invertSwitch.checked = this.settings.padInvertY;
+    this.invertSwitch.addEventListener('change', () => {
+      this.settings.padInvertY = this.invertSwitch.checked;
+      change();
+    });
+
     // Touch devices have no F3 key; this switch replaces it.
-    const debugRow = element('label', 'setting-row switch-row');
-    debugRow.htmlFor = 'setting-debug';
-    debugRow.appendChild(element('span', 'setting-label', 'Debug overlay'));
-    this.debugSwitch = element('input', 'setting-switch');
-    this.debugSwitch.type = 'checkbox';
-    this.debugSwitch.id = 'setting-debug';
+    const debug = this.switchRow('setting-debug', 'Debug overlay');
+    const debugRow = debug.row;
+    this.debugSwitch = debug.input;
     this.debugSwitch.addEventListener('change', () =>
       options.onDebugChange(this.debugSwitch.checked),
     );
-    debugRow.appendChild(this.debugSwitch);
     settings.appendChild(debugRow);
     this.touchOnly.push(debugRow);
     right.appendChild(settings);
@@ -328,17 +360,28 @@ export class PauseScreen {
     if (settings) {
       place(this.sliders.mouseSensitivity.row, settings, this.sliders.fov.row, !touch);
       place(this.sliders.touchSensitivity.row, settings, this.sliders.fov.row, touch);
+      // The controller's rows show once a controller was used during this visit.
+      place(this.sliders.padSensitivity.row, settings, this.sliders.fov.row, this.padSeen);
+      place(this.invertRow, settings, null, this.padSeen);
       for (const node of this.touchOnly) place(node, settings, null, touch);
     }
     this.placeFullscreenButton();
   }
 
+  /** A controller was used: from now on its settings rows are shown. */
+  setPadSeen(): void {
+    if (this.padSeen) return;
+    this.padSeen = true;
+    this.setMode(this.mode);
+  }
+
   /** Shows other settings than the player chose, e.g. the defaults of another mode. */
   setSettings(settings: Settings): void {
     this.settings = { ...settings };
-    for (const key of Object.keys(this.sliders) as (keyof Settings)[]) {
+    for (const key of Object.keys(this.sliders) as NumberSetting[]) {
       this.sliders[key].set(settings[key]);
     }
+    this.invertSwitch.checked = settings.padInvertY;
   }
 
   setDebugChecked(checked: boolean): void {
@@ -395,6 +438,17 @@ export class PauseScreen {
     window.setTimeout(() => {
       button.textContent = 'Copy link to this world';
     }, 2000);
+  }
+
+  private switchRow(id: string, label: string): { row: HTMLElement; input: HTMLInputElement } {
+    const row = element('label', 'setting-row switch-row');
+    row.htmlFor = id;
+    row.appendChild(element('span', 'setting-label', label));
+    const input = element('input', 'setting-switch');
+    input.type = 'checkbox';
+    input.id = id;
+    row.appendChild(input);
+    return { row, input };
   }
 
   private slider(config: {

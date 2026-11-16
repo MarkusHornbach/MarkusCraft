@@ -29,6 +29,8 @@ describe('settings', () => {
       fov: 75,
       touchSensitivity: 1,
       brightness: 0.5,
+      padSensitivity: 1,
+      padInvertY: false,
     });
     expect(SETTINGS_STORAGE_KEY).toBe('markuscraft.settings.v1');
   });
@@ -40,6 +42,8 @@ describe('settings', () => {
       fov: 110,
       touchSensitivity: 1,
       brightness: 0.5,
+      padSensitivity: 1,
+      padInvertY: false,
     });
     expect(validateSettings({ renderDistance: 99, mouseSensitivity: 0, fov: 10 })).toEqual({
       renderDistance: 16,
@@ -47,6 +51,8 @@ describe('settings', () => {
       fov: 60,
       touchSensitivity: 1,
       brightness: 0.5,
+      padSensitivity: 1,
+      padInvertY: false,
     });
     expect(validateSettings({ touchSensitivity: 2 }).touchSensitivity).toBe(2);
     expect(validateSettings({ touchSensitivity: 9 }).touchSensitivity).toBe(3);
@@ -74,6 +80,8 @@ describe('settings', () => {
       fov: 90,
       touchSensitivity: 1,
       brightness: 0.5,
+      padSensitivity: 1,
+      padInvertY: false,
     };
     saveSettings(storage, chosen);
     expect(hasStoredSettings(storage)).toBe(true);
@@ -115,6 +123,8 @@ describe('settings', () => {
       fov: 90,
       touchSensitivity: 2,
       brightness: 0.5,
+      padSensitivity: 1,
+      padInvertY: false,
     });
     // Writing them back without a change of Brightness gives the same text.
     saveSettings(storage, loadSettings(storage));
@@ -122,6 +132,38 @@ describe('settings', () => {
     saveSettings(storage, { ...loadSettings(storage), brightness: 0.8 });
     expect(JSON.parse(storage.data.get(SETTINGS_STORAGE_KEY) ?? '').brightness).toBe(0.8);
     expect(loadSettings(storage).brightness).toBe(0.8);
+  });
+
+  it('Phase 5 AC1.8: the controller settings default, clamp and survive storing', () => {
+    expect(validateSettings({})).toMatchObject({ padSensitivity: 1, padInvertY: false });
+    for (const broken of ['fast', null, NaN, Infinity, {}, []]) {
+      expect(validateSettings({ padSensitivity: broken }).padSensitivity).toBe(1);
+    }
+    for (const broken of ['true', 1, 0, null, {}]) {
+      expect(validateSettings({ padInvertY: broken }).padInvertY).toBe(false);
+    }
+    expect(validateSettings({ padSensitivity: 2.4 }).padSensitivity).toBe(2.4);
+    expect(validateSettings({ padSensitivity: 9 }).padSensitivity).toBe(3);
+    expect(validateSettings({ padSensitivity: 0 }).padSensitivity).toBe(0.2);
+    expect(validateSettings({ padInvertY: true }).padInvertY).toBe(true);
+
+    const storage = fakeStorage();
+    saveSettings(storage, { ...DEFAULT_SETTINGS, padSensitivity: 1.7, padInvertY: true });
+    expect(JSON.parse(storage.data.get(SETTINGS_STORAGE_KEY) ?? '')).toMatchObject({
+      padSensitivity: 1.7,
+      padInvertY: true,
+    });
+    expect(loadSettings(storage)).toMatchObject({ padSensitivity: 1.7, padInvertY: true });
+  });
+
+  it('Phase 5 AC1.8: the stored text of a player who never changed them stays the same', () => {
+    const stored = '{"renderDistance":5,"mouseSensitivity":1.5,"fov":90,"brightness":0.8}';
+    const storage = fakeStorage(stored);
+    expect(loadSettings(storage)).toMatchObject({ padSensitivity: 1, padInvertY: false });
+    saveSettings(storage, loadSettings(storage));
+    expect(storage.data.get(SETTINGS_STORAGE_KEY)).toBe(stored);
+    saveSettings(storage, { ...loadSettings(storage), padInvertY: false, padSensitivity: 1 });
+    expect(storage.data.get(SETTINGS_STORAGE_KEY)).toBe(stored);
   });
 
   it('survives corrupt or unavailable storage', () => {

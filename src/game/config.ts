@@ -237,3 +237,35 @@ export const BENCH_LABEL = 'perf-run';
 export const BENCH_STORAGE_KEY = 'markuscraft.lastPerfRun.v1';
 /** After "Start" the view may settle (fullscreen) this long before anything is loaded. */
 export const BENCH_START_DELAY_MS = 800;
+
+// --- Controller (Phase 5) ---
+
+/** Button value from which a button counts as down, and below which it counts as up again. */
+export const PAD_BUTTON_DOWN = 0.5;
+export const PAD_BUTTON_UP = 0.35;
+/** Radial dead zone of both sticks; outside it the deflection is rescaled to 0..1. */
+export const PAD_DEADZONE = 0.15;
+/** Look rate = (rescaled deflection ^ exponent) × maximum × controller sensitivity. */
+export const PAD_LOOK_EXPONENT = 2;
+export const PAD_LOOK_MAX_RAD_PER_S = 3.0;
+/** Held beyond this horizontal deflection, turning speeds up (the ramp). */
+export const PAD_RAMP_THRESHOLD = 0.95;
+export const PAD_RAMP_DELAY_MS = 250;
+export const PAD_RAMP_MS = 400;
+export const PAD_RAMP_FACTOR = 1.6;
+/** A stick makes the controller the active source only when pushed this far. */
+export const PAD_ACTIVATE_THRESHOLD = 0.5;
+/** The left stick moves the focus in menus when pushed this far along one axis. */
+export const PAD_NAV_THRESHOLD = 0.5;
+/** Holding a direction in menus: first repeat after this delay, then at this interval. */
+export const PAD_NAV_DELAY_MS = 400;
+export const PAD_NAV_REPEAT_MS = 120;
+/** The right stick scrolls a menu this many pixels per second at full deflection. */
+export const PAD_SCROLL_PX_PER_S = 900;
+/** Longest time one poll may account for (as the simulation's 0.25 s cap). */
+export const PAD_MAX_ELAPSED_MS = 250;
+export const PAD_SENSITIVITY_DEFAULT = 1;
+export const PAD_SENSITIVITY_MIN = 0.2;
+export const PAD_SENSITIVITY_MAX = 3;
+/** A browser "Back" this soon after the controller's B press is the same press. */
+export const BACK_PAIR_MS = 150;
