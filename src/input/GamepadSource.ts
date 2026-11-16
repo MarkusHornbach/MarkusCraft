@@ -79,6 +79,7 @@ export class GamepadSource {
   private connectedCount = 0;
   private pollCount = 0;
   private unsupportedSeen = false;
+  private lastTarget: PadTarget = 'play';
 
   constructor(options: GamepadSourceOptions) {
     this.options = options;
@@ -146,10 +147,13 @@ export class GamepadSource {
     }
     if (!current) return;
 
+    const target = this.options.target();
+    // A button held across a change of target (a menu opened, play began) does nothing there.
+    if (target !== this.lastTarget) this.mapper.blockHeld();
+    this.lastTarget = target;
     this.read(current);
     const frame = this.mapper.update(this.snapshot, elapsedMs);
     if (frame.used) this.options.onUse();
-    const target = this.options.target();
     if (target === 'play') this.feed(frame, elapsedMs);
     else this.release();
     this.options.onFrame(frame, target, elapsedMs);

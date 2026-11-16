@@ -30,6 +30,8 @@ import {
 import { MemoryStore, type WorldStore } from '../save/WorldStore';
 import { BenchScreen } from '../ui/BenchScreen';
 import { DebugOverlay } from '../ui/DebugOverlay';
+import { FocusManager } from '../ui/FocusManager';
+import { glyphSheet } from '../ui/padGlyphs';
 import { Hud } from '../ui/Hud';
 import { InventoryScreen } from '../ui/InventoryScreen';
 import { type InputMode, PauseScreen, SAVE_FAILED_TEXT } from '../ui/PauseScreen';
@@ -56,6 +58,7 @@ import { blockOf, skyOf } from '../world/light/lightRules';
 import { type RayHit, raycast } from '../world/raycast';
 import { World } from '../world/World';
 import { Autosave, type SaveBatch } from './autosave';
+import { BackGuard } from './backGuard';
 import { heapMb, readBenchEnv } from './benchEnv';
 import {
   ACTION_REPEAT_MS,
@@ -220,8 +223,14 @@ export class Game {
   private padActive = false;
   /** A controller was used during this visit (its settings rows are shown from then on). */
   private padSeen = false;
+  /** The controller's focus on the menus. */
+  private readonly focus: FocusManager;
+  /** Keeps the browser's Back inside the game while a menu or a world is shown. */
+  private readonly backGuard: BackGuard | null = null;
   /** A controller notice in play ("Controller connected") and the action time it stays until. */
   private padNotice: { text: string; untilMs: number } | null = null;
+  /** The controller notice last shown, which a menu clears once the controller is used. */
+  private menuPadNotice: string | null = null;
   /** Smoothed frames per second for the debug overlay. */
   private fps = 0;
   private readonly perf = new PerfStats();
@@ -305,11 +314,19 @@ export class Game {
       target: () => this.padTarget(),
       onFrame: (frame, target, elapsedMs) => this.onPadFrame(frame, target, elapsedMs),
       onUse: () => this.setPadActive(true),
-      onConnect: () => this.showPadNotice(TEXT_PAD_CONNECTED),
+      onConnect: () => {
+        this.showPadNotice(TEXT_PAD_CONNECTED);
+        this.pauseScreen?.setPadWaiting(!this.padSeen);
+      },
       onDisconnect: () => this.onPadDisconnect(),
       onUnsupported: () => this.showPadNotice(TEXT_PAD_UNSUPPORTED),
     });
     this.gamepad.setLook(this.settings.padSensitivity, this.settings.padInvertY);
+    this.focus = new FocusManager({
+      host: this.root,
+      screen: () => this.focusScreen(),
+      onStart: () => this.onPadStart(),
+    });
 
     this.session = this.createSession(createPlayerRecord(this.gameMode));
     this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
@@ -399,6 +416,7 @@ export class Game {
       this.showScreen('worlds');
       if (params.bench === 'sample') this.showBenchResult(SAMPLE_RESULT);
       else if (params.bench !== 'off') this.openBench();
+      this.backGuard = new BackGuard(() => this.onBrowserBack());
       document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
       document.addEventListener('pointerlockerror', () => this.onPointerLockError());
       void this.openStore();
@@ -1384,6 +1402,9 @@ export class Game {
       );
     }
     this.draw(this.params.test ? 1 : this.accumulator / SIM_DT);
+    // The focus frame follows its element (lists reorder, content scrolls).
+    this.focus.update();
+    this.backGuard?.setArmed(this.wantsBackGuard());
 
     if (this.chunksIdle()) {
       this.framesSinceIdle++;
@@ -1640,9 +1661,11 @@ export class Game {
   }
 
   /** The controller's frame outside play: the inventory, a run, the menus. */
-  private onPadFrame(frame: PadFrame, target: PadTarget, _elapsedMs: number): void {
-    if (target === 'play') return;
+  private onPadFrame(frame: PadFrame, target: PadTarget, elapsedMs: number): void {
     const pressed = frame.pressed;
+    // A browser that also sends B as "Back" must not make it act twice.
+    if (pressed.includes(PadButton.B)) this.backGuard?.notePadBack();
+    if (target === 'play') return;
     if (this.bench) {
       // A run takes no input but what cancels it.
       if (pressed.includes(PadButton.B) || pressed.includes(PadButton.START)) {
@@ -1657,7 +1680,44 @@ export class Game {
       } else if (pressed.includes(PadButton.B) || pressed.includes(PadButton.Y)) {
         this.closeInventory();
       }
+      return;
     }
+    this.focus.handle(frame, elapsedMs);
+  }
+
+  /** The screen the controller's focus is on, or null (play, a run, the inventory in Part A). */
+  private focusScreen(): HTMLElement | null {
+    if (this.bench || this.inventoryOpen || !this.pauseScreen) return null;
+    if (this.screen === 'bench') return this.benchScreen?.element ?? null;
+    if (this.screen === 'worlds') return this.worldMenu?.element ?? null;
+    if (this.screen === 'pause' || this.screen === 'settings') return this.pauseScreen.element;
+    return null;
+  }
+
+  /** Start on a screen: the pause menu continues the game; elsewhere it does nothing. */
+  private onPadStart(): void {
+    if (this.screen === 'pause' && this.meta && !this.menuBusy) this.requestPlay(null);
+  }
+
+  /**
+   * The browser's Back (or the phone's back gesture) while the guard holds its entry: acts
+   * as the controller's B would.
+   */
+  private onBrowserBack(): void {
+    if (this.bench) this.interruptBench('cancel');
+    else if (this.inventoryOpen) this.closeInventory();
+    else if (this.screen === 'play') {
+      if (!this.meta || this.paused) return;
+      // The pause menu needs the mouse free, as after Esc.
+      if (document.pointerLockElement) document.exitPointerLock();
+      this.setPaused(true);
+    } else if (this.screen === 'worlds') this.worldMenu?.backToList();
+    else this.focus.back();
+  }
+
+  /** Back leaves the page only from the world list. */
+  private wantsBackGuard(): boolean {
+    return this.screen !== 'worlds' || this.worldMenu?.currentView !== 'list';
   }
 
   /**
@@ -1671,7 +1731,17 @@ export class Game {
     if (active && !this.padSeen) {
       this.padSeen = true;
       this.pauseScreen?.setPadSeen();
+      this.pauseScreen?.setPadWaiting(false);
     }
+    if (active && this.menuPadNotice !== null) {
+      // The notice has served its purpose: the controller is in use.
+      if (this.worldMenu?.messageText === this.menuPadNotice) this.worldMenu.setMessage('');
+      if (this.pauseScreen?.hintText === this.menuPadNotice) this.pauseScreen.setHint('');
+      this.menuPadNotice = null;
+    }
+    this.focus.setActive(active);
+    this.worldMenu?.setPadActive(active);
+    this.pauseScreen?.setPadActive(active);
     // The mouse is set free: it does not look while the controller plays.
     if (active && this.mode === 'mouse' && document.pointerLockElement) document.exitPointerLock();
     this.updateTouchCover();
@@ -1684,6 +1754,7 @@ export class Game {
 
   private onPadDisconnect(): void {
     this.setPadActive(false);
+    this.pauseScreen?.setPadWaiting(false);
     // A player who loses the controller mid-walk must not walk on blind.
     if (this.pauseScreen && this.meta && !this.paused && !this.bench) this.setPaused(true);
     this.showPadNotice(TEXT_PAD_DISCONNECTED);
@@ -1692,9 +1763,10 @@ export class Game {
   /**
    * A notice about the controller: over the game while it is played (for `NOTICE_MS` of
    * game time, like a pickup), otherwise in the message line of the menu, where it stays
-   * until another message replaces it.
+   * until the controller is used or another message replaces it.
    */
   private showPadNotice(text: string): void {
+    this.menuPadNotice = text;
     if (!this.pauseScreen || this.screen === 'play') {
       this.padNotice = { text, untilMs: this.nowMs() + NOTICE_MS };
     } else if (this.screen === 'worlds') {
@@ -1915,6 +1987,7 @@ export class Game {
       ui: {
         screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play',
         tab: this.inventoryOpen ? this.inventoryScreen.currentTab : null,
+        focus: this.focus.description,
       },
       recipes: this.recipeStatuses().map((status) => ({
         id: status.id,
@@ -2046,6 +2119,9 @@ export class Game {
       give: (item, count) => this.testGive(item, count),
       clearInventory: () => this.testClearInventory(),
       benchResult: () => (this.benchPhase === 'result' ? this.benchResult : null),
+      glyphSheet: () => {
+        if (!this.root.querySelector('.pad-glyph-sheet')) this.root.appendChild(glyphSheet());
+      },
       openWorld: (name, seed, mode) => this.openNamedWorld(name, seed, mode ?? this.params.mode),
       step: (n) => {
         for (let i = 0; i < n; i++) this.simulate();

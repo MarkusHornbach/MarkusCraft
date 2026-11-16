@@ -67,14 +67,42 @@ describe('nextFocus (Phase 5 AC1.7)', () => {
     expect(nextFocus(rects, 2, 'right')).toBe(3);
   });
 
-  it('jumps over a gap in a row rather than leaving the row', () => {
+  it('with a gap: sideways it stays in the row, up and down it takes the nearer row', () => {
     // A 3 × 3 grid without its centre.
     const cells = grid(3, 3, [4]);
     // Index 3 is the middle row's left cell, 4 its right cell.
     expect(nextFocus(cells, 3, 'right')).toBe(4);
     expect(nextFocus(cells, 4, 'left')).toBe(3);
-    // Down from the top middle: the bottom middle.
-    expect(nextFocus(cells, 1, 'down')).toBe(6);
+    // Down from the top middle: the next row is nearer than the bottom middle beyond the
+    // gap; of its two cells the earlier one.
+    expect(nextFocus(cells, 1, 'down')).toBe(3);
+    // A column with a gap: down skips it.
+    const column = grid(1, 4, [1]);
+    expect(nextFocus(column, 0, 'down')).toBe(1);
+  });
+
+  it('prefers the nearest element in the direction when nothing overlaps (the pause menu)', () => {
+    // A button at the top left; below it, in a column to the right, sliders at the top
+    // and a button at the bottom that lies less far to the side.
+    const rects = [
+      rect(264, 137, 214, 40),
+      rect(620, 226, 132, 16),
+      rect(620, 247, 132, 16),
+      rect(491, 396, 161, 28),
+    ];
+    expect(nextFocus(rects, 0, 'down')).toBe(1);
+    expect(nextFocus(rects, 1, 'down')).toBe(2);
+    expect(nextFocus(rects, 2, 'down')).toBe(3);
+    expect(nextFocus(rects, 3, 'up')).toBe(2);
+  });
+
+  it('a switch right under a slider wins over a button far below that overlaps it', () => {
+    const rects = [rect(620, 289, 132, 16), rect(820, 312, 16, 16), rect(491, 396, 161, 28)];
+    expect(nextFocus(rects, 0, 'down')).toBe(1);
+    expect(nextFocus(rects, 1, 'down')).toBe(2);
+    // Back up: the switch lies in between, then the slider.
+    expect(nextFocus(rects, 2, 'up')).toBe(1);
+    expect(nextFocus(rects, 1, 'up')).toBe(0);
   });
 
   it('ignores elements that only lie partly beyond the edge', () => {

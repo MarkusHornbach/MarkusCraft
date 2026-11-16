@@ -200,6 +200,21 @@ describe('buttons (Phase 5 AC1.4)', () => {
   });
 });
 
+describe('blockHeld', () => {
+  it('a button held across a change reports nothing until released and pressed again', () => {
+    const mapper = awake();
+    let f = mapper.update(snapshot({ [PadButton.A]: 1, [PadButton.LS]: 1 }, [0, -1, 0, 0]), 10);
+    expect([...f.held].sort()).toEqual(['jump', 'sprint']);
+    mapper.blockHeld();
+    f = mapper.update(snapshot({ [PadButton.A]: 1 }, [0, -1, 0, 0]), 10);
+    expect(f.held.size).toBe(0);
+    f = mapper.update(snapshot({}, [0, -1, 0, 0]), 10);
+    expect(f.released).toEqual([]);
+    f = mapper.update(snapshot({ [PadButton.A]: 1 }, [0, -1, 0, 0]), 10);
+    expect(f.pressed).toEqual([PadButton.A]);
+  });
+});
+
 describe('sprint and the mapping (Phase 5 AC1.5)', () => {
   it('the stick click sprints until the left stick returns into its dead zone', () => {
     const mapper = awake();

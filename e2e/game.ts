@@ -142,7 +142,11 @@ export async function openMenu(page: Page, query = '', storeSettings = true): Pr
   if (storeSettings) {
     await page.addInitScript(
       ([key, value]) => {
-        if (window.localStorage.getItem(key) === null) window.localStorage.setItem(key, value);
+        try {
+          if (window.localStorage.getItem(key) === null) window.localStorage.setItem(key, value);
+        } catch {
+          // A page without storage (about:blank after leaving the game) needs nothing.
+        }
       },
       [SETTINGS_KEY, JSON.stringify(SMALL_SETTINGS)],
     );

@@ -154,6 +154,15 @@ export class PadMapper {
     this.blocked.length = 0;
   }
 
+  /**
+   * Buttons down now report nothing more until they were released (what the pad acts on
+   * changed under them: a menu opened or play began). The sprint latch ends too.
+   */
+  blockHeld(): void {
+    for (let i = 0; i < this.down.length; i++) if (this.down[i]) this.blocked[i] = true;
+    this.sprint = false;
+  }
+
   /** Whether a button is down and counts (not blocked since the first snapshot). */
   isDown(button: number): boolean {
     return this.down[button] === true && this.blocked[button] !== true;

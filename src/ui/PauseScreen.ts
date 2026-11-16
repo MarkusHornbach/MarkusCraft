@@ -14,6 +14,7 @@ import {
 } from '../game/config';
 import type { GameMode } from '../actions/playerRecord';
 import { type InputMode, button, element, onActivate } from './activate';
+import { type GlyphName, drawGlyph } from './padGlyphs';
 import type { NumberSetting, Settings } from './settings';
 
 export type { InputMode } from './activate';
@@ -55,6 +56,26 @@ const TOUCH_CONTROLS: readonly ControlLine[] = [
   ['Bag', 'Open the inventory'],
   ['Menu', 'Pause and open this menu'],
 ];
+
+/** The controller's lines: glyphs, what they do, and the text in Gathering (as above). */
+type PadControlLine = readonly [readonly GlyphName[], string, (string | null)?];
+
+const PAD_CONTROLS: readonly PadControlLine[] = [
+  [['LS'], 'Move'],
+  [['LS-click'], 'Sprint (until the stick is let go)'],
+  [['RS'], 'Look around'],
+  [['A'], 'Jump / swim up / fly up', 'Jump / swim up'],
+  [['B'], 'Fly down', null],
+  [['X'], 'Toggle fly mode', null],
+  [['RT'], 'Break block'],
+  [['LT'], 'Place block'],
+  [['LB', 'RB'], 'Select block (also the D-pad)'],
+  [['Y'], 'Inventory'],
+  [['start'], 'Pause'],
+];
+
+/** Shown while a controller is connected that has not been used yet. */
+export const PAD_WAITING_TEXT = 'Press a button on the controller to use it';
 
 export interface PauseScreenOptions {
   settings: Settings;
@@ -106,6 +127,10 @@ export class PauseScreen {
   private kind: PauseKind = 'pause';
   private gameMode: GameMode = 'creative';
   private resumed = false;
+  /** The controller is the active source: its controls list and button labels. */
+  private padActive = false;
+  /** A controller is connected but was not used yet during this visit. */
+  private padWaiting = false;
 
   constructor(parent: HTMLElement, options: PauseScreenOptions) {
     this.settings = { ...options.settings };
@@ -296,6 +321,11 @@ export class PauseScreen {
     this.kind = kind;
     const pause = kind === 'pause';
     this.backButton.textContent = pause ? 'Save and back to worlds' : 'Back to worlds';
+    // Where the controller's focus starts and what B does (plan 5.6).
+    this.mark(this.playButton, pause, pause);
+    this.mark(this.backButton, false, !pause);
+    const firstSlider = this.sliders.renderDistance.row.querySelector('input');
+    if (firstSlider) this.mark(firstSlider, !pause, false);
     // Parts without a meaning on the settings page are taken out of the document.
     if (pause) {
       this.buttonRow.insertBefore(this.playButton, this.backButton);
@@ -333,16 +363,56 @@ export class PauseScreen {
     this.renderControls();
   }
 
+  private mark(node: HTMLElement, isDefault: boolean, isBack: boolean): void {
+    if (isDefault) node.dataset.padDefault = '';
+    else delete node.dataset.padDefault;
+    if (isBack) node.dataset.padBack = '';
+    else delete node.dataset.padBack;
+  }
+
   private renderControls(): void {
     this.controlsList.replaceChildren();
     // The settings page is about no world: it lists everything.
     const gathering = this.gameMode === 'gathering' && this.kind === 'pause';
-    for (const [input, action, inGathering] of this.mode === 'touch' ? TOUCH_CONTROLS : CONTROLS) {
-      const text = gathering && inGathering !== undefined ? inGathering : action;
-      if (text === null) continue;
-      this.controlsList.appendChild(element('dt', 'control-input', input));
-      this.controlsList.appendChild(element('dd', 'control-action', text));
+    const pick = (action: string, inGathering: string | null | undefined): string | null =>
+      gathering && inGathering !== undefined ? inGathering : action;
+    if (this.padActive) {
+      for (const [glyphs, action, inGathering] of PAD_CONTROLS) {
+        const text = pick(action, inGathering);
+        if (text === null) continue;
+        const term = element('dt', 'control-input control-glyphs');
+        for (const glyph of glyphs) term.appendChild(drawGlyph(glyph, 22));
+        this.controlsList.appendChild(term);
+        this.controlsList.appendChild(element('dd', 'control-action', text));
+      }
+    } else {
+      const lines = this.mode === 'touch' ? TOUCH_CONTROLS : CONTROLS;
+      for (const [input, action, inGathering] of lines) {
+        const text = pick(action, inGathering);
+        if (text === null) continue;
+        this.controlsList.appendChild(element('dt', 'control-input', input));
+        this.controlsList.appendChild(element('dd', 'control-action', text));
+      }
     }
+    if (this.padWaiting && !this.padActive) {
+      this.controlsList.appendChild(element('dt', 'control-input', 'Controller'));
+      this.controlsList.appendChild(element('dd', 'control-action', PAD_WAITING_TEXT));
+    }
+  }
+
+  /** The controller became the active source, or control went back to mouse or touch. */
+  setPadActive(active: boolean): void {
+    if (active === this.padActive) return;
+    this.padActive = active;
+    this.updatePlayLabel();
+    this.renderControls();
+  }
+
+  /** A controller is connected that was not used yet: the controls list says what to do. */
+  setPadWaiting(waiting: boolean): void {
+    if (waiting === this.padWaiting) return;
+    this.padWaiting = waiting;
+    this.renderControls();
   }
 
   /** Adapts the labels, the controls list and the settings to the input mode. */
@@ -399,13 +469,17 @@ export class PauseScreen {
   }
 
   private updatePlayLabel(): void {
-    const verb = this.mode === 'touch' ? 'Tap' : 'Click';
+    const verb = this.padActive ? 'Press A' : this.mode === 'touch' ? 'Tap' : 'Click';
     this.playButton.textContent = `${verb} to ${this.resumed ? 'continue' : 'play'}`;
   }
 
   /** Shows a short message under the play button (empty string clears it). */
   setHint(text: string): void {
     this.hint.textContent = text;
+  }
+
+  get hintText(): string {
+    return this.hint.textContent ?? '';
   }
 
   /** Enters or leaves fullscreen; browsers allow this only from a tap or click. */
@@ -447,6 +521,7 @@ export class PauseScreen {
     const input = element('input', 'setting-switch');
     input.type = 'checkbox';
     input.id = id;
+    input.setAttribute('aria-label', label);
     row.appendChild(input);
     return { row, input };
   }
@@ -467,6 +542,7 @@ export class PauseScreen {
     const input = element('input', 'setting-input');
     input.type = 'range';
     input.id = config.id;
+    input.setAttribute('aria-label', config.label);
     input.min = String(config.min);
     input.max = String(config.max);
     input.step = String(config.step);
