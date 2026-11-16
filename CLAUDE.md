@@ -563,6 +563,8 @@ hold:
 ## Owner decisions
 
 - No tests with children and no child-specific adaptations (owner, 2026-11-16).
+- Sessions watch every PR they open (CI results and review comments) until it is
+  merged or closed, without asking first (owner, 2026-11-16).
 
 ## Current status
 
