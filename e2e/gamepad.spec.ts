@@ -211,7 +211,7 @@ test('Phase 5 AC2.4: Y opens the inventory', async ({ page }) => {
   const pad = await padGame(page, { mode: 'gathering' });
   await pad.tap(BUTTON.Y);
   expect((await getState(page)).ui.screen).toBe('inventory');
-  // In Part A, B and Y close it again.
+  // Y closes it again, and B with no slot picked (Part B: B first puts a picked slot down).
   await pad.tap(BUTTON.Y);
   expect((await getState(page)).ui.screen).toBe('play');
   await pad.tap(BUTTON.Y);

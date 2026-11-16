@@ -26,8 +26,8 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: polishing session 1 (recipe list in fixed order, hold delay: CRAFT-12 and
-CRAFT-13 added, CRAFT-3 and CRAFT-8 obsolete); 2026-11-16.
+Last updated: Phase 5 part B (the controller on the inventory, the palette and the recipe
+list: PAD-13 to PAD-15 added); 2026-11-16.
 
 ---
 
@@ -286,6 +286,20 @@ after a press. The buttons are listed in the pause menu while the controller is 
 - [ ] **PAD-12** (5A) The button pictures in the pause menu and the bar at the bottom of the
       menus ("A Select, B Back"): readable from the sofa, understood without explanation?
       Result:
+- [ ] **PAD-13** (5B) Inventory in a Gathering world, controller only: Y opens it with the
+      frame on the selected bar slot. Move a stack (A on it, then A on another slot), merge
+      two stacks of the same item, swap two, throw one into the bin. B puts a picked stack
+      down first, then closes; Y closes at once. Does the frame always go where you expect
+      in the grid, along the bar and to the bin? On the phone: is the bar at the bottom
+      readable and nothing hidden under it? _PC, Phone._ Result:
+- [ ] **PAD-14** (5B) Crafting tab with the controller: RB opens it, LB goes back. Hold A on
+      "Craft": the first item after half a second, then four a second; letting go stops.
+      A furnace recipe shows its bar; Y closes and cancels it. Scroll the list with the right
+      stick, also to recipes that cannot be made yet. Does the frame stay on "Craft" after a
+      craft, and go somewhere sensible when the button disappears? _PC, Phone._ Result:
+- [ ] **PAD-15** (5B) Creative palette with the controller: A on a block puts it into the
+      selected bar slot; A on a bar slot first and then on a block puts it into that slot.
+      Is the frame easy to follow over the many blocks? Result:
 
 ---
 

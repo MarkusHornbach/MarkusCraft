@@ -20,6 +20,11 @@ export interface FocusManagerOptions {
   screen: () => HTMLElement | null;
   /** Start was pressed on a screen. */
   onStart: () => void;
+  /**
+   * The hints of a screen that has more buttons than A and B (the inventory); null for the
+   * generic ones.
+   */
+  hintsFor?: (root: HTMLElement, element: HTMLElement) => PadHint[] | null;
 }
 
 function isRange(element: Element | null): element is HTMLInputElement {
@@ -35,15 +40,37 @@ export function isFocusable(element: Element): element is HTMLElement {
   return rect.width > 0 && rect.height > 0;
 }
 
+function canScroll(node: HTMLElement): boolean {
+  // The sizes first: most elements have nothing to scroll, and that check needs no style.
+  if (node.scrollHeight <= node.clientHeight) return false;
+  const overflow = getComputedStyle(node).overflowY;
+  return overflow === 'auto' || overflow === 'scroll';
+}
+
 /** The scroll container of an element below `root`, or `root` itself. */
 function scrollerOf(element: HTMLElement, root: HTMLElement): HTMLElement {
   for (let node = element.parentElement; node && node !== root; node = node.parentElement) {
-    const overflow = getComputedStyle(node).overflowY;
-    if ((overflow === 'auto' || overflow === 'scroll') && node.scrollHeight > node.clientHeight) {
-      return node;
-    }
+    if (canScroll(node)) return node;
   }
   return root;
+}
+
+/**
+ * What the right stick scrolls: the scroll container of the focus; if the focus lies in
+ * none and the screen itself cannot scroll, the first visible one on the screen (a list
+ * whose rows have no button the focus could be on).
+ */
+function scrollTarget(focused: HTMLElement | null, root: HTMLElement): HTMLElement {
+  const own = focused ? scrollerOf(focused, root) : root;
+  if (own !== root || canScroll(root)) return own;
+  for (const node of root.querySelectorAll<HTMLElement>('*')) {
+    if (canScroll(node) && !node.closest('[hidden]') && node.clientHeight > 0) return node;
+  }
+  return root;
+}
+
+function inside(rect: DOMRect, box: DOMRect): boolean {
+  return rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1;
 }
 
 export class FocusManager {
@@ -85,7 +112,7 @@ export class FocusManager {
     // On the way back the screen is looked at afresh: memory first, then its default.
     this.root = null;
     if (!active) {
-      this.pressed = null;
+      this.dropPress();
       this.update();
     }
   }
@@ -140,10 +167,36 @@ export class FocusManager {
     if (frame.pressed.includes(PadButton.B)) this.back();
     if (frame.pressed.includes(PadButton.START)) this.options.onStart();
     if (frame.scroll !== 0) {
-      const scroller = this.focused ? scrollerOf(this.focused, root) : root;
+      const scroller = scrollTarget(this.focused, root);
       scroller.scrollTop += frame.scroll * PAD_SCROLL_PX_PER_S * (Math.min(elapsedMs, 250) / 1000);
+      this.keepInView(scroller);
     }
     this.update();
+  }
+
+  /**
+   * After the right stick scrolled a list: a focus in that list that went out of view moves
+   * to the nearest element in view (in the list, or else outside it), so A never acts on a
+   * hidden row.
+   */
+  private keepInView(scroller: HTMLElement): void {
+    const focused = this.focused;
+    const root = this.root;
+    if (!focused || !root || !scroller.contains(focused) || scroller === root) return;
+    const box = scroller.getBoundingClientRect();
+    if (inside(focused.getBoundingClientRect(), box)) return;
+    const shown = this.focusables(root).filter(
+      (element) => !scroller.contains(element) || inside(element.getBoundingClientRect(), box),
+    );
+    const from = focused.getBoundingClientRect();
+    const index = nearestFocus(
+      shown.map((element) => element.getBoundingClientRect()),
+      { x: (from.left + from.right) / 2, y: (from.top + from.bottom) / 2 },
+    );
+    if (index >= 0) {
+      this.setFocused(shown[index]);
+      this.memory.set(root, { element: shown[index], view: this.lastDefault });
+    }
   }
 
   /**
@@ -152,6 +205,7 @@ export class FocusManager {
    */
   update(): void {
     const root = this.active ? this.options.screen() : null;
+    if (root !== this.root) this.dropPress();
     if (!root) {
       this.root = null;
       this.setFocused(null);
@@ -174,6 +228,17 @@ export class FocusManager {
       this.focus(this.nearest(root) ?? this.defaultOf(root, marked));
     }
     this.place();
+  }
+
+  /**
+   * A held while its screen went away (Y closed the inventory over a held "Craft"): the
+   * element hears that the press ended, but is not clicked.
+   */
+  private dropPress(): void {
+    const element = this.pressed;
+    if (!element) return;
+    this.pressed = null;
+    element.dispatchEvent(new CustomEvent('padrelease'));
   }
 
   private markedDefault(root: HTMLElement): HTMLElement | null {
@@ -254,9 +319,13 @@ export class FocusManager {
     const box = scroller.getBoundingClientRect();
     const rect = element.getBoundingClientRect();
     const margin = FRAME_GAP + 4;
+    // On a short screen the hint bar lies over the end of a list: show the element above it.
+    const hints = this.hints.top;
+    const bottom =
+      hints !== null && hints > box.top + rect.height ? Math.min(box.bottom, hints) : box.bottom;
     if (rect.top - margin < box.top) scroller.scrollTop -= box.top - rect.top + margin;
-    else if (rect.bottom + margin > box.bottom) {
-      scroller.scrollTop += rect.bottom + margin - box.bottom;
+    else if (rect.bottom + margin > bottom) {
+      scroller.scrollTop += rect.bottom + margin - bottom;
     }
   }
 
@@ -285,8 +354,10 @@ export class FocusManager {
   }
 
   private hintsFor(element: HTMLElement): PadHint[] {
-    const hints: PadHint[] = [{ glyphs: ['A'], text: 'Select' }];
     const root = this.root;
+    const own = root && this.options.hintsFor?.(root, element);
+    if (own) return own;
+    const hints: PadHint[] = [{ glyphs: ['A'], text: 'Select' }];
     const back = root && [...root.querySelectorAll('[data-pad-back]')].some(isFocusable);
     if (back) hints.push({ glyphs: ['B'], text: 'Back' });
     if (isRange(element)) hints.push({ glyphs: ['dpad-horizontal'], text: 'Change' });

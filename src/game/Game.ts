@@ -31,6 +31,7 @@ import { MemoryStore, type WorldStore } from '../save/WorldStore';
 import { BenchScreen } from '../ui/BenchScreen';
 import { DebugOverlay } from '../ui/DebugOverlay';
 import { FocusManager } from '../ui/FocusManager';
+import type { PadHint } from '../ui/PadHints';
 import { glyphSheet } from '../ui/padGlyphs';
 import { Hud } from '../ui/Hud';
 import { InventoryScreen } from '../ui/InventoryScreen';
@@ -325,6 +326,8 @@ export class Game {
       host: this.root,
       screen: () => this.focusScreen(),
       onStart: () => this.onPadStart(),
+      hintsFor: (root, element) =>
+        root === this.inventoryScreen.element ? this.inventoryHints(element) : null,
     });
 
     this.session = this.createSession(createPlayerRecord(this.gameMode));
@@ -1670,20 +1673,73 @@ export class Game {
       return;
     }
     if (this.inventoryOpen) {
-      if (pressed.includes(PadButton.START)) {
-        this.closeInventory();
-        if (this.pauseScreen) this.setPaused(true);
-      } else if (pressed.includes(PadButton.B) || pressed.includes(PadButton.Y)) {
-        this.closeInventory();
-      }
+      this.onInventoryPadFrame(frame, elapsedMs);
       return;
     }
     this.focus.handle(frame, elapsedMs);
   }
 
-  /** The screen the controller's focus is on, or null (play, a run, the inventory in Part A). */
+  /**
+   * The controller on the inventory: Y closes it, Start closes it and pauses, B puts a
+   * picked slot down or closes, LB / RB change the tab; the rest is the focus system.
+   */
+  private onInventoryPadFrame(frame: PadFrame, elapsedMs: number): void {
+    const pressed = frame.pressed;
+    if (pressed.includes(PadButton.START)) {
+      this.closeInventory();
+      if (this.pauseScreen) this.setPaused(true);
+      return;
+    }
+    if (pressed.includes(PadButton.Y)) {
+      this.closeInventory();
+      return;
+    }
+    if (pressed.includes(PadButton.B)) {
+      this.inventoryBack();
+      if (!this.inventoryOpen) return;
+    }
+    for (const [button, direction] of [
+      [PadButton.LB, -1],
+      [PadButton.RB, 1],
+    ] as const) {
+      // A hold of "Craft" ends with its page: it must not go on crafting unseen.
+      if (pressed.includes(button) && this.inventoryScreen.cycleTab(direction)) {
+        this.craftHold = null;
+      }
+    }
+    // B and Start are handled above; the focus system gets A, the moves and the scrolling.
+    const rest = pressed.filter((b) => b !== PadButton.B && b !== PadButton.START);
+    this.focus.handle(
+      rest.length === pressed.length ? frame : { ...frame, pressed: rest },
+      elapsedMs,
+    );
+  }
+
+  /** B (and the browser's Back) on the inventory: a picked slot is put down, else it closes. */
+  private inventoryBack(): void {
+    if (!this.inventoryScreen.cancelPick()) this.closeInventory();
+  }
+
+  /** The hint bar of the inventory: what A does on the focused element, B, Y, the tabs. */
+  private inventoryHints(element: HTMLElement): PadHint[] {
+    let select = 'Select';
+    if (element.classList.contains('recipe-craft')) select = 'Craft';
+    else if (element.classList.contains('inv-slot')) select = 'Pick / Put';
+    const hints: PadHint[] = [
+      { glyphs: ['A'], text: select },
+      { glyphs: ['B'], text: 'Back' },
+      { glyphs: ['Y'], text: 'Close' },
+    ];
+    if (this.gameMode === 'gathering') hints.push({ glyphs: ['LB', 'RB'], text: 'Tabs' });
+    return hints;
+  }
+
+  /** The screen the controller's focus is on, or null (play, a run). */
   private focusScreen(): HTMLElement | null {
-    if (this.bench || this.inventoryOpen || !this.pauseScreen) return null;
+    if (this.bench) return null;
+    // The inventory also in test mode, which has no menus.
+    if (this.inventoryOpen) return this.inventoryScreen.element;
+    if (!this.pauseScreen) return null;
     if (this.screen === 'bench') return this.benchScreen?.element ?? null;
     if (this.screen === 'worlds') return this.worldMenu?.element ?? null;
     if (this.screen === 'pause' || this.screen === 'settings') return this.pauseScreen.element;
@@ -1701,7 +1757,7 @@ export class Game {
    */
   private onBrowserBack(): void {
     if (this.bench) this.interruptBench('cancel');
-    else if (this.inventoryOpen) this.closeInventory();
+    else if (this.inventoryOpen) this.inventoryBack();
     else if (this.screen === 'play') {
       if (!this.meta || this.paused) return;
       // The pause menu needs the mouse free, as after Esc.
