@@ -1,5 +1,7 @@
 // Controller soak (Phase 5 AC4.1): 2 000 seeded frames of random sticks, buttons,
-// connects and disconnects, in play and in the menus, without a console message.
+// connects and disconnects, in play and in the menus, and (Part B) over the inventory and
+// the recipe list, without a console message.
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { createWorld, getState, openMenu } from './game';
 import { installFakePads } from './gamepad';
@@ -9,12 +11,17 @@ test.describe.configure({ timeout: 600_000 });
 const FRAMES = 2000;
 const SEED = 5;
 
-test('Phase 5 AC4.1: 2 000 random controller frames in play and in the menus', async ({ page }) => {
-  await installFakePads(page);
-  await openMenu(page);
-  await createWorld(page);
-  const report = await page.evaluate(
-    async ([frames, seed]) => {
+interface SoakReport {
+  screens: string[];
+  tabs: string[];
+  connects: number;
+  presses: number;
+}
+
+/** Plays `frames` seeded random controller frames; `weights` lists the buttons to press. */
+function soak(page: Page, seed: number, weights: number[]): Promise<SoakReport> {
+  return page.evaluate(
+    async ([frames, seed, weights]) => {
       // A small seeded generator (mulberry32): the same run every time.
       let state = seed >>> 0;
       const random = (): number => {
@@ -30,6 +37,7 @@ test('Phase 5 AC4.1: 2 000 random controller frames in play and in the menus', a
         new Promise((done) => requestAnimationFrame(() => done()));
       let connected = false;
       const screens = new Set<string>();
+      const tabs = new Set<string>();
       let connects = 0;
       let presses = 0;
       for (let i = 0; i < frames; i++) {
@@ -44,8 +52,6 @@ test('Phase 5 AC4.1: 2 000 random controller frames in play and in the menus', a
           op({ kind: 'disconnect', index: 0 });
           connected = false;
         } else if (roll < 0.5) {
-          // Mostly the buttons of play and of the menus; Start and B less often.
-          const weights = [0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 10, 12, 13, 14, 15, 1, 9];
           const button = weights[Math.floor(random() * weights.length)];
           op({ kind: 'button', index: 0, button, value: random() < 0.5 ? 1 : random() * 0.6 });
           presses++;
@@ -59,6 +65,7 @@ test('Phase 5 AC4.1: 2 000 random controller frames in play and in the menus', a
         if (i % 10 === 0) {
           const s = window.__mc.getState();
           screens.add(s.ui.screen);
+          if (s.ui.tab) tabs.add(s.ui.tab);
           // A performance test run would only make the soak slow; it is left at once.
           if (s.bench && connected) {
             op({ kind: 'button', index: 0, button: 1, value: 1 });
@@ -71,17 +78,60 @@ test('Phase 5 AC4.1: 2 000 random controller frames in play and in the menus', a
       if (connected) op({ kind: 'disconnect', index: 0 });
       await nextFrame();
       await nextFrame();
-      return { screens: [...screens].sort(), connects, presses };
+      return { screens: [...screens].sort(), tabs: [...tabs].sort(), connects, presses };
     },
-    [FRAMES, SEED],
+    [FRAMES, seed, weights] as const,
+  );
+}
+
+/** After a soak: no pad left, and the light of the open world is still right. */
+async function expectCleanEnd(page: Page): Promise<void> {
+  const state = await getState(page);
+  expect(state.pad).toMatchObject({ connected: 0, active: false });
+  expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
+}
+
+test('Phase 5 AC4.1: 2 000 random controller frames in play and in the menus', async ({ page }) => {
+  await installFakePads(page);
+  await openMenu(page);
+  await createWorld(page);
+  // Mostly the buttons of play and of the menus; Start and B less often.
+  const report = await soak(
+    page,
+    SEED,
+    [0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 7, 10, 12, 13, 14, 15, 1, 9],
   );
   // The run went through play and through menus, and connected more than once.
   expect(report.screens).toContain('play');
   expect(report.screens.some((screen) => screen !== 'play')).toBe(true);
   expect(report.connects).toBeGreaterThan(1);
   expect(report.presses).toBeGreaterThan(500);
-  const state = await getState(page);
-  expect(state.pad).toMatchObject({ connected: 0, active: false });
-  // Whatever world is open: its light is still right.
-  expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
+  await expectCleanEnd(page);
+});
+
+test('Phase 5 AC4.1 (Part B): 2 000 random controller frames over the inventory and the recipe list', async ({
+  page,
+}) => {
+  await installFakePads(page);
+  await openMenu(page);
+  await createWorld(page, { mode: 'gathering' });
+  // Something to move, merge, throw away and craft.
+  await page.evaluate(() => {
+    window.__mc.give(5, 20);
+    window.__mc.give(7, 30);
+    window.__mc.give(2, 40);
+    window.__mc.give(257, 6);
+  });
+  // Y opens the inventory, LB/RB change the tab, A picks, puts and crafts (often held), the
+  // D-pad moves; Start and B less often, so most of the run stays on the inventory.
+  const report = await soak(
+    page,
+    SEED + 1,
+    [0, 0, 0, 0, 0, 1, 3, 3, 3, 4, 5, 5, 12, 13, 13, 14, 15, 15, 12, 13, 9],
+  );
+  expect(report.screens).toContain('inventory');
+  expect(report.tabs).toEqual(['crafting', 'items']);
+  expect(report.connects).toBeGreaterThan(1);
+  expect(report.presses).toBeGreaterThan(500);
+  await expectCleanEnd(page);
 });

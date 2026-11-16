@@ -346,8 +346,8 @@ sides in turn.
   place. Until a world is open `Game` holds an empty placeholder world.
 - **Screens.** Outside test mode: world menu → (play) → game ⇄ pause menu → "Save and back
   to worlds". The settings page is the pause screen without its world parts. The inventory
-  screen (`E`, `Esc`, touch button `bag`) lies over the running game and does not pause
-  it; `Game` listens for its keys itself and `Input` ignores keys while it is open. The HUD
+  screen (`E`, `Esc`, touch button `bag`, the pad's Y) lies over the running game and
+  does not pause it; `Game` listens for its keys itself and `Input` ignores keys while it is open. The HUD
   is hidden and the touch controls are made invisible (`covered`), not removed. Closing
   requests the pointer lock again; if the browser refuses, the pause menu shows. In a
   Gathering world the screen has two tabs, "Items" and "Crafting" (the recipe list); it
@@ -367,7 +367,7 @@ sides in turn.
   `play`) the source feeds `Input` with `setMove`, `setHeld`, `press` and `addTurn`
   (radians, consumed per frame like the mouse), **sending only changes**, so keys and
   fingers that hold the same action keep it; otherwise `Game.onPadFrame` gets the frame
-  (inventory: B/Y close, Start pauses; a run: B/Start cancel; menus: `FocusManager`). A
+  (inventory: `onInventoryPadFrame`, below; a run: B/Start cancel; menus: `FocusManager`). A
   change of target blocks every held button until it is released (`PadMapper.blockHeld`).
   `Game.padActive` is set by a press or a stick beyond 0.5: the touch controls are covered,
   mouse mode plays **without pointer lock** (losing the lock does not pause; Esc pauses),
@@ -376,8 +376,8 @@ sides in turn.
   or touching in a menu only clears `padActive`. Keys never change it. Disconnecting the
   pad in use releases everything and pauses a played world (not in test mode).
 - **The focus system.** `FocusManager` works on the topmost open screen (`Game.focusScreen`:
-  world menu, pause/settings, performance test screens; not during a run; the inventory
-  joins in Part B). Focusable: `button`, `input[type=range]`, `input[type=checkbox]`,
+  the inventory (also in test mode), world menu, pause/settings, performance test screens;
+  not during a run). Focusable: `button`, `input[type=range]`, `input[type=checkbox]`,
   `[data-pad-focus]`; enabled, with a size, not inside `[hidden]` or `[data-pad-skip]`;
   never text fields. It is looked up anew on every move. A screen takes part with at most
   `data-pad-default` (where its view starts; a new visible default means a new view and
@@ -387,7 +387,24 @@ sides in turn.
   `.pad-focus-frame`; DOM `focus()` is never called. Moving is `nextFocus`
   (`focusMove.ts`): elements overlapping in the direction first, then the nearest by
   `13 × gap² + gap across²`; an unexpected neighbour is fixed there with a unit test,
-  never per screen. Start on the pause menu continues.
+  never per screen. Start on the pause menu continues. The right stick scrolls the scroll
+  container of the focus, or else the first visible one on the screen; a focus scrolled out
+  of its list moves to the nearest element in view. `scrollToShow` keeps the focus above the
+  hint bar. A screen with more buttons than A and B gives its own hints through the
+  `hintsFor` option (only the inventory does). A held A whose screen goes away gets a
+  `padrelease` without a click.
+- **The controller on the inventory (Phase 5 part B).** Marks only: `data-pad-default` on
+  the selected bar slot (Gathering), the first palette block (Creative) or, on the
+  Crafting tab, the tab itself (a "Craft" button comes and goes; a default that changed
+  would count as a new view); `data-pad-back` on "Close". `Game.onInventoryPadFrame`: Y
+  closes, Start closes and pauses, B (and the browser's Back) puts a picked slot down or
+  else closes (`InventoryScreen.cancelPick`), LB/RB change the tab (`cycleTab`, no
+  wrap-around; it ends a held "Craft"); the rest goes to `FocusManager` without B and Start.
+  `padpress` arms the click guard (a capture listener sees the non-bubbling event).
+  `RecipeList` treats `padpress` / `padrelease` on "Craft" like `pointerdown` / release, so
+  the hold, the 500 ms delay and the suppressed click after a hold are the mouse's. Slots
+  have an `aria-label` ("Slot 3: Planks"), which `ui.focus` reports; recipe buttons
+  "Craft <item>" (e.g. "Craft Stick").
 - **Back guard.** Outside test mode, while anything but the world list is shown, the page
   holds one history entry (`backGuard.ts`); a `popstate` re-arms it and acts like the pad's
   B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press only
@@ -466,7 +483,9 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   `connect()` (with a wake-up tap of Select, as a real browser reports a pad only after a
   press; `connect({ holding })` connects with buttons down, `wake: false` without the tap),
   `disconnect()`, `press`, `release`, `tap`, `trigger(button, value)` and
-  `stick('left' | 'right', x, y)` (y down). Each call applies the change and reads the poll
+  `stick('left' | 'right', x, y)` (y down). `e2e/gamepadInventory.spec.ts` walks the
+  inventory with `focusOn(page, pad, selector)`, which taps the D-pad towards an element
+  (rows first) without knowing the layout. Each call applies the change and reads the poll
   count in one page call, then waits until `getState().pad.polls` grew by two; `tap` holds
   the button for exactly one poll (held longer, a slow frame could make the D-pad repeat
   after `PAD_NAV_DELAY_MS`, as it should). `BUTTON`
@@ -639,10 +658,10 @@ hold:
     back guard): implemented (report: `docs/phase-5a-report.md`). Read its "Decisions and
     deviations" before changing `Input`, the controller, the focus system, the menus or
     the back guard.
-  - Part B (inventory, Creative palette, Crafting tab) starts after Part A and after the
-    polishing session of the inventory and recipe list are merged (or the owner says there
-    will be none). Part A already lets B and Y close the inventory and Start pause from
-    it; Part B replaces that with the focus system on the inventory.
+  - Phase 5 part B (inventory, Creative palette, Crafting tab with the pad): implemented
+    (report: `docs/phase-5b-report.md`). Read its "Decisions and deviations" before
+    changing the inventory screen, the recipe list or the focus system.
+  - Phase 5 is complete with parts A and B.
 - Polishing session 1 (inventory and recipe list, between Phase 5 parts A and B):
   implemented (plan: `docs/polish-1-plan.md`, report: `docs/polish-1-report.md`). The
   recipe list keeps table order with craftable rows highlighted and a count on the

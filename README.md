@@ -98,7 +98,7 @@ That first press does nothing in the game.
 | RT (right trigger) | Break; in a Gathering world hold it                  |
 | LT (left trigger)  | Place; hold to keep placing                          |
 | LB / RB, D-pad ◄ ► | Previous / next slot of the bar                      |
-| Y                  | Open the inventory (B or Y closes it)                |
+| Y                  | Open the inventory (Y closes it again)               |
 | Start              | Pause                                                |
 
 In the menus the D-pad or the left stick moves a white frame between the buttons, **A**
@@ -106,6 +106,14 @@ selects, **B** goes back, the right stick scrolls, and left/right change a slide
 at the bottom of each menu shows the buttons. The pause menu then lists the controller's
 buttons and has two more settings: **Controller sensitivity** and **Invert controller
 look**.
+
+In the inventory the frame moves over the slots, the bin and the tabs. **A** on a slot
+picks its stack, **A** on another slot puts it there (moved, merged or swapped), **A** on
+the bin throws it away; **B** puts a picked stack down again and otherwise closes, **Y**
+closes, **Start** closes and pauses. In Creative, **A** on a block puts it into the
+selected bar slot, or into a bar slot picked first. In a Gathering world **LB** and **RB**
+switch between "Items" and "Crafting"; there **A** on "Craft" makes the recipe once, held
+it repeats (first after half a second), and the right stick scrolls the list.
 
 The controller is an extra source, not a mode of its own: a computer stays in mouse mode
 (the game just stops capturing the mouse while the controller plays) and a phone stays in
