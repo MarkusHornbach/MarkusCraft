@@ -82,6 +82,7 @@ export class InventoryScreen {
   private readonly slots: HTMLButtonElement[] = [];
   private readonly shown: (ItemStack | null)[] = [];
   private readonly tiles: Uint8ClampedArray[];
+  private readonly options: InventoryScreenOptions;
   private readonly tabBar: HTMLElement;
   private readonly tabButtons = new Map<InventoryTab, HTMLButtonElement>();
   private readonly craftCount: HTMLElement;
@@ -97,12 +98,14 @@ export class InventoryScreen {
   private armed = true;
 
   constructor(parent: HTMLElement, options: InventoryScreenOptions) {
+    this.options = options;
     this.tiles = options.tiles;
     this.element = element('div', 'inventory-screen hidden');
     // The screen opens on the press of a button (a finger on the bag); the click that ends
     // the same tap must not reach whatever lies under the finger now ("Close" on a phone).
-    // A click counts only after a press (or a key) that began on the open screen.
-    for (const type of ['pointerdown', 'keydown']) {
+    // A click counts only after a press (or a key, or the controller's A) that began on the
+    // open screen. `padpress` does not bubble; a capture listener still sees it.
+    for (const type of ['pointerdown', 'keydown', 'padpress']) {
       this.element.addEventListener(
         type,
         () => {
@@ -147,6 +150,8 @@ export class InventoryScreen {
     this.craftCount.hidden = true;
     this.tabButtons.get('crafting')?.appendChild(this.craftCount);
     const close = button('menu-button inventory-close', 'Close');
+    // The controller's B clicks it when no slot is picked (`back`).
+    close.dataset.padBack = '';
     onActivate(close, (via) => options.onClose(via));
     header.append(this.title, this.tabBar, close);
     panel.appendChild(header);
@@ -156,6 +161,7 @@ export class InventoryScreen {
       const slot = button('inv-slot', '');
       slot.dataset.index = String(index);
       slot.dataset.item = '';
+      slot.setAttribute('aria-label', `Slot ${index + 1}`);
       slot.addEventListener('click', () => {
         if (this.picked === null) {
           // Only a slot with something in it can be picked up.
@@ -234,6 +240,8 @@ export class InventoryScreen {
     this.palette.hidden = mode !== 'creative';
     // Creative has every block already: no recipes, and so no tabs.
     this.tabBar.hidden = mode !== 'gathering';
+    // In Creative the controller's focus starts on the first block of the palette.
+    this.palette.firstElementChild?.toggleAttribute('data-pad-default', mode === 'creative');
     this.setTab('items');
     // A world was loaded: its list starts at the top.
     this.recipes.scrollToTop();
@@ -247,11 +255,35 @@ export class InventoryScreen {
       choice.classList.toggle('active', name === this.tab);
       choice.setAttribute('aria-selected', String(name === this.tab));
     }
+    // On the recipe list the controller's focus starts on its tab: a "Craft" button comes and
+    // goes, and a default that changes would count as a new view and move the focus.
+    this.tabButtons.get('crafting')?.toggleAttribute('data-pad-default', this.tab === 'crafting');
     this.itemsPage.hidden = this.tab !== 'items';
     this.recipes.element.hidden = this.tab !== 'crafting';
     // The list keeps its scroll position while a world is open.
     if (this.tab === 'crafting' && this.visible) this.recipes.restoreScroll();
     this.setPicked(null);
+  }
+
+  /**
+   * The controller's LB / RB: the tab to the left or right, if there is one (no
+   * wrap-around). Returns whether the tab changed.
+   */
+  cycleTab(direction: -1 | 1): boolean {
+    if (this.gameMode !== 'gathering') return false;
+    const index = TABS.findIndex((entry) => entry.tab === this.tab) + direction;
+    const next = TABS[index];
+    if (!next) return false;
+    this.setTab(next.tab);
+    this.options.onTab(next.tab);
+    return true;
+  }
+
+  /** The controller's B: puts a picked slot down. Returns whether one was picked. */
+  cancelPick(): boolean {
+    if (this.picked === null) return false;
+    this.setPicked(null);
+    return true;
   }
 
   get currentTab(): InventoryTab {
@@ -276,6 +308,8 @@ export class InventoryScreen {
   setSlots(slots: readonly (ItemStack | null)[], selected: number): void {
     this.slots.forEach((node, index) => {
       node.classList.toggle('selected', index === selected);
+      // In Gathering the controller's focus starts on the selected bar slot.
+      node.toggleAttribute('data-pad-default', this.gameMode === 'gathering' && index === selected);
       const stack = slots[index] ?? null;
       const before = this.shown[index];
       if (before?.item === stack?.item && before?.count === stack?.count) return;
@@ -283,6 +317,10 @@ export class InventoryScreen {
       node.replaceChildren();
       node.dataset.item = stack ? (getItemDef(stack.item)?.name ?? 'unknown') : '';
       node.title = stack ? itemLabel(stack.item) : '';
+      node.setAttribute(
+        'aria-label',
+        stack ? `Slot ${index + 1}: ${itemLabel(stack.item)}` : `Slot ${index + 1}`,
+      );
       if (!stack) return;
       node.appendChild(createItemIcon(stack.item, this.tiles));
       // Creative blocks are never used up: no numbers there.

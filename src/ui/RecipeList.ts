@@ -42,8 +42,10 @@ export class RecipeList {
   private pressed = false;
   /** Where the list was scrolled to while it was last on screen. */
   private scrollPos = 0;
+  private readonly options: RecipeListOptions;
 
   constructor(parent: HTMLElement, options: RecipeListOptions) {
+    this.options = options;
     this.element = element('div', 'recipe-list');
     this.element.setAttribute('role', 'list');
     for (const recipe of RECIPES) {
@@ -52,11 +54,7 @@ export class RecipeList {
       this.element.appendChild(row.root);
     }
     // The press may end anywhere: the finger may have started to scroll the list.
-    const release = (): void => {
-      if (!this.pressed) return;
-      this.pressed = false;
-      options.onCraftUp();
-    };
+    const release = (): void => this.release();
     // A hidden list has no scroll box, and a browser may forget its position: keep it here.
     this.element.addEventListener('scroll', () => {
       if (this.element.clientHeight > 0) this.scrollPos = this.element.scrollTop;
@@ -65,6 +63,13 @@ export class RecipeList {
     window.addEventListener('pointercancel', release);
     window.addEventListener('blur', release);
     parent.appendChild(this.element);
+  }
+
+  /** The press on a "Craft" button ended. */
+  private release(): void {
+    if (!this.pressed) return;
+    this.pressed = false;
+    this.options.onCraftUp();
   }
 
   private createRow(recipe: Recipe, options: RecipeListOptions): Row {
@@ -99,6 +104,12 @@ export class RecipeList {
       this.pressed = true;
       options.onCraftDown(recipe.id);
     });
+    // The controller's A goes down and up exactly like a mouse button: holding repeats.
+    craft.addEventListener('padpress', () => {
+      this.pressed = true;
+      options.onCraftDown(recipe.id);
+    });
+    craft.addEventListener('padrelease', () => this.release());
     craft.addEventListener('click', () => options.onCraftClick(recipe.id));
     // A long press on a button must not open the browser's menu.
     craft.addEventListener('contextmenu', (e) => e.preventDefault());

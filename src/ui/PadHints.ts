@@ -17,6 +17,11 @@ export class PadHints {
     this.element.setAttribute('aria-hidden', 'true');
   }
 
+  /** The top edge of the bar in page pixels, or null while it is not shown. */
+  get top(): number | null {
+    return this.element.isConnected ? this.element.getBoundingClientRect().top : null;
+  }
+
   /** Shows these hints; null takes the bar out of the document. */
   show(hints: readonly PadHint[] | null): void {
     const key = hints ? hints.map((h) => `${h.glyphs.join('+')}:${h.text}`).join('|') : '';

@@ -1646,6 +1646,13 @@ canvas {
   z-index: 20;
 }
 
+/* On a short screen the hint bar lies over the inventory's line of text, and says the same. */
+@media (max-height: 480px) {
+  .pad-active .inventory-hint {
+    visibility: hidden;
+  }
+}
+
 .pad-hint {
   display: inline-flex;
   align-items: center;
