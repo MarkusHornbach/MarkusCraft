@@ -102,7 +102,15 @@ export interface GameState {
   settings: {
     /** The Brightness setting, 0..1. */
     brightness: number;
+    padSensitivity: number;
+    padInvertY: boolean;
   };
+  /**
+   * The controller: pads the browser reports, whether one is the active source, how often
+   * the game has polled (tests wait for it to grow), and whether an unsupported pad was
+   * pressed.
+   */
+  pad: { connected: number; active: boolean; polls: number; unsupported: boolean };
   render: {
     drawCalls: number;
     triangles: number;

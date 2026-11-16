@@ -8,7 +8,9 @@ import { type BenchResult, issueText, parseIssueBody } from '../bench/benchRepor
 import { type BenchHost, BenchRunner } from '../bench/BenchRunner';
 import { SAMPLE_RESULT } from '../bench/sampleResult';
 import type { SuiteKind } from '../bench/scenarios';
+import { GamepadSource, type PadTarget } from '../input/GamepadSource';
 import { Input, type PressAction } from '../input/Input';
+import { PadButton, type PadFrame } from '../input/padMapping';
 import { breakTimeMs, missingTool } from '../items/hardness';
 import { addItems } from '../items/inventory';
 import { isItem, itemLabel } from '../items/items';
@@ -142,6 +144,9 @@ const TEXT_INVENTORY_FULL = 'Inventory full';
 const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
 const TEXT_NEEDS_SUPPORT = 'Needs a block underneath';
 const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
+const TEXT_PAD_CONNECTED = 'Controller connected';
+const TEXT_PAD_DISCONNECTED = 'Controller disconnected';
+const TEXT_PAD_UNSUPPORTED = 'This controller is not supported';
 
 /** A timed break as the screen shows it: the cell and how far it has come (0..1). */
 interface BreakView {
@@ -206,6 +211,17 @@ export class Game {
   /** Touch source and its on-screen controls; they exist only in touch mode. */
   private touch: TouchControls | null = null;
   private touchHud: TouchHud | null = null;
+  /** The controller: a source on top of mouse or touch mode, not a mode of its own. */
+  private readonly gamepad: GamepadSource;
+  /**
+   * The controller is the active source: the touch controls are covered, mouse mode
+   * plays without pointer lock, menus show the focus frame.
+   */
+  private padActive = false;
+  /** A controller was used during this visit (its settings rows are shown from then on). */
+  private padSeen = false;
+  /** A controller notice in play ("Controller connected") and the action time it stays until. */
+  private padNotice: { text: string; untilMs: number } | null = null;
   /** Smoothed frames per second for the debug overlay. */
   private fps = 0;
   private readonly perf = new PerfStats();
@@ -284,6 +300,17 @@ export class Game {
       onPress: (action) => this.handlePress(action),
     });
 
+    this.gamepad = new GamepadSource({
+      input: this.input,
+      target: () => this.padTarget(),
+      onFrame: (frame, target, elapsedMs) => this.onPadFrame(frame, target, elapsedMs),
+      onUse: () => this.setPadActive(true),
+      onConnect: () => this.showPadNotice(TEXT_PAD_CONNECTED),
+      onDisconnect: () => this.onPadDisconnect(),
+      onUnsupported: () => this.showPadNotice(TEXT_PAD_UNSUPPORTED),
+    });
+    this.gamepad.setLook(this.settings.padSensitivity, this.settings.padInvertY);
+
     this.session = this.createSession(createPlayerRecord(this.gameMode));
     this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
     this.hud.setSelected(this.selectedSlot, false);
@@ -328,8 +355,12 @@ export class Game {
         else this.openInventory();
       } else if (e.code === 'Escape' && this.inventoryOpen) {
         this.closeInventory();
+      } else if (e.code === 'Escape' && this.padActive && this.isPlaying()) {
+        // Without pointer lock there is no lock for Esc to release: it pauses directly.
+        this.setPaused(true);
       }
     });
+    this.watchOtherSources(canvas);
 
     if (!params.test) {
       // Normal play starts in the world menu; no world is open until one is chosen.
@@ -630,9 +661,11 @@ export class Game {
     this.worldMenu?.setMessage('');
     this.pauseScreen?.setHint('');
     // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
+    if (via) this.setPadActive(false);
     if (via && via !== this.mode && !this.params.touch) this.setMode(via);
-    if (this.mode === 'mouse') this.requestPointerLock();
-    else this.enterFullscreen();
+    // With the controller, mouse mode plays without capturing the mouse.
+    if (this.mode === 'touch') this.enterFullscreen();
+    else if (!this.padActive) this.requestPointerLock();
     try {
       const loaded = await load();
       this.loadWorld(loaded.meta, loaded.edits);
@@ -641,7 +674,7 @@ export class Game {
       if (this.mode === 'touch') {
         if (this.isPortrait()) this.showScreen('pause');
         else this.setPaused(false);
-      } else if (this.input.pointerLocked) {
+      } else if (this.input.pointerLocked || this.padActive) {
         this.setPaused(false);
       } else {
         // The mouse is not captured (yet): the pause menu offers "Click to play".
@@ -768,6 +801,7 @@ export class Game {
    */
   private startBench(via: InputMode | null): void {
     if (this.menuBusy || this.bench || !this.benchScreen) return;
+    if (via) this.setPadActive(false);
     if (via && via !== this.mode && !this.params.touch) this.setMode(via);
     if (this.mode === 'touch') this.enterFullscreen();
     const suite = this.benchSuite;
@@ -841,7 +875,7 @@ export class Game {
         // The loop runs the simulation; no pointer lock is asked for.
         this.paused = false;
         this.showScreen('play');
-        this.touchHud?.setCovered(true);
+        this.updateTouchCover();
       },
       setPlayer: (pose) => this.setPlayer(pose),
       setTime: (time) => {
@@ -901,7 +935,7 @@ export class Game {
     void run.wake?.release().catch(() => {});
     this.input.setScript(null);
     this.touch?.tracker.reset();
-    this.touchHud?.setCovered(false);
+    this.updateTouchCover();
     this.paused = true;
     this.useSettings(run.settings);
     this.closeWorld();
@@ -1044,7 +1078,7 @@ export class Game {
     this.refreshRecipes();
     // The screen has its own bar; the controls of the game would only shine through.
     this.hud.setVisible(false);
-    this.touchHud?.setCovered(true);
+    this.updateTouchCover();
     if (this.pauseScreen && this.mode === 'mouse' && document.pointerLockElement) {
       document.exitPointerLock();
     }
@@ -1058,15 +1092,16 @@ export class Game {
   private closeInventory(): void {
     if (!this.inventoryOpen) return;
     this.hideInventory();
-    if (!this.pauseScreen || this.mode !== 'mouse') return;
+    // With the controller, mouse mode goes on without capturing the mouse.
+    if (!this.pauseScreen || this.mode !== 'mouse' || this.padActive) return;
     this.requestPointerLock();
     window.setTimeout(() => this.pauseWithoutPointerLock(), POINTER_LOCK_WAIT_MS);
   }
 
   private hideInventory(): void {
     if (this.inventoryOpen && !this.paused) this.hud.setVisible(true);
-    this.touchHud?.setCovered(false);
     this.inventoryOpen = false;
+    this.updateTouchCover();
     this.inventoryScreen.setVisible(false);
     // Closing cancels what is in the furnace: its ingredients were never taken.
     this.stopCrafting();
@@ -1075,7 +1110,7 @@ export class Game {
   /** Mouse mode is played with a captured mouse; without it the pause menu shows. */
   private pauseWithoutPointerLock(): void {
     if (this.mode !== 'mouse' || this.inventoryOpen || this.paused || !this.meta) return;
-    if (!this.input.pointerLocked) this.setPaused(true);
+    if (!this.input.pointerLocked && !this.padActive) this.setPaused(true);
   }
 
   private onActionResult(action: Action, result: ActionResult): void {
@@ -1131,6 +1166,7 @@ export class Game {
       this.touchHud = new TouchHud(this.root, this.hud.element);
       this.touchHud.setFlyAvailable(this.gameMode === 'creative');
       this.touchHud.setVisible(!this.paused);
+      this.updateTouchCover();
       this.touch = new TouchControls({
         root: this.root,
         sink: this.input,
@@ -1166,6 +1202,7 @@ export class Game {
   private requestPlay(via: InputMode | null): void {
     if (!this.meta) return;
     this.pauseScreen?.setHint('');
+    if (via) this.setPadActive(false);
     // `touch=1` pins touch mode; otherwise the way the button was pressed decides.
     if (via && via !== this.mode && !this.params.touch) this.setMode(via);
     if (this.mode === 'touch') {
@@ -1173,7 +1210,9 @@ export class Game {
       if (!this.isPortrait()) this.setPaused(false);
       return;
     }
-    this.requestPointerLock();
+    // The controller plays without capturing the mouse.
+    if (this.padActive) this.setPaused(false);
+    else this.requestPointerLock();
   }
 
   /**
@@ -1205,7 +1244,7 @@ export class Game {
   }
 
   private onPointerLockChange(): void {
-    if (this.mode === 'touch' || this.benchPhase) return;
+    if (this.mode === 'touch' || this.benchPhase || this.padActive) return;
     // While a world is still being opened, `startWorld` looks at the lock when it is there.
     if (!this.meta) return;
     // The inventory sets the mouse free without pausing.
@@ -1253,6 +1292,7 @@ export class Game {
     this.renderer.setBrightness(settings.brightness);
     this.renderer.setRenderDistance(settings.renderDistance);
     this.chunkManager.setRadius(settings.renderDistance);
+    this.gamepad.setLook(settings.padSensitivity, settings.padInvertY);
     if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
@@ -1306,6 +1346,9 @@ export class Game {
       this.fpsTime = 0;
     }
 
+    // The controller first: its input counts for this frame's steps and look.
+    this.gamepad.poll(elapsed * 1000);
+
     // In test mode the simulation only advances through `__mc.step()`.
     if (!this.params.test && !this.paused) {
       this.accumulator += elapsed;
@@ -1324,6 +1367,11 @@ export class Game {
       if (this.touch) {
         const drag = this.touch.tracker.consumeLook();
         this.applyTouchLook(drag.dx, drag.dy);
+      }
+      const turn = this.input.consumeTurn();
+      if (turn.yaw !== 0 || turn.pitch !== 0) {
+        applyLook(this.player, turn.yaw, turn.pitch);
+        this.markMetaDirty();
       }
     }
 
@@ -1441,7 +1489,10 @@ export class Game {
     this.hud.setBreakProgress(view ? view.progress : null);
     const now = this.nowMs();
     const pickup = this.pickup && now <= this.pickup.untilMs ? this.pickup : null;
-    this.hud.setNotice(pickup ? `+${pickup.count} ${itemLabel(pickup.item)}` : null);
+    const padNotice = this.padNotice && now <= this.padNotice.untilMs ? this.padNotice : null;
+    this.hud.setNotice(
+      padNotice ? padNotice.text : pickup ? `+${pickup.count} ${itemLabel(pickup.item)}` : null,
+    );
     this.hud.setMessage(
       now <= this.fullUntilMs
         ? TEXT_INVENTORY_FULL
@@ -1570,6 +1621,130 @@ export class Game {
         if (this.pauseScreen) this.setPaused(true);
         break;
     }
+  }
+
+  // --- controller ------------------------------------------------------------------------
+
+  /** A world is on screen and played: no menu, no inventory, no performance test. */
+  private isPlaying(): boolean {
+    return this.meta !== null && !this.paused && !this.inventoryOpen && this.bench === null;
+  }
+
+  /** Something covers the game that a mouse or finger may use: a menu or the inventory. */
+  private screenShown(): boolean {
+    return this.inventoryOpen || (this.pauseScreen !== null && this.screen !== 'play');
+  }
+
+  private padTarget(): PadTarget {
+    return this.isPlaying() ? 'play' : 'other';
+  }
+
+  /** The controller's frame outside play: the inventory, a run, the menus. */
+  private onPadFrame(frame: PadFrame, target: PadTarget, _elapsedMs: number): void {
+    if (target === 'play') return;
+    const pressed = frame.pressed;
+    if (this.bench) {
+      // A run takes no input but what cancels it.
+      if (pressed.includes(PadButton.B) || pressed.includes(PadButton.START)) {
+        this.interruptBench('cancel');
+      }
+      return;
+    }
+    if (this.inventoryOpen) {
+      if (pressed.includes(PadButton.START)) {
+        this.closeInventory();
+        if (this.pauseScreen) this.setPaused(true);
+      } else if (pressed.includes(PadButton.B) || pressed.includes(PadButton.Y)) {
+        this.closeInventory();
+      }
+    }
+  }
+
+  /**
+   * Makes the controller the active source, or hands control back to the mouse or the
+   * fingers. Keys never change it.
+   */
+  private setPadActive(active: boolean): void {
+    if (active === this.padActive) return;
+    this.padActive = active;
+    this.root.classList.toggle('pad-active', active);
+    if (active && !this.padSeen) {
+      this.padSeen = true;
+      this.pauseScreen?.setPadSeen();
+    }
+    // The mouse is set free: it does not look while the controller plays.
+    if (active && this.mode === 'mouse' && document.pointerLockElement) document.exitPointerLock();
+    this.updateTouchCover();
+  }
+
+  /** The touch controls are invisible under the inventory, during a run and with the pad. */
+  private updateTouchCover(): void {
+    this.touchHud?.setCovered(this.inventoryOpen || this.bench !== null || this.padActive);
+  }
+
+  private onPadDisconnect(): void {
+    this.setPadActive(false);
+    // A player who loses the controller mid-walk must not walk on blind.
+    if (this.pauseScreen && this.meta && !this.paused && !this.bench) this.setPaused(true);
+    this.showPadNotice(TEXT_PAD_DISCONNECTED);
+  }
+
+  /**
+   * A notice about the controller: over the game while it is played (for `NOTICE_MS` of
+   * game time, like a pickup), otherwise in the message line of the menu, where it stays
+   * until another message replaces it.
+   */
+  private showPadNotice(text: string): void {
+    if (!this.pauseScreen || this.screen === 'play') {
+      this.padNotice = { text, untilMs: this.nowMs() + NOTICE_MS };
+    } else if (this.screen === 'worlds') {
+      this.worldMenu?.setMessage(text);
+    } else if (this.screen !== 'bench') {
+      this.pauseScreen.setHint(text);
+    }
+  }
+
+  /**
+   * A click on the game hands control back to the mouse, a finger on it back to touch;
+   * that press does nothing else. In menus, moving the mouse or touching only hides the
+   * focus frame.
+   */
+  private watchOtherSources(canvas: HTMLCanvasElement): void {
+    this.root.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (!this.padActive || this.bench) return;
+        if (this.screenShown()) {
+          this.setPadActive(false);
+          return;
+        }
+        if (e.pointerType !== 'touch' || this.mode !== 'touch') return;
+        this.setPadActive(false);
+        // Only the controls come back: this touch does not reach them.
+        e.stopPropagation();
+        e.preventDefault();
+      },
+      { capture: true },
+    );
+    // Mouse buttons reach Input as mouse events: the press that switches must not act.
+    this.root.addEventListener(
+      'mousedown',
+      (e) => {
+        if (!this.padActive || this.bench || this.mode !== 'mouse') return;
+        if (e.target !== canvas || this.screenShown()) return;
+        this.setPadActive(false);
+        e.stopPropagation();
+        e.preventDefault();
+        // The mouse is captured inside this press, while the browser still allows it.
+        if (this.pauseScreen && this.isPlaying()) this.requestPointerLock();
+      },
+      { capture: true },
+    );
+    window.addEventListener('pointermove', (e) => {
+      if (!this.padActive || e.pointerType !== 'mouse') return;
+      if (e.movementX === 0 && e.movementY === 0) return;
+      if (this.screenShown()) this.setPadActive(false);
+    });
   }
 
   /** Mouse movement in pixels → rotation. Moving right turns right, moving up looks up. */
@@ -1769,7 +1944,12 @@ export class Game {
         relight: this.chunkManager.relight,
       },
       perf: this.perf.summary(performance.now()),
-      settings: { brightness: this.settings.brightness },
+      settings: {
+        brightness: this.settings.brightness,
+        padSensitivity: this.settings.padSensitivity,
+        padInvertY: this.settings.padInvertY,
+      },
+      pad: this.gamepad.state(this.padActive),
       render: {
         drawCalls: stats.drawCalls,
         triangles: stats.triangles,
