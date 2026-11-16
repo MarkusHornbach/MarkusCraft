@@ -29,7 +29,14 @@ game in a procedurally generated world"; everything in it is original work.
      for part P `docs/phase-4p-plan.md`, for part E `docs/phase-4e-plan.md`;
      reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`, `docs/phase-4e-report.md`,
      `docs/phase-4b-report.md`)
-  5. **Gamepad controls** (not yet planned)
+  5. **Gamepad controls** – a controller with the standard layout as a third input source
+     next to mouse/keyboard and touch, on desktop browsers and in Chrome on Android; it
+     feeds `Input` and is an active source on top of mouse or touch mode, not a mode of its
+     own; a generic focus system makes every screen usable with the pad. Two parts with
+     separate pull requests: A (the pad in play, the focus system, all screens but the
+     inventory, the back guard) and B (inventory, Creative palette, Crafting tab), B after
+     the polishing of those screens (plan: `docs/phase-5-plan.md`; reports:
+     `docs/phase-5a-report.md`, `docs/phase-5b-report.md`)
   6. **Multiplayer** – play together in one world: a host opens their world, others join
      with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
      of Phases 3–5 (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
@@ -552,4 +559,8 @@ hold:
 - **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
   personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
   "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
-- Phases 5 (gamepad controls), 6 (multiplayer) and 7 (personalization): not yet planned.
+- Phase 5 (gamepad controls): planned (`docs/phase-5-plan.md`), not started. Part A comes
+  first; Part B starts after Part A and after the polishing session of the inventory and
+  recipe list are merged (or the owner says there will be none). Read the plan's sections
+  2, 3 and 5 before changing `Input`, the input modes or the screens.
+- Phases 6 (multiplayer) and 7 (personalization): not yet planned.
