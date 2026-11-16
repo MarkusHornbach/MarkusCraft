@@ -2,6 +2,7 @@
 import { TEXTURE_SEED } from '../../game/config';
 import { ITEMS, Item, type ToolClass, type ToolTier } from '../../items/items';
 import { type Rng, deriveSeed, mulberry32 } from '../../util/rng';
+import { Block } from '../../world/blocks';
 
 /** Icons are square, this many pixels wide, with a transparent background. */
 export const ITEM_ICON_SIZE = 32;
@@ -145,6 +146,45 @@ function paintStick(rng: Rng): Uint8ClampedArray {
   return px;
 }
 
+/**
+ * A torch: a stick held slanted, charred at its top, with a flame on it. The flame is a
+ * drop pointing up and away from the stick, orange at its edge and pale at its core.
+ */
+function paintTorch(rng: Rng): Uint8ClampedArray {
+  const px = new Uint8ClampedArray(S * S * 4);
+  shaft(px, rng, 7.5, 28.5, 19.5, 14.5, 5);
+  // Charred end below the flame.
+  fill(
+    px,
+    (x, y) => isSet(px, x, y) && x + -y > 1 && Math.hypot(x - 18.5, y - 15.5) < 3.6,
+    () => [52, 36, 26],
+  );
+  // The flame: a circle drawn out to a point towards the upper right.
+  const cx = 21;
+  const cy = 11;
+  fill(
+    px,
+    (x, y) => {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      // Along the flame's axis (up and to the right) the drop is longer.
+      const along = (dx - dy) / Math.SQRT2;
+      const across = (dx + dy) / Math.SQRT2;
+      const radius = along > 0 ? 6.5 - along * 0.55 : 6.5;
+      return Math.hypot(across, Math.min(along, 0)) < radius && along < 9.5;
+    },
+    (x, y) => {
+      const d = Math.hypot(x + 0.5 - (cx - 0.8), y + 0.5 - (cy + 0.8));
+      const flicker = rng() < 0.15 ? 1 : 0;
+      if (d < 2.6) return [255, 248, 206];
+      if (d < 4.4 - flicker) return [255, 210, 74];
+      return [240, 120, 28];
+    },
+  );
+  outline(px, RIM);
+  return px;
+}
+
 /** An ingot: a flat bar with slanted ends, seen from above the front edge. */
 function paintIronIngot(rng: Rng): Uint8ClampedArray {
   const px = new Uint8ClampedArray(S * S * 4);
@@ -268,6 +308,8 @@ const ICON_PAINTERS = new Map<number, IconPainter>([
   [Item.COAL, paintCoal],
   [Item.STICK, paintStick],
   [Item.IRON_INGOT, paintIronIngot],
+  // The one block with a painted icon: a cube of its stick-and-flame tile says nothing.
+  [Block.TORCH, paintTorch],
 ]);
 for (const item of ITEMS) {
   if (item.tool) ICON_PAINTERS.set(item.id, toolPainter(item.tool.class, item.tool.tier));
@@ -278,7 +320,7 @@ export const ICON_ITEMS: readonly number[] = [...ICON_PAINTERS.keys()];
 
 /**
  * Paints the icon of an item with its fixed seed, or returns null if the item has none
- * (blocks are drawn as cubes from their tiles). Row 0 of the result is the top.
+ * (blocks other than the torch are drawn as cubes from their tiles). Row 0 is the top.
  */
 export function paintItemIcon(item: number): Uint8ClampedArray | null {
   const painter = ICON_PAINTERS.get(item);

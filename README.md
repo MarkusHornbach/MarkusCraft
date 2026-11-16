@@ -175,6 +175,8 @@ make one after the other. A Creative world has no recipes: all blocks are in its
 7. The furnace needs coal: from coal ore (dark specks in the stone, any pickaxe) or by
    burning two logs. Iron ore (rust-coloured specks, deeper down) needs a stone pickaxe;
    the furnace turns it into iron ingots for the best tools.
+8. Underground and at night, make **torches**: one stick and one coal give four, anywhere,
+   without a workbench.
 
 **Recipes**
 
@@ -183,6 +185,7 @@ make one after the other. A Creative world has no recipes: all blocks are in its
 | Anywhere  | 1 log                                     | 4 planks                      |
 | Anywhere  | 2 planks                                  | 4 sticks                      |
 | Anywhere  | 4 planks                                  | 1 workbench                   |
+| Anywhere  | 1 stick + 1 coal                          | 4 torches                     |
 | Workbench | 3 planks, stone or iron ingots + 2 sticks | Wooden, stone or iron pickaxe |
 | Workbench | 3 planks, stone or iron ingots + 2 sticks | Wooden, stone or iron axe     |
 | Workbench | 1 plank, stone or iron ingot + 2 sticks   | Wooden, stone or iron shovel  |
@@ -219,9 +222,20 @@ at noon. A hole in the roof or a window of glass lets the light back in; leaves 
 dim it a little, so it is shady under trees and dim at the bottom of a deep lake. A shaft
 that is open to the sky is bright by day all the way down.
 
-Torches come with the next update. Until then the **Brightness** slider in the settings
-(pause menu) is the remedy for places that are too dark: it changes how bright the darkest
-places are drawn, on this device only. It does not change the world.
+**The night** is dark: open ground gets about a seventh of the daylight, and places
+without any light are almost black.
+
+**Torches** are the answer. A torch stands on top of a block (it needs a solid block
+underneath; "Needs a block underneath" says when it has none) and gives warm light that
+reaches about thirteen blocks, through glass and a little through leaves and water. It
+has no collision: you walk through it. It breaks at once, also in a Gathering world, and
+goes back into the inventory; breaking the block under a torch takes the torch along. A
+torch can stand under water and keeps burning. In Creative it is the last block of the
+palette; in Gathering it is made from a stick and a coal.
+
+The **Brightness** slider in the settings (pause menu) changes how bright the darkest
+places are drawn, on this device only: at the night of a phone screen, move it up. It does
+not change the world.
 
 The debug overlay (F3, or the switch in the pause menu) shows the light at your eyes, and
 numbers that tell how smoothly the game runs on a device: the time spent per frame on

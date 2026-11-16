@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_LENGTH_SECONDS, SIM_DT, START_TIME_OF_DAY } from '../game/config';
+import { DAYLIGHT_MIN, DAY_LENGTH_SECONDS, SIM_DT, START_TIME_OF_DAY } from '../game/config';
 import {
   advanceTime,
   daylightFactor,
@@ -32,12 +32,13 @@ describe('day/night model (AC10.1)', () => {
     expect(Math.abs(skyColors(0.99999).horizon[0] - skyColors(0).horizon[0])).toBeLessThan(0.001);
   });
 
-  it('is fully bright at noon and at the minimum at midnight', () => {
+  it('is fully bright at noon and at the minimum at midnight (Phase 4 AC8.1)', () => {
     expect(daylightFactor(0.25)).toBe(1);
-    expect(daylightFactor(0.75)).toBe(0.25);
+    expect(daylightFactor(0.75)).toBe(0.14);
+    expect(DAYLIGHT_MIN).toBe(0.14);
     for (let i = 0; i < 1000; i++) {
       const f = daylightFactor(i * STEP);
-      expect(f).toBeGreaterThanOrEqual(0.25);
+      expect(f).toBeGreaterThanOrEqual(0.14);
       expect(f).toBeLessThanOrEqual(1);
     }
     // The start time is a bright morning.

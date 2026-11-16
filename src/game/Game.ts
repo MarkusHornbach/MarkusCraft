@@ -140,6 +140,7 @@ const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.
 const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 const TEXT_INVENTORY_FULL = 'Inventory full';
 const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
+const TEXT_NEEDS_SUPPORT = 'Needs a block underneath';
 const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
 
 /** A timed break as the screen shows it: the cell and how far it has come (0..1). */
@@ -227,6 +228,8 @@ export class Game {
   private pickup: { item: number; count: number; untilMs: number } | null = null;
   /** "Inventory full" shows until this action time. */
   private fullUntilMs = -1;
+  /** Until when "Needs a block underneath" shows, after a refused torch. */
+  private supportUntilMs = -1;
   /** The item in the furnace: its recipe and the action time the progress bar started. */
   private smelt: { recipe: number; startMs: number } | null = null;
   /** A "Craft" button that is held down: its recipe, and how often it has repeated. */
@@ -451,6 +454,7 @@ export class Game {
     this.breakActive = false;
     this.pickup = null;
     this.fullUntilMs = -1;
+    this.supportUntilMs = -1;
     this.target = null;
     this.stopCrafting();
     this.meta = meta;
@@ -840,6 +844,9 @@ export class Game {
         this.touchHud?.setCovered(true);
       },
       setPlayer: (pose) => this.setPlayer(pose),
+      setTime: (time) => {
+        this.time = wrapTime(time);
+      },
       setInput: (input) => this.input.setScript(input),
       submit: (action) => this.session.submit(action),
       chunksIdle: () => this.chunksIdle(),
@@ -1079,6 +1086,9 @@ export class Game {
       // The break runs from now on, or it does not start at all.
       this.breakActive = result.ok;
       if (!result.ok && result.reason === 'full') this.fullUntilMs = this.nowMs() + NOTICE_MS;
+    }
+    if (action.kind === 'place' && !result.ok && result.reason === 'support') {
+      this.supportUntilMs = this.nowMs() + NOTICE_MS;
     }
     // A recipe that cannot be made any more ends the hold on its button.
     if (action.kind === 'craft' && !result.ok && this.craftHold) {
@@ -1396,6 +1406,11 @@ export class Game {
     if (!this.breakActive || !started || !same) {
       this.breakActive = false;
       this.session.submit({ kind: 'startBreak', x: t.x, y: t.y, z: t.z });
+      // A block without break time (the torch) comes off in the step of its start, once
+      // the session has accepted it; a session that answers later gets the next step.
+      if (!this.breakActive || breakTimeMs(t.id, heldItem(this.session.record)) !== 0) return;
+      this.session.submit({ kind: 'break', x: t.x, y: t.y, z: t.z });
+      this.updateTarget();
       return;
     }
     const required = breakTimeMs(t.id, heldItem(this.session.record)) ?? 0;
@@ -1427,7 +1442,13 @@ export class Game {
     const now = this.nowMs();
     const pickup = this.pickup && now <= this.pickup.untilMs ? this.pickup : null;
     this.hud.setNotice(pickup ? `+${pickup.count} ${itemLabel(pickup.item)}` : null);
-    this.hud.setMessage(now <= this.fullUntilMs ? TEXT_INVENTORY_FULL : this.toolHint());
+    this.hud.setMessage(
+      now <= this.fullUntilMs
+        ? TEXT_INVENTORY_FULL
+        : now <= this.supportUntilMs
+          ? TEXT_NEEDS_SUPPORT
+          : this.toolHint(),
+    );
     const smelt = this.smeltView();
     this.inventoryScreen.setSmelting(smelt ? smelt.recipe : null, smelt ? smelt.progress : 0);
   }

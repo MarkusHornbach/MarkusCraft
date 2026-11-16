@@ -9,6 +9,7 @@ import {
   BENCH_FRAME_EDGES,
   BENCH_IDLE_TIMEOUT_MS,
   BENCH_SUITE_VERSION,
+  BENCH_TIME,
   SIM_HZ,
 } from '../game/config';
 import type { MoveInput } from '../player/physics';
@@ -28,6 +29,8 @@ export interface BenchHost {
   /** Opens a fresh test world at this render distance, replacing the one before. */
   loadWorld(renderDistance: number): void;
   setPlayer(pose: ScenarioPose): void;
+  /** Sets the time of day (0..1); the clock stands still during a run. */
+  setTime(time: number): void;
   /** The scripted input of the next simulation steps. */
   setInput(input: MoveInput): void;
   submit(action: Action): void;
@@ -190,6 +193,7 @@ export class BenchRunner {
       this.loadedMs = nowMs;
     }
     this.host.setPlayer(entry.scenario.start);
+    this.host.setTime(entry.scenario.time ?? BENCH_TIME);
     this.cut = false;
     this.windowDone = false;
     this.sinceMs = nowMs;

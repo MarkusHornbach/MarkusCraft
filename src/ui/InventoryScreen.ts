@@ -92,10 +92,33 @@ export class InventoryScreen {
   /** The slot chosen first; the next activation says where its items go. */
   private picked: number | null = null;
   private visible = false;
+  /** Whether a click may act: false from opening until the next press on the screen. */
+  private armed = true;
 
   constructor(parent: HTMLElement, options: InventoryScreenOptions) {
     this.tiles = options.tiles;
     this.element = element('div', 'inventory-screen hidden');
+    // The screen opens on the press of a button (a finger on the bag); the click that ends
+    // the same tap must not reach whatever lies under the finger now ("Close" on a phone).
+    // A click counts only after a press (or a key) that began on the open screen.
+    for (const type of ['pointerdown', 'keydown']) {
+      this.element.addEventListener(
+        type,
+        () => {
+          this.armed = true;
+        },
+        true,
+      );
+    }
+    this.element.addEventListener(
+      'click',
+      (e) => {
+        if (this.armed) return;
+        e.stopPropagation();
+        e.preventDefault();
+      },
+      true,
+    );
     const panel = element('div', 'inventory-panel');
     this.element.appendChild(panel);
 
@@ -265,6 +288,7 @@ export class InventoryScreen {
   }
 
   setVisible(visible: boolean): void {
+    if (visible && !this.visible) this.armed = false;
     this.visible = visible;
     this.element.classList.toggle('hidden', !visible);
     this.setPicked(null);

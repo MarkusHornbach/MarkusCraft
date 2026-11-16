@@ -1,4 +1,5 @@
-// Phase 3 AC10.3: from an empty inventory to an iron pickaxe with valid actions only.
+// Phase 3 AC10.3: from an empty inventory to an iron pickaxe with valid actions only;
+// Phase 4 AC9.1: then coal, torches and a lit tunnel.
 import { describe, expect, it } from 'vitest';
 import {
   GENERATOR_VERSION,
@@ -24,6 +25,10 @@ import { LocalSession } from './Session';
 type Cell = readonly [number, number, number];
 
 const SEED = 1337;
+/** Logs the script gathers: 3 for planks, 6 for the coal of the iron, 2 for torch coal. */
+const LOGS = 11;
+/** Length of the tunnel the torch lights (Phase 4 AC9.1). */
+const TUNNEL = 16;
 /** Chunks generated around the start point: 9 × 9. */
 const RADIUS = 4;
 
@@ -213,12 +218,13 @@ describe('from nothing to an iron pickaxe (Phase 3 AC10.3)', () => {
     const [sx, , sz] = s.cell;
     expect(countItems(s.session.record.slots)).toBe(0);
 
-    // 1. Wood: nine logs from the nearest trees. Three become planks, six become coal.
+    // 1. Wood: eleven logs from the nearest trees. Three become planks, six become coal for
+    // the iron, two the coal for torches.
     const trunks = columnsAround(sx, sz, 56).filter(
       ([x, z]) => s.world.getBlock(x, s.groundY(x, z) + 1, z) === Block.LOG,
     );
     for (const [tx, tz] of trunks) {
-      if (s.count(Block.LOG) >= 9) break;
+      if (s.count(Block.LOG) >= LOGS) break;
       // Stand beside the trunk, on the ground.
       const side = columnsAround(tx, tz, 1).find(([x, z]) => {
         const y = s.groundY(x, z) + 1;
@@ -227,15 +233,15 @@ describe('from nothing to an iron pickaxe (Phase 3 AC10.3)', () => {
       });
       if (!side) continue;
       s.moveTo([side[0], s.groundY(side[0], side[1]) + 1, side[1]]);
-      for (let y = s.groundY(tx, tz) + 1; s.count(Block.LOG) < 9; y++) {
+      for (let y = s.groundY(tx, tz) + 1; s.count(Block.LOG) < LOGS; y++) {
         if (s.world.getBlock(tx, y, tz) !== Block.LOG) break;
         // The top of a tall trunk may be out of reach from the ground.
         if (y + 0.5 - (s.pose.y + PLAYER_EYE_HEIGHT) > 5) break;
         s.breakBlock([tx, y, tz]);
       }
     }
-    expect(s.count(Block.LOG)).toBe(9);
-    s.note('9 logs by hand');
+    expect(s.count(Block.LOG)).toBe(LOGS);
+    s.note(`${LOGS} logs by hand`);
 
     // 2. Planks, sticks, a workbench; with it the wooden pickaxe.
     s.craft('planks', 3);
@@ -323,6 +329,38 @@ describe('from nothing to an iron pickaxe (Phase 3 AC10.3)', () => {
     expect(s.count(Item.IRON_PICKAXE)).toBe(1);
     expect(s.count(Item.IRON_INGOT)).toBe(0);
     expect(s.count(Item.STICK)).toBe(2);
+
+    // 8. (Phase 4 AC9.1) Coal from the last two logs at the furnace, four torches from it
+    // and a stick, no station needed. Then a tunnel of 16 blocks, a torch three blocks in:
+    // light reaches its end.
+    s.craft('coal');
+    s.craft('torch');
+    expect(s.count(Block.TORCH)).toBe(4);
+    expect(s.count(Item.COAL)).toBe(0);
+    const [ux, uy, uz] = s.cell;
+    const tunnel = (i: number): Cell => [ux + i, uy, uz];
+    s.digTo(tunnel(TUNNEL));
+    for (let i = 0; i <= TUNNEL; i++) {
+      expect(s.solid(tunnel(i)), `tunnel cell ${i}`).toBe(false);
+      expect(s.solid([ux + i, uy + 1, uz]), `tunnel cell ${i}, above`).toBe(false);
+    }
+    // Light around the tunnel, as the game has it before the torch is placed.
+    const cx = Math.floor(ux / 16);
+    const cz = Math.floor(uz / 16);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 2; dx++) s.world.light(cx + dx, cz + dz);
+    }
+    expect(s.world.getLight(...tunnel(TUNNEL))).toBe(0);
+    s.moveTo(tunnel(4));
+    s.place(tunnel(3), Block.TORCH);
+    expect(s.block(tunnel(3))).toBe(Block.TORCH);
+    expect(s.count(Block.TORCH)).toBe(3);
+    const end = s.world.getLight(...tunnel(TUNNEL)) ?? 0;
+    expect(end & 15).toBeGreaterThanOrEqual(1);
+    expect(s.world.verifyLight()).toBe(0);
+    s.note(
+      `coal, 4 torches; a tunnel of ${TUNNEL} blocks lit to its end (block light ${end & 15})`,
+    );
 
     // The path, for the report: break time is simulated exactly, walking is estimated.
     const walkMs = (s.walked / WALK_SPEED) * 1000;

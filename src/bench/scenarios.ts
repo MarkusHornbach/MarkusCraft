@@ -3,6 +3,7 @@
 import type { Action } from '../actions/actions';
 import {
   BENCH_EDIT_INTERVAL,
+  BENCH_TORCH_MOVE_SHARE,
   BENCH_FLY_STOP_STEPS,
   BENCH_QUICK_DIVISOR,
   BENCH_QUICK_MIN_STEPS,
@@ -34,6 +35,8 @@ export interface Scenario {
   /** Measured steps of the full suite. */
   steps: number;
   start: ScenarioPose;
+  /** Time of day (0..1, 0.25 is noon) while it runs; the test world's time if absent. */
+  time?: number;
   /**
    * Input of one step. Warm-up steps are negative, measured steps count from 0 to
    * `steps - 1`; `steps` is the length of the window in this suite.
@@ -99,6 +102,49 @@ function editAction(step: number, steps: number): Action | null {
   return index < half ? { kind: 'place', ...at, slot: 0 } : { kind: 'break', ...at };
 }
 
+/** `torches`: the player hovers above a slope south of the start point, at midnight. */
+export const TORCH_HOVER = { x: 0.5, y: 60.5, z: 9.5 };
+const TORCH_TIME = 0.75;
+/**
+ * The cells of the line: on the grass of row z = 7, across the chunk border at x = 0,
+ * one block above the ground (the slope rises towards +X). Pinned by the tests.
+ */
+export const TORCH_CELLS: readonly { x: number; y: number; z: number }[] = [
+  { x: -3, y: 57, z: 7 },
+  { x: -2, y: 57, z: 7 },
+  { x: -1, y: 58, z: 7 },
+  { x: 0, y: 58, z: 7 },
+  { x: 1, y: 59, z: 7 },
+  { x: 2, y: 59, z: 7 },
+  { x: 3, y: 60, z: 7 },
+];
+/** The bar slot that receives the torch (a new Creative player holds blocks in all nine). */
+const TORCH_SLOT = 0;
+const TORCH_ID = 19;
+/** Moving past the line: forward and up, slowly, so trees ahead are cleared. */
+const PASS_INPUT: MoveInput = { forward: 1, strafe: 0, jump: true, sprint: false, descend: false };
+
+/** First step of the part in which the player moves past the line. */
+function torchMoveStart(steps: number): number {
+  const actions = Math.floor((steps * (1 - BENCH_TORCH_MOVE_SHARE)) / BENCH_EDIT_INTERVAL);
+  return actions * BENCH_EDIT_INTERVAL;
+}
+
+/**
+ * `torches`: the torch is put into the bar, then the line is placed from west to east and
+ * broken again from east to west, round after round; the rounds end with the line placed,
+ * and the player moves past it for the rest of the window.
+ */
+function torchAction(step: number, steps: number): Action | null {
+  if (step < 0 || step % BENCH_EDIT_INTERVAL !== 0 || step >= torchMoveStart(steps)) return null;
+  if (step === 0) return { kind: 'setBarSlot', slot: TORCH_SLOT, item: TORCH_ID };
+  const index = step / BENCH_EDIT_INTERVAL - 1;
+  const n = TORCH_CELLS.length;
+  const k = index % (2 * n);
+  const cell = TORCH_CELLS[k < n ? k : 2 * n - 1 - k];
+  return k < n ? { kind: 'place', ...cell, slot: TORCH_SLOT } : { kind: 'break', ...cell };
+}
+
 /** The scenario table. Append new scenarios; never change one without a new version. */
 export const SCENARIOS: readonly Scenario[] = [
   {
@@ -144,6 +190,16 @@ export const SCENARIOS: readonly Scenario[] = [
     start: { ...EDIT_HOVER, yaw: 0, pitch: -60 * DEG, mode: 'fly' },
     input: () => NO_INPUT,
     action: editAction,
+  },
+  {
+    id: 'torches',
+    version: 1,
+    label: 'torches at night',
+    steps: 1200,
+    start: { ...TORCH_HOVER, yaw: 0, pitch: -30 * DEG, mode: 'fly' },
+    time: TORCH_TIME,
+    input: (step, steps) => (step >= torchMoveStart(steps) ? PASS_INPUT : NO_INPUT),
+    action: torchAction,
   },
 ];
 

@@ -26,7 +26,7 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 4 part E (edits without hitches).
+Last updated: Phase 4 part B (torch, darker night).
 
 ---
 
@@ -67,6 +67,12 @@ Once, before the first run:
       and the tablet and submit the issues. Is `edit` at render distance 5 green or yellow
       now (it was red in #13, #15 and #16)? _Phone, Tablet._
       Result: (issue numbers)
+- [ ] **PERF-7** (4B) After Part B is deployed: run the performance test once more on the
+      phone (and the tablet if you like) and submit the issue. The suite now has eleven
+      scenarios: the new one, "torches at night", places and breaks a row of torches at
+      midnight and then flies past them. Is it green, and does placing the torches look
+      smooth while you watch? _Phone, Tablet._
+      Result: (issue numbers)
 - [ ] **PERF-3** (1) PC only: 60 FPS at render distance 8 on a mid-range laptop? Try 16 as
       well (render distance 16 is not part of the performance test; use the debug overlay,
       F3). Result:
@@ -87,6 +93,32 @@ Once, before the first run:
       blocks? Light through walls or closed corners, black or sparkling faces? Result:
 - [ ] **LIGHT-8** (4A) Break and place blocks quickly at a tunnel mouth: does it still
       feel immediate? _Phone._ Result:
+
+## 2b. Torches and the night (Phase 4 part B)
+
+- [ ] **NIGHT-1** (4B) A night on the phone at the default Brightness: is it "dark, but I
+      can walk", or a black screen? Then move the Brightness slider: which position do you
+      like at night? Tell me the position; it can become the default. _Phone._ Result:
+- [ ] **TORCH-1** (4B) Place torches at night and in a tunnel: is the lit area large
+      enough to be useful (about 13 blocks)? Is the warm tint pleasant or too orange? Do
+      stone and grass still look like themselves? Result:
+- [ ] **TORCH-2** (4B) Place a torch with the phone: is there a hitch? Place ten in a row
+      along a tunnel. _Phone._ Result:
+- [ ] **TORCH-3** (4B) Break a torch with a finger, and aim past a torch at the wall
+      behind it: does the crosshair go where you expect? _Phone._ Result:
+- [ ] **TORCH-4** (4B) Break the block under a torch: is it understood that the torch
+      comes along (it goes into the inventory in a Gathering world)? Result:
+- [ ] **TORCH-5** (4B) Give the device to a child in a Gathering world at dusk without
+      explaining anything: do they find "Torch" in the recipe list, understand that coal
+      is needed, and use torches? Result:
+- [ ] **TORCH-6** (4B) Dig for iron with torches (as in CRAFT-6): is mining
+      more fun now? Result:
+- [ ] **TORCH-7** (4B) A torch under water, a torch on glass and on leaves: does anything
+      look broken? (A torch in the top layer of a shallow lake stands in a small square well:
+      its cell holds no water; see the Part B report.) Result:
+- [ ] **TORCH-8** (4B) The inventory opens with the bag button on the phone in a Creative
+      world and stays open (it used to be possible that the same tap closed it again).
+      _Phone._ Result:
 
 ## 3. Movement and look of the world
 

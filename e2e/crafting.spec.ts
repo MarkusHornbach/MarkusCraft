@@ -34,7 +34,7 @@ const IRON_SHOVEL = 267;
 const LOG = 5;
 const COAL = 256;
 const STICK = 257;
-const RECIPE_COUNT = 19;
+const RECIPE_COUNT = 20;
 const COAL_RECIPE = 11;
 
 /** A Gathering world; the player stands on a platform of `block`, looking at the cell ahead. */
@@ -402,8 +402,9 @@ test('Phase 3 AC12.2: short ingredients are marked; station recipes need a workb
     ingredient(page, pickaxe, item).evaluate((node) => getComputedStyle(node).color);
   expect(await color('planks')).toBe('rgb(255, 138, 120)');
   expect(await color('stick')).not.toBe('rgb(255, 138, 120)');
-  // Sticks need no station: two planks are enough for them.
-  expect(await withButton(page)).toEqual(['sticks']);
+  // Sticks need no station: two planks are enough for them. Torches need none either
+  // (Phase 4 part B), and a stick and the coal are there.
+  expect(await withButton(page)).toEqual(['sticks', 'torch']);
 
   // Enough planks, but still no workbench.
   await give(page, PLANKS, 1);
@@ -639,15 +640,16 @@ test('Phase 3 AC12.7: matches the recipe-list reference (craftable rows, the fur
 
 test('Phase 3 AC12.7: matches the item-icons reference (every item once)', async ({ page }) => {
   await openGame(page, { mode: 'gathering' });
-  // The sixteen placeable blocks, then coal, stick, iron ingot and the nine tools.
-  const blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18];
+  // The seventeen placeable blocks (the torch with its painted icon), then coal, stick,
+  // iron ingot and the nine tools.
+  const blocks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19];
   const items = Array.from({ length: 12 }, (_, index) => COAL + index);
   for (const item of [...blocks, ...items]) await give(page, item, 1);
   const slots = await inventory(page);
-  expect(slots.filter((s) => s !== null)).toHaveLength(28);
+  expect(slots.filter((s) => s !== null)).toHaveLength(29);
   await page.keyboard.press('KeyE');
   await expect(page.locator('.inv-slot[data-item="unknown"]')).toHaveCount(0);
-  await expect(page.locator('.inventory-grid .inv-slot canvas')).toHaveCount(19);
+  await expect(page.locator('.inventory-grid .inv-slot canvas')).toHaveCount(20);
   // The icons are the subject: no world behind the panel.
   await page.locator('canvas.game-canvas').evaluate((node) => {
     (node as HTMLElement).style.visibility = 'hidden';

@@ -708,6 +708,44 @@ function paintIronBlock(rng: Rng): Uint8ClampedArray {
   return px;
 }
 
+/**
+ * Torch: horizontal bands, read by the torch mesher in pieces (`TORCH_UV` in the mesher):
+ * a wooden stick below 10/16 of the height, charred towards its top, then the flame from
+ * orange to a pale yellow core. The tile is opaque everywhere, so no mip level of a piece
+ * can let the background through.
+ */
+function paintTorch(rng: Rng): Uint8ClampedArray {
+  const px = createTile();
+  const stickTop = (S * 10) / 16;
+  for (let y = 0; y < S; y++) {
+    // Height above the bottom edge, in pixels (row 0 is the top of the image).
+    const h = S - 1 - y;
+    for (let x = 0; x < S; x++) {
+      if (h < stickTop) {
+        // Wood with a vertical grain, darker where the flame has charred it.
+        const grain = (x % 4 === 0 ? -16 : x % 4 === 2 ? 8 : 0) + (rng() - 0.5) * 12;
+        const char = Math.max(0, (h - (stickTop - 4)) / 4);
+        const wood = mix([134, 94, 54], [52, 36, 26], char);
+        setPixel(px, x, y, [wood[0] + grain, wood[1] + grain, wood[2] + grain * 0.6]);
+      } else {
+        // The flame: deep orange at its root, a pale yellow core at the top.
+        const t = (h - stickTop) / (S - 1 - stickTop);
+        const flicker = (rng() - 0.5) * 18;
+        const colour =
+          t < 0.5
+            ? mix([236, 104, 24], [252, 186, 52], t * 2)
+            : mix([252, 186, 52], [255, 246, 196], (t - 0.5) * 2);
+        setPixel(px, x, y, [
+          colour[0] + flicker * 0.3,
+          colour[1] + flicker,
+          colour[2] + flicker * 0.5,
+        ]);
+      }
+    }
+  }
+  return px;
+}
+
 /** Painters indexed by tile id. */
 export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   const painters: TilePainter[] = [];
@@ -733,6 +771,7 @@ export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   painters[Tile.FURNACE_TOP] = paintFurnaceTop;
   painters[Tile.STONE_BRICKS] = paintStoneBricks;
   painters[Tile.IRON_BLOCK] = paintIronBlock;
+  painters[Tile.TORCH] = paintTorch;
   return painters;
 })();
 

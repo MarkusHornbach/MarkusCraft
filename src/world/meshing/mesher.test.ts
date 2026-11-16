@@ -329,7 +329,8 @@ describe('meshChunk UVs (AC6.6)', () => {
           expect(v).toBeGreaterThan(rect.v0);
           expect(v).toBeLessThan(rect.v1);
         }
-        // The quad shows (nearly) the whole tile.
+        // The quad shows (nearly) the whole tile; the torch shows pieces of it.
+        if (def.shape !== 'cube') continue;
         expect(Math.max(...us) - Math.min(...us)).toBeGreaterThan((rect.u1 - rect.u0) * 0.99);
         expect(Math.max(...vs) - Math.min(...vs)).toBeGreaterThan((rect.v1 - rect.v0) * 0.99);
       }

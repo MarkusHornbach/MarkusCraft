@@ -10,6 +10,7 @@ import {
 } from '../game/config';
 import { daylightFactor } from '../world/dayNight';
 import type { ChunkMeshData } from '../world/meshing/mesher';
+import { aimBox } from '../world/raycast';
 import { BreakOverlay } from './BreakOverlay';
 import { ChunkMeshes } from './ChunkMeshes';
 import { type ChunkMaterials, createChunkMaterials, minLightFor } from './materials';
@@ -101,9 +102,23 @@ export class Renderer {
   }
 
   /** Shows the outline around a block, or hides it when `block` is null. */
-  setHighlight(block: { x: number; y: number; z: number } | null): void {
+  /** Outlines the targeted block: the whole cell, or the aiming box of a torch. */
+  setHighlight(block: { x: number; y: number; z: number; id: number } | null): void {
     this.highlight.visible = block !== null;
-    if (block) this.highlight.position.set(block.x + 0.5, block.y + 0.5, block.z + 0.5);
+    if (!block) return;
+    const box = aimBox(block.id);
+    this.highlight.position.set(
+      block.x + (box.x0 + box.x1) / 2,
+      block.y + (box.y0 + box.y1) / 2,
+      block.z + (box.z0 + box.z1) / 2,
+    );
+    // The geometry is a unit cube grown by the inflation on each side.
+    const grow = 2 * HIGHLIGHT_INFLATE;
+    this.highlight.scale.set(
+      (box.x1 - box.x0 + grow) / (1 + grow),
+      (box.y1 - box.y0 + grow) / (1 + grow),
+      (box.z1 - box.z0 + grow) / (1 + grow),
+    );
   }
 
   setSize(width: number, height: number): void {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ITEMS, Item, TOOL_CLASSES, TOOL_TIERS } from '../../items/items';
+import { Block } from '../../world/blocks';
 import { ICON_ITEMS, ITEM_ICON_SIZE, TOOL_HEAD_COLOURS, paintItemIcon } from './itemIcons';
 
 const PIXELS = ITEM_ICON_SIZE * ITEM_ICON_SIZE;
@@ -30,12 +31,14 @@ function countColour(px: Uint8ClampedArray, c: readonly [number, number, number]
 }
 
 describe('item icons', () => {
-  it('has a painted icon for every item that is not a block, and for no block', () => {
+  it('has a painted icon for every item that is not a block, and for the torch only of the blocks', () => {
+    const painted = (id: number, block: number | null): boolean =>
+      block === null || id === Block.TORCH;
     for (const item of ITEMS) {
-      expect(paintItemIcon(item.id) !== null, item.name).toBe(item.block === null);
+      expect(paintItemIcon(item.id) !== null, item.name).toBe(painted(item.id, item.block));
     }
-    expect([...ICON_ITEMS].sort()).toEqual(
-      ITEMS.filter((item) => item.block === null).map((item) => item.id),
+    expect([...ICON_ITEMS].sort((a, b) => a - b)).toEqual(
+      ITEMS.filter((item) => painted(item.id, item.block)).map((item) => item.id),
     );
     expect(paintItemIcon(99999)).toBeNull();
   });
@@ -63,7 +66,7 @@ describe('item icons', () => {
   });
 
   it('every icon differs from every other in at least 10 % of its pixels (Phase 3 AC10.4)', () => {
-    expect(ICON_ITEMS.length).toBe(12);
+    expect(ICON_ITEMS.length).toBe(13);
     for (const a of ICON_ITEMS) {
       for (const b of ICON_ITEMS) {
         if (a >= b) continue;

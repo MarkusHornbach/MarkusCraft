@@ -558,7 +558,7 @@ for (const [device, view] of [
 
     // Every recipe has a row at least 48 px high; no text leaves its row.
     const rows = await boxes(page, '.recipe-row');
-    expect(rows).toHaveLength(19);
+    expect(rows).toHaveLength(20);
     for (const row of rows) {
       expect(row.height, row.name).toBeGreaterThanOrEqual(48);
       expect(row.x, row.name).toBeGreaterThanOrEqual(listBox.x);
@@ -626,5 +626,73 @@ for (const [device, view] of [
     await page.locator('.inventory-close').tap();
     await expect(page.locator('.inventory-screen')).toBeHidden();
     expect((await getState(page)).paused).toBe(false);
+  });
+}
+
+// --- Phase 4 part B: the torch on a phone and a tablet ---------------------------------
+
+for (const [device, view] of [
+  ['phone', PHONE],
+  ['tablet', TABLET],
+] as const) {
+  test(`Phase 4 AC8.5: the torch row of the recipe list is reachable on a ${view.width} × ${view.height} ${device}`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(view);
+    await page.addInitScript(
+      ([key, value]) => window.localStorage.setItem(key, value),
+      [STORAGE_KEY, JSON.stringify({ renderDistance: 2, mouseSensitivity: 1, fov: 75 })],
+    );
+    await openOnDevice(page);
+    await tapCreate(page, 'gathering');
+    await page.evaluate(() => {
+      window.__mc.give(257, 1);
+      window.__mc.give(256, 1);
+    });
+    await page.locator('.touch-bag').tap();
+    await page.locator('.inventory-tab[data-tab="crafting"]').tap();
+    const listBox = (await boxes(page, '.recipe-list'))[0];
+    // Craftable recipes stand first: the torch is the only one, so it is on top.
+    const craft = page.locator('.recipe-row[data-recipe="torch"] .recipe-craft');
+    const button = await boxes(page, '.recipe-row[data-recipe="torch"] .recipe-craft');
+    expect(button).toHaveLength(1);
+    expectFingerSized(button);
+    expectInside(button, view);
+    expect(button[0].y + button[0].height).toBeLessThanOrEqual(listBox.y + listBox.height);
+    await craft.tap();
+    await expect
+      .poll(async () =>
+        (await getState(page)).inventory.slots.reduce(
+          (sum, s) => sum + (s?.item === 19 ? s.count : 0),
+          0,
+        ),
+      )
+      .toBe(4);
+  });
+
+  test(`Phase 4 AC8.5: the palette's 17th block, the torch, is reachable on a ${view.width} × ${view.height} ${device}`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize(view);
+    await page.addInitScript(
+      ([key, value]) => window.localStorage.setItem(key, value),
+      [STORAGE_KEY, JSON.stringify({ renderDistance: 2, mouseSensitivity: 1, fov: 75 })],
+    );
+    await openOnDevice(page);
+    await tapCreate(page, 'creative');
+    await page.locator('.touch-bag').tap();
+    // The tap that opens the screen does not also close it, although "Close" now lies
+    // under the finger.
+    await expect(page.locator('.inventory-screen')).toBeVisible();
+    await expect(page.locator('.palette-slot')).toHaveCount(17);
+    const torch = page.locator('.palette-slot[data-item="torch"]');
+    await torch.scrollIntoViewIfNeeded();
+    const slot = await boxes(page, '.palette-slot[data-item="torch"]');
+    expectFingerSized(slot);
+    expectInside(slot, view);
+    await torch.tap();
+    await expect(page.locator('.inv-slot[data-index="0"]')).toHaveAttribute('data-item', 'torch');
   });
 }

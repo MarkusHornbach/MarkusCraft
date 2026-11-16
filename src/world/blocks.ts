@@ -1,5 +1,11 @@
 // Block registry: a data table describing every block, plus fast lookup arrays.
-import { HOTBAR_SLOTS, LEAVES_OPACITY, LIGHT_MAX, WATER_OPACITY } from '../game/config';
+import {
+  HOTBAR_SLOTS,
+  LEAVES_OPACITY,
+  LIGHT_MAX,
+  TORCH_LIGHT,
+  WATER_OPACITY,
+} from '../game/config';
 
 /** Texture tiles. The painters live in `render/textures/tiles.ts`, keyed by these ids. */
 export const Tile = {
@@ -25,6 +31,7 @@ export const Tile = {
   FURNACE_TOP: 19,
   STONE_BRICKS: 20,
   IRON_BLOCK: 21,
+  TORCH: 22,
 } as const;
 export type TileId = (typeof Tile)[keyof typeof Tile];
 export const TILE_COUNT = Object.keys(Tile).length;
@@ -54,10 +61,14 @@ export const Block = {
   FURNACE: 16,
   STONE_BRICKS: 17,
   IRON_BLOCK: 18,
+  TORCH: 19,
 } as const;
 export type BlockId = (typeof Block)[keyof typeof Block];
 
 export type RenderKind = 'none' | 'opaque' | 'cutout' | 'translucent';
+
+/** How a block is drawn and aimed at: a full cube, or the torch's stick and flame. */
+export type BlockShape = 'cube' | 'torch';
 
 export interface BlockTiles {
   top: TileId;
@@ -71,8 +82,13 @@ export interface BlockDef {
   name: string;
   /** Name shown in the user interface. */
   label: string;
-  /** Solid blocks collide with the player and can be targeted. */
+  /** Solid blocks collide with the player (physics). */
   solid: boolean;
+  /** Targetable blocks stop the crosshair: they can be broken and placed against. */
+  targetable: boolean;
+  shape: BlockShape;
+  /** The block stands on the block below and comes off when that one is broken. */
+  needsSupport: boolean;
   render: RenderKind;
   /** Null only for blocks that are never drawn. */
   tiles: BlockTiles | null;
@@ -110,6 +126,9 @@ function solidBlock(
     name,
     label,
     solid: true,
+    targetable: true,
+    shape: 'cube',
+    needsSupport: false,
     render,
     tiles,
     slot,
@@ -129,6 +148,9 @@ export const BLOCKS: readonly BlockDef[] = [
     name: 'air',
     label: 'Air',
     solid: false,
+    targetable: false,
+    shape: 'cube',
+    needsSupport: false,
     render: 'none',
     tiles: null,
     slot: null,
@@ -171,6 +193,9 @@ export const BLOCKS: readonly BlockDef[] = [
     name: 'water',
     label: 'Water',
     solid: false,
+    targetable: false,
+    shape: 'cube',
+    needsSupport: false,
     render: 'translucent',
     tiles: uniform(Tile.WATER),
     slot: null,
@@ -204,12 +229,34 @@ export const BLOCKS: readonly BlockDef[] = [
   ),
   solidBlock(Block.STONE_BRICKS, 'stone_bricks', 'Stone bricks', uniform(Tile.STONE_BRICKS), null),
   solidBlock(Block.IRON_BLOCK, 'iron_block', 'Iron block', uniform(Tile.IRON_BLOCK), null),
+  {
+    // The first block that is not a cube: no collision, lit by itself, stands on the floor.
+    id: Block.TORCH,
+    name: 'torch',
+    label: 'Torch',
+    solid: false,
+    targetable: true,
+    shape: 'torch',
+    needsSupport: true,
+    render: 'cutout',
+    tiles: uniform(Tile.TORCH),
+    slot: null,
+    breakable: true,
+    replaceable: false,
+    castsAo: false,
+    mergesFaces: false,
+    opacity: 0,
+    emission: TORCH_LIGHT,
+  },
 ];
 
 export const RENDER_NONE = 0;
 export const RENDER_OPAQUE = 1;
 export const RENDER_CUTOUT = 2;
 export const RENDER_TRANSLUCENT = 3;
+export const SHAPE_CUBE = 0;
+export const SHAPE_TORCH = 1;
+const SHAPE_CODES: Record<BlockShape, number> = { cube: SHAPE_CUBE, torch: SHAPE_TORCH };
 const RENDER_CODES: Record<RenderKind, number> = {
   none: RENDER_NONE,
   opaque: RENDER_OPAQUE,
@@ -219,6 +266,10 @@ const RENDER_CODES: Record<RenderKind, number> = {
 
 // Flat lookup arrays for hot paths (meshing, physics). Unknown ids behave like air.
 export const BLOCK_SOLID = new Uint8Array(256);
+export const BLOCK_TARGETABLE = new Uint8Array(256);
+/** `SHAPE_CUBE` or `SHAPE_TORCH`. */
+export const BLOCK_SHAPE = new Uint8Array(256);
+export const BLOCK_NEEDS_SUPPORT = new Uint8Array(256);
 export const BLOCK_RENDER = new Uint8Array(256);
 export const BLOCK_CASTS_AO = new Uint8Array(256);
 export const BLOCK_MERGES_FACES = new Uint8Array(256);
@@ -232,6 +283,9 @@ for (const def of BLOCKS) {
   BLOCK_OPACITY[def.id] = def.opacity;
   BLOCK_EMISSION[def.id] = def.emission;
   BLOCK_SOLID[def.id] = def.solid ? 1 : 0;
+  BLOCK_TARGETABLE[def.id] = def.targetable ? 1 : 0;
+  BLOCK_SHAPE[def.id] = SHAPE_CODES[def.shape];
+  BLOCK_NEEDS_SUPPORT[def.id] = def.needsSupport ? 1 : 0;
   BLOCK_RENDER[def.id] = RENDER_CODES[def.render];
   BLOCK_CASTS_AO[def.id] = def.castsAo ? 1 : 0;
   BLOCK_MERGES_FACES[def.id] = def.mergesFaces ? 1 : 0;
@@ -258,8 +312,13 @@ export function isSolid(id: number): boolean {
   return BLOCK_SOLID[id] === 1;
 }
 
-/** Blocks a player can hold and place: every solid block that can also be broken again. */
+/** Blocks a player can hold and place: every targetable block that can also be broken again. */
 export function isPlaceable(id: number): boolean {
   const def = BLOCKS[id];
-  return def !== undefined && def.solid && def.breakable;
+  return def !== undefined && def.targetable && def.breakable;
+}
+
+/** Whether a block can carry a block that needs support: a solid full cube. */
+export function isSupport(id: number): boolean {
+  return BLOCK_SOLID[id] === 1 && BLOCK_SHAPE[id] === SHAPE_CUBE;
 }

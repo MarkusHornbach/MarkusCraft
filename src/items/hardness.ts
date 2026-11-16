@@ -8,6 +8,8 @@ import { Item, type ToolClass, type ToolDef, toolOf } from './items';
  * test fails if one is missing. Tools divide these times.
  */
 const BREAK_SECONDS: ReadonlyMap<number, number> = new Map([
+  // A torch comes off at once: `break` follows `startBreak` in the same step.
+  [Block.TORCH, 0],
   [Block.LEAVES, 0.25],
   [Block.GLASS, 0.4],
   [Block.SAND, 0.6],

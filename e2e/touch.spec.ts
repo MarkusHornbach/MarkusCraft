@@ -389,3 +389,48 @@ test('buttons do not turn the view; stick and look area do not break or place (A
     expect(await getBlock(page, px, PLATFORM_Y + 1, pz - dz)).toBe(AIR);
   }
 });
+
+test('Phase 4 AC8.4: a torch is selected, placed with the place button, aimed at with a look drag and broken with one tap', async ({
+  page,
+}) => {
+  const TORCH = 19;
+  const fingers = await openTouchGame(page, { mode: 'gathering' });
+  const { px, pz } = await standOnPlatform(page);
+  await page.evaluate((torch) => window.__mc.give(torch, 3), TORCH);
+  const slot = await centerOf(page, '.hotbar-slot[data-slot="1"]');
+  await fingers.tap(1, slot.x, slot.y);
+  await expect(page.locator('.hotbar-label')).toHaveText('Torch');
+
+  await setPlayer(page, { pitch: -50 * DEG });
+  await press(page, fingers, 1, 'place');
+  await fingers.touchUp(1);
+  expect(await getBlock(page, px, PLATFORM_Y + 1, pz - 1)).toBe(TORCH);
+  const count = async () =>
+    (await getState(page)).inventory.slots.reduce(
+      (sum, s) => sum + (s?.item === TORCH ? s.count : 0),
+      0,
+    );
+  expect(await count()).toBe(2);
+
+  // Looking ahead the crosshair misses it; a drag down of 30° brings it onto the torch.
+  await setPlayer(page, { pitch: -20 * DEG });
+  await step(page, 1);
+  expect((await getState(page)).target?.id).not.toBe(TORCH);
+  await fingers.touchDown(2, LOOK.x, LOOK.y);
+  await fingers.touchMove(2, LOOK.x, LOOK.y + 131, 5);
+  await fingers.touchUp(2);
+  await whenIdle(page);
+  await step(page, 1);
+  expect((await getState(page)).target).toMatchObject({
+    x: px,
+    y: PLATFORM_Y + 1,
+    z: pz - 1,
+    id: TORCH,
+  });
+
+  await press(page, fingers, 1, 'break');
+  await fingers.touchUp(1);
+  await step(page, 2);
+  expect(await getBlock(page, px, PLATFORM_Y + 1, pz - 1)).toBe(AIR);
+  expect(await count()).toBe(3);
+});

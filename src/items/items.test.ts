@@ -34,6 +34,7 @@ describe('item table (Phase 3 AC6.4)', () => {
       furnace: 16,
       stone_bricks: 17,
       iron_block: 18,
+      torch: 19,
       coal: 256,
       stick: 257,
       iron_ingot: 258,
