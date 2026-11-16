@@ -26,7 +26,7 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 4 part B (torch, darker night).
+Last updated: 2026-11-16 (no tests with children: TORCH-5 and CRAFT-1 obsolete).
 
 ---
 
@@ -108,9 +108,6 @@ Once, before the first run:
       behind it: does the crosshair go where you expect? _Phone._ Result:
 - [ ] **TORCH-4** (4B) Break the block under a torch: is it understood that the torch
       comes along (it goes into the inventory in a Gathering world)? Result:
-- [ ] **TORCH-5** (4B) Give the device to a child in a Gathering world at dusk without
-      explaining anything: do they find "Torch" in the recipe list, understand that coal
-      is needed, and use torches? Result:
 - [ ] **TORCH-6** (4B) Dig for iron with torches (as in CRAFT-6): is mining
       more fun now? Result:
 - [ ] **TORCH-7** (4B) A torch under water, a torch on glass and on leaves: does anything
@@ -222,9 +219,6 @@ Once, before the first run:
 
 ## 8. Crafting and tools
 
-- [ ] **CRAFT-1** (3C) Can a child reach the wooden pickaxe without help, told only "break
-      a tree and look into the bag"? Do they find the "Crafting" tab, understand the green
-      rows, put the workbench down and stand next to it? Result:
 - [ ] **CRAFT-2** (3C) Is the recipe list understood without reading: icons, "2 / 3" in
       red, the greyed rows, "Needs a workbench nearby", that the list scrolls? Result:
 - [ ] **CRAFT-3** (3C) The list reorders after every craft (what can be made moves up).
@@ -239,7 +233,7 @@ Once, before the first run:
 - [ ] **CRAFT-7** (3C) The furnace's two seconds: does the bar feel like "it is cooking"?
       Is it understood that closing the bag cancels it and that holding goes on? Result:
 - [ ] **CRAFT-8** (3C) Holding "Craft", by mouse and by finger: four per second. Too fast
-      for a child? Result:
+      for the player? Result:
 - [ ] **CRAFT-9** (3C) The recipe list on the phone: are tabs, rows and buttons easy to
       hit, does scrolling work without crafting something, is the text readable? Result:
 - [ ] **CRAFT-10** (3C) The icons: are pickaxe, axe and shovel told apart in the bar on
@@ -268,3 +262,11 @@ Tests that no longer need doing, with the reason.
 - **PERF-2** (4A) "The same test with light, plus 'Chunk work: avg, max' and 'Frames: … in
   10 s, … long' from the overlay." Never filled in. Reason: these numbers are taken by the
   performance test (PERF-4), on the same route on every device.
+- **TORCH-5** (4B) "Give the device to a child in a Gathering world at dusk without
+  explaining anything: do they find "Torch" in the recipe list, understand that coal is
+  needed, and use torches?" Never filled in. Reason: Dropped 2026-11-16: no tests with
+  children.
+- **CRAFT-1** (3C) "Can a child reach the wooden pickaxe without help, told only "break a
+  tree and look into the bag"? Do they find the "Crafting" tab, understand the green rows,
+  put the workbench down and stand next to it?" Never filled in. Reason: Dropped
+  2026-11-16: no tests with children.

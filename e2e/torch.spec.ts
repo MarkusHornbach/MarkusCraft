@@ -283,6 +283,8 @@ async function floorPatch(page: Page, time: number, torch: boolean) {
 test('Phase 4 AC7.6: at midnight the ground next to a torch is four times as bright and warm; by day it is unchanged', async ({
   page,
 }) => {
+  // Four game opens; on a CI runner with software WebGL this already took 50 s of the 60 s budget.
+  test.slow();
   const dark = await floorPatch(page, MIDNIGHT, false);
   const lit = await floorPatch(page, MIDNIGHT, true);
   expect(lit.lum).toBeGreaterThan(4 * dark.lum);
