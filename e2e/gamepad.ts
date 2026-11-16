@@ -167,9 +167,30 @@ export class Pad {
     return this.trigger(button, 0);
   }
 
+  /**
+   * A short press: the button is down for exactly one poll, as a quick real tap. (Down for
+   * two or more polls, a slow frame could make a held D-pad repeat, which it rightly does
+   * after 400 ms.)
+   */
   async tap(button: number): Promise<void> {
-    await this.press(button);
-    await this.release(button);
+    const released = await this.page.evaluate(
+      async ([index, b]) => {
+        const op = window.__fakePadOp;
+        if (!op) throw new Error('installFakePads was not called');
+        const before = op({ kind: 'button', index, button: b, value: 1 });
+        // Released in the first frame callback after the poll that saw the press.
+        await new Promise<void>((done) => {
+          const check = (): void => {
+            if (window.__mc.getState().pad.polls > before) done();
+            else requestAnimationFrame(check);
+          };
+          requestAnimationFrame(check);
+        });
+        return op({ kind: 'button', index, button: b, value: 0 });
+      },
+      [this.index, button],
+    );
+    await this.page.waitForFunction((n) => window.__mc.getState().pad.polls >= n, released + 2);
   }
 
   /** Puts a stick at (x, y), each −1..1; y grows downwards as on a real pad. */

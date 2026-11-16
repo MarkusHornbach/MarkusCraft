@@ -459,7 +459,9 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   press; `connect({ holding })` connects with buttons down, `wake: false` without the tap),
   `disconnect()`, `press`, `release`, `tap`, `trigger(button, value)` and
   `stick('left' | 'right', x, y)` (y down). Each call applies the change and reads the poll
-  count in one page call, then waits until `getState().pad.polls` grew by two. `BUTTON`
+  count in one page call, then waits until `getState().pad.polls` grew by two; `tap` holds
+  the button for exactly one poll (held longer, a slow frame could make the D-pad repeat
+  after `PAD_NAV_DELAY_MS`, as it should). `BUTTON`
   has the standard indices. Menu tests read `getState().ui.focus`; a focus move is one
   `tap` of the D-pad.
 - Test API beyond Phase 2: `submit(action)` (returns the session's answer),

@@ -91,7 +91,7 @@ Plan: `docs/phase-5-plan.md`, Part A (steps 1–4). Branch: `claude/hopeful-hypa
 4. **Choosing a pad.** The first standard-mapping pad on which a button is down (or a stick
    beyond 0.5) becomes the pad; that snapshot is its first one, so the press does nothing
    (the wake-up rule of 5.2 covers it). The fake pad's `connect()` therefore taps Select
-   (unused) after connecting, as a real browser reports a pad only after a press.
+   (unused) after connecting, as a real browser reports a pad only after a press. `Pad.tap` holds a button for exactly one poll: on CI a tap held for two slow frames made the D-pad repeat (correct for a held button) and moved the focus twice.
 5. **"Press a button on the controller to use it" shows only while a pad is connected but
    not used yet** (after the wake-up press), at the end of the controls list. Plan 5.2
    says "while no pad was seen", but 5.8 and 6.3 require the pause screen and its
