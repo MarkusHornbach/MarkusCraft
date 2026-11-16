@@ -527,7 +527,7 @@ active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused
 ## Tests on real devices
 
 `docs/device-tests.md` is the one list of everything only a person with a real device can
-judge (frame rate, feel, readability, whether a child understands something). The owner
+judge (frame rate, feel, readability, whether a player understands something). The owner
 fills it out; it is used for all phases.
 
 - A phase part adds its new tests there, in the section they belong to, with an id
@@ -559,6 +559,10 @@ hold:
    pointless were moved to "Obsolete" there.
 9. Hard rule 1 has been checked: no third-party assets or protected names anywhere.
 10. One pull request into `main` is open, describing the result and linking the report.
+
+## Owner decisions
+
+- No tests with children and no child-specific adaptations (owner, 2026-11-16).
 
 ## Current status
 
