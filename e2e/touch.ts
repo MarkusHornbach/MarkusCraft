@@ -101,12 +101,14 @@ function watchFingers(): void {
  * One finger that drags in a straight line and lifts. Unlike `Fingers` it does not wait
  * until the page has seen each position: when the browser takes the drag over for
  * scrolling it cancels the touch, and the page sees no more of it. Each event gets a frame.
+ * `rest` runs after the finger is down and before it moves (a finger that rests first).
  */
 export async function swipe(
   page: Page,
   from: { x: number; y: number },
   to: { x: number; y: number },
   steps = 6,
+  rest?: () => Promise<void>,
 ): Promise<void> {
   const session = await page.context().newCDPSession(page);
   const frame = (): Promise<void> =>
@@ -124,6 +126,7 @@ export async function swipe(
     await frame();
   };
   await send('touchStart', from.x, from.y);
+  if (rest) await rest();
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     await send('touchMove', from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);

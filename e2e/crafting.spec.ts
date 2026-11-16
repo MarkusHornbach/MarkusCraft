@@ -4,11 +4,13 @@ import { expect, test } from './fixtures';
 import {
   DEG,
   PLATFORM_Y,
+  createWorld,
   getBlock,
   getState,
   give,
   inventory,
   openGame,
+  openMenu,
   setBlock,
   setPlayer,
   standOnPlatform,
@@ -17,6 +19,7 @@ import {
   whenIdle,
 } from './game';
 import { capture, centerRegion, colorDistance, meanColor, shareOf, type Rgb } from './helpers';
+import { expectPartOfSixthRow, expectRowsNeverMove } from './recipeRows';
 import { TOUCH_DEVICE, centerOf, openTouchGame, swipe } from './touch';
 
 const STONE = 3;
@@ -36,6 +39,8 @@ const COAL = 256;
 const STICK = 257;
 const RECIPE_COUNT = 20;
 const COAL_RECIPE = 11;
+/** The recipe ids in table order, as the list shows them (polishing session 1). */
+const TABLE_IDS = Array.from({ length: RECIPE_COUNT }, (_, index) => index + 1);
 
 /** A Gathering world; the player stands on a platform of `block`, looking at the cell ahead. */
 async function onPlatform(page: Page, block: number): Promise<{ px: number; pz: number }> {
@@ -312,7 +317,7 @@ async function place(page: Page, x: number, y: number, z: number, item: number):
   expect(await submit(page, { kind: 'place', x, y, z, slot })).toBe(true);
 }
 
-test('Phase 3 AC12.1: the Crafting tab lists every recipe; one log makes planks craftable and first, and crafting reorders the list', async ({
+test('Phase 3 AC12.1: the Crafting tab lists every recipe in table order; one log makes planks craftable, and crafting does not reorder the list', async ({
   page,
 }) => {
   await openGame(page, { mode: 'gathering' });
@@ -320,27 +325,27 @@ test('Phase 3 AC12.1: the Crafting tab lists every recipe; one log makes planks 
   await page.keyboard.press('KeyE');
   // The screen opens on the items page; the list is the second tab.
   expect((await getState(page)).ui).toEqual({ screen: 'inventory', tab: 'items' });
-  await expect(page.locator('.inventory-tab')).toHaveText(['Items', 'Crafting']);
+  await expect(page.locator('.inventory-tab')).toHaveText(['Items', /^Crafting/]);
   await expect(page.locator('.recipe-list')).toBeHidden();
   await page.locator('.inventory-tab[data-tab="crafting"]').click();
   await expect(page.locator('.recipe-list')).toBeVisible();
   await expect(page.locator('.inventory-grid')).toBeHidden();
-  await expect(page.locator('.inventory-tab.active')).toHaveText('Crafting');
+  await expect(page.locator('.inventory-tab.active')).toHaveAttribute('aria-label', 'Crafting');
 
   // Every recipe has a row with the icon and the name of its result.
   await expect(page.locator('.recipe-row')).toHaveCount(RECIPE_COUNT);
   await expect(page.locator('.recipe-row .recipe-result canvas')).toHaveCount(RECIPE_COUNT);
   let state = await getState(page);
   expect(state.recipes).toHaveLength(RECIPE_COUNT);
+  expect(state.recipes.map((r) => r.id)).toEqual(TABLE_IDS);
   expect(await listOrder(page)).toEqual(state.recipes.map((r) => r.name));
   await expect(row(page, 'planks').locator('.recipe-name')).toHaveText('Planks');
   await expect(row(page, 'planks').locator('.recipe-result-count')).toHaveText('4');
   await expect(row(page, 'iron_pickaxe').locator('.recipe-name')).toHaveText('Iron pickaxe');
   await expect(row(page, 'iron_pickaxe').locator('.recipe-result-count')).toHaveCount(0);
 
-  // With one log only the planks can be made, and they stand first.
+  // With one log only the planks can be made.
   expect(state.recipes.filter((r) => r.craftable).map((r) => r.name)).toEqual(['planks']);
-  expect((await listOrder(page))[0]).toBe('planks');
   expect(await withButton(page)).toEqual(['planks']);
   await expect(ingredient(page, 'planks', 'log')).toHaveText('1 / 1');
   await expect(ingredient(page, 'planks', 'log')).not.toHaveClass(/short/);
@@ -348,24 +353,19 @@ test('Phase 3 AC12.1: the Crafting tab lists every recipe; one log makes planks 
   await craftButton(page, 'planks').click();
   expect(await have(page, LOG)).toBe(0);
   expect(await have(page, PLANKS)).toBe(4);
-  // Four planks: sticks and the workbench come first now, the planks have gone down.
+  // Four planks: sticks and the workbench can be made; the list keeps its order.
   state = await getState(page);
   expect(state.recipes.filter((r) => r.craftable).map((r) => r.name)).toEqual([
     'sticks',
     'workbench',
   ]);
-  const order = await listOrder(page);
-  expect(order).toEqual(state.recipes.map((r) => r.name));
-  expect(order.slice(0, 3)).toEqual(['sticks', 'workbench', 'planks']);
+  expect(state.recipes.map((r) => r.id)).toEqual(TABLE_IDS);
+  expect(await listOrder(page)).toEqual(state.recipes.map((r) => r.name));
   expect(await withButton(page)).toEqual(['sticks', 'workbench']);
   await expect(ingredient(page, 'planks', 'log')).toHaveText('0 / 1');
   await expect(ingredient(page, 'planks', 'log')).toHaveClass(/short/);
 
-  // The list has reordered under the mouse: a second quick click on the same spot, where
-  // "Sticks" stands now, crafts nothing. A quarter of a second later it does.
-  await craftButton(page, 'sticks').click();
-  expect(await have(page, STICK)).toBe(0);
-  await step(page, 15);
+  // Another recipe right after a craft, without a step in between: it is made.
   await craftButton(page, 'sticks').click();
   expect(await have(page, STICK)).toBe(4);
   expect(await have(page, PLANKS)).toBe(2);
@@ -418,11 +418,12 @@ test('Phase 3 AC12.2: short ingredients are marked; station recipes need a workb
   await place(page, px, PLATFORM_Y + 1, pz - 2, WORKBENCH);
   await expect(note(page, pickaxe)).toBeHidden();
   await expect(craftButton(page, pickaxe)).toBeVisible();
-  expect((await listOrder(page)).slice(0, 4)).toEqual([
+  expect(await withButton(page)).toEqual([
     'sticks',
     'wooden_pickaxe',
     'wooden_axe',
     'wooden_shovel',
+    'torch',
   ]);
   // With the workbench near, a recipe short of ingredients still has no button.
   await expect(ingredient(page, 'furnace', 'stone')).toHaveText('0 / 8');
@@ -505,7 +506,7 @@ test('Phase 3 AC12.3: a furnace recipe shows a progress bar and delivers after 1
   expect(await inventory(page)).toEqual(before);
 });
 
-test('Phase 3 AC12.4: holding "Craft" on sticks crafts four times a second until the planks run out', async ({
+test('Phase 3 AC12.4 and Polish 1 AC3.1: holding "Craft" on sticks crafts after half a second, then four times a second until the planks run out', async ({
   page,
 }) => {
   await openGame(page, { mode: 'gathering' });
@@ -514,12 +515,13 @@ test('Phase 3 AC12.4: holding "Craft" on sticks crafts four times a second until
   const at = await centerOf(page, '.recipe-row[data-recipe="sticks"] .recipe-craft');
   await page.mouse.move(at.x, at.y);
   await page.mouse.down();
-  // A quarter of a second per craft.
-  await step(page, 14);
+  // Half a second (30 steps) before the first craft of a hold.
+  await step(page, 29);
   expect(await have(page, STICK)).toBe(0);
   await step(page, 1);
   expect(await have(page, STICK)).toBe(4);
   expect(await have(page, PLANKS)).toBe(3);
+  // Then a quarter of a second per craft.
   await step(page, 14);
   expect(await have(page, STICK)).toBe(4);
   await step(page, 1);
@@ -539,14 +541,22 @@ test('Phase 3 AC12.4: holding "Craft" on sticks crafts four times a second until
 
   // Letting go after a hold that crafted does not craft once more; a short click crafts once.
   await page.mouse.down();
-  await step(page, 15);
+  await step(page, 30);
   await page.mouse.up();
   await step(page, 30);
   expect(await have(page, STICK)).toBe(12);
   expect(await have(page, PLANKS)).toBe(3);
+  // A hold let go before half a second crafts once, by its click.
+  await page.mouse.down();
+  await step(page, 29);
+  expect(await have(page, STICK)).toBe(12);
+  await page.mouse.up();
+  expect(await have(page, STICK)).toBe(16);
+  expect(await have(page, PLANKS)).toBe(1);
+  await give(page, PLANKS, 2);
   await craftButton(page, 'sticks').click();
   await step(page, 30);
-  expect(await have(page, STICK)).toBe(16);
+  expect(await have(page, STICK)).toBe(20);
   expect(await have(page, PLANKS)).toBe(1);
 });
 
@@ -593,10 +603,10 @@ test.describe('touch', () => {
     await step(page, 30);
     expect(await have(page, LOG)).toBe(2);
     expect(await have(page, PLANKS)).toBe(10);
-    // A finger held on the button repeats.
+    // A finger held on the button repeats: after half a second, then a quarter later.
     const planks = await centerOf(page, '.recipe-row[data-recipe="planks"] .recipe-craft');
     await fingers.touchDown(1, planks.x, planks.y);
-    await step(page, 30);
+    await step(page, 45);
     await fingers.touchUp(1);
     await step(page, 30);
     expect(await have(page, LOG)).toBe(0);
@@ -606,7 +616,7 @@ test.describe('touch', () => {
 
 // --- Step 12: reference screenshots ------------------------------------------------------
 
-test('Phase 3 AC12.7: matches the recipe-list reference (craftable rows, the furnace at work, short ingredients, a missing station)', async ({
+test('Phase 3 AC12.7: matches the recipe-list reference (craftable rows, the furnace at work, short ingredients, a missing station, the tab count)', async ({
   page,
 }) => {
   await openGame(page, { mode: 'gathering' });
@@ -621,17 +631,30 @@ test('Phase 3 AC12.7: matches the recipe-list reference (craftable rows, the fur
   );
   await give(page, LOG, 2);
   await give(page, PLANKS, 3);
+  await give(page, IRON_ORE, 1);
+  await give(page, COAL, 1);
   await openCrafting(page);
-  await craftButton(page, 'coal').click();
+  await craftButton(page, 'coal').dispatchEvent('click');
   await step(page, 60);
+  // The list keeps table order (polishing session 1): the furnace rows lie further down.
+  // Scrolled so that the stone shovel is the top row: furnace (no workbench), coal (in the
+  // furnace), iron ingot (can be made) and the iron tools (short of ingredients) follow.
+  await page.locator('.recipe-list').evaluate((list) => {
+    const target = list.querySelector('.recipe-row[data-recipe="stone_shovel"]');
+    if (!target) throw new Error('no stone shovel row');
+    list.scrollTop += target.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  });
   await whenIdle(page);
-  expect((await listOrder(page)).slice(0, 5)).toEqual([
-    'planks',
-    'sticks',
+  expect((await listOrder(page)).slice(8, 13)).toEqual([
+    'stone_shovel',
+    'furnace',
     'coal',
-    'workbench',
-    'wooden_pickaxe',
+    'iron_ingot',
+    'iron_pickaxe',
   ]);
+  await expect(page.locator('.tab-count')).toHaveText('4');
+  await expect(craftButton(page, 'iron_ingot')).toBeVisible();
+  await expect(note(page, 'furnace')).toHaveText('Needs a workbench nearby');
   expect((await getState(page)).smelting?.progress).toBeCloseTo(0.5, 5);
   // Mostly text, and CI has other fonts than the cloud session: the looser limit of the
   // text references. The assertions above and AC12.1–AC12.3 check what the rows say.
@@ -680,4 +703,212 @@ test('Phase 3 AC12.7: matches the stations reference (workbench and furnace plac
   const state = await getState(page);
   expect(state.recipes.every((r) => !r.stationMissing)).toBe(true);
   await expect(page).toHaveScreenshot('stations.png');
+});
+
+// --- Polishing session 1: a recipe list in fixed order ----------------------------------
+
+test('Polish 1 AC1.2: the rows and getState().recipes stay in table order before and after crafts', async ({
+  page,
+}) => {
+  await openGame(page, { mode: 'gathering' });
+  await openCrafting(page);
+  const table = (await getState(page)).recipes.map((r) => r.name);
+  const expectTableOrder = async (): Promise<void> => {
+    const state = await getState(page);
+    expect(state.recipes.map((r) => r.id)).toEqual(TABLE_IDS);
+    expect(state.recipes.map((r) => r.name)).toEqual(table);
+    expect(await listOrder(page)).toEqual(table);
+  };
+  await expectTableOrder();
+  // One log: planks become craftable.
+  await give(page, LOG, 1);
+  expect(await withButton(page)).toEqual(['planks']);
+  await expectTableOrder();
+  // Crafting them makes the planks uncraftable, sticks and workbench craftable.
+  await craftButton(page, 'planks').click();
+  expect(await withButton(page)).toEqual(['sticks', 'workbench']);
+  await expectTableOrder();
+  // A workbench makes the last planks uncraftable for sticks.
+  await craftButton(page, 'workbench').click();
+  expect(await have(page, WORKBENCH)).toBe(1);
+  expect(await withButton(page)).toEqual([]);
+  await expectTableOrder();
+});
+
+test('Polish 1 AC1.3: every row keeps its place and height whatever it shows (mouse, 960 × 540)', async ({
+  page,
+}) => {
+  await openGame(page, { mode: 'gathering' });
+  await openCrafting(page);
+  expect(await expectRowsNeverMove(page)).toBeCloseTo(48, 0);
+});
+
+test('Polish 1 AC1.4: after a craft the same point still holds the same row; quick presses craft without a step', async ({
+  page,
+}) => {
+  await openGame(page, { mode: 'gathering' });
+  await give(page, LOG, 2);
+  await openCrafting(page);
+  const at = await centerOf(page, '.recipe-row[data-recipe="planks"] .recipe-craft');
+  const rowAt = (): Promise<string | null> =>
+    page.evaluate(
+      ({ x, y }) =>
+        document.elementFromPoint(x, y)?.closest<HTMLElement>('.recipe-row')?.dataset.recipe ??
+        null,
+      at,
+    );
+  expect(await rowAt()).toBe('planks');
+  await page.mouse.click(at.x, at.y);
+  expect(await have(page, PLANKS)).toBe(4);
+  expect(await rowAt()).toBe('planks');
+  // The same point again, no step in between: planks again.
+  await page.mouse.click(at.x, at.y);
+  expect(await have(page, PLANKS)).toBe(8);
+  expect(await have(page, LOG)).toBe(0);
+  expect(await rowAt()).toBe('planks');
+  // Another recipe right away: it is made.
+  await craftButton(page, 'sticks').click();
+  expect(await have(page, STICK)).toBe(4);
+  expect(await have(page, PLANKS)).toBe(6);
+});
+
+test('Polish 1 AC1.5: the list shows five rows and part of the sixth (mouse, 960 × 540)', async ({
+  page,
+}) => {
+  await openGame(page, { mode: 'gathering' });
+  await openCrafting(page);
+  await expectPartOfSixthRow(page);
+});
+
+test('Polish 1 AC1.5: the list shows five rows and part of the sixth (mouse, 640 × 360)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 640, height: 360 });
+  await openMenu(page);
+  await createWorld(page, { mode: 'gathering' });
+  await page.keyboard.press('KeyE');
+  await page.locator('.inventory-tab[data-tab="crafting"]').click();
+  await expect(page.locator('.recipe-list')).toBeVisible();
+  await expectPartOfSixthRow(page);
+});
+
+test('Polish 1 AC2.1: the Crafting tab counts the recipes that can be made, on both tabs', async ({
+  page,
+}) => {
+  const { px, pz } = await onPlatform(page, LOG);
+  const count = page.locator('.inventory-tab[data-tab="crafting"] .tab-count');
+  const tab = page.locator('.inventory-tab[data-tab="crafting"]');
+  const craftableCount = async (): Promise<number> =>
+    (await getState(page)).recipes.filter((r) => r.craftable).length;
+  const expectCount = async (n: number): Promise<void> => {
+    expect(await craftableCount()).toBe(n);
+    if (n === 0) await expect(count).toBeHidden();
+    else await expect(count).toHaveText(String(n));
+    await expect(tab).toHaveAttribute('aria-label', 'Crafting');
+  };
+
+  await page.keyboard.press('KeyE');
+  expect((await getState(page)).ui.tab).toBe('items');
+  await expectCount(0);
+  await expect(tab).toHaveText('Crafting');
+  await give(page, LOG, 1);
+  await expectCount(1);
+  await expect(tab).toHaveText('Crafting1');
+
+  await tab.click();
+  await craftButton(page, 'planks').click();
+  // Sticks and workbench.
+  await expectCount(2);
+
+  // On the items page: throwing the planks away, then a pickup of a log.
+  await page.locator('.inventory-tab[data-tab="items"]').click();
+  const planksSlot = (await inventory(page)).findIndex((s) => s?.item === PLANKS);
+  expect(await submit(page, { kind: 'discard', slot: planksSlot })).toBe(true);
+  await expectCount(0);
+  expect(await submit(page, { kind: 'startBreak', x: px, y: PLATFORM_Y, z: pz - 1 })).toBe(true);
+  await step(page, 125);
+  expect(await submit(page, { kind: 'break', x: px, y: PLATFORM_Y, z: pz - 1 })).toBe(true);
+  expect(await have(page, LOG)).toBe(1);
+  await expectCount(1);
+
+  // Planks and sticks for the wooden tools; a workbench placed within reach unlocks them.
+  await give(page, PLANKS, 3);
+  await give(page, STICK, 2);
+  // Planks (the log) and sticks.
+  await expectCount(2);
+  await give(page, WORKBENCH, 1);
+  await place(page, px, PLATFORM_Y + 1, pz - 2, WORKBENCH);
+  // And the three wooden tools.
+  await expectCount(5);
+  await expect(page.locator('.inventory-tab.active')).toHaveAttribute('data-tab', 'items');
+});
+
+test('Polish 1 AC2.2: the list keeps its scroll position while a world is open; a loaded world starts at the top', async ({
+  page,
+}) => {
+  await openGame(page, { mode: 'gathering' });
+  await openCrafting(page);
+  const list = page.locator('.recipe-list');
+  const scrollTop = (): Promise<number> => list.evaluate((node) => node.scrollTop);
+  await list.evaluate((node) => node.scrollTo(0, node.scrollHeight));
+  const bottom = await scrollTop();
+  expect(bottom).toBeGreaterThan(100);
+  await expect(row(page, 'torch')).toBeInViewport();
+
+  // Another tab and back.
+  await page.locator('.inventory-tab[data-tab="items"]').click();
+  await page.locator('.inventory-tab[data-tab="crafting"]').click();
+  expect(await scrollTop()).toBe(bottom);
+  // Closed and opened by E: it opens on the Crafting tab, where it was.
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('.inventory-screen')).toBeHidden();
+  await page.keyboard.press('KeyE');
+  await expect(list).toBeVisible();
+  expect(await scrollTop()).toBe(bottom);
+  // Closed by "Close".
+  await page.locator('.inventory-close').click();
+  await expect(page.locator('.inventory-screen')).toBeHidden();
+  await page.keyboard.press('KeyE');
+  await expect(list).toBeVisible();
+  expect(await scrollTop()).toBe(bottom);
+  await page.keyboard.press('KeyE');
+
+  // Another world: the list starts at the top.
+  await page.evaluate(() => window.__mc.openWorld('Other', 7, 'gathering'));
+  await page.waitForFunction(() => window.__mc.isReady());
+  await openCrafting(page);
+  expect(await scrollTop()).toBe(0);
+});
+
+test.describe('touch', () => {
+  test.use(TOUCH_DEVICE);
+
+  test('Polish 1 AC3.2: a finger that rests on "Craft" for 20 steps and then scrolls crafts nothing; a tap crafts once', async ({
+    page,
+  }) => {
+    const fingers = await openTouchGame(page, { mode: 'gathering' });
+    await give(page, LOG, 3);
+    await give(page, PLANKS, 6);
+    const bag = await centerOf(page, '.touch-bag');
+    await fingers.tap(9, bag.x, bag.y);
+    await page.locator('.inventory-tab[data-tab="crafting"]').tap();
+    const list = page.locator('.recipe-list');
+    await expect(list).toBeVisible();
+    const before = await inventory(page);
+
+    // Down on "Workbench", resting for a third of a second, then up the screen.
+    const button = await centerOf(page, '.recipe-row[data-recipe="workbench"] .recipe-craft');
+    await swipe(page, button, { x: button.x, y: button.y - 110 }, 6, () => step(page, 20));
+    await step(page, 60);
+    await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(40);
+    expect(await inventory(page)).toEqual(before);
+
+    // A tap crafts once.
+    await list.evaluate((node) => node.scrollTo(0, 0));
+    await craftButton(page, 'planks').tap();
+    await step(page, 30);
+    expect(await have(page, LOG)).toBe(2);
+    expect(await have(page, PLANKS)).toBe(10);
+  });
 });

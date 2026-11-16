@@ -380,8 +380,9 @@ canvas {
 
 .setting-row {
   display: grid;
-  /* Room for "Controller sensitivity" on one line, with some to spare for other fonts. */
-  grid-template-columns: 148px 1fr 74px;
+  /* Room for "Controller sensitivity" on one line (126 px in Inter), with some to spare
+     for other fonts. */
+  grid-template-columns: 136px 1fr 74px;
   align-items: center;
   gap: 8px;
   margin-bottom: 5px;
@@ -609,7 +610,7 @@ canvas {
 }
 
 .switch-row {
-  grid-template-columns: 148px 1fr;
+  grid-template-columns: 136px 1fr;
 }
 
 .setting-switch {
@@ -639,6 +640,12 @@ canvas {
 
 .touch-mode .setting-row {
   min-height: 30px;
+}
+
+/* A narrower value column ("16 chunks" is the longest) leaves the slider room for a
+   finger next to the wider labels. */
+.touch-mode .setting-row:not(.switch-row) {
+  grid-template-columns: 136px 1fr 66px;
 }
 
 /* Phones in landscape: everything has to fit into about 360 px of height. */

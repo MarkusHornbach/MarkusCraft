@@ -163,7 +163,8 @@ src/
 e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, sites.ts
                      (tree, beach and rock near the start point), lightScenes.ts (tunnel,
                      room with a window, roof over a chunk corner), gamepad.ts (the fake
-                     controller), screenshots/
+                     controller), recipeRows.ts (recipe rows that never move),
+                     screenshots/
 scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item
                      icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
@@ -314,9 +315,16 @@ sides in turn.
   `station`, `missing`, `full`; ingredients are taken from the last slots first. The
   furnace has no state in the world: its two seconds (`SMELT_MS`) are a progress bar in
   `Game`, which submits `craft` when the bar is full and forgets it when the screen
-  closes. Holding "Craft" repeats every `CRAFT_REPEAT_MS` of simulation time; for that
-  long after a craft, a press on another recipe is ignored, because the list reorders
-  (craftable first) and another button may slide under the pointer.
+  closes. **The recipe list keeps table order** (`listRecipes`, polishing session 1):
+  rows never move, all rows have one fixed height (48 px, touch 52 px) and the action
+  column a fixed width, so crafting never changes what lies under the pointer; there is
+  no rule that ignores presses after a craft. Craftable rows are found by their highlight
+  and by the count on the "Crafting" tab (`.tab-count`, hidden at 0; the tab's
+  `aria-label` stays "Crafting"). The list keeps its scroll position while a world is
+  open (`RecipeList.restoreScroll`); `setGameMode` (a loaded world) puts it back to the
+  top. Holding "Craft" makes its first item after `CRAFT_HOLD_DELAY_MS` (500) of
+  simulation time, then one every `CRAFT_REPEAT_MS` (250); a quick press crafts once on
+  release.
 - **Stable ids.** Block ids, item ids and recipe ids are written into save files or
   actions. The tables are append-only: never renumber or reuse an id. `blocks.test.ts`,
   `items.test.ts` and `recipes.test.ts` pin them. Every placeable block is an item with the block's id; items that are no blocks
@@ -469,7 +477,7 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   `give(item, count)`, `clearInventory()`; `getState()` has `mode`, `world`,
   `save { dirty, lastError, lastSaveMs, lastLoadMs }`, `inventory`,
   `breaking { x, y, z, progress } | null`, `ui { screen, tab }`,
-  `recipes [{ id, name, craftable, missing, stationMissing }]` in the order of the list,
+  `recipes [{ id, name, craftable, missing, stationMissing }]` in table order (ids 1–20),
   and `smelting { recipe, progress } | null`. Phase 5: `getState().pad { connected,
 active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused element;
   the key is left out while there is no focus, so older `toEqual` checks of `ui` hold), `settings.padSensitivity` and `settings.padInvertY`;
@@ -482,8 +490,10 @@ active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused
   Light scenes are built by `e2e/lightScenes.ts`. Brightness of pixels is compared as
   gamma-encoded values (`meanLuminance`) or as linear light (`linearBrightness`); say
   which. A test that changes blocks should end with `verifyLight()` being 0.
-- Recipe-list tests: a click on "Craft" of another recipe within 15 steps of the last
-  craft is ignored (see "Crafting"): step in between. `Fingers` waits until the page has
+- Recipe-list tests: rows are in table order, so a row further down (furnace rows, the
+  torch) must be scrolled to; `e2e/recipeRows.ts` walks the list through the states that
+  must not move a row. A held "Craft" crafts first after 30 steps, then every 15.
+  `swipe` takes a `rest` callback for a finger that rests before it moves. `Fingers` waits until the page has
   seen each finger position and therefore hangs on a gesture the browser takes over for
   scrolling; use `swipe` from `e2e/touch.ts` for those.
 - The "New world" form is reset when the list of stored worlds arrives: `WorldMenu` sets
@@ -633,11 +643,13 @@ hold:
     polishing session of the inventory and recipe list are merged (or the owner says there
     will be none). Part A already lets B and Y close the inventory and Start pause from
     it; Part B replaces that with the focus system on the inventory.
-- Polishing session 1 (inventory and recipe list, between Phase 5 parts A and B): planned
-  in `docs/polish-1-plan.md`, not yet implemented. The recipe list keeps a fixed order
-  with craftable rows highlighted and a count on the "Crafting" tab, the quarter-second
-  rule after a craft goes, rows get a fixed height, the scroll position is kept, a held
-  "Craft" first repeats after 500 ms, and two pause menu labels fit on one line. Esc stays
-  as it is. One branch, one pull request; report `docs/polish-1-report.md`. Its tests
-  name their criterion as "Polish 1 AC1.1"; device tests it adds have the origin "P1".
+- Polishing session 1 (inventory and recipe list, between Phase 5 parts A and B):
+  implemented (plan: `docs/polish-1-plan.md`, report: `docs/polish-1-report.md`). The
+  recipe list keeps table order with craftable rows highlighted and a count on the
+  "Crafting" tab, the quarter-second rule after a craft is gone, rows have a fixed
+  height, the scroll position is kept, a held "Craft" first repeats after 500 ms, and the
+  label column of the settings rows is wider (136 px) so the controller labels fit on one
+  line. Esc stays as it is. Read its "Decisions and deviations" before changing the
+  recipe list or the hold. Its tests name their criterion as "Polish 1 AC1.1"; device
+  tests it added have the origin "P1" (CRAFT-12, CRAFT-13).
 - Phases 6 (multiplayer) and 7 (personalization): not yet planned.
