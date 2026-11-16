@@ -50,7 +50,7 @@ Plan: `docs/phase-5-plan.md`, Part A (steps 1–4). Branch: `claude/hopeful-hypa
 | AC1.3 | `padMapping.test.ts` "ramp"                                                                                                   |
 | AC1.4 | `padMapping.test.ts` "buttons"                                                                                                |
 | AC1.5 | `padMapping.test.ts` "sprint and the mapping" (table-driven over all 16 buttons)                                              |
-| AC1.6 | `padMapping.test.ts` "cost" (`expectFasterThan`, best of five rounds)                                                         |
+| AC1.6 | `padMappingSpeed.solo.test.ts` (runs alone; warm-up, best of 15 rounds; CI measured 21.5 ms in the ordinary pass)             |
 | AC1.7 | `focusMove.test.ts`; navigation repeat also through `PadMapper` in `padMapping.test.ts`                                       |
 | AC1.8 | `settings.test.ts` (two "Phase 5 AC1.8" tests)                                                                                |
 | AC2.1 | `gamepad.spec.ts` "Phase 5 AC2.1"                                                                                             |
