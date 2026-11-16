@@ -38,9 +38,10 @@ interface Row {
 export class RecipeList {
   readonly element: HTMLElement;
   private readonly rows = new Map<number, Row>();
-  private order = '';
   private smelting: number | null = null;
   private pressed = false;
+  /** Where the list was scrolled to while it was last on screen. */
+  private scrollPos = 0;
 
   constructor(parent: HTMLElement, options: RecipeListOptions) {
     this.element = element('div', 'recipe-list');
@@ -50,12 +51,16 @@ export class RecipeList {
       this.rows.set(recipe.id, row);
       this.element.appendChild(row.root);
     }
-    // The press may end anywhere, also after its row has moved away under the pointer.
+    // The press may end anywhere: the finger may have started to scroll the list.
     const release = (): void => {
       if (!this.pressed) return;
       this.pressed = false;
       options.onCraftUp();
     };
+    // A hidden list has no scroll box, and a browser may forget its position: keep it here.
+    this.element.addEventListener('scroll', () => {
+      if (this.element.clientHeight > 0) this.scrollPos = this.element.scrollTop;
+    });
     window.addEventListener('pointerup', release);
     window.addEventListener('pointercancel', release);
     window.addEventListener('blur', release);
@@ -109,11 +114,10 @@ export class RecipeList {
   }
 
   /**
-   * Shows the recipes in the given order (craftable ones first) with what the player has
-   * of every ingredient.
+   * Shows what the player has of every ingredient and which recipes can be made. The rows
+   * never move: they stay in table order whatever the statuses say.
    */
   update(statuses: readonly RecipeStatus[]): void {
-    const order = statuses.map((s) => s.id).join(',');
     for (const status of statuses) {
       const row = this.rows.get(status.id);
       if (!row) continue;
@@ -122,10 +126,7 @@ export class RecipeList {
         row.shown = shown;
         this.showStatus(row, status);
       }
-      // Appending an element that is in the list already moves it to the end.
-      if (order !== this.order) this.element.appendChild(row.root);
     }
-    this.order = order;
   }
 
   private showStatus(row: Row, status: RecipeStatus): void {
@@ -169,8 +170,14 @@ export class RecipeList {
     if (row.fill.style.width !== percent) row.fill.style.width = percent;
   }
 
-  /** Back to the top, as when the tab is opened. */
+  /** Back to the top, as when a world is loaded. */
   scrollToTop(): void {
+    this.scrollPos = 0;
     this.element.scrollTop = 0;
+  }
+
+  /** Scrolls to where the list was when it was last on screen; call it once it is shown. */
+  restoreScroll(): void {
+    if (this.element.scrollTop !== this.scrollPos) this.element.scrollTop = this.scrollPos;
   }
 }

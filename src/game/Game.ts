@@ -68,6 +68,7 @@ import {
   BENCH_STORAGE_KEY,
   BENCH_TIME,
   CHUNK_BUDGET_MS,
+  CRAFT_HOLD_DELAY_MS,
   CRAFT_REPEAT_MS,
   GENERATOR_VERSION,
   HOTBAR_SLOTS,
@@ -261,8 +262,6 @@ export class Game {
   private craftHold: { recipe: number; timer: number; repeats: number } | null = null;
   /** The click that ends a hold which already crafted must not craft once more. */
   private suppressCraftClick = false;
-  /** The recipe made last and the action time it was made at. */
-  private lastCraft: { recipe: number; atMs: number } | null = null;
   /** Seconds a mouse button has been held since the last break/place action. */
   private repeatTimer = 0;
   /** Player position before the latest simulation step, for render interpolation. */
@@ -1030,10 +1029,6 @@ export class Game {
   private craft(id: number): void {
     const recipe = getRecipe(id);
     if (!recipe || !this.inventoryOpen || this.gameMode !== 'gathering') return;
-    // The list reorders after a craft, and another recipe's button may slide under the
-    // pointer: a quick second press must not craft something the player did not choose.
-    const last = this.lastCraft;
-    if (last && last.recipe !== id && this.nowMs() - last.atMs < CRAFT_REPEAT_MS - 1e-6) return;
     if (recipe.station !== 'furnace') {
       this.session.submit({ kind: 'craft', recipe: id });
       return;
@@ -1055,8 +1050,10 @@ export class Game {
     const hold = this.craftHold;
     if (hold) {
       hold.timer += SIM_DT;
-      // The small tolerance keeps 15 steps of 1/60 s from falling just short of 250 ms.
-      if (hold.timer >= CRAFT_REPEAT_MS / 1000 - 1e-9) {
+      // The first craft of a hold waits longer than the repeats after it. The small
+      // tolerance keeps 15 steps of 1/60 s from falling just short of 250 ms.
+      const wait = hold.repeats === 0 ? CRAFT_HOLD_DELAY_MS : CRAFT_REPEAT_MS;
+      if (hold.timer >= wait / 1000 - 1e-9) {
         hold.timer = 0;
         hold.repeats++;
         this.craft(hold.recipe);
@@ -1071,7 +1068,6 @@ export class Game {
     this.smelt = null;
     this.craftHold = null;
     this.suppressCraftClick = false;
-    this.lastCraft = null;
     this.inventoryScreen.setSmelting(null, 0);
   }
 
@@ -1152,9 +1148,6 @@ export class Game {
       this.craftHold = null;
     }
     if (!result.ok) return;
-    if (action.kind === 'craft' && this.inventoryOpen) {
-      this.lastCraft = { recipe: action.recipe, atMs: this.nowMs() };
-    }
     if (action.kind === 'selectSlot') this.hud.setSelected(this.selectedSlot, true);
     if (action.kind === 'break') this.breakActive = false;
     for (const notice of result.notices) this.showPickup(notice.item, notice.count);

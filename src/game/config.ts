@@ -131,7 +131,12 @@ export const ACTION_REPEAT_MS = 250;
 export const STATION_REACH = 5;
 /** A furnace recipe shows its progress bar this long before the item is made. */
 export const SMELT_MS = 2000;
-/** Holding "Craft" repeats at this interval. */
+/**
+ * A held "Craft" makes its first item after this long, so that a finger resting on the
+ * button before it scrolls the list does not craft (polishing session 1).
+ */
+export const CRAFT_HOLD_DELAY_MS = 500;
+/** After the first, holding "Craft" repeats at this interval. */
 export const CRAFT_REPEAT_MS = 250;
 /** Slots of a player's inventory; the first `HOTBAR_SLOTS` are the bar. */
 export const INVENTORY_SLOTS = 36;
