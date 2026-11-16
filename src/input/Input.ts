@@ -1,6 +1,7 @@
 // Input: one abstraction over keyboard, mouse and pointer lock. Exposes state ("is
 // move-forward held", "look delta since last frame") and reports discrete presses.
-// Touch controls feed the same state through `setHeld`, `setMove` and `press`.
+// Touch controls and the controller feed the same state through `setHeld`, `setMove` and
+// `press`; the controller's look comes in as a rotation through `addTurn`.
 import { HOTBAR_SLOTS } from '../game/config';
 
 export type HeldAction =
@@ -50,6 +51,9 @@ export class Input {
   private readonly held = new Set<HeldAction>();
   private lookX = 0;
   private lookY = 0;
+  /** Rotation in radians from the controller since the last frame. */
+  private turnYaw = 0;
+  private turnPitch = 0;
   private analogForward = 0;
   private analogStrafe = 0;
   private mouseEnabled = true;
@@ -140,6 +144,23 @@ export class Input {
     this.analogStrafe = 0;
     this.lookX = 0;
     this.lookY = 0;
+    this.turnYaw = 0;
+    this.turnPitch = 0;
+  }
+
+  /** Adds a rotation in radians (the controller's right stick), applied with the next frame. */
+  addTurn(yaw: number, pitch: number): void {
+    if (!this.isActive()) return;
+    this.turnYaw += yaw;
+    this.turnPitch += pitch;
+  }
+
+  /** Returns the rotation accumulated by `addTurn` since the last call and clears it. */
+  consumeTurn(): { yaw: number; pitch: number } {
+    const turn = { yaw: this.turnYaw, pitch: this.turnPitch };
+    this.turnYaw = 0;
+    this.turnPitch = 0;
+    return turn;
   }
 
   /** Adds a look delta in pixels, as if the mouse had moved. */

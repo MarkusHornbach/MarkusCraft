@@ -66,6 +66,7 @@ export class BenchScreen {
     start.appendChild(hints);
     const startRow = element('div', 'world-buttons');
     const startButton = button('play-button bench-start-button', 'Start');
+    startButton.dataset.padDefault = '';
     onActivate(startButton, (via) => options.onStart(via));
     this.lastButton = button('menu-button bench-last-button', 'Show last result');
     this.lastButton.addEventListener('click', () => options.onShowLast());
@@ -77,6 +78,8 @@ export class BenchScreen {
     this.progress = element('div', 'bench-progress');
     this.progress.setAttribute('role', 'status');
     const cancel = button('menu-button bench-cancel-button', 'Cancel');
+    cancel.dataset.padDefault = '';
+    cancel.dataset.padBack = '';
     cancel.addEventListener('click', () => options.onCancel());
     running.append(this.progress, cancel);
 
@@ -108,19 +111,17 @@ export class BenchScreen {
     this.issueLink = element('a', 'play-button bench-issue-link', 'Open GitHub issue');
     this.issueLink.target = '_blank';
     this.issueLink.rel = 'noopener';
+    // A link, not a button: the controller can still select it.
+    this.issueLink.dataset.padFocus = '';
     const copy = button('menu-button bench-copy-button', 'Copy result');
     copy.addEventListener('click', () => this.copy());
     this.textButton = button('menu-button bench-text-button', 'Show text');
     this.textButton.addEventListener('click', () => this.showText(this.text.hidden !== false));
     const again = button('menu-button bench-again-button', 'Run again');
     onActivate(again, (via) => options.onStart(via));
-    resultRow.append(
-      this.issueLink,
-      copy,
-      this.textButton,
-      again,
-      this.backButton(options, 'bench-result-back'),
-    );
+    const resultBack = this.backButton(options, 'bench-result-back');
+    resultBack.dataset.padDefault = '';
+    resultRow.append(this.issueLink, copy, this.textButton, again, resultBack);
     result.appendChild(resultRow);
 
     // --- interrupted ---
@@ -132,6 +133,7 @@ export class BenchScreen {
     interrupted.appendChild(this.reason);
     const interruptedRow = element('div', 'world-buttons');
     const retry = button('play-button bench-retry-button', 'Start again');
+    retry.dataset.padDefault = '';
     onActivate(retry, (via) => options.onStart(via));
     interruptedRow.append(retry, this.backButton(options, 'bench-interrupted-back'));
     interrupted.appendChild(interruptedRow);
@@ -143,6 +145,7 @@ export class BenchScreen {
 
   private backButton(options: BenchScreenOptions, name: string): HTMLButtonElement {
     const back = button(`menu-button ${name}`, 'Back');
+    back.dataset.padBack = '';
     back.addEventListener('click', () => options.onBack());
     return back;
   }

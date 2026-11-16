@@ -13,7 +13,9 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Unit tests, coverage and about 200 browser tests under software WebGL take 20–30
+    # minutes on a busy runner (Phase 5 part A added 29 browser tests).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

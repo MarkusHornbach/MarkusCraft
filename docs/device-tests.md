@@ -26,7 +26,8 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: 2026-11-16 (no tests with children: TORCH-5 and CRAFT-1 obsolete).
+Last updated: Phase 5 part A (controller: play, menus, back guard); 2026-11-16 (no tests
+with children: TORCH-5 and CRAFT-1 obsolete).
 
 ---
 
@@ -241,6 +242,46 @@ Once, before the first run:
       what they are once placed? Result:
 - [ ] **CRAFT-11** (3C) Building blocks: are stone bricks, glass, bricks and the iron
       block worth their recipes? Result:
+
+## 9. Controller (Phase 5)
+
+A controller with the common layout (two sticks, A/B/X/Y, bumpers, triggers, D-pad,
+Start). Press any button once after connecting it: browsers report a controller only
+after a press. The buttons are listed in the pause menu while the controller is in use.
+
+- [ ] **PAD-1** (5A) PC, Chrome, controller by USB: "Controller connected" appears after
+      the first press (and that press does nothing). Play a few minutes: walk, look,
+      break, place, change the slot, open the inventory, pause. _PC._ Result:
+- [ ] **PAD-2** (5A) The same on the phone and the tablet, Chrome, controller by
+      Bluetooth. _Phone, Tablet._ Result:
+- [ ] **PAD-3** (5A) Phone: B during play (flies down, does nothing while walking) and in
+      the menus (goes back) never leaves the page. The phone's back gesture opens the pause
+      menu in play and goes back one page in the menus; on the world list it leaves the
+      game. _Phone._ Result:
+- [ ] **PAD-4** (5A) Look with the right stick: is the dead zone right (no creeping, fine
+      aiming possible)? Is the speed right, and the speed-up when holding fully sideways?
+      Which "Controller sensitivity" feels best (it can become the default)? Is "Invert
+      controller look" needed? Result:
+- [ ] **PAD-5** (5A) Lay the controller down for a minute during play: nothing moves or
+      turns by itself. Result:
+- [ ] **PAD-6** (5A) Switching: controller → finger on the screen → controller on the phone;
+      controller → mouse click → controller on the PC. Does the switch happen when expected,
+      and never by itself (e.g. a bumped mouse)? _PC, Phone._ Result:
+- [ ] **PAD-7** (5A) Switch the controller off during play: the game pauses with
+      "Controller disconnected". Switch it on, press a button, press A on "continue": play
+      goes on. Result:
+- [ ] **PAD-8** (5A) The whole menu flow without touching the screen or the mouse: create a
+      world, play, pause, change Brightness, back to the worlds, play the world again. Is
+      the white frame always visible and where you expect it after each press? Result:
+- [ ] **PAD-9** (5A) "Fullscreen" in the pause menu, chosen with the controller: does the
+      browser go fullscreen, or does it say "Fullscreen is not available"? _Phone._ Result:
+- [ ] **PAD-10** (5A) Start the performance test with A and cancel it with B. _PC or
+      Tablet._ Result:
+- [ ] **PAD-11** (5A, optional) Firefox and Edge on the PC: is the controller reported, or
+      does "This controller is not supported" show? _PC._ Result:
+- [ ] **PAD-12** (5A) The button pictures in the pause menu and the bar at the bottom of the
+      menus ("A Select, B Back"): readable from the sofa, understood without explanation?
+      Result:
 
 ---
 

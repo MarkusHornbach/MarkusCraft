@@ -16,7 +16,8 @@ export interface WorldMenuOptions {
   onBench: () => void;
 }
 
-type View = 'list' | 'form' | 'confirm';
+/** The parts of the menu: the list of worlds, the "New world" form, the confirmation. */
+export type View = 'list' | 'form' | 'confirm';
 
 const MODE_LABELS: Record<GameMode, string> = { creative: 'Creative', gathering: 'Gathering' };
 /** The modes in the order of the form; the first one is preselected. */
@@ -51,6 +52,8 @@ export class WorldMenu {
   /** Game mode chosen in the form. */
   private gameMode: GameMode = FORM_MODES[0];
   private mode: InputMode;
+  private padActive = false;
+  private view: View = 'form';
   private busy = false;
 
   constructor(parent: HTMLElement, options: WorldMenuOptions) {
@@ -67,6 +70,8 @@ export class WorldMenu {
     this.list.setAttribute('aria-label', 'Worlds');
     this.listView.appendChild(this.list);
     this.playButton = button('play-button world-play-button', '');
+    // The controller's focus starts here and on the default of each view (plan 5.6).
+    this.playButton.dataset.padDefault = '';
     onActivate(this.playButton, (via) => {
       const entry = this.selected();
       if (entry?.status === 'ok' && !this.busy) options.onPlay(entry.id, via);
@@ -110,11 +115,13 @@ export class WorldMenu {
     this.setGameMode(this.gameMode);
     const formRow = element('div', 'world-buttons');
     const create = button('play-button world-create-button', 'Create and play');
+    create.dataset.padDefault = '';
     onActivate(create, (via) => {
       if (this.busy) return;
       options.onCreate(this.nameInput.value, this.seedInput.value, this.gameMode, via);
     });
     this.backButton = button('menu-button world-back-button', 'Back');
+    this.backButton.dataset.padBack = '';
     this.backButton.addEventListener('click', () => this.setView('list'));
     const formSettings = button('menu-button world-form-settings-button', 'Settings');
     formSettings.addEventListener('click', () => options.onSettings());
@@ -143,6 +150,8 @@ export class WorldMenu {
       if (entry && !this.busy) options.onDelete(entry.id);
     });
     const keep = button('menu-button world-confirm-keep', 'Keep');
+    keep.dataset.padDefault = '';
+    keep.dataset.padBack = '';
     keep.addEventListener('click', () => this.setView('list'));
     confirmRow.append(confirmDelete, keep);
     this.confirmView.appendChild(confirmRow);
@@ -260,7 +269,20 @@ export class WorldMenu {
     this.setView('form');
   }
 
+  /** Which part of the menu shows: the list, the "New world" form or the confirmation. */
+  get currentView(): View {
+    return this.view;
+  }
+
+  /** Goes back to the list from the form or the confirmation; false if there is none. */
+  backToList(): boolean {
+    if (this.view === 'list' || this.entries.length === 0) return false;
+    this.setView('list');
+    return true;
+  }
+
   private setView(view: View): void {
+    this.view = view;
     this.listView.hidden = view !== 'list';
     this.formView.hidden = view !== 'form';
     this.confirmView.hidden = view !== 'confirm';
@@ -268,12 +290,27 @@ export class WorldMenu {
 
   setMode(mode: InputMode): void {
     this.mode = mode;
-    this.playButton.textContent = `${this.mode === 'touch' ? 'Tap' : 'Click'} to play`;
+    this.updatePlayLabel();
+  }
+
+  /** While the controller is the active source the play button names its button. */
+  setPadActive(active: boolean): void {
+    this.padActive = active;
+    this.updatePlayLabel();
+  }
+
+  private updatePlayLabel(): void {
+    const verb = this.padActive ? 'Press A' : this.mode === 'touch' ? 'Tap' : 'Click';
+    this.playButton.textContent = `${verb} to play`;
   }
 
   /** A line under the buttons, e.g. why a world could not be opened. Empty clears it. */
   setMessage(text: string): void {
     this.message.textContent = text;
+  }
+
+  get messageText(): string {
+    return this.message.textContent ?? '';
   }
 
   /** While a world is being opened, created or deleted the buttons do nothing. */

@@ -7,6 +7,9 @@ import {
   MOUSE_SENSITIVITY_DEFAULT,
   MOUSE_SENSITIVITY_MAX,
   MOUSE_SENSITIVITY_MIN,
+  PAD_SENSITIVITY_DEFAULT,
+  PAD_SENSITIVITY_MAX,
+  PAD_SENSITIVITY_MIN,
   RENDER_DISTANCE_DEFAULT,
   RENDER_DISTANCE_MAX,
   RENDER_DISTANCE_MIN,
@@ -30,7 +33,14 @@ export interface Settings {
    * the light of the world.
    */
   brightness: number;
+  /** Multiplier on the look speed of the controller's right stick. */
+  padSensitivity: number;
+  /** The controller's right stick pushed up looks down. */
+  padInvertY: boolean;
 }
+
+/** The settings that are numbers (each has a slider). */
+export type NumberSetting = Exclude<keyof Settings, 'padInvertY'>;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   renderDistance: RENDER_DISTANCE_DEFAULT,
@@ -38,6 +48,8 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   fov: FOV_DEFAULT,
   touchSensitivity: TOUCH_SENSITIVITY_DEFAULT,
   brightness: BRIGHTNESS_DEFAULT,
+  padSensitivity: PAD_SENSITIVITY_DEFAULT,
+  padInvertY: false,
 };
 
 /** The part of the Storage interface that is used; lets tests pass a fake. */
@@ -77,6 +89,14 @@ export function validateSettings(raw: unknown): Settings {
       DEFAULT_SETTINGS.touchSensitivity,
     ),
     brightness: numberInRange(source.brightness, 0, 1, DEFAULT_SETTINGS.brightness),
+    padSensitivity: numberInRange(
+      source.padSensitivity,
+      PAD_SENSITIVITY_MIN,
+      PAD_SENSITIVITY_MAX,
+      DEFAULT_SETTINGS.padSensitivity,
+    ),
+    padInvertY:
+      typeof source.padInvertY === 'boolean' ? source.padInvertY : DEFAULT_SETTINGS.padInvertY,
   };
 }
 
@@ -105,15 +125,17 @@ export function hasStoredSettings(storage: SettingsStorage | null): boolean {
 export function saveSettings(storage: SettingsStorage | null, settings: Settings): void {
   if (!storage) return;
   try {
-    const { touchSensitivity, brightness, ...rest } = validateSettings(settings);
-    // The touch sensitivity and the brightness are only written once they were changed,
-    // so the stored text of players who never touched them stays as it was before the
-    // settings existed.
+    const { touchSensitivity, brightness, padSensitivity, padInvertY, ...rest } =
+      validateSettings(settings);
+    // The settings added after Phase 1 are only written once they were changed, so the
+    // stored text of players who never touched them stays as it was before they existed.
     const stored: Partial<Settings> = rest;
     if (touchSensitivity !== DEFAULT_SETTINGS.touchSensitivity) {
       stored.touchSensitivity = touchSensitivity;
     }
     if (brightness !== DEFAULT_SETTINGS.brightness) stored.brightness = brightness;
+    if (padSensitivity !== DEFAULT_SETTINGS.padSensitivity) stored.padSensitivity = padSensitivity;
+    if (padInvertY !== DEFAULT_SETTINGS.padInvertY) stored.padInvertY = padInvertY;
     storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(stored));
   } catch {
     // Storage can be full or blocked (private mode); the game works without it.

@@ -1548,3 +1548,83 @@ canvas {
     font-size: 14px;
   }
 }
+
+/* ---- Controller (Phase 5) ---- */
+
+/* While the controller plays, the mouse is not captured; its cursor must not sit in the view. */
+.pad-active .game-canvas {
+  cursor: none;
+}
+
+/* The controller's focus: a light frame with a dark edge on both sides, readable on any
+   background. It is drawn over the element, which keeps its own look. */
+.pad-focus-frame {
+  position: absolute;
+  box-sizing: border-box;
+  border: 3px solid #f4f7fb;
+  border-radius: 9px;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* The hint bar at the bottom of a screen: "[A] Select [B] Back". */
+.pad-hints {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: rgba(10, 14, 22, 0.88);
+  color: #eef2f6;
+  font-size: 15px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.pad-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pad-glyph {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.control-glyphs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* The reference sheet of all glyphs (test API `glyphSheet`). */
+.pad-glyph-sheet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 120px);
+  /* Fixed rows: the sheet's size must not depend on the system font (reference). */
+  grid-auto-rows: 64px;
+  gap: 10px;
+  padding: 16px;
+  background: #3a4658;
+  color: #eef2f6;
+  font-size: 13px;
+  z-index: 30;
+}
+
+.pad-glyph-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}

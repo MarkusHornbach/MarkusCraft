@@ -45,6 +45,12 @@ export interface GameState {
     screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'bench';
     /** The open page of the inventory screen, or null while it is closed. */
     tab: 'items' | 'crafting' | null;
+    /**
+     * The element the controller's focus is on (its `aria-label`, its text or its id).
+     * Left out while there is none (the controller is not the active source, or no screen
+     * is open), so that tests of earlier phases that compare `ui` as a whole still match.
+     */
+    focus?: string;
   };
   /**
    * Every recipe in the order of the recipe list (craftable ones first): whether it can
@@ -102,7 +108,15 @@ export interface GameState {
   settings: {
     /** The Brightness setting, 0..1. */
     brightness: number;
+    padSensitivity: number;
+    padInvertY: boolean;
   };
+  /**
+   * The controller: pads the browser reports, whether one is the active source, how often
+   * the game has polled (tests wait for it to grow), and whether an unsupported pad was
+   * pressed.
+   */
+  pad: { connected: number; active: boolean; polls: number; unsupported: boolean };
   render: {
     drawCalls: number;
     triangles: number;
@@ -177,6 +191,8 @@ export interface TestApi {
   clearInventory(): void;
   /** The result record on the performance test's result screen, or null. */
   benchResult(): BenchResult | null;
+  /** Shows the sheet of all controller glyphs over the game (reference screenshot). */
+  glyphSheet(): void;
   /** Advance exactly `n` fixed simulation steps and render once. */
   step(n: number): void;
 }

@@ -45,6 +45,8 @@ export default defineConfig({
         'src/render/textures/itemIcons.ts',
         'src/render/textures/cracks.ts',
         'src/input/TouchTracker.ts',
+        'src/input/padMapping.ts',
+        'src/input/focusMove.ts',
         'src/game/autosave.ts',
         'src/game/perfStats.ts',
       ],
