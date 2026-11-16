@@ -179,6 +179,10 @@ two lines in the label column; readable, but a candidate for the polishing sessi
 
 ## Known issues
 
+- CI's job limit was raised from 30 to 45 minutes (`.github/workflows/ci.yml`, at the
+  owner's request): on a slow runner the suite with the 29 new browser tests was cut
+  off after 148 and 173 of 202 tests, all of them passing.
+
 - Real controllers, Bluetooth, B sent as Back by Android browsers, whether a pad press
   counts as a user gesture (fullscreen) and the feel of the sticks cannot be tested here
   (plan 6.4): PAD-1 to PAD-12.
