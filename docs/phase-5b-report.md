@@ -131,7 +131,8 @@ stick is pushed with the focus outside a list (sizes first; a style is read only
 element that has something to scroll).
 
 Browser (software WebGL, not evidence): the eight new tests take about 45 s on three
-workers; the new soak plays its 2 000 frames in about 90 s.
+workers; the new soak plays its 2 000 frames in about 90 s. `npm run check:all` in the cloud session: 223 browser tests
+passed in 19.1 minutes (9 of them new).
 
 ## Tests on real devices
 
