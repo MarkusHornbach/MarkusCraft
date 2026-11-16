@@ -199,7 +199,7 @@ Node, cloud session (not a real device):
 
 Browser (software WebGL; not evidence of performance): the new browser tests take about
 two minutes together on three workers; the soak plays its 2 000 frames in about 70 s.
-The full suite: see the pull request.
+`npm run check:all` in the cloud session: 202 browser tests passed in 19.6 minutes (29 of them new).
 
 ## Tests on real devices
 
