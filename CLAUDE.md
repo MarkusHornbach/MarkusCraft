@@ -605,6 +605,12 @@ hold:
   previews). The Pi's main build is the home of shared worlds; worlds are stored per site,
   so GitHub Pages stays a single-player site and each PR preview starts with an empty
   world list (owner, 2026-11-17).
+- Before planning or implementing a phase part that touches multiplayer, the Pi preview
+  or build variables, read `sync/status.md` in the owner's private repository
+  `MarkusHornbach/pi-infra` if it is reachable (read only, never write there). Never copy
+  hostnames, domains, addresses or secrets from it into this repository (code, docs,
+  tests, commit messages, pull requests). What the Pi side has to do goes into the part's
+  report under the heading "For the Pi side", without addresses (owner, 2026-11-17).
 
 ## Current status
 
