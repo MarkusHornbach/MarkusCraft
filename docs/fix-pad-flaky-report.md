@@ -99,6 +99,12 @@ part that holds the stick up until the pitch limit is unchanged.
   owner's agreement they were fixed too (sections 3 and 4); result of the second run: see
   "Stability" below.
 
+## Stability
+
+Second run, after all four fixes: the three controller files with `--repeat-each 5
+--workers 2` (38 tests × 5): **190 passed, 0 failed** (11.4 minutes). AC6.3 also passed
+2 of 2 and AC2.2 2 of 2 with 300 ms frames (the local slow-frame fixture).
+
 ## Known issues
 
 - **This cloud container's Chromium logs "GPU stall due to ReadPixels"** as a console warning
