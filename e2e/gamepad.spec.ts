@@ -74,18 +74,15 @@ test('Phase 5 AC2.2: the right stick turns right and looks up; pitch stays clamp
 }) => {
   const pad = await padGame(page);
   await setPlayer(page, { yaw: 0, pitch: 0 });
-  await pad.stick('right', 1, 0);
-  await polls(page, 3);
-  await pad.stick('right', 0, 0);
+  // Three polls turn at most 3 × 0.75 rad, so the yaw cannot wrap past −π.
+  await pad.stickFor('right', 1, 0, 3);
   let player = (await getState(page)).player;
   // Turning right lowers the yaw, as with the mouse.
   expect(player.yaw).toBeLessThan(-0.01);
   expect(Math.abs(player.pitch)).toBeLessThan(1e-9);
 
   const yaw = player.yaw;
-  await pad.stick('right', 0, -1);
-  await polls(page, 3);
-  await pad.stick('right', 0, 0);
+  await pad.stickFor('right', 0, -1, 3);
   player = (await getState(page)).player;
   expect(player.pitch).toBeGreaterThan(0.01);
   expect(player.yaw).toBeCloseTo(yaw, 9);

@@ -112,6 +112,26 @@ test('Phase 5 AC3.1: the pad alone creates a world, plays, pauses, goes back and
   expect((await getState(page)).world?.name).toBe('My world');
 });
 
+test('Phase 5 AC3.1: the focus leaves a screen in the same moment as the screen', async ({
+  page,
+}) => {
+  await installFakePads(page);
+  await openMenu(page);
+  await createWorld(page);
+  const pad = new Pad(page);
+  await pad.connect();
+  await pad.tap(BUTTON.START);
+  expect((await getState(page)).ui.focus).toBe('Press A to continue');
+  // Outside a frame, as when a world finishes loading: no frame may pass in between.
+  const state = await page.evaluate(() => {
+    const play = document.querySelector<HTMLElement>('.pause-screen .play-button');
+    play?.click();
+    const now = window.__mc.getState();
+    return { paused: now.paused, focus: now.ui.focus ?? null };
+  });
+  expect(state).toEqual({ paused: false, focus: null });
+});
+
 test('Phase 5 AC3.2: the focus frame lies over the focused element while the pad is active', async ({
   page,
 }) => {
@@ -421,6 +441,38 @@ test.describe('the back guard', () => {
     await pad.release(BUTTON.B);
     await polls(page, 5);
     // B continued the game; the Back that came with it did not pause it again.
+    expect((await getState(page)).paused).toBe(false);
+  });
+
+  test('Phase 5 AC3.7: B and a browser Back held up by a slow frame act once', async ({ page }) => {
+    await installFakePads(page);
+    await openMenu(page);
+    await createWorld(page);
+    const pad = new Pad(page);
+    await pad.connect();
+    await pad.tap(BUTTON.START);
+    expect((await getState(page)).paused).toBe(true);
+    // B, then a frame that takes far longer than BACK_PAIR_MS before the Back comes.
+    await page.evaluate(async () => {
+      const before = window.__mc.getState().pad.polls;
+      window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
+      await new Promise<void>((done) => {
+        const check = (): void => {
+          if (window.__mc.getState().pad.polls > before) {
+            const end = performance.now() + 600;
+            while (performance.now() < end) {
+              // The slow frame.
+            }
+            done();
+          } else requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+      });
+      history.back();
+    });
+    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await pad.release(BUTTON.B);
+    await polls(page, 5);
     expect((await getState(page)).paused).toBe(false);
   });
 });
