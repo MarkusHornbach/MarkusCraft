@@ -1,4 +1,4 @@
-# Fix: two flaky controller tests
+# Fix: flaky controller tests
 
 Two tests in `e2e/gamepadMenus.spec.ts` failed on CI now and then, with no change to the game
 code. Both had a cause in the game, not in the test: something the game did "at the next
@@ -50,6 +50,40 @@ The new e2e test "Phase 5 AC3.7: B and a browser Back held up by a slow frame ac
 busy-waits 600 ms after the poll that saw B before calling `history.back()`; before the fix it
 timed out at the same line as on CI, now it passes.
 
+## 3. Phase 5 AC6.3: the second craft pressed "Close"
+
+**Seen (this container, 4 of 5 runs; not seen on CI):** line 381 expects 4 sticks after A on
+"Craft Stick" and gets 0.
+
+**Cause (in the test):** the test empties the inventory (`clearInventory`) and then gives
+two planks and a log, in two separate page calls. With an empty inventory no row has a
+"Craft" button, so a frame in between rightly moves the focus to the nearest focusable
+element, "Close"; it does not jump back when the button returns. A then closed the
+inventory. Whether a frame fell between the two calls depended on timing: with slow frames
+(CI) it rarely did, with fast frames (this container) almost always. A probe showed the
+focus on "Close" right before A in every failing run.
+
+**Fix:** after the planks are back the test moves the focus onto "Craft Stick" again
+(`focusOn`) and checks it is there before pressing A. What the step checks (the craft makes
+the button go, the focus moves to the nearest one) is unchanged.
+
+## 4. Phase 5 AC2.2: the right stick turned more than half a turn
+
+**Seen (this container, 2 of 5 runs):** after "turn right" the yaw was about +2.7 to +3.1
+instead of below −0.01.
+
+**Cause (in the test):** the yaw is kept in (−π, π]. The right stick turns by
+3 rad/s × frame time for as long as it is out, and the test put it out and back with two
+separate calls (`stick`, `polls(page, 3)`, `stick`). The time in between is round trips
+between Playwright and the page, which a busy machine stretches past a second; the player
+then turned by more than π and the yaw wrapped to a positive value. Slow frames do the same
+(each frame turns up to 0.75 rad, and the two calls span at least five polls).
+
+**Fix:** `Pad.stickFor(which, x, y, count)` (`e2e/gamepad.ts`) puts the stick out for
+exactly `count` polls inside one page call, the way `tap` holds a button for one poll. The
+test turns and looks up with `stickFor(…, 3)`: at most 3 × 0.75 rad, which cannot wrap. The
+part that holds the stick up until the pitch limit is unchanged.
+
 ## How it was reproduced and checked
 
 - A local-only fixture (not committed) ended every animation frame with a 300 ms busy wait.
@@ -58,16 +92,12 @@ timed out at the same line as on CI, now it passes.
   DevTools protocol was tried first and only ran the container out of memory.
 - Both new e2e tests fail on the old build and pass on the new one.
 - Stability: `e2e/gamepad.spec.ts`, `e2e/gamepadMenus.spec.ts` and
-  `e2e/gamepadInventory.spec.ts` with `--repeat-each 5 --workers 2`: 184 passed, 6 failed.
-  Every run of AC3.1, AC3.7 and the two new tests passed. The 6 failures are two other tests
-  that fail the same way on the old build in this container (5 runs each, old build:
-  AC6.3 5 failed, AC2.2 1 failed), so they come from before this fix:
-  - `gamepadInventory.spec.ts:334` (Phase 5 AC6.3): line 381 expects 4 sticks after A on
-    "Craft Stick" and gets 0 (4 of 5 runs with the fix).
-  - `gamepad.spec.ts:72` (Phase 5 AC2.2): after the right stick turned right, the yaw is
-    about +2.7 to +3.1 instead of below -0.01 (2 of 5 runs with the fix).
-
-  Neither was investigated here.
+  `e2e/gamepadInventory.spec.ts` with `--repeat-each 5 --workers 2`. The first run (after
+  fixes 1 and 2) gave 184 passed, 6 failed: every run of AC3.1, AC3.7 and the two new tests
+  passed, and the 6 failures were two other tests that fail the same way on the old build
+  in this container (old build, 5 runs each: AC6.3 5 failed, AC2.2 1 failed). With the
+  owner's agreement they were fixed too (sections 3 and 4); result of the second run: see
+  "Stability" below.
 
 ## Known issues
 

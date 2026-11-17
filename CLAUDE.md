@@ -489,7 +489,10 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   `connect()` (with a wake-up tap of Select, as a real browser reports a pad only after a
   press; `connect({ holding })` connects with buttons down, `wake: false` without the tap),
   `disconnect()`, `press`, `release`, `tap`, `trigger(button, value)` and
-  `stick('left' | 'right', x, y)` (y down). `e2e/gamepadInventory.spec.ts` walks the
+  `stick('left' | 'right', x, y)` (y down). A test that measures how far a stick moved
+  something uses `stickFor(which, x, y, count)`, which holds it for exactly `count` polls
+  inside one page call: between two separate calls it stays out as long as the round trips
+  take. `e2e/gamepadInventory.spec.ts` walks the
   inventory with `focusOn(page, pad, selector)`, which taps the D-pad towards an element
   (rows first) without knowing the layout. Each call applies the change and reads the poll
   count in one page call, then waits until `getState().pad.polls` grew by two; `tap` holds
@@ -698,5 +701,6 @@ hold:
   together (steps 8–10), **D** measure and harden (steps 11–13). The servers on the Pi
   are built separately in the owner's `pi-infra` repository (plan section 5.12).
 - Phase 7 (personalization): not yet planned.
-- Fix of two flaky controller tests (focus one frame late, back pairing in wall-clock time):
+- Fix of flaky controller tests (focus one frame late, back pairing in wall-clock time,
+  two tests that depended on round-trip timing):
   report `docs/fix-pad-flaky-report.md`.
