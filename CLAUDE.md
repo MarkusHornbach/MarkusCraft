@@ -37,10 +37,13 @@ game in a procedurally generated world"; everything in it is original work.
      inventory, the back guard) and B (inventory, Creative palette, Crafting tab), B after
      the polishing of those screens (plan: `docs/phase-5-plan.md`; reports:
      `docs/phase-5a-report.md`, `docs/phase-5b-report.md`)
-  6. **Multiplayer** – play together in one world: a host opens their world, others join
-     with a room code, peer-to-peer over WebRTC. Built on the gameplay and the action layer
-     of Phases 3–5 (not yet planned; `docs/phase-2-plan.md`, Part B, is an earlier design
-     and serves as reference)
+  6. **Multiplayer** – up to four players in one world on the home network: a host opens
+     the world they play to others, the others join from a list of open worlds at home or
+     with a room code, peer-to-peer over WebRTC with the owner's own PeerJS and STUN
+     servers on a Raspberry Pi; the host validates every action and saves every guest's
+     items. Four parts with separate pull requests: A connection test, B together in
+     Creative, C Gathering together, D measure and harden (plan: `docs/phase-6-plan.md`;
+     it replaces `docs/phase-2-plan.md`, Part B)
   7. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
 
 ## Hard rules
@@ -594,6 +597,14 @@ hold:
 - No tests with children and no child-specific adaptations (owner, 2026-11-16).
 - Sessions watch every PR they open (CI results and review comments) until it is
   merged or closed, without asking first (owner, 2026-11-16).
+- The repository is public: never commit the owner's home domain or any address of the
+  Raspberry Pi (code, tests, docs, commit messages, pull requests). Builds get the
+  signaling and STUN addresses from the build variables `VITE_SIGNAL_URL` and
+  `VITE_STUN_URLS`; docs say "the Pi's signaling host" (owner, 2026-11-17).
+- Multiplayer is played from the builds the Pi serves (the main build and the PR
+  previews). The Pi's main build is the home of shared worlds; worlds are stored per site,
+  so GitHub Pages stays a single-player site and each PR preview starts with an empty
+  world list (owner, 2026-11-17).
 
 ## Current status
 
@@ -602,8 +613,8 @@ hold:
 - Phase 2 part A (touch controls): implemented (report: `docs/phase-2a-report.md`). Read
   its "Decisions and deviations" before changing input, the menu or the touch tests.
 - Phase 2 is complete with part A. Its former part B (multiplayer) was postponed by the
-  owner and is now Phase 6; `docs/phase-2-plan.md`, Part B, is not to be implemented as
-  written. It will be re-planned on top of Phases 3–5.
+  owner and is now Phase 6; `docs/phase-2-plan.md`, Part B, is not to be implemented. It
+  was re-planned on top of Phases 3–5 as `docs/phase-6-plan.md`.
 - Phase 3 (Gathering & Crafting): implemented (parts A–C); plan: `docs/phase-3-plan.md`.
   - Phase 3 part A (foundation: terrain version 1, action layer, saving, world menu):
     implemented (report: `docs/phase-3a-report.md`). Read its "Decisions and deviations"
@@ -671,4 +682,10 @@ hold:
   line. Esc stays as it is. Read its "Decisions and deviations" before changing the
   recipe list or the hold. Its tests name their criterion as "Polish 1 AC1.1"; device
   tests it added have the origin "P1" (CRAFT-12, CRAFT-13).
-- Phases 6 (multiplayer) and 7 (personalization): not yet planned.
+- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), not yet implemented. Four parts,
+  each in its own session with its own pull request, in order: **A** connection test
+  (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's NET
+  tests of A in `docs/device-tests.md` show a working connection), **C** Gathering
+  together (steps 8–10), **D** measure and harden (steps 11–13). The servers on the Pi
+  are built separately in the owner's `pi-infra` repository (plan section 5.12).
+- Phase 7 (personalization): not yet planned.
