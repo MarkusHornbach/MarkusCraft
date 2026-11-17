@@ -68,6 +68,6 @@ timed out at the same line as on CI, now it passes.
   browser and is not affected. For the local runs above that one message was allowed in a
   local, uncommitted change to `fixtures.ts`; the committed fixture is unchanged. If a later
   session sees the same, it is the container, not the game.
-- A Back that the browser delivers *before* the poll that sees the same B press is still not
+- A Back that the browser delivers _before_ the poll that sees the same B press is still not
   paired (the guard only knows of B once the poll saw it). No test or device report shows it;
   it was not part of this fix.
