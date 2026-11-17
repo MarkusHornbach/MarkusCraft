@@ -395,7 +395,9 @@ sides in turn.
   of its list moves to the nearest element in view. `scrollToShow` keeps the focus above the
   hint bar. A screen with more buttons than A and B gives its own hints through the
   `hintsFor` option (only the inventory does). A held A whose screen goes away gets a
-  `padrelease` without a click.
+  `padrelease` without a click. `Game.showScreen`, `openInventory` and `hideInventory`
+  update the focus at once (`syncFocus`): a screen often changes outside a frame (a world
+  finished loading), and `ui.focus` must never name an element of a screen that is gone.
 - **The controller on the inventory (Phase 5 part B).** Marks only: `data-pad-default` on
   the selected bar slot (Gathering), the first palette block (Creative) or, on the
   Crafting tab, the tab itself (a "Craft" button comes and goes; a default that changed
@@ -410,8 +412,9 @@ sides in turn.
   "Craft <item>" (e.g. "Craft Stick").
 - **Back guard.** Outside test mode, while anything but the world list is shown, the page
   holds one history entry (`backGuard.ts`); a `popstate` re-arms it and acts like the pad's
-  B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press only
-  re-arms. Back on the world list leaves the entry in place (no navigation of its own,
+  B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press, or
+  before the end of the frame after the one whose poll saw B (a slow frame holds the
+  `popstate` back), only re-arms. Back on the world list leaves the entry in place (no navigation of its own,
   which could collide with a reload); a Back that pops it there goes back once more.
   Whether it is armed is asked at each `popstate` (`Game.wantsBackGuard`); `update()` per
   frame only pushes the entry.
@@ -695,3 +698,5 @@ hold:
   together (steps 8–10), **D** measure and harden (steps 11–13). The servers on the Pi
   are built separately in the owner's `pi-infra` repository (plan section 5.12).
 - Phase 7 (personalization): not yet planned.
+- Fix of two flaky controller tests (focus one frame late, back pairing in wall-clock time):
+  report `docs/fix-pad-flaky-report.md`.

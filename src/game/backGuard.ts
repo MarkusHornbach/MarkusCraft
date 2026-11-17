@@ -8,6 +8,9 @@ export class BackGuard {
   private pushed = false;
   /** When the controller's B was pressed last. */
   private padBackAt = -Infinity;
+  /** Frames ended so far (`update` calls), and the count when B was pressed last. */
+  private frames = 0;
+  private padBackFrame = -Infinity;
 
   /**
    * `armed` says whether Back should act in the game right now; it is asked at the moment
@@ -27,12 +30,24 @@ export class BackGuard {
    * with a reload or a link.
    */
   update(): void {
+    this.frames++;
     if (this.armed() && !this.pushed) this.push();
   }
 
   /** The controller's B was pressed: a "Back" right after it is the same press. */
   notePadBack(): void {
     this.padBackAt = this.now();
+    this.padBackFrame = this.frames;
+  }
+
+  /**
+   * Whether a "Back" now is the one that came with the last B press. The `popstate` of
+   * that Back is a task that waits for the frame in which the poll saw B (and maybe the
+   * next one) to end; a slow frame can stretch that past `BACK_PAIR_MS`, so a Back before
+   * the end of the frame after the B frame is paired however long those frames took.
+   */
+  private pairedWithPadBack(): boolean {
+    return this.frames - this.padBackFrame <= 1 || this.now() - this.padBackAt < BACK_PAIR_MS;
   }
 
   private push(): void {
@@ -61,7 +76,7 @@ export class BackGuard {
       return;
     }
     this.push();
-    if (this.now() - this.padBackAt < BACK_PAIR_MS) return;
+    if (this.pairedWithPadBack()) return;
     this.onBack();
   }
 }

@@ -628,6 +628,16 @@ export class Game {
     this.pauseScreen?.setVisible(screen === 'settings' || screen === 'pause');
     this.hud.setVisible(screen === 'play');
     this.touchHud?.setVisible(screen === 'play');
+    this.syncFocus();
+  }
+
+  /**
+   * The focus follows a screen change at once rather than with the next frame: a screen
+   * often changes outside a frame (a world finished loading), and until the frame the
+   * focus would still name an element of the screen that went away.
+   */
+  private syncFocus(): void {
+    this.focus.update();
   }
 
   /** Reads a stored world for playing; takes its tab lock. */
@@ -1099,6 +1109,7 @@ export class Game {
     // The screen has its own bar; the controls of the game would only shine through.
     this.hud.setVisible(false);
     this.updateTouchCover();
+    this.syncFocus();
     if (this.pauseScreen && this.mode === 'mouse' && document.pointerLockElement) {
       document.exitPointerLock();
     }
@@ -1125,6 +1136,7 @@ export class Game {
     this.inventoryScreen.setVisible(false);
     // Closing cancels what is in the furnace: its ingredients were never taken.
     this.stopCrafting();
+    this.syncFocus();
   }
 
   /** Mouse mode is played with a captured mouse; without it the pause menu shows. */
