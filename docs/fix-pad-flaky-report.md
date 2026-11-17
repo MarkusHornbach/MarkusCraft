@@ -58,7 +58,16 @@ timed out at the same line as on CI, now it passes.
   DevTools protocol was tried first and only ran the container out of memory.
 - Both new e2e tests fail on the old build and pass on the new one.
 - Stability: `e2e/gamepad.spec.ts`, `e2e/gamepadMenus.spec.ts` and
-  `e2e/gamepadInventory.spec.ts` with `--repeat-each 5 --workers 2` (result below).
+  `e2e/gamepadInventory.spec.ts` with `--repeat-each 5 --workers 2`: 184 passed, 6 failed.
+  Every run of AC3.1, AC3.7 and the two new tests passed. The 6 failures are two other tests
+  that fail the same way on the old build in this container (5 runs each, old build:
+  AC6.3 5 failed, AC2.2 1 failed), so they come from before this fix:
+  - `gamepadInventory.spec.ts:334` (Phase 5 AC6.3): line 381 expects 4 sticks after A on
+    "Craft Stick" and gets 0 (4 of 5 runs with the fix).
+  - `gamepad.spec.ts:72` (Phase 5 AC2.2): after the right stick turned right, the yaw is
+    about +2.7 to +3.1 instead of below -0.01 (2 of 5 runs with the fix).
+
+  Neither was investigated here.
 
 ## Known issues
 
