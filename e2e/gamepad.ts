@@ -198,6 +198,34 @@ export class Pad {
     return this.apply({ kind: 'stick', index: this.index, offset: which === 'left' ? 0 : 2, x, y });
   }
 
+  /**
+   * Puts a stick at (x, y) for exactly `count` polls, then back to the middle, all inside
+   * the page. A stick set and reset by two calls from the test stays out for as long as the
+   * round trips take, and a busy machine stretches that past a second; the right stick then
+   * turns the player by more than half a turn.
+   */
+  async stickFor(which: 'left' | 'right', x: number, y: number, count: number): Promise<void> {
+    const offset = which === 'left' ? 0 : 2;
+    const centred = await this.page.evaluate(
+      async ([index, off, sx, sy, n]) => {
+        const op = window.__fakePadOp;
+        if (!op) throw new Error('installFakePads was not called');
+        const before = op({ kind: 'stick', index, offset: off, x: sx, y: sy });
+        // Back to the middle in the first frame callback after the n-th poll that saw it.
+        await new Promise<void>((done) => {
+          const check = (): void => {
+            if (window.__mc.getState().pad.polls >= before + n) done();
+            else requestAnimationFrame(check);
+          };
+          requestAnimationFrame(check);
+        });
+        return op({ kind: 'stick', index, offset: off, x: 0, y: 0 });
+      },
+      [this.index, offset, x, y, count] as const,
+    );
+    await this.page.waitForFunction((n) => window.__mc.getState().pad.polls >= n, centred + 2);
+  }
+
   /** Makes a change in the page, then waits until the game has polled at least twice more. */
   private async apply(op: FakeOp): Promise<void> {
     const before = await this.page.evaluate((o) => {

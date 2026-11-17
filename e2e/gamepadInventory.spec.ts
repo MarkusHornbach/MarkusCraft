@@ -377,6 +377,10 @@ test('Phase 5 AC6.3: after a craft the focus stays on its button, or goes to the
   await give(page, PLANKS, 2);
   await give(page, LOG, 1);
   await whenIdle(page);
+  // With the inventory empty for a moment no row had a button: a frame in between rightly
+  // moved the focus away ("Close"), and it does not jump back when the button returns.
+  await focusOn(page, pad, craft('sticks'));
+  expect(await focusOf(page)).toBe('Craft Stick');
   await pad.tap(BUTTON.A);
   expect(await have(page, STICK)).toBe(4);
   await expect(page.locator(craft('sticks'))).toBeHidden();
