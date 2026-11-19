@@ -7,6 +7,7 @@ import {
   test as base,
   expect,
 } from '@playwright/test';
+import { ALLOWED_CONSOLE } from './fixtures';
 import { openMenu } from './game';
 
 /** The local signaling server that Playwright starts (`scripts/signalServer.mjs`). */
@@ -32,14 +33,7 @@ export interface Player {
   page: Page;
 }
 
-/**
- * Software WebGL itself: two pages of one browser share its GPU process, and reading
- * pixels of one (a test's screenshot or `preserveDrawingBuffer`) stalls the other.
- */
-const SHARED_GPU_WARNING =
-  /GL Driver Message \(OpenGL, Performance, .*\): GPU stall due to ReadPixels/;
-
-class Players {
+export class Players {
   private readonly all: { player: Player; problems: string[] }[] = [];
 
   constructor(private readonly browser: Browser) {}
@@ -52,7 +46,7 @@ class Players {
     });
     const page = await context.newPage();
     const problems: string[] = [];
-    const allowed = [SHARED_GPU_WARNING, ...(options.allowConsole ?? [])];
+    const allowed = [...ALLOWED_CONSOLE, ...(options.allowConsole ?? [])];
     page.on('console', (msg) => {
       const type = msg.type();
       if (type !== 'error' && type !== 'warning') return;

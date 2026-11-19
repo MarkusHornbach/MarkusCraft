@@ -324,6 +324,36 @@ The test stores no world and does not change your settings. The browser keeps th
 the last finished result ("Show last result" on the start page) until the next run
 replaces it.
 
+### Playing together (in preparation)
+
+Multiplayer is being built (Phase 6): up to four players in one world on the home network,
+connected directly between the browsers. For now the game has only its **network test**,
+which checks whether the devices at home can reach each other before the game depends on
+it.
+
+Open the world menu, press **Settings**, then **Network test**, on two or more devices at
+the same time. Each device registers with the signaling server and shows its own four-letter
+test code; under **Others testing now** it lists the other devices with the test open.
+**Connect** next to one opens a direct connection and shows, on both devices, the candidate
+pair in use (`host` is a direct local address, `srflx` one learnt from the STUN server),
+the round-trip time of 20 pings and the throughput of 1 MB. The verdict line says
+"Direct connection OK" or what failed. **Use STUN** repeats the test without the STUN
+server, to find out whether it is needed at home. **Copy result** copies all numbers as a
+short text for `docs/device-tests.md`.
+
+Multiplayer needs servers that this repository does not contain. They run on the owner's
+Raspberry Pi in the home network, and only the builds the Pi serves know them:
+
+- a PeerJS signaling server (`peer` 1.0.x) with discovery switched on, reachable over
+  `wss` with a valid certificate, and allowing the origins of the game's builds (CORS);
+- a STUN server (no TURN, no relay) on UDP 3478, reachable from the home network;
+- builds made with the variables `VITE_SIGNAL_URL` (the signaling server, for example
+  `wss://<host>/`), `VITE_STUN_URLS` (comma-separated `stun:` URLs) and `BUILD_COMMIT`
+  (the commit of the build; only devices running the same build see each other).
+
+Builds without `VITE_SIGNAL_URL`, such as the one on GitHub Pages, say "Multiplayer is
+not available in this build." Single-player never contacts any server.
+
 ### One-time setup for deployment
 
 The owner must set **Settings → Pages → Source** to **GitHub Actions** once. After that,
@@ -342,6 +372,10 @@ npm run dev
 ```
 
 `npm run build` creates the static site in `dist/`; `npm run preview` serves it.
+
+To try the network test with two tabs: `npm run signal` starts a local PeerJS server on
+`127.0.0.1:9000`; open the dev server with `?signal=http://127.0.0.1:9000/&stun=none` in
+both tabs.
 
 ## Test
 

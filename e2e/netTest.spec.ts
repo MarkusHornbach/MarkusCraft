@@ -3,7 +3,29 @@ import type { Server } from 'node:http';
 import { type Page } from '@playwright/test';
 import { PeerServer } from 'peer';
 import { createWorld, openMenu } from './game';
-import { expect, netQuery, openNetTest, test, untilNetTest } from './multiplayer';
+import { BUTTON, Pad, focusOn, installFakePads } from './gamepad';
+import {
+  type Player,
+  type Players,
+  expect,
+  netQuery,
+  openNetTest,
+  test,
+  untilNetTest,
+} from './multiplayer';
+
+/** Starts a PeerJS server of the test's own on `port`; resolves with a function that stops it. */
+async function ownServer(port: number, discovery: boolean): Promise<() => Promise<void>> {
+  const server = await new Promise<Server>((resolve) => {
+    PeerServer({ host: '127.0.0.1', port, path: '/', allow_discovery: discovery }, (s) =>
+      resolve(s as Server),
+    );
+  });
+  return async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  };
+}
 
 /** Opens the page's PeerJS network in the page and registers `id` (kept on `window`). */
 async function registerPeer(page: Page, id: string): Promise<void> {
@@ -68,19 +90,39 @@ test('Phase 6 AC1.3: two contexts exchange messages through the local server', a
   if (list.ok) expect(list.ids).toEqual(expect.arrayContaining([idA, idB]));
 });
 
-test('Phase 6 AC2.1: two devices find each other and the test connects directly', async ({
+/** Opens the network test on both pages and waits until each lists the other; codes. */
+async function listEachOther(a: Player, b: Player, query = netQuery()): Promise<[string, string]> {
+  await openNetTest(a.page, query);
+  await openNetTest(b.page, query);
+  const codeA = (await untilNetTest(a.page, (s) => s.code !== null && s.signaling === 'open')).code;
+  const codeB = (await untilNetTest(b.page, (s) => s.code !== null && s.signaling === 'open')).code;
+  if (!codeA || !codeB) throw new Error('no test codes');
+  const started = Date.now();
+  await untilNetTest(a.page, (s) => s.others.includes(codeB), 10_000);
+  await untilNetTest(b.page, (s) => s.others.includes(codeA), 10_000);
+  expect(Date.now() - started).toBeLessThan(10_000);
+  return [codeA, codeB];
+}
+
+test('Phase 6 AC2.1, AC2.5, AC2.7: the test connects directly; result text; reference', async ({
   players,
 }) => {
   test.setTimeout(120_000);
-  const a = await players.open();
+  // A server of its own: devices of tests running alongside must not show in the reference.
+  const stop = await ownServer(9003, true);
+  try {
+    await connectAndCheck(players);
+  } finally {
+    await stop();
+  }
+});
+
+async function connectAndCheck(players: Players): Promise<void> {
+  const a = await players.open({ permissions: ['clipboard-read', 'clipboard-write'] });
   const b = await players.open();
-  await openNetTest(a.page, netQuery());
-  await openNetTest(b.page, netQuery());
-  const stateA = await untilNetTest(a.page, (s) => s.code !== null && s.signaling === 'open');
-  const stateB = await untilNetTest(b.page, (s) => s.code !== null && s.signaling === 'open');
-  await untilNetTest(a.page, (s) => s.others.includes(stateB.code ?? ''), 10_000);
-  await untilNetTest(b.page, (s) => s.others.includes(stateA.code ?? ''), 10_000);
-  await a.page.locator(`.net-other[data-code="${stateB.code}"] .net-connect-button`).click();
+  const query = `?${new URLSearchParams({ signal: 'http://127.0.0.1:9003/', stun: 'none' })}`;
+  const [, codeB] = await listEachOther(a, b, query);
+  await a.page.locator(`.net-other[data-code="${codeB}"] .net-connect-button`).click();
   for (const page of [a.page, b.page]) {
     const done = await untilNetTest(
       page,
@@ -92,6 +134,78 @@ test('Phase 6 AC2.1: two devices find each other and the test connects directly'
     expect(done.mbPerS).toBeGreaterThan(0);
     expect(done.verdict).toBe('Direct connection OK');
     await expect(page.locator('.net-verdict')).toHaveText('Direct connection OK');
+  }
+
+  // AC2.7: the reference, with everything that differs between runs masked.
+  const masked = [
+    '.net-build',
+    '.net-code',
+    '.net-other-code',
+    '.net-pair',
+    '.net-rtt',
+    '.net-throughput',
+    '.net-remote',
+  ].map((selector) => a.page.locator(selector));
+  await expect(a.page).toHaveScreenshot('net-test.png', { mask: masked });
+
+  // AC2.5: "Copy result" puts the numbers on the clipboard.
+  await a.page.locator('.net-copy-button').click();
+  await expect(a.page.locator('.net-status')).toHaveText('Copied');
+  const text = await a.page.evaluate(() => navigator.clipboard.readText());
+  const state = await untilNetTest(a.page, (s) => s.state === 'done');
+  const build = await a.page.evaluate(() => window.__mc.getState().net.build);
+  expect(text).toContain(`Build: ${build}`);
+  expect(text).toContain(`Candidate pair: ${state.candidate}`);
+  expect(text).toMatch(/Round trip: \d+\.\d ms/);
+  expect(text).toMatch(/Throughput: \d+\.\d\d MB\/s/);
+  expect(text).toContain('Other device: Chrome');
+  expect(text).toContain('Verdict: Direct connection OK');
+
+  // Closed before the server, whose loss they would otherwise report.
+  await a.page.close();
+  await b.page.close();
+}
+
+test('Phase 6 AC2.6: the controller connects; touch controls are finger-sized', async ({
+  players,
+}) => {
+  test.setTimeout(120_000);
+  const a = await players.open({ viewport: { width: 640, height: 360 }, touch: true });
+  await installFakePads(a.page);
+  const b = await players.open();
+  const [, codeB] = await listEachOther(a, b);
+  expect(await a.page.evaluate(() => window.__mc.getState().touch)).toBe(true);
+
+  // Touch, 640 × 360: every control lies inside the view (scrolled to) and is 48 × 48.
+  const controls = a.page.locator('.net-test-screen button:visible');
+  expect(await controls.count()).toBeGreaterThanOrEqual(4);
+  for (const control of await controls.all()) {
+    await control.scrollIntoViewIfNeeded();
+    const box = await control.boundingBox();
+    const name = await control.textContent();
+    if (!box) throw new Error(`no box: ${name}`);
+    expect(box.width, name ?? '').toBeGreaterThanOrEqual(48);
+    expect(box.height, name ?? '').toBeGreaterThanOrEqual(48);
+    expect(box.x, name ?? '').toBeGreaterThanOrEqual(0);
+    expect(box.y, name ?? '').toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, name ?? '').toBeLessThanOrEqual(640);
+    expect(box.y + box.height, name ?? '').toBeLessThanOrEqual(360);
+  }
+
+  // The controller: the focus moves to "Connect", A connects.
+  const pad = new Pad(a.page);
+  await pad.connect();
+  // The first press makes the controller the active source and shows the focus.
+  await pad.tap(BUTTON.DOWN);
+  await a.page.waitForFunction(() => window.__mc.getState().ui.focus !== undefined);
+  const connect = `.net-other[data-code="${codeB}"] .net-connect-button`;
+  await focusOn(a.page, pad, connect);
+  expect((await a.page.evaluate(() => window.__mc.getState())).ui.focus).toBe(
+    `Connect to ${codeB}`,
+  );
+  await pad.tap(BUTTON.A);
+  for (const page of [a.page, b.page]) {
+    await untilNetTest(page, (s) => s.state === 'done', 30_000);
   }
 });
 
@@ -131,6 +245,7 @@ test('Phase 6 AC1.7: single-player requests nothing outside the page and never l
     if (url.startsWith('data:') || url.startsWith('blob:')) continue;
     expect(new URL(url).origin, url).toBe(origin);
     expect(url).not.toContain('peerTransport');
+    expect(url).not.toContain('NetTestScreen');
   }
 });
 
@@ -158,11 +273,7 @@ test('Phase 6 AC2.3: a server without discovery says so and still shows the own 
   players,
 }) => {
   test.setTimeout(120_000);
-  const server = await new Promise<Server>((resolve) => {
-    PeerServer({ host: '127.0.0.1', port: 9002, path: '/', allow_discovery: false }, (s) =>
-      resolve(s as Server),
-    );
-  });
+  const stop = await ownServer(9002, false);
   try {
     const { page } = await players.open({
       // Chromium itself reports the 401 of the switched-off discovery list.
@@ -179,8 +290,7 @@ test('Phase 6 AC2.3: a server without discovery says so and still shows the own 
     // Closed before the server, which its retries would otherwise report as refused.
     await page.close();
   } finally {
-    server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
+    await stop();
   }
 });
 

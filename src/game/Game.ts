@@ -46,8 +46,7 @@ import {
 } from '../ui/settings';
 import { TouchHud } from '../ui/TouchHud';
 import { WorldMenu } from '../ui/WorldMenu';
-import { NET_UNAVAILABLE_TEXT, NetTestScreen } from '../ui/NetTestScreen';
-import { browserName } from '../net/netTest';
+import type { NetTestScreen } from '../ui/NetTestScreen';
 import type { Network } from '../net/transport';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
@@ -207,7 +206,9 @@ export class Game {
   /** Where multiplayer finds its servers (build variables, URL parameters). */
   private readonly netConfig: NetConfig;
   /** The network test, opened from the settings page; like the menus not in test mode. */
-  private readonly netTestScreen: NetTestScreen | null = null;
+  private netTestScreen: NetTestScreen | null = null;
+  /** The network test's screen is being loaded (its own chunk). */
+  private netTestLoading = false;
   /** The inventory covers the view. Unlike the menus it does not pause the world. */
   private inventoryOpen = false;
   /** True while a world is being opened, created or deleted from the menu. */
@@ -402,15 +403,7 @@ export class Game {
         onFullscreenExit: () => {
           this.fullscreenDeclined = true;
         },
-        onNetTest: () => this.showScreen('nettest'),
-      });
-      this.netTestScreen = new NetTestScreen(this.root, {
-        build: __BUILD_COMMIT__,
-        config: this.netConfig,
-        browser: browserName(navigator.userAgent),
-        load: (iceServers) => this.loadNetwork(iceServers),
-        randomBytes: (count) => crypto.getRandomValues(new Uint8Array(count)),
-        onBack: () => this.showScreen('settings'),
+        onNetTest: () => void this.openNetTest(),
       });
       document.addEventListener('fullscreenchange', () => {
         this.orientationQuietUntil = performance.now() + FULLSCREEN_SETTLE_MS;
@@ -821,9 +814,38 @@ export class Game {
    */
   private async loadNetwork(iceServers: { urls: string }[]): Promise<Network> {
     const signal = this.netConfig.signal;
-    if (!signal) throw new Error(NET_UNAVAILABLE_TEXT);
+    if (!signal) throw new Error('Multiplayer is not available in this build.');
     const { createPeerNetwork } = await import('./peerTransport');
     return createPeerNetwork({ signal, iceServers }, signal);
+  }
+
+  /**
+   * "Network test" on the settings page. The screen lives in a chunk of its own, loaded the
+   * first time: single-player never fetches it.
+   */
+  private async openNetTest(): Promise<void> {
+    if (this.netTestLoading || this.screen !== 'settings') return;
+    if (!this.netTestScreen) {
+      this.netTestLoading = true;
+      try {
+        const { NetTestScreen } = await import('../ui/NetTestScreen');
+        this.netTestScreen ??= new NetTestScreen(this.root, {
+          build: __BUILD_COMMIT__,
+          config: this.netConfig,
+          load: (iceServers) => this.loadNetwork(iceServers),
+          randomBytes: (count) => crypto.getRandomValues(new Uint8Array(count)),
+          onBack: () => this.showScreen('settings'),
+        });
+      } catch {
+        this.pauseScreen?.setHint('The network test could not be loaded.');
+        return;
+      } finally {
+        this.netTestLoading = false;
+      }
+      // The player may have left the settings page meanwhile.
+      if (this.screen !== 'settings') return;
+    }
+    this.showScreen('nettest');
   }
 
   private netState(): GameState['net'] {

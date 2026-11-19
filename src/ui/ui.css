@@ -1808,8 +1808,11 @@ canvas {
 }
 
 .net-status {
+  min-height: 16px;
   margin-top: 6px;
+  font-size: 13px;
   text-align: center;
+  color: #ffd27f;
 }
 
 @media (max-height: 480px) {

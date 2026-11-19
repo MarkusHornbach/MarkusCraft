@@ -10,6 +10,7 @@ import type { NetConfig } from '../game/netConfig';
 import {
   type CandidatePair,
   NetTestRun,
+  browserName,
   type VerdictInput,
   codeFromBytes,
   pairText,
@@ -31,8 +32,6 @@ const STATS_POLL_MS = 500;
 export interface NetTestScreenOptions {
   build: string;
   config: NetConfig;
-  /** "Chrome 140 on Android": what the other device is told about this one. */
-  browser: string;
   /** Loads the network (the `peerjs` chunk) for these ICE servers. */
   load: (iceServers: { urls: string }[]) => Promise<Network>;
   randomBytes: (count: number) => Uint8Array;
@@ -65,6 +64,8 @@ interface InfoRow {
 export class NetTestScreen {
   readonly element: HTMLElement;
   private readonly options: NetTestScreenOptions;
+  /** "Chrome 140 on Android": what the other device is told about this one. */
+  private readonly browser = browserName(navigator.userAgent);
   private readonly unavailable: HTMLElement;
   private readonly body: HTMLElement;
   private readonly rows: Record<
@@ -162,7 +163,7 @@ export class NetTestScreen {
     back.addEventListener('click', () => options.onBack());
     buttons.append(this.stunButton, copy, back);
     panel.appendChild(buttons);
-    this.status = element('div', 'bench-status net-status');
+    this.status = element('div', 'net-status');
     this.status.setAttribute('role', 'status');
     panel.appendChild(this.status);
     parent.appendChild(this.element);
@@ -385,7 +386,7 @@ export class NetTestScreen {
     this.connectState = 'open';
     const run = new NetTestRun(connection, {
       initiator,
-      browser: this.options.browser,
+      browser: this.browser,
       onChange: () => {
         if (run.view.phase === 'done') void this.readStats(connection);
         this.render();
@@ -505,7 +506,7 @@ export class NetTestScreen {
     const run = this.run?.view ?? null;
     const text = resultText({
       build: this.options.build,
-      browser: this.options.browser,
+      browser: this.browser,
       remoteBrowser: run?.remoteBrowser ?? null,
       stun: this.useStun,
       iceServers: this.iceServers().length,

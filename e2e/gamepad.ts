@@ -245,3 +245,29 @@ export async function polls(page: Page, n: number): Promise<void> {
   const before = await padPolls(page);
   await page.waitForFunction((target) => window.__mc.getState().pad.polls >= target, before + n);
 }
+
+/**
+ * Moves the focus with the D-pad onto the element `selector` names, one tap at a time
+ * towards it (the larger distance first). Knows nothing of the layout, as a player.
+ */
+export async function focusOn(page: Page, pad: Pad, selector: string): Promise<void> {
+  for (let i = 0; i < 24; i++) {
+    const move = await page.evaluate((sel) => {
+      const target = document.querySelector(sel);
+      const focused = document.querySelector('.pad-focused');
+      if (!target || !focused) throw new Error(`no ${target ? 'focus' : sel}`);
+      if (target === focused) return null;
+      const a = focused.getBoundingClientRect();
+      const b = target.getBoundingClientRect();
+      const dx = b.left + b.width / 2 - (a.left + a.width / 2);
+      const dy = b.top + b.height / 2 - (a.top + a.height / 2);
+      // Rows first when the target lies in another row: the grid is walked as a player would.
+      if (Math.abs(dy) > Math.min(a.height, b.height) / 2) return dy < 0 ? 'up' : 'down';
+      return dx < 0 ? 'left' : 'right';
+    }, selector);
+    if (move === null) return;
+    const button = { up: BUTTON.UP, down: BUTTON.DOWN, left: BUTTON.LEFT, right: BUTTON.RIGHT };
+    await pad.tap(button[move]);
+  }
+  throw new Error(`the focus did not reach ${selector}`);
+}
