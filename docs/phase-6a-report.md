@@ -165,8 +165,12 @@ when NET-1 to NET-4 show a working connection).
 
 ## CI
 
-AC1.4: see the pull request; the CI run of the step's last commit is named here once it is
-green.
+AC1.4: CI run 118 of commit 7a030b0 (the last code commit of the part) is green:
+<https://github.com/MarkusHornbach/MarkusCraft/actions/runs/44618998308>. WebRTC between
+two browser contexts works on GitHub Actions without extra launch flags (AC1.3 and AC2.1
+passed there). The two runs before it failed for reasons fixed since: the screenshot count
+of `repoHygiene.test.ts` (run 116) and the `net-test` reference's font and AC1.7's random
+seed (run 117, see "Decisions and deviations").
 
 ## For the Pi side
 
