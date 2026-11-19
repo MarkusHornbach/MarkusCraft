@@ -123,6 +123,12 @@ when NET-1 to NET-4 show a working connection).
   imports without an extension in the config.
 - **The status line under "Copy result"** has its own class `net-status`; reusing
   `.bench-status` made a locator of the performance test's tests match two elements.
+- **The `net-test` reference allows 8 % of its pixels to differ** (the menu references
+  allow 5 %). CI's browser draws the text with another font than the cloud container, which
+  makes every row of this dense screen a pixel or two taller; the first CI run measured 6 %.
+  What the screen shows is checked by the rule-based assertions of the same test.
+- **AC1.7 plays in a world of seed 1337** and walks and jumps until the player moved half
+  a block: with a random seed the player could face a trunk, and the first CI run timed out.
 - **`focusOn`** moved from `e2e/gamepadInventory.spec.ts` to `e2e/gamepad.ts`, so the
   network test's controller test uses the same walk.
 - **No WebRTC launch flags were needed**: two contexts connect with host candidates in the

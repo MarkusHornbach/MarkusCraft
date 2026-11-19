@@ -120,6 +120,16 @@ test('Phase 6 AC2.1, AC2.5, AC2.7: the test connects directly; result text; refe
 async function connectAndCheck(players: Players): Promise<void> {
   const a = await players.open({ permissions: ['clipboard-read', 'clipboard-write'] });
   const b = await players.open();
+  try {
+    await connectAndCheckPages(a, b);
+  } finally {
+    // Closed before the server, whose loss they would otherwise report.
+    await a.page.close();
+    await b.page.close();
+  }
+}
+
+async function connectAndCheckPages(a: Player, b: Player): Promise<void> {
   const query = `?${new URLSearchParams({ signal: 'http://127.0.0.1:9003/', stun: 'none' })}`;
   const [, codeB] = await listEachOther(a, b, query);
   await a.page.locator(`.net-other[data-code="${codeB}"] .net-connect-button`).click();
@@ -146,7 +156,9 @@ async function connectAndCheck(players: Players): Promise<void> {
     '.net-throughput',
     '.net-remote',
   ].map((selector) => a.page.locator(selector));
-  await expect(a.page).toHaveScreenshot('net-test.png', { mask: masked });
+  // Text only, like the menu references (5 %); denser text, and CI's browser draws it with
+  // another font than the cloud container, which moves every line a little.
+  await expect(a.page).toHaveScreenshot('net-test.png', { mask: masked, maxDiffPixelRatio: 0.08 });
 
   // AC2.5: "Copy result" puts the numbers on the clipboard.
   await a.page.locator('.net-copy-button').click();
@@ -160,10 +172,6 @@ async function connectAndCheck(players: Players): Promise<void> {
   expect(text).toMatch(/Throughput: \d+\.\d\d MB\/s/);
   expect(text).toContain('Other device: Chrome');
   expect(text).toContain('Verdict: Direct connection OK');
-
-  // Closed before the server, whose loss they would otherwise report.
-  await a.page.close();
-  await b.page.close();
 }
 
 test('Phase 6 AC2.6: the controller connects; touch controls are finger-sized', async ({
@@ -234,10 +242,20 @@ test('Phase 6 AC1.7: single-player requests nothing outside the page and never l
   page.on('request', (request) => requests.push(request.url()));
   // A build that knows a server: still nothing is fetched until multiplayer is used.
   await openMenu(page, netQuery());
-  await createWorld(page, { name: 'Alone' });
+  await createWorld(page, { name: 'Alone', seed: '1337' });
   await page.waitForFunction(() => window.__mc.isReady());
+  // Play: walk and jump until the player has moved, whatever stands in the way.
+  const start = await page.evaluate(() => window.__mc.getState().player);
   await page.keyboard.down('KeyW');
-  await page.waitForFunction(() => window.__mc.getState().player.z < -2);
+  await page.keyboard.down('Space');
+  await page.waitForFunction(
+    ([x, z]) => {
+      const p = window.__mc.getState().player;
+      return Math.hypot(p.x - x, p.z - z) > 0.5;
+    },
+    [start.x, start.z],
+  );
+  await page.keyboard.up('Space');
   await page.keyboard.up('KeyW');
   const origin = new URL(page.url()).origin;
   expect(requests.length).toBeGreaterThan(0);
