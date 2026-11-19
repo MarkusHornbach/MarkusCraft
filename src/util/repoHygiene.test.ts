@@ -41,7 +41,7 @@ describe('repository hygiene (AC12.4)', () => {
     // from part B, `recipe-list`, `recipe-list-touch`, `item-icons` and `stations` from part C.
     // Phase 4 part A added three of the light; part P `bench-start` and `bench-result`.
     // Phase 5 part A added `pad-glyphs`, `pad-world-menu` and `pad-pause`; part B
-    // `pad-inventory` and `pad-recipe-list`.
-    expect(assets.length).toBe(32);
+    // `pad-inventory` and `pad-recipe-list`. Phase 6 part A added `net-test`.
+    expect(assets.length).toBe(33);
   });
 });
