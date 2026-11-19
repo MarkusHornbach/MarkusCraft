@@ -2,7 +2,9 @@
 import type { ActionResult } from '../actions/apply';
 import type { GameMode, ItemStack } from '../actions/playerRecord';
 import type { BenchResult } from '../bench/benchReport';
+import type { Network } from '../net/transport';
 import type { MoveMode } from '../player/player';
+import type { NetTestState } from '../ui/NetTestScreen';
 
 export interface TargetInfo {
   x: number;
@@ -42,7 +44,7 @@ export interface GameState {
   touch: boolean;
   /** What covers the view: a menu, the inventory, or nothing (`play`). */
   ui: {
-    screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'bench';
+    screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'bench' | 'nettest';
     /** The open page of the inventory screen, or null while it is closed. */
     tab: 'items' | 'crafting' | null;
     /**
@@ -78,6 +80,17 @@ export interface GameState {
     scenario: string | null;
     reason: BenchStop | null;
   } | null;
+  /**
+   * Multiplayer (Phase 6): the role of this page, whether this build knows a signaling
+   * server, the build id that must match between players, and the network test while its
+   * screen is open.
+   */
+  net: {
+    role: 'off' | 'host' | 'guest';
+    available: boolean;
+    build: string;
+    test: NetTestState | null;
+  };
   player: {
     x: number;
     y: number;
@@ -191,6 +204,11 @@ export interface TestApi {
   clearInventory(): void;
   /** The result record on the performance test's result screen, or null. */
   benchResult(): BenchResult | null;
+  /**
+   * The PeerJS network of this page's configuration (loads `peerjs`), or null without a
+   * signaling server. Tests drive its signaling and connections directly.
+   */
+  netNetwork(): Promise<Network | null>;
   /** Shows the sheet of all controller glyphs over the game (reference screenshot). */
   glyphSheet(): void;
   /** Advance exactly `n` fixed simulation steps and render once. */

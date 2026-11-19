@@ -88,6 +88,8 @@ export interface PauseScreenOptions {
   onDebugChange: (visible: boolean) => void;
   /** The player left fullscreen with the "Exit fullscreen" button. */
   onFullscreenExit: () => void;
+  /** "Network test" on the settings page. */
+  onNetTest: () => void;
 }
 
 interface SliderHandle {
@@ -118,6 +120,8 @@ export class PauseScreen {
   private readonly fullscreenButton: HTMLButtonElement;
   private readonly worldSection: HTMLElement;
   private readonly backButton: HTMLButtonElement;
+  /** "Network test": only on the settings page. */
+  private readonly netTestButton: HTMLButtonElement;
   private readonly buttonRow: HTMLElement;
   private readonly rightColumn: HTMLElement;
   private readonly seedValue: HTMLElement;
@@ -145,6 +149,8 @@ export class PauseScreen {
     onActivate(this.playButton, (via) => options.onPlay(via));
     this.backButton = button('menu-button back-button', '');
     this.backButton.addEventListener('click', () => options.onBack());
+    this.netTestButton = button('menu-button net-test-button', 'Network test');
+    this.netTestButton.addEventListener('click', () => options.onNetTest());
     this.buttonRow.append(this.playButton, this.backButton);
     panel.appendChild(this.buttonRow);
     this.hint = element('div', 'pause-hint');
@@ -330,9 +336,11 @@ export class PauseScreen {
     if (pause) {
       this.buttonRow.insertBefore(this.playButton, this.backButton);
       this.rightColumn.appendChild(this.worldSection);
+      this.netTestButton.remove();
     } else {
       this.playButton.remove();
       this.worldSection.remove();
+      this.buttonRow.insertBefore(this.netTestButton, this.backButton.nextSibling);
     }
     this.placeFullscreenButton();
     this.renderControls();

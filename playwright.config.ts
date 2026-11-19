@@ -23,10 +23,19 @@ export default defineConfig({
       args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
     },
   },
-  webServer: {
-    command: 'npm run preview',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: 'npm run preview',
+      url: 'http://localhost:4173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+    {
+      // The local PeerJS server of the multiplayer tests (Phase 6); no test reaches outside.
+      command: 'npm run signal',
+      url: 'http://127.0.0.1:9000/',
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+  ],
 });
