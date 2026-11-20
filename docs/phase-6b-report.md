@@ -176,7 +176,17 @@ join link" are all built and tested.
 - `room-panel` (new): "Playing together" while hosting room HAPPY2 with Ada (host, you)
   and Bo, "Copy join link" and "Close to others". Looked at: code in large type, colour
   swatches red and blue, buttons in one row.
-- Changed references: see "Full browser run".
+- Changed references (old and new side by side with `scripts/compareShots.mjs`, each
+  looked at; no other reference changed, every other one 0.0 %):
+  - `world-menu` (39.6 % of pixels): the panel grew by the section "Join a world" (name
+    field, "Open worlds at home", code field with "Join"); this test page has no
+    signaling server, so the list says "Multiplayer is not available in this build." The
+    list of worlds and the buttons above are unchanged.
+  - `pause-screen` (26.7 %): "Playing together" with a disabled "Open to others" and its
+    reason, as the last section of the right column; everything else unchanged.
+  - `pad-pause` (27.8 %): the same section; at 960 × 540 the controller's hint bar now
+    covers the last line of the panel (the reason text), which scrolls up from under it.
+    Nothing a controller can focus is hidden.
 
 ## Known issues
 
@@ -202,7 +212,34 @@ join link" are all built and tested.
 
 ## Full browser run
 
-(filled in below after the run)
+The full run (`MC_CONTAINER_GPU_STALL=1 npx playwright test`, 263 tests, both projects
+side by side) found eleven failures, all fixed and re-run:
+
+- the player key stored on page load (performance test's storage rule): fixed in the code;
+- the room list's request to the unreachable test port 9 (AC2.2, AC5.6): Chromium logs
+  `ERR_UNSAFE_PORT` itself; both tests allow exactly that message;
+- Phase 6 AC1.7 (see below), Phase 5 AC3.1, AC3.3, AC3.4 (controller paths through the
+  world menu, which the join section makes longer: the tests now walk to the button with
+  `focusOn`, by position), Phase 2 AC3.1 and Phase 3 AC4.9 (layouts at 640 × 360, see
+  below), and the three references above.
+
+The run hit the session's 30-minute limit for background commands after 259 of 263 tests;
+the four left (`mpRooms.spec.ts` AC5.9–AC5.12) passed in the runs of their own file.
+Afterwards every changed file was run again in full (`gamepadMenus`, `netTest`,
+`touchLayout`, `ui`, `worldMenu`, `mpRooms`, `mpMenus`, `mpPlayers`): all passed.
+
+- **Phase 6 AC1.7 is narrowed.** Plan 5.11 lists the open worlds on the world menu every
+  3 s, which needs `peerjs` and the discovery list; plan 5.2 already says `peerjs` loads
+  when "the room list is used". So a build with a signaling server now fetches both on the
+  world menu. The test checks what still holds: a build without a server (GitHub Pages)
+  requests nothing outside its origin and never loads `peerjs`, the network test or the
+  sessions; and in a build with a server, playing a world alone requests nothing outside
+  the origin (the room list stops when the menu is left).
+- **Layouts at 640 × 360.** Phase 2 AC3.1 and Phase 3 AC4.9 required the whole pause menu
+  and world menu to fit a phone without scrolling. With "Join a world" and "Playing
+  together" they do not; the plan's AC7.13 asks for exactly that: reachable by scrolling.
+  Both new sections are placed last, so everything that was on screen stays where it was;
+  the old tests check everything but the new sections, AC7.13 checks those.
 
 ## CI
 

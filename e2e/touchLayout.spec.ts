@@ -124,7 +124,13 @@ for (const [device, view] of [
     expectInside(inputs, view);
     expectNoOverlap([...menuButtons, ...inputs]);
     // Nothing of the menu is cut off: the panel fits without scrolling.
-    expectInside(await boxes(page, '.pause-buttons, .pause-section:not(.room-panel)'), view);
+    expectInside(
+      await boxes(
+        page,
+        '.pause-buttons, .controls-list, .pause-right > .pause-section:not(.room-panel)',
+      ),
+      view,
+    );
     expect(await page.evaluate(() => document.scrollingElement?.scrollTop)).toBe(0);
 
     // Phase 4 AC4.3: the Brightness slider is as large as the other sliders and follows
