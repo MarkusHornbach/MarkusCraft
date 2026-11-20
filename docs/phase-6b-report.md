@@ -243,7 +243,10 @@ Afterwards every changed file was run again in full (`gamepadMenus`, `netTest`,
 
 ## CI
 
-(filled in after the CI run of the pull request)
+The first CI run of the pull request (run 44824343396) was cancelled by the job's
+45-minute limit while every test so far had passed: the multiplayer project, one test at a
+time, started late and needs about 20 minutes. `.github/workflows/ci.yml` now allows 80
+minutes.
 
 ## For the Pi side
 
