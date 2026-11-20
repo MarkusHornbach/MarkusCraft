@@ -273,7 +273,11 @@ test('Phase 6 AC2.2: an unreachable signaling server is reported and the game st
   test.setTimeout(120_000);
   const { page } = await players.open({
     // Chromium itself reports the refused WebSocket of the PeerJS client.
-    allowConsole: [/WebSocket connection to 'ws:\/\/127\.0\.0\.1:9\/peerjs/],
+    allowConsole: [
+      /WebSocket connection to 'ws:\/\/127\.0\.0\.1:9\/peerjs/,
+      // The world menu's room list asks the same port for the discovery list.
+      /Failed to load resource: net::ERR_UNSAFE_PORT/,
+    ],
   });
   const query = `?${new URLSearchParams({ signal: 'http://127.0.0.1:9/', stun: 'none' })}`;
   await openNetTest(page, query);

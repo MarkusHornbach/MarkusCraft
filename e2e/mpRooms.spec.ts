@@ -230,7 +230,11 @@ test('Phase 6 AC5.6: unknown codes and an unreachable server fail with their mes
   // The menu keeps working: a world can be created and played afterwards.
   const lost = await players.open({
     // Chromium itself logs the refused WebSocket.
-    allowConsole: [/WebSocket connection to 'ws:\/\/127\.0\.0\.1:9\/peerjs/],
+    allowConsole: [
+      /WebSocket connection to 'ws:\/\/127\.0\.0\.1:9\/peerjs/,
+      // The world menu's room list asks the same port for the discovery list.
+      /Failed to load resource: net::ERR_UNSAFE_PORT/,
+    ],
   });
   const query = `?${new URLSearchParams({ signal: 'http://127.0.0.1:9/', stun: 'none' })}`;
   await openMenu(lost.page, query);
