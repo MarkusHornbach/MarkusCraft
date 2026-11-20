@@ -140,7 +140,8 @@ function isFiniteIn(value: unknown, min: number, max: number): value is number {
 
 const TIME_LIMIT = 8.64e15; // the range of JavaScript dates
 
-function decodePlayer(value: unknown): PlayerRecord | null {
+/** Reads a player record (save files and network messages); null if it does not check out. */
+export function decodePlayer(value: unknown): PlayerRecord | null {
   if (!isObject(value)) return null;
   if (!Array.isArray(value.slots) || value.slots.length !== INVENTORY_SLOTS) return null;
   const slots: (ItemStack | null)[] = [];
@@ -182,13 +183,16 @@ export function encodeMeta(meta: WorldMeta): Record<string, unknown> {
     time: meta.time,
     pose: { ...meta.pose },
     moveMode: meta.moveMode,
-    player: {
-      slots: meta.player.slots.map((slot) =>
-        slot ? { item: slot.item, count: slot.count } : null,
-      ),
-      selectedSlot: meta.player.selectedSlot,
-      breaking: meta.player.breaking ? { ...meta.player.breaking } : null,
-    },
+    player: encodePlayer(meta.player),
+  };
+}
+
+/** The plain form of a player record, as stored and as sent over the network. */
+export function encodePlayer(player: PlayerRecord): Record<string, unknown> {
+  return {
+    slots: player.slots.map((slot) => (slot ? { item: slot.item, count: slot.count } : null)),
+    selectedSlot: player.selectedSlot,
+    breaking: player.breaking ? { ...player.breaking } : null,
   };
 }
 

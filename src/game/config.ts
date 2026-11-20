@@ -295,3 +295,54 @@ export const NET_TEST_BYTES = 1_048_576;
 export const NET_TEST_MESSAGE_BYTES = 16_384;
 /** The pings and the transfer of the network test must be done within this time. */
 export const NET_TEST_RUN_TIMEOUT_MS = 30_000;
+
+// --- Multiplayer: rooms and sessions (Phase 6 part B) ---
+
+/** Players in one room, the host included. */
+export const NET_MAX_PLAYERS = 4;
+/** Length of a room code (the part after `mc-<build>-r-`). */
+export const ROOM_CODE_LENGTH = 6;
+/** A room code that is taken is drawn again up to this many times. */
+export const ROOM_CODE_ATTEMPTS = 5;
+/** A room that does not answer `info` within this time is left out of the room list. */
+export const INFO_TIMEOUT_MS = 3_000;
+/** Joining fails if the world has not arrived within this time. */
+export const JOIN_TIMEOUT_MS = 15_000;
+/** Longest message the decoder accepts, in characters. */
+export const MAX_MESSAGE_BYTES = 65_536;
+/** A peer that sends this many invalid messages is disconnected. */
+export const MAX_PROTOCOL_ERRORS = 20;
+/** Longest part of the world's edits sent on joining, in characters. */
+export const SNAPSHOT_PART_BYTES = 16_384;
+/** The host sends a guest more only while less than this is queued in its channel. */
+export const NET_QUEUE_HIGH_WATER = 262_144;
+/** Chunks the host keeps generated on the side for actions far from its own player. */
+export const AUTHORITY_CACHE_CHUNKS = 32;
+/** A player's pose is sent at most this often, and only while it changes. */
+export const POSE_SEND_HZ = 20;
+/** Other players are drawn this far in the past, between two received poses. */
+export const INTERP_DELAY_MS = 100;
+/** A pose this many blocks from the last one is a jump, not a movement. */
+export const SNAP_DISTANCE = 8;
+/** A guest pings the host this often; the pong carries the time of day. */
+export const PING_INTERVAL_MS = 1_000;
+/** A peer that sent nothing for this long counts as lost. */
+export const HEARTBEAT_TIMEOUT_MS = 5_000;
+/** A guest whose earlier connection was silent this long may replace it (a reconnect). */
+export const DUPLICATE_STALE_MS = 2_500;
+/** A guest that lost the host tries again this often, for this long. */
+export const RECONNECT_INTERVAL_MS = 2_000;
+export const RECONNECT_WINDOW_MS = 10_000;
+/** "<name> joined", "<name> left" and connection notices stay this long; at most this many. */
+export const NET_NOTICE_MS = 5_000;
+export const NET_NOTICES_MAX = 4;
+/** Longest player name, after trimming. */
+export const PLAYER_NAME_MAX = 16;
+/** Poses beyond these bounds are dropped by the host. */
+export const POSE_LIMIT_XZ = 30_000_000;
+export const POSE_MIN_Y = -64;
+export const POSE_MAX_Y = 512;
+/** A new guest starts on free ground within this many blocks of the host. */
+export const START_POSE_RADIUS = 3;
+/** Where a device keeps its player key and name (per site). */
+export const PLAYER_STORAGE_KEY = 'markuscraft.player.v1';
