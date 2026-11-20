@@ -243,8 +243,8 @@ test('Phase 5 AC3.3: the pause menu and the settings page', async ({ page }) => 
   await focusTo(page, pad, 'Save and back to worlds', [BUTTON.UP, BUTTON.RIGHT]);
   await pad.tap(BUTTON.A);
   await page.locator('.world-list-view').waitFor();
-  await pad.tap(BUTTON.DOWN);
-  await focusOn(page, pad, '.world-form-settings-button');
+  // The join section (Phase 6) lies below the list: walk there by position, not by path.
+  await focusOn(page, pad, '.world-settings-button');
   expect(await focusOf(page)).toBe('Settings');
   await pad.tap(BUTTON.A);
   expect((await getState(page)).ui.screen).toBe('settings');

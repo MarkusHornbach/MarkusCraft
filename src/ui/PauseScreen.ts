@@ -339,9 +339,9 @@ export class PauseScreen {
     // Parts without a meaning on the settings page are taken out of the document.
     if (pause) {
       this.buttonRow.insertBefore(this.playButton, this.backButton);
-      if (this.roomPanel)
-        this.rightColumn.insertBefore(this.roomPanel, this.rightColumn.firstChild);
       this.rightColumn.appendChild(this.worldSection);
+      // Last: on a phone it is reached by scrolling, the rest stays where it was.
+      if (this.roomPanel) this.rightColumn.appendChild(this.roomPanel);
       this.netTestButton.remove();
     } else {
       this.playButton.remove();
@@ -361,7 +361,7 @@ export class PauseScreen {
   /** The "Playing together" section; shown in the pause menu of a world. */
   setRoomPanel(panel: HTMLElement): void {
     this.roomPanel = panel;
-    if (this.kind === 'pause') this.rightColumn.insertBefore(panel, this.rightColumn.firstChild);
+    if (this.kind === 'pause') this.rightColumn.appendChild(panel);
   }
 
   /** A guest's world is left, not saved; its seed link would open another world. */

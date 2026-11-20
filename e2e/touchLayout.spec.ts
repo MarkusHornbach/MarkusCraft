@@ -108,12 +108,12 @@ for (const [device, view] of [
     await tapCreate(page);
     await tapMenu(page);
     // The pause menu: every button is on screen, finger-sized and free of its neighbours.
-    const menuButtons = await boxes(page, '.pause-screen button');
+    // "Playing together" (Phase 6) is the last section and reached by scrolling on a phone
+    // (Phase 6 AC7.13); everything else fits without scrolling.
+    const menuButtons = await boxes(page, '.pause-screen button:not(.room-panel button)');
     expect(menuButtons.map((b) => b.name)).toEqual([
       'play-button',
       'menu-button back-button',
-      // "Open to others" (Phase 6 part B).
-      'menu-button room-open-button',
       'copy-link-button',
       'fullscreen-button',
     ]);
@@ -124,7 +124,7 @@ for (const [device, view] of [
     expectInside(inputs, view);
     expectNoOverlap([...menuButtons, ...inputs]);
     // Nothing of the menu is cut off: the panel fits without scrolling.
-    expectInside(await boxes(page, '.pause-panel'), view);
+    expectInside(await boxes(page, '.pause-buttons, .pause-section:not(.room-panel)'), view);
     expect(await page.evaluate(() => document.scrollingElement?.scrollTop)).toBe(0);
 
     // Phase 4 AC4.3: the Brightness slider is as large as the other sliders and follows
