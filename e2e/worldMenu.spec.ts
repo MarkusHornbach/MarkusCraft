@@ -575,8 +575,11 @@ test.describe('by touch', () => {
       expect((await getState(page)).touch).toBe(true);
 
       // The form: fields and buttons are finger-sized, on screen and apart.
-      check(await boxes(page, '.world-menu button, .world-menu input'), view);
-      expect((await boxes(page, '.world-panel'))[0].height).toBeLessThanOrEqual(view.height);
+      // The world part fits without scrolling; "Join a world" (Phase 6) follows below it and
+      // is reached by scrolling (its own check: Phase 6 AC7.13).
+      check(await boxes(page, '.world-view button, .world-view input'), view);
+      const form = (await boxes(page, '.world-form'))[0];
+      expect(form.y + form.height).toBeLessThanOrEqual(view.height);
       await page.locator('#world-name').tap();
       await expect(page.locator('#world-name')).toBeFocused();
       await page.keyboard.press('Control+A');
@@ -606,8 +609,8 @@ test.describe('by touch', () => {
       await expect(rows(page)).toHaveCount(6);
       await expect(page.locator('.world-play-button')).toHaveText('Tap to play');
       // Everything outside the list is on screen; the panel is not cut off.
-      check(await boxes(page, '.world-menu button:not(.world-row)'), view);
-      const [panel] = await boxes(page, '.world-panel');
+      check(await boxes(page, '.world-view button:not(.world-row)'), view);
+      const [panel] = await boxes(page, '.world-list-view');
       expect(panel.y).toBeGreaterThanOrEqual(0);
       expect(panel.y + panel.height).toBeLessThanOrEqual(view.height);
       // Rows are finger-sized; the ones below the fold are reached by scrolling the list.
