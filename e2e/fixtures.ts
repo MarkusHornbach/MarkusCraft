@@ -5,7 +5,13 @@ import { test as base, expect } from '@playwright/test';
  * Messages proven to come from software WebGL itself, not from the game.
  * Keep this list minimal; every entry needs a comment.
  */
-const ALLOWED_CONSOLE: RegExp[] = [];
+export const ALLOWED_CONSOLE: RegExp[] = [
+  // Only with MC_CONTAINER_GPU_STALL=1: the cloud container's Chromium (SwiftShader over
+  // Vulkan) logs this in every test; CI's own browser does not (docs/fix-pad-flaky-report.md).
+  ...(process.env.MC_CONTAINER_GPU_STALL === '1'
+    ? [/GL Driver Message \(OpenGL, Performance, .*\): GPU stall due to ReadPixels/]
+    : []),
+];
 
 export const test = base.extend<{ consoleProblems: string[] }>({
   consoleProblems: [

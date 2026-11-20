@@ -46,6 +46,8 @@ import {
 } from '../ui/settings';
 import { TouchHud } from '../ui/TouchHud';
 import { WorldMenu } from '../ui/WorldMenu';
+import type { NetTestScreen } from '../ui/NetTestScreen';
+import type { Network } from '../net/transport';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
@@ -93,6 +95,7 @@ import {
   WATER_SURFACE_DROP,
 } from './config';
 import { IdbStore } from './idbStore';
+import { type NetConfig, readNetConfig } from './netConfig';
 import {
   type BenchPhase,
   type BenchStop,
@@ -113,7 +116,7 @@ const FULLSCREEN_SETTLE_MS = 500;
 const STATION_CHECK_STEPS = 15;
 
 /** What covers the view outside test mode: a menu, or nothing while playing. */
-type Screen = 'worlds' | 'settings' | 'pause' | 'play' | 'bench';
+type Screen = 'worlds' | 'settings' | 'pause' | 'play' | 'bench' | 'nettest';
 
 /** Why a performance test run was thrown away, as the "Interrupted" screen says it. */
 const BENCH_STOP_TEXT: Record<BenchStop, string> = {
@@ -200,6 +203,12 @@ export class Game {
   private benchResult: BenchResult | null = null;
   private benchStop: BenchStop | null = null;
   private readonly inventoryScreen: InventoryScreen;
+  /** Where multiplayer finds its servers (build variables, URL parameters). */
+  private readonly netConfig: NetConfig;
+  /** The network test, opened from the settings page; like the menus not in test mode. */
+  private netTestScreen: NetTestScreen | null = null;
+  /** The network test's screen is being loaded (its own chunk). */
+  private netTestLoading = false;
   /** The inventory covers the view. Unlike the menus it does not pause the world. */
   private inventoryOpen = false;
   /** True while a world is being opened, created or deleted from the menu. */
@@ -276,6 +285,7 @@ export class Game {
 
   constructor(container: HTMLElement, params: GameParams) {
     this.params = params;
+    this.netConfig = readNetConfig(window.location.search);
     this.time = params.time;
     this.world = new World(0);
 
@@ -393,6 +403,7 @@ export class Game {
         onFullscreenExit: () => {
           this.fullscreenDeclined = true;
         },
+        onNetTest: () => void this.openNetTest(),
       });
       document.addEventListener('fullscreenchange', () => {
         this.orientationQuietUntil = performance.now() + FULLSCREEN_SETTLE_MS;
@@ -626,6 +637,11 @@ export class Game {
     this.worldMenu?.setVisible(screen === 'worlds');
     this.pauseScreen?.setKind(screen === 'settings' ? 'settings' : 'pause');
     this.pauseScreen?.setVisible(screen === 'settings' || screen === 'pause');
+    if (screen === 'nettest') {
+      if (!this.netTestScreen?.isOpen) this.netTestScreen?.open();
+    } else if (this.netTestScreen?.isOpen) {
+      this.netTestScreen.close();
+    }
     this.hud.setVisible(screen === 'play');
     this.touchHud?.setVisible(screen === 'play');
     this.syncFocus();
@@ -788,6 +804,57 @@ export class Game {
   private async openStoredTestWorld(): Promise<void> {
     this.store = await IdbStore.open();
     await this.openNamedWorld(this.params.world, this.params.seed, this.params.mode);
+  }
+
+  // --- network (Phase 6) ----------------------------------------------------------------
+
+  /**
+   * The PeerJS network for these ICE servers. `peerjs` is loaded here, the first time it is
+   * needed: single-player never requests it.
+   */
+  private async loadNetwork(iceServers: { urls: string }[]): Promise<Network> {
+    const signal = this.netConfig.signal;
+    if (!signal) throw new Error('Multiplayer is not available in this build.');
+    const { createPeerNetwork } = await import('./peerTransport');
+    return createPeerNetwork({ signal, iceServers }, signal);
+  }
+
+  /**
+   * "Network test" on the settings page. The screen lives in a chunk of its own, loaded the
+   * first time: single-player never fetches it.
+   */
+  private async openNetTest(): Promise<void> {
+    if (this.netTestLoading || this.screen !== 'settings') return;
+    if (!this.netTestScreen) {
+      this.netTestLoading = true;
+      try {
+        const { NetTestScreen } = await import('../ui/NetTestScreen');
+        this.netTestScreen ??= new NetTestScreen(this.root, {
+          build: __BUILD_COMMIT__,
+          config: this.netConfig,
+          load: (iceServers) => this.loadNetwork(iceServers),
+          randomBytes: (count) => crypto.getRandomValues(new Uint8Array(count)),
+          onBack: () => this.showScreen('settings'),
+        });
+      } catch {
+        this.pauseScreen?.setHint('The network test could not be loaded.');
+        return;
+      } finally {
+        this.netTestLoading = false;
+      }
+      // The player may have left the settings page meanwhile.
+      if (this.screen !== 'settings') return;
+    }
+    this.showScreen('nettest');
+  }
+
+  private netState(): GameState['net'] {
+    return {
+      role: 'off',
+      available: this.netConfig.signal !== null,
+      build: __BUILD_COMMIT__,
+      test: this.netTestScreen?.isOpen ? this.netTestScreen.state : null,
+    };
   }
 
   // --- performance test (not in test mode) ---------------------------------------------
@@ -1755,6 +1822,7 @@ export class Game {
     if (this.screen === 'bench') return this.benchScreen?.element ?? null;
     if (this.screen === 'worlds') return this.worldMenu?.element ?? null;
     if (this.screen === 'pause' || this.screen === 'settings') return this.pauseScreen.element;
+    if (this.screen === 'nettest') return this.netTestScreen?.element ?? null;
     return null;
   }
 
@@ -2062,6 +2130,7 @@ export class Game {
       })),
       smelting: this.smeltView(),
       bench: this.benchState(),
+      net: this.netState(),
       player: {
         x: p.x,
         y: p.y,
@@ -2183,6 +2252,8 @@ export class Game {
       give: (item, count) => this.testGive(item, count),
       clearInventory: () => this.testClearInventory(),
       benchResult: () => (this.benchPhase === 'result' ? this.benchResult : null),
+      netNetwork: () =>
+        this.netConfig.signal ? this.loadNetwork(this.netConfig.iceServers) : Promise.resolve(null),
       glyphSheet: () => {
         if (!this.root.querySelector('.pad-glyph-sheet')) this.root.appendChild(glyphSheet());
       },

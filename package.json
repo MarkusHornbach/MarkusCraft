@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "signal": "node scripts/signalServer.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
@@ -19,6 +20,7 @@
     "check:all": "npm run check && npm run test:e2e"
   },
   "dependencies": {
+    "peerjs": "^1.5.5",
     "three": "^0.187.0"
   },
   "devDependencies": {
@@ -31,6 +33,7 @@
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",
+    "peer": "1.0.2",
     "pngjs": "^7.0.0",
     "prettier": "^3.10.1",
     "typescript": "~6.0",

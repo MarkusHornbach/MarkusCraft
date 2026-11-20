@@ -38,6 +38,7 @@ export default tseslint.config(
       'src/items/**',
       'src/save/**',
       'src/bench/**',
+      'src/net/**',
       'src/render/textures/tiles.ts',
       'src/render/textures/itemIcons.ts',
       'src/render/textures/cracks.ts',
@@ -46,9 +47,13 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: [{ name: 'three', message: 'The pure core must not import three.' }],
+          paths: [
+            { name: 'three', message: 'The pure core must not import three.' },
+            { name: 'peerjs', message: 'The pure core must not import peerjs.' },
+          ],
           patterns: [
             { group: ['three/*'], message: 'The pure core must not import three.' },
+            { group: ['peerjs/*'], message: 'The pure core must not import peerjs.' },
             {
               group: ['**/render/*', '**/ui/*', '**/input/*', '**/game/*', '!**/game/config'],
               message: 'The pure core must not depend on the browser shell.',

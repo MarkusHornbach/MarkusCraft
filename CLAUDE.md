@@ -87,12 +87,16 @@ game in a procedurally generated world"; everything in it is original work.
 | Unit tests         | Vitest (Node environment)                                           |
 | Browser tests      | Playwright (`@playwright/test`), Chromium, software WebGL           |
 | Lint / format      | ESLint (typescript-eslint) + Prettier                               |
+| Multiplayer        | `peerjs` client (dynamic import), `peer` 1.0.2 as local test server |
 | Package manager    | npm, lockfile committed                                             |
 | Runtime            | Node 22 (`.nvmrc`)                                                  |
 | CI / deploy        | GitHub Actions: checks on every push, deploy `main` to GitHub Pages |
 
-Keep runtime dependencies minimal: `three` only, unless a phase plan says otherwise.
-Noise, RNG, physics and meshing are implemented in this repo.
+Keep runtime dependencies minimal: `three` and `peerjs` (Phase 6, the WebRTC client,
+loaded with a dynamic import only when multiplayer is used), unless a phase plan says
+otherwise. `peer` (the PeerJS server, pinned to the Pi's version 1.0.2) is a dev
+dependency for the local signaling server of the tests. Noise, RNG, physics and meshing
+are implemented in this repo.
 
 ### Playwright in cloud sessions
 
@@ -113,7 +117,11 @@ src/
                      idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world),
                      perfStats.ts (pure: frames and chunk work of the last ten seconds),
                      benchEnv.ts (browser, GPU and screen for a performance test result),
-                     backGuard.ts (one history entry, so the browser's Back stays in the game)
+                     backGuard.ts (one history entry, so the browser's Back stays in the game),
+                     netConfig.ts (pure: build variables and URL parameters → NetConfig),
+                     buildCommit.ts (pure: the build id; used by vite.config.ts),
+                     peerTransport.ts (Signaling, Connection, RoomDirectory with peerjs;
+                     own chunk, dynamic import)
   bench/             the performance test (pure): scenarios.ts (scenario table, scripts,
                      suites), benchStats.ts (numbers of one measurement window),
                      verdict.ts (lights, throttling flag, Web Workers line), benchReport.ts
@@ -122,6 +130,9 @@ src/
                      (what `bench=sample` shows), compare.ts (table of several runs)
   actions/           the action layer (pure): actions.ts (types, decodeAction), apply.ts
                      (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
+  net/               pure (Phase 6): transport.ts (Connection, Signaling, RoomDirectory,
+                     Network), memoryTransport.ts (fake clock, seeded delays), netTest.ts
+                     (ids, messages and one run of the network test, candidate pair, texts)
   items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
                      slots), hardness.ts (break times, tool speed, gating, drop table),
                      recipes.ts (recipe table, stations near a player, recipe status)
@@ -156,20 +167,23 @@ src/
                      PauseScreen.ts (pause menu of a world; also the settings page),
                      activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint),
                      BenchScreen.ts (performance test: start page, progress line, result,
-                     "Interrupted"), FocusManager.ts (the controller's focus on a screen,
+                     "Interrupted"), NetTestScreen.ts (the network test; own chunk, loaded
+                     on its first use), FocusManager.ts (the controller's focus on a screen,
                      the focus frame), PadHints.ts (the hint bar), padGlyphs.ts (button
                      glyphs drawn on canvases)
   util/              rng.ts, noise.ts, math.ts
   testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts,
                      lightChecksum.ts, lightScenes.ts (tables with emitters, artificial
                      volumes), lightEdits.ts (a lit test world, random edits)
-e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts, sites.ts
+e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts,
+                     multiplayer.ts (several players in their own contexts, `netQuery`,
+                     `openNetTest`), sites.ts
                      (tree, beach and rock near the start point), lightScenes.ts (tunnel,
                      room with a window, roof over a chunk corner), gamepad.ts (the fake
                      controller), recipeRows.ts (recipe rows that never move),
                      screenshots/
-scripts/             dev tools: shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item
-                     icons), terrainStats.ts (terrain statistics and generation time), perf.ts
+scripts/             dev tools: signalServer.mjs (local PeerJS server, `npm run signal`),
+                     shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
                      next to new), benchRun.mjs (plays the performance test headlessly),
                      perfRuns.ts (comparison table from saved `perf-run` issues), editCost.ts
@@ -193,13 +207,14 @@ sides in turn.
 
 ## Architecture and code conventions
 
-- **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/`, `items/`
-  and `bench/` must not import `three` or touch the DOM (enforced by an ESLint
-  `no-restricted-imports` rule). They are tested in Node. Only `render/`, `ui/`, `input/`
+- **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/`, `items/`,
+  `bench/` and `net/` must not import `three` or `peerjs`, touch the DOM or use
+  `Math.random` / `Date.now` (enforced by ESLint rules). They are tested in Node. Only `render/`, `ui/`, `input/`
   and `game/` may use Three.js and browser APIs. The same rule covers
   `render/textures/tiles.ts`, `itemIcons.ts` and `cracks.ts`. The core may import `game/config.ts`.
   `input/TouchTracker.ts`, `input/padMapping.ts`, `input/focusMove.ts`,
-  `game/autosave.ts` and `game/perfStats.ts` follow the same discipline (no DOM,
+  `game/autosave.ts`, `game/perfStats.ts`, `game/netConfig.ts` and `game/buildCommit.ts`
+  follow the same discipline (no DOM,
   unit-tested in Node, in the coverage scope) although they live in the shell.
 - **One pipeline for changes (action layer).** `Game` and the UI never change blocks, the
   selected slot or the inventory themselves. They build a plain action
@@ -418,6 +433,22 @@ sides in turn.
   which could collide with a reload); a Back that pops it there goes back once more.
   Whether it is armed is asked at each `popstate` (`Game.wantsBackGuard`); `update()` per
   frame only pushes the entry.
+- **Multiplayer configuration (Phase 6).** The signaling and STUN addresses reach the game
+  only through the build variables `VITE_SIGNAL_URL` (e.g. `wss://<host>/`) and
+  `VITE_STUN_URLS` (comma-separated `stun:` URLs), overridden by the URL parameters
+  `signal` and `stun` (`stun=none` empties the list); an invalid value counts as not set.
+  Never write an address of the Pi or the owner's domain anywhere in the repository; docs
+  say "the Pi's signaling host". Without a signaling server the build says "Multiplayer is
+  not available in this build." The build id `__BUILD_COMMIT__` comes from `BUILD_COMMIT`,
+  else `GITHUB_SHA`, else git, else `dev`; every peer id starts with `mc-<build>-`, so only
+  the same build sees each other. Single-player loads neither `peerjs` nor the network
+  test's chunk and requests nothing outside its origin (AC1.7). Time reaches `src/net/` as
+  `nowMs`, randomness as bytes (`crypto.getRandomValues` in the shell).
+- **The network test (Phase 6 part A)** is a screen of its own (`nettest`), opened by
+  "Network test" on the settings page; "Back" returns there. Its test id is
+  `mc-<build>-t-<4 characters>`; it lists the others from PeerJS discovery every 3 s,
+  connects with "Connect", runs 20 pings and 1 MB in 16 kB messages (`NetTestRun`), reads
+  the candidate pair from `getStats()` and gives one verdict line.
 - **Determinism.** No `Math.random()` and no `Date.now()` in `world/`, `player/`, `util/`
   or texture generation. Randomness comes from the seeded RNG; time comes in as a parameter.
   The same seed must always produce the same world and the same textures.
@@ -435,20 +466,21 @@ sides in turn.
 
 ## Commands
 
-| Command                   | Purpose                                                    |
-| ------------------------- | ---------------------------------------------------------- |
-| `npm run dev`             | Dev server                                                 |
-| `npm run build`           | Type check + production build into `dist/`                 |
-| `npm run preview`         | Serve the production build                                 |
-| `npm run typecheck`       | `tsc --noEmit`                                             |
-| `npm run lint`            | ESLint + Prettier check                                    |
-| `npm run format`          | Apply Prettier                                             |
-| `npm test`                | Vitest unit tests: ordinary, then solo, then slow files    |
-| `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI) |
-| `npm run test:e2e`        | Build, then Playwright tests against the preview server    |
-| `npm run test:e2e:update` | Same, regenerating reference screenshots                   |
-| `npm run check`           | `typecheck` + `lint` + `test` (fast gate for every commit) |
-| `npm run check:all`       | `check` + `build` + `test:e2e` (gate for every plan step)  |
+| Command                   | Purpose                                                     |
+| ------------------------- | ----------------------------------------------------------- |
+| `npm run dev`             | Dev server                                                  |
+| `npm run build`           | Type check + production build into `dist/`                  |
+| `npm run preview`         | Serve the production build                                  |
+| `npm run signal`          | Local PeerJS server on `127.0.0.1:9000` (multiplayer tests) |
+| `npm run typecheck`       | `tsc --noEmit`                                              |
+| `npm run lint`            | ESLint + Prettier check                                     |
+| `npm run format`          | Apply Prettier                                              |
+| `npm test`                | Vitest unit tests: ordinary, then solo, then slow files     |
+| `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI)  |
+| `npm run test:e2e`        | Build, then Playwright tests against the preview server     |
+| `npm run test:e2e:update` | Same, regenerating reference screenshots                    |
+| `npm run check`           | `typecheck` + `lint` + `test` (fast gate for every commit)  |
+| `npm run check:all`       | `check` + `build` + `test:e2e` (gate for every plan step)   |
 
 ## Headless testing
 
@@ -530,6 +562,22 @@ active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused
 - Run the browser suite alone: a build or `npm run check` in parallel makes menu tests
   time out. A vertical finger drag that starts on the inventory overlay is a scroll
   gesture for the browser and cancels the touch; tests drag sideways there.
+- **Multiplayer tests** use `test` from `e2e/multiplayer.ts`: `players.open()` makes a
+  player in its own browser context with the console checks. Playwright starts the local
+  PeerJS server (`npm run signal`, `127.0.0.1:9000`, discovery on) next to the preview
+  server; pages pass `netQuery()` (`signal=http://127.0.0.1:9000/&stun=none`). Every
+  build's ids carry its build id, so tests running alongside see each other's devices: a
+  test that needs a list of only its own devices (the `net-test` reference) starts a
+  PeerJS server of its own on another port (`ownServer` in `e2e/netTest.spec.ts`) and
+  closes its pages before stopping it. `__mc.netNetwork()` gives a test the page's PeerJS
+  network to drive directly; `getState().net` is `{ role, available, build, test }`, with
+  `test` the network test's state while its screen is open. A test whose page reaches a
+  closed port or a server without discovery allows exactly the message Chromium itself
+  logs for it (`allowConsole`).
+- **This cloud container's Chromium** logs "GPU stall due to ReadPixels" in every test
+  (CI's browser does not). Run the browser tests here with `MC_CONTAINER_GPU_STALL=1`,
+  which allows exactly that message (`ALLOWED_CONSOLE` in `e2e/fixtures.ts`); CI runs
+  without it.
 - Text-only reference screenshots use `maxDiffPixelRatio` 0.05, which is loose enough to
   miss a whole button: after changing a menu, regenerate with `--update-snapshots=all`
   and look at the result.
@@ -694,7 +742,10 @@ hold:
   line. Esc stays as it is. Read its "Decisions and deviations" before changing the
   recipe list or the hold. Its tests name their criterion as "Polish 1 AC1.1"; device
   tests it added have the origin "P1" (CRAFT-12, CRAFT-13).
-- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), not yet implemented. Four parts,
+- Phase 6 part A (connection test: transport, local signaling server, network test):
+  implemented (report: `docs/phase-6a-report.md`). Read its "Decisions and deviations"
+  before changing the network layer, the network test or the multiplayer tests.
+- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), part A implemented. Four parts,
   each in its own session with its own pull request, in order: **A** connection test
   (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's NET
   tests of A in `docs/device-tests.md` show a working connection), **C** Gathering

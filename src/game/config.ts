@@ -274,3 +274,24 @@ export const PAD_SENSITIVITY_MIN = 0.2;
 export const PAD_SENSITIVITY_MAX = 3;
 /** A browser "Back" this soon after the controller's B press is the same press. */
 export const BACK_PAIR_MS = 150;
+
+// --- Multiplayer (Phase 6) ---
+
+/** Characters of room codes and test codes: no I, O, 0 or 1, which are easily mixed up. */
+export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+/** Length of the network test's own code (the part after `mc-<build>-t-`). */
+export const NET_TEST_CODE_LENGTH = 4;
+/** The PeerJS server's key (its default). */
+export const PEERJS_KEY = 'peerjs';
+/** Registering with the signaling server must succeed within this time. */
+export const SIGNAL_TIMEOUT_MS = 15_000;
+/** A data channel must open within this time after "Connect" (ICE). */
+export const ICE_TIMEOUT_MS = 15_000;
+/** The room list and the network test's list of others are refreshed this often. */
+export const ROOM_LIST_REFRESH_MS = 3_000;
+/** The network test: pings for the round-trip time, then bytes in messages of this size. */
+export const NET_TEST_PINGS = 20;
+export const NET_TEST_BYTES = 1_048_576;
+export const NET_TEST_MESSAGE_BYTES = 16_384;
+/** The pings and the transfer of the network test must be done within this time. */
+export const NET_TEST_RUN_TIMEOUT_MS = 30_000;
