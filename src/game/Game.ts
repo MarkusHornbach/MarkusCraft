@@ -50,7 +50,9 @@ import type { NetTestScreen } from '../ui/NetTestScreen';
 import type { Network } from '../net/transport';
 import type { Welcome } from '../net/protocol';
 import { worldHash } from '../net/snapshot';
-import { Multiplayer } from './multiplayer';
+import { Multiplayer, TEXT_GATHERING_LATER } from './multiplayer';
+import { JoinSection, type RoomListView, TEXT_UNAVAILABLE } from '../ui/JoinSection';
+import { RoomPanel } from '../ui/RoomPanel';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
@@ -84,6 +86,7 @@ import {
   PIXEL_RATIO_MAX,
   PLAYER_EYE_HEIGHT,
   REACH,
+  ROOM_LIST_REFRESH_MS,
   SAVE_FORMAT_VERSION,
   SIM_DT,
   SIM_HZ,
@@ -265,6 +268,14 @@ export class Game {
   private readonly mp: Multiplayer;
   /** Test tool: the frame loop does nothing (a hidden tab). */
   private framesSuspended = false;
+  /** "Join a world" on the world menu and "Playing together" in the pause menu. */
+  private joinSection: JoinSection | null = null;
+  private roomPanel: RoomPanel | null = null;
+  /** The line of the room panel ("Opening…", an error, "Link copied"). */
+  private roomMessage = '';
+  /** When the room list was last asked for, and whether an answer is pending. */
+  private roomListAt = -Infinity;
+  private roomListPending = false;
   private gameMode: GameMode = 'creative';
   /** Simulation steps since the world was opened: the clock of the action layer. */
   private simSteps = 0;
@@ -300,7 +311,7 @@ export class Game {
     this.params = params;
     this.netConfig = readNetConfig(window.location.search);
     this.mp = this.createMultiplayer();
-    if (params.name !== null) this.mp.setName(params.name);
+    if (params.name) this.mp.setName(params.name);
     this.time = params.time;
     this.world = new World(0);
 
@@ -433,6 +444,23 @@ export class Game {
         onSettings: () => this.showScreen('settings'),
         onBench: () => this.openBench(),
       });
+      this.joinSection = new JoinSection({
+        name: this.mp.identity.name,
+        available: this.netConfig.signal !== null,
+        onName: (name) => this.mp.setName(name),
+        onJoin: (code, via) => void this.joinFromMenu(code, via),
+      });
+      this.joinSection.setLink(params.join);
+      this.worldMenu.addSection(this.joinSection.element);
+      this.roomPanel = new RoomPanel({
+        onOpen: () => void this.openRoomFromMenu(),
+        onClose: () => {
+          this.roomMessage = '';
+          this.mp.leave();
+        },
+        onCopyLink: () => void this.copyJoinLink(),
+      });
+      this.pauseScreen.setRoomPanel(this.roomPanel.element);
       this.benchScreen = new BenchScreen(this.root, {
         onStart: (via) => this.startBench(via),
         onBack: () => this.closeBench(),
@@ -656,6 +684,9 @@ export class Game {
 
   /** Shows one of the menus, or the game. Only outside test mode. */
   private showScreen(screen: Screen): void {
+    // The room list registers with the signaling server only while it is shown.
+    if (screen !== 'worlds' && this.screen === 'worlds') this.mp.closeRoomList();
+    if (screen === 'worlds') this.roomListAt = -Infinity;
     this.screen = screen;
     this.worldMenu?.setVisible(screen === 'worlds');
     this.pauseScreen?.setKind(screen === 'settings' ? 'settings' : 'pause');
@@ -904,8 +935,23 @@ export class Game {
       worldHash: worldHash(this.world.edits),
       lastError: this.mp.lastError,
       notices: this.mp.currentNotices(),
+      figures: this.renderer.remotePlayers.drawn,
       test: this.netTestScreen?.isOpen ? this.netTestScreen.state : null,
     };
+  }
+
+  /** The other players' figures at their interpolated poses (after the light uniforms). */
+  private updateFigures(): void {
+    const roster = this.mp.host?.roster ?? this.mp.client?.roster ?? null;
+    const now = performance.now();
+    this.renderer.remotePlayers.update(
+      roster
+        ? roster
+            .list()
+            .map((p) => ({ id: p.id, name: p.name, slot: p.slot, pose: p.poses.sample(now) }))
+        : [],
+      (x, y, z) => this.lightAt(x, y, z),
+    );
   }
 
   /** Where another player is drawn now, or null if it is not drawn. */
@@ -1001,7 +1047,121 @@ export class Game {
 
   /** The room was opened, joined, left or lost. */
   private onNetRoleChanged(): void {
-    // Menus follow in step 7.
+    this.pauseScreen?.setGuest(this.mp.role === 'guest');
+    this.updateRoomPanel();
+  }
+
+  /** "Playing together" in the pause menu, as the room is now. */
+  private updateRoomPanel(): void {
+    if (!this.roomPanel) return;
+    const p = this.player;
+    const players = this.mp.players({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch });
+    this.roomPanel.set({
+      role: this.mp.role,
+      code: this.mp.roomCode,
+      players: players.map(({ id, name, slot, host, self }) => ({ id, name, slot, host, self })),
+      disabledReason:
+        this.netConfig.signal === null
+          ? TEXT_UNAVAILABLE
+          : this.gameMode !== 'creative'
+            ? TEXT_GATHERING_LATER
+            : null,
+      touch: this.mode === 'touch',
+      message: this.roomMessage,
+    });
+  }
+
+  /** "Open to others" in the pause menu. */
+  private async openRoomFromMenu(): Promise<void> {
+    if (this.mp.role !== 'off' || !this.meta) return;
+    this.roomMessage = 'Opening…';
+    this.updateRoomPanel();
+    try {
+      await this.mp.openRoom();
+      this.roomMessage = '';
+    } catch (error) {
+      this.roomMessage = error instanceof Error ? error.message : 'The world could not be opened.';
+    }
+    this.updateRoomPanel();
+  }
+
+  /** The link that joins this room: the page with `join=CODE` (and the server parameters). */
+  private joinLink(): string {
+    const query = new URLSearchParams();
+    query.set('join', this.mp.roomCode ?? '');
+    const current = new URLSearchParams(window.location.search);
+    for (const key of ['signal', 'stun']) {
+      const value = current.get(key);
+      if (value !== null) query.set(key, value);
+    }
+    return `${window.location.origin}${window.location.pathname}?${query.toString()}`;
+  }
+
+  private async copyJoinLink(): Promise<void> {
+    const link = this.joinLink();
+    try {
+      await navigator.clipboard.writeText(link);
+      this.roomMessage = 'Link copied';
+    } catch {
+      // Clipboard access can be denied: the link is shown to copy by hand.
+      this.roomMessage = link;
+    }
+    this.updateRoomPanel();
+  }
+
+  /**
+   * "Join" on the world menu (a listed room, the code field, the join link). Like a play
+   * button: the way it was pressed decides mouse or touch mode, and the mouse is captured
+   * inside the press; the world arrives when the host has sent it.
+   */
+  private async joinFromMenu(code: string, via: InputMode | null): Promise<void> {
+    if (this.menuBusy || this.mp.role !== 'off') return;
+    this.setMenuBusy(true);
+    this.worldMenu?.setMessage('');
+    this.joinSection?.setStatus('Connecting…');
+    if (via) this.setPadActive(false);
+    if (via && via !== this.mode && !this.params.touch) this.setMode(via);
+    if (this.mode === 'touch') this.enterFullscreen();
+    else if (!this.padActive) this.requestPointerLock();
+    try {
+      await this.mp.join(code);
+      this.joinSection?.setStatus('');
+      this.mp.closeRoomList();
+      if (this.mode === 'touch') {
+        if (this.isPortrait()) this.showScreen('pause');
+        else this.setPaused(false);
+      } else if (this.input.pointerLocked || this.padActive) {
+        this.setPaused(false);
+      } else {
+        this.showScreen('pause');
+      }
+    } catch {
+      if (document.pointerLockElement) document.exitPointerLock();
+      this.joinSection?.setStatus(this.mp.lastError ?? '');
+    } finally {
+      this.setMenuBusy(false);
+    }
+  }
+
+  /** The world menu asks for the open rooms every few seconds while it is shown. */
+  private refreshRoomList(now: number): void {
+    if (this.screen !== 'worlds' || !this.joinSection || this.roomListPending) return;
+    if (this.netConfig.signal === null || this.mp.role !== 'off') return;
+    if (now - this.roomListAt < ROOM_LIST_REFRESH_MS) return;
+    this.roomListAt = now;
+    this.roomListPending = true;
+    void this.mp
+      .rooms()
+      .then((list) => {
+        const view: RoomListView = list.ok
+          ? { kind: 'rooms', rooms: list.rooms }
+          : { kind: list.reason };
+        this.joinSection?.setRooms(view);
+      })
+      .catch(() => this.joinSection?.setRooms({ kind: 'unreachable' }))
+      .finally(() => {
+        this.roomListPending = false;
+      });
   }
 
   /**
@@ -1651,7 +1811,9 @@ export class Game {
 
     if (this.meta) this.updateChunks();
     this.autosave.tick(performance.now());
+    this.refreshRoomList(performance.now());
     if (this.screen === 'pause') {
+      this.updateRoomPanel();
       const failed = this.autosave.lastError !== null;
       this.pauseScreen?.setSaveState(
         failed ? SAVE_FAILED_TEXT : this.autosave.dirty ? 'Saving…' : 'Saved',
@@ -2180,6 +2342,7 @@ export class Game {
     const underwater = this.isUnderWater(x, y + PLAYER_EYE_HEIGHT, z);
     this.hud.setUnderwater(underwater);
     this.renderer.setEnvironment(this.time, underwater);
+    this.updateFigures();
     this.renderer.render();
     if (this.touchHud && this.touch) {
       this.touchHud.setStick(this.touch.tracker.stick);

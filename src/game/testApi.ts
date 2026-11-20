@@ -122,6 +122,8 @@ export interface GameState {
     lastError: string | null;
     /** The multiplayer notices on screen ("Anna joined"). */
     notices: string[];
+    /** Figures of other players drawn in the last frame. */
+    figures: number;
     test: NetTestState | null;
   };
   player: {

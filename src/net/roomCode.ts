@@ -1,6 +1,19 @@
 // Room codes, peer ids of rooms and guests, player names and player keys (Phase 6 part B).
 import { PLAYER_NAME_MAX, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '../game/config';
-import { codeFromBytes, peerPrefix } from './netTest';
+
+/** Every id of one build starts with this, so different builds never see each other. */
+export function peerPrefix(build: string): string {
+  return `mc-${build}-`;
+}
+
+/** A code of `length` characters of the room alphabet from random bytes (one per character). */
+export function codeFromBytes(bytes: ArrayLike<number>, length: number): string {
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += ROOM_CODE_ALPHABET[(bytes[i] ?? 0) % ROOM_CODE_ALPHABET.length];
+  }
+  return code;
+}
 
 /** A room code from random bytes (one per character). */
 export function makeRoomCode(bytes: ArrayLike<number>): string {

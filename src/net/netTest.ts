@@ -7,23 +7,12 @@ import {
   NET_TEST_PINGS,
   ROOM_CODE_ALPHABET,
 } from '../game/config';
+import { codeFromBytes, peerPrefix } from './roomCode';
 import type { Connection, StatsEntry } from './transport';
 
+export { codeFromBytes, peerPrefix };
+
 // --- ids -----------------------------------------------------------------------------
-
-/** Every id of one build starts with this, so different builds never see each other. */
-export function peerPrefix(build: string): string {
-  return `mc-${build}-`;
-}
-
-/** A code of `length` characters of the room alphabet from random bytes (one per character). */
-export function codeFromBytes(bytes: ArrayLike<number>, length: number): string {
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += ROOM_CODE_ALPHABET[(bytes[i] ?? 0) % ROOM_CODE_ALPHABET.length];
-  }
-  return code;
-}
 
 /** The network test's id of a device: `mc-<build>-t-<code>`. */
 export function testPeerId(build: string, code: string): string {

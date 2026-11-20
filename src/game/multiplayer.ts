@@ -34,6 +34,7 @@ export const JOIN_TEXT: Record<JoinFailure | 'unavailable', string> = {
   unavailable: 'Multiplayer is not available in this build.',
 };
 
+export const TEXT_GATHERING_LATER = 'Gathering worlds can be shared from a later version.';
 export const TEXT_HOST_CLOSED = 'The host closed the world.';
 export const TEXT_HOST_LOST = 'Lost the connection to the host.';
 export const TEXT_RECONNECTING = 'Connection lost. Reconnecting…';
@@ -114,6 +115,8 @@ export class Multiplayer {
   identity: PlayerIdentity;
   private readonly game: MultiplayerGame;
   private signaling: Signaling | null = null;
+  /** The room list's own registration, kept while the world menu asks again and again. */
+  private lister: Signaling | null = null;
   private notices: { text: string; untilMs: number }[] = [];
   private timer = 0;
   private wake: WakeLockSentinel | null = null;
@@ -170,6 +173,8 @@ export class Multiplayer {
     const worldName = this.game.worldName();
     if (worldName === null) throw new Error('No world is open');
     if (!this.game.available) throw new Error(JOIN_TEXT.unavailable);
+    // Gathering needs the host-side rules of Part C (break timing, saved guests).
+    if (this.game.mode() !== 'creative') throw new Error(TEXT_GATHERING_LATER);
     const network = await this.game.loadNetwork();
     const build = options.build ?? this.game.build;
     const signaling = network.signaling();
@@ -193,6 +198,8 @@ export class Multiplayer {
       throw new Error(JOIN_TEXT.unreachable);
     }
     const world = this.game.world();
+    // From now on this device is known by its key: it is kept.
+    saveIdentity(this.identity);
     const { HostSession } = await loadSessions();
     const host = new HostSession({
       build,
@@ -245,6 +252,8 @@ export class Multiplayer {
       throw new Error(this.lastError, { cause: error });
     }
     const { ClientSession, JoinError } = sessions;
+    // The host keeps this guest's items under the key: it must survive a reload.
+    saveIdentity(this.identity);
     const client = new ClientSession({
       network,
       build: options.build ?? this.game.build,
@@ -343,12 +352,14 @@ export class Multiplayer {
 
   /** The work of a frame: the session, and the guest's pose. */
   frame(nowMs: number): void {
-    if (this.host) this.host.update(nowMs);
-    if (this.client) {
-      this.client.update(nowMs);
-      this.client.setPose(this.game.pose(), nowMs, this.teleported);
-      this.teleported = false;
-    }
+    this.host?.update(nowMs);
+    const client = this.client;
+    if (!client) return;
+    client.update(nowMs);
+    // The update may have ended the room (the host was lost).
+    if (this.client !== client) return;
+    client.setPose(this.game.pose(), nowMs, this.teleported);
+    this.teleported = false;
   }
 
   // --- room list -----------------------------------------------------------------------
@@ -368,20 +379,25 @@ export class Multiplayer {
       .map((id) => roomCodeOf(id, this.game.build))
       .filter((code): code is string => code !== null && code !== this.roomCode);
     if (codes.length === 0) return { ok: true, rooms: [] };
-    const signaling = network.signaling();
-    try {
-      await signaling.open(
-        `mc-${this.game.build}-l-${hex(crypto.getRandomValues(new Uint8Array(6)))}`,
-      );
-    } catch {
-      signaling.close();
-      return { ok: false, reason: 'unreachable' };
+    let signaling = this.lister;
+    if (!signaling || signaling.state !== 'open') {
+      signaling?.close();
+      signaling = network.signaling();
+      this.lister = signaling;
+      try {
+        await signaling.open(
+          `mc-${this.game.build}-l-${hex(crypto.getRandomValues(new Uint8Array(6)))}`,
+        );
+      } catch {
+        signaling.close();
+        if (this.lister === signaling) this.lister = null;
+        return { ok: false, reason: 'unreachable' };
+      }
     }
     const { decodeHostMessage, encodeMessage } = await loadSessions();
     const rows = await Promise.all(
       codes.map((code) => this.roomInfo(signaling, code, decodeHostMessage, encodeMessage)),
     );
-    signaling.close();
     return { ok: true, rooms: rows.filter((row): row is RoomRow => row !== null) };
   }
 
@@ -399,6 +415,8 @@ export class Multiplayer {
       return new Promise<RoomRow | null>((resolve) => {
         conn.onMessage = (text) => {
           const decoded = decodeHostMessage(text);
+          // Closing reports the close at once: the answer must be taken first.
+          conn.onClose = null;
           conn.close();
           if (!decoded.ok || decoded.message.t !== 'info') resolve(null);
           else {
@@ -418,6 +436,12 @@ export class Multiplayer {
       });
     })().catch(() => null);
     return Promise.race([ask, timeout]);
+  }
+
+  /** The world menu is gone: its registration for the room list is given up. */
+  closeRoomList(): void {
+    this.lister?.close();
+    this.lister = null;
   }
 
   // --- state ---------------------------------------------------------------------------

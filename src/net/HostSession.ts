@@ -149,7 +149,7 @@ export class HostSession {
     this.frozenTime = options.frozen;
     this.self = {
       id: 1,
-      name: normalizePlayerName(options.hostName, 0),
+      name: normalizePlayerName(options.hostName, parseInt(options.hostKey.slice(0, 4), 16) || 0),
       slot: 0,
       key: options.hostKey,
       conn: null,

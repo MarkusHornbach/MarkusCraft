@@ -8,7 +8,10 @@ export interface PlayerIdentity {
   name: string;
 }
 
-/** Reads the stored identity, creating and storing a key on first use. Never throws. */
+/**
+ * Reads the stored identity, or makes a new key. Nothing is stored here: single-player
+ * leaves no trace; `saveIdentity` keeps it once a room is opened, joined or a name typed.
+ */
 export function loadIdentity(): PlayerIdentity {
   let stored: unknown;
   try {
@@ -22,9 +25,7 @@ export function loadIdentity(): PlayerIdentity {
     ? record.key
     : playerKeyFromBytes(crypto.getRandomValues(new Uint8Array(16)));
   const name = typeof record.name === 'string' ? record.name.slice(0, 64) : '';
-  const identity = { key, name };
-  if (record.key !== key) saveIdentity(identity);
-  return identity;
+  return { key, name };
 }
 
 export function saveIdentity(identity: PlayerIdentity): void {

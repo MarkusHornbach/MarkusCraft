@@ -1853,3 +1853,136 @@ canvas {
     font-size: 12px;
   }
 }
+
+/* --- Playing together (Phase 6) --- */
+
+.join-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(169, 196, 230, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.join-section .pause-heading {
+  margin: 0;
+}
+
+.join-subheading {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #a9c4e6;
+}
+
+.room-list {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.room-list-empty {
+  font-size: 13px;
+  color: #a9c4e6;
+}
+
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  text-align: left;
+}
+
+.room-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-row-world {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-row-details {
+  font-size: 13px;
+  color: #a9c4e6;
+}
+
+.join-code-field .world-input {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.join-status {
+  min-height: 18px;
+  font-size: 13px;
+  color: #ffd27f;
+}
+
+.room-panel .menu-button {
+  margin: 4px 4px 0 0;
+}
+
+.room-code-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.room-code-label {
+  font-size: 13px;
+  color: #a9c4e6;
+}
+
+.room-code {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+.room-players {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.room-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.room-swatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+.room-note,
+.room-message {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #a9c4e6;
+  overflow-wrap: anywhere;
+}
+
+.room-message {
+  color: #ffd27f;
+}

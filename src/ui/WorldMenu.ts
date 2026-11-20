@@ -44,6 +44,7 @@ export class WorldMenu {
   private readonly nameInput: HTMLInputElement;
   private readonly seedInput: HTMLInputElement;
   private readonly message: HTMLElement;
+  private readonly panel: HTMLElement;
   private readonly confirmText: HTMLElement;
   private entries: WorldListEntry[] = [];
   private selectedId: string | null = null;
@@ -60,6 +61,7 @@ export class WorldMenu {
     this.mode = options.mode;
     this.element = element('div', 'world-menu');
     const panel = element('div', 'world-panel');
+    this.panel = panel;
     this.element.appendChild(panel);
     panel.appendChild(element('h1', 'pause-title', 'MarkusCraft'));
 
@@ -302,6 +304,11 @@ export class WorldMenu {
   private updatePlayLabel(): void {
     const verb = this.padActive ? 'Press A' : this.mode === 'touch' ? 'Tap' : 'Click';
     this.playButton.textContent = `${verb} to play`;
+  }
+
+  /** Adds a section (joining a world) under the views, above the message line. */
+  addSection(section: HTMLElement): void {
+    this.panel.insertBefore(section, this.message);
   }
 
   /** A line under the buttons, e.g. why a world could not be opened. Empty clears it. */
