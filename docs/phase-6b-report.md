@@ -259,8 +259,18 @@ fixed:
   as the `net-test` reference of Part A.
 - AC6.3 waited for the received yaw of the host, but the figure is drawn at the
   interpolated pose 100 ms behind; on CI the picture was taken before it turned.
-  `getState().net.players` has `renderYaw` now, and the test waits for it. `.github/workflows/ci.yml` now allows 80
-  minutes.
+  `getState().net.players` has `renderYaw` now, and the test waits for it.
+
+The third run (44839265136) stopped in the unit tests: Phase 4 AC1.7 ("lighting a terrain
+chunk takes at most 40 % of meshing it") measured 2.16 ms against a limit of 1.88 ms. The
+code it measures is not touched by this part; the cause is where the test lived: a
+comparison of two times with a tight ratio inside `lightChunk.slow.test.ts`, whose files
+run side by side with the four heavy light soak tests. `CLAUDE.md` puts such comparisons
+into `*.solo.test.ts`. Both timing tests of AC1.7 moved to
+`src/world/light/lightSpeed.solo.test.ts` (both sides warmed up, the best of 12 and 16
+rounds, the sides in turn); the slow file keeps the check of the cave chunk against the
+reference. `.github/workflows/ci.yml` now allows 80
+minutes.
 
 ## For the Pi side
 

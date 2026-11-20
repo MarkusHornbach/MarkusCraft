@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, CHUNK_VOLUME, GENERATOR_VERSION, WORLD_HEIGHT } from '../../game/config';
 import { LIGHT_CHECKSUM_1337_V1 } from '../../testing/lightChecksum';
 import { TEST_LIGHT, artificialGroup, caveGroup } from '../../testing/lightScenes';
-import { expectFasterThan } from '../../testing/timing';
 import { generateChunk } from '../generation/terrain';
-import { meshChunk } from '../meshing/mesher';
 import { checkChunkLight, checkLight, joinChunks } from './lightCheck';
 import { lightChecksumOf, lightChunk } from './lightChunk';
 import { type ChunkLookup, blockOf, skyOf, stepLight } from './lightRules';
@@ -35,16 +33,6 @@ function firstDifference(actual: Uint8Array, expected: Uint8Array): string | nul
     }
   }
   return null;
-}
-
-function bestOf(rounds: number, run: () => void): number {
-  let best = Infinity;
-  for (let i = 0; i < rounds; i++) {
-    const start = performance.now();
-    run();
-    best = Math.min(best, performance.now() - start);
-  }
-  return best;
 }
 
 describe('lightChunk', () => {
@@ -188,37 +176,12 @@ describe('lightChunk', () => {
     expect(lightChecksumOf((cx, cz) => lightChunk(around(cx, cz)))).toBe(LIGHT_CHECKSUM_1337_V1);
   });
 
-  it('Phase 4 AC1.7: lighting a terrain chunk takes at most 40 % of meshing it', () => {
-    for (let cz = -1; cz <= 4; cz++) for (let cx = -1; cx <= 4; cx++) terrainChunk(cx, cz);
-    const each = (run: (cx: number, cz: number) => void) => () => {
-      for (let cz = 0; cz < 4; cz++) for (let cx = 0; cx < 4; cx++) run(cx, cz);
-    };
-    const light =
-      bestOf(
-        8,
-        each((cx, cz) => lightChunk(around(cx, cz))),
-      ) / 16;
-    const mesh =
-      bestOf(
-        8,
-        each((cx, cz) => meshChunk(terrainChunk(cx, cz), around(cx, cz))),
-      ) / 16;
-    console.log(`light ${light.toFixed(3)} ms/chunk, meshing ${mesh.toFixed(3)} ms/chunk`);
-    expectFasterThan(light, mesh * 0.4);
-  });
-
-  it('Phase 4 AC1.7: a chunk full of caves takes at most four times a terrain chunk', () => {
+  it('Phase 4 AC1.7: a chunk full of caves is lit like the reference', () => {
+    // Its time against a terrain chunk is compared in `lightSpeed.solo.test.ts`.
     const caves = caveGroup(SEED, 1, 1);
     expect(caves.carvedShare).toBeGreaterThan(0.25);
     expect(caves.carvedShare).toBeLessThan(0.42);
     const lookup: ChunkLookup = (dx, dz) => caves.at(dx + 1, dz + 1);
     expect(firstDifference(lightChunk(lookup), checkChunkLight(lookup))).toBeNull();
-    const cave = bestOf(12, () => lightChunk(lookup));
-    const plain = bestOf(12, () => lightChunk(around(1, 1)));
-    console.log(
-      `cave chunk ${cave.toFixed(3)} ms, terrain chunk ${plain.toFixed(3)} ms, ` +
-        `carved ${(caves.carvedShare * 100).toFixed(0)} %`,
-    );
-    expectFasterThan(cave, plain * 4);
   });
 });
