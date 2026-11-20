@@ -112,6 +112,8 @@ for (const [device, view] of [
     expect(menuButtons.map((b) => b.name)).toEqual([
       'play-button',
       'menu-button back-button',
+      // "Open to others" (Phase 6 part B).
+      'menu-button room-open-button',
       'copy-link-button',
       'fullscreen-button',
     ]);
