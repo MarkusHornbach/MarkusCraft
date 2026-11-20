@@ -245,8 +245,22 @@ Afterwards every changed file was run again in full (`gamepadMenus`, `netTest`,
 
 The first CI run of the pull request (run 44824343396) was cancelled by the job's
 45-minute limit while every test so far had passed: the multiplayer project, one test at a
-time, started late and needs about 20 minutes. `.github/workflows/ci.yml` now allows 80
-minutes.
+time, started late and needs about 20 minutes.
+
+The second run (44831792708) passed 260 of 263 tests in 50 minutes. Three failed, all
+fixed:
+
+- `pad-world-menu` was not regenerated with the other menu references: in the container it
+  stayed under its 5 % tolerance, with CI's font it is 6 %. Regenerated and looked at
+  (the join section below the world list, the focus frame on "Press A to play").
+- `join-section`: CI's font draws the section 6 px shorter, and an element screenshot of
+  another size always fails. `join-section` and `room-panel` are now regions of a fixed
+  size (472 × 270 and 340 × 140) from the section's top left corner, with 8 % tolerance
+  as the `net-test` reference of Part A.
+- AC6.3 waited for the received yaw of the host, but the figure is drawn at the
+  interpolated pose 100 ms behind; on CI the picture was taken before it turned.
+  `getState().net.players` has `renderYaw` now, and the test waits for it. `.github/workflows/ci.yml` now allows 80
+  minutes.
 
 ## For the Pi side
 

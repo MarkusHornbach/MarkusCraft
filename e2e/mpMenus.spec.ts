@@ -279,6 +279,22 @@ test.describe('five players', () => {
   });
 });
 
+/**
+ * A reference of a menu section as a region of a fixed size from its top left corner: CI's
+ * font makes text a few pixels taller or shorter, which an element screenshot cannot take.
+ */
+async function sectionShot(page: Page, section: Locator, name: string): Promise<void> {
+  await section.scrollIntoViewIfNeeded();
+  const box = await section.boundingBox();
+  if (!box) throw new Error(`${name}: no box`);
+  const size =
+    name === 'join-section.png' ? { width: 472, height: 270 } : { width: 340, height: 140 };
+  await expect(page).toHaveScreenshot(name, {
+    clip: { x: Math.round(box.x), y: Math.round(box.y), ...size },
+    maxDiffPixelRatio: 0.08,
+  });
+}
+
 /** A stub of the screen wake lock that records requests and releases on `window.__wake`. */
 async function stubWakeLock(page: Page, reject = false): Promise<void> {
   await page.addInitScript((rejecting) => {
@@ -414,9 +430,7 @@ test('Phase 6 AC7.14: reference screenshots of the join section and the room pan
   await hostRoom(b.page, { code: 'BEN567' });
   const guest = await menuPlayer(players, 'Mira');
   await expect(guest.page.locator('.room-row')).toHaveCount(2, { timeout: 6000 });
-  await expect(guest.page.locator('.join-section')).toHaveScreenshot('join-section.png', {
-    maxDiffPixelRatio: 0.05,
-  });
+  await sectionShot(guest.page, guest.page.locator('.join-section'), 'join-section.png');
   // The room panel: a host with a fixed code and one guest.
   for (const page of [a.page, b.page]) await page.close();
   const host = await pausedHost(players, 'Ada');
@@ -424,7 +438,5 @@ test('Phase 6 AC7.14: reference screenshots of the join section and the room pan
   const bo = await openTestPlayer(players, { query: { name: 'Bo' } });
   await joinRoom(bo.page, 'HAPPY2');
   await untilList(host.page, ['Ada (host) (you)', 'Bo'], 10_000);
-  await expect(host.page.locator('.room-panel')).toHaveScreenshot('room-panel.png', {
-    maxDiffPixelRatio: 0.05,
-  });
+  await sectionShot(host.page, host.page.locator('.room-panel'), 'room-panel.png');
 });

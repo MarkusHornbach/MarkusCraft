@@ -928,6 +928,7 @@ export class Game {
           renderX: drawn ? drawn.x : player.x,
           renderY: drawn ? drawn.y : player.y,
           renderZ: drawn ? drawn.z : player.z,
+          renderYaw: drawn ? drawn.yaw : player.yaw,
         };
       }),
       rttMs: this.mp.client?.rttMs ?? null,
@@ -955,7 +956,7 @@ export class Game {
   }
 
   /** Where another player is drawn now, or null if it is not drawn. */
-  private drawnPose(id: number): { x: number; y: number; z: number } | null {
+  private drawnPose(id: number): { x: number; y: number; z: number; yaw: number } | null {
     const roster = this.mp.host?.roster ?? this.mp.client?.roster;
     return roster?.get(id)?.poses.sample(performance.now()) ?? null;
   }

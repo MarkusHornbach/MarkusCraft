@@ -612,7 +612,7 @@ active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused
   `net.join(code, { name?, checksum?, build? })` (`checksum` forces a terrain mismatch,
   `build` another build), `net.rooms()`, `net.leave()`, `net.sendRaw(message)`,
   `net.dropConnection()`, `suspendFrames(on)`; `getState().net` has `role`, `status`,
-  `roomCode`, `selfId`, `players` (with `renderX/Y/Z`, where the figure is drawn),
+  `roomCode`, `selfId`, `players` (with `renderX/Y/Z/Yaw`, where the figure is drawn),
   `rttMs`, `lastResult` (the host's last answer, also to raw messages), `worldHash`,
   `lastError`, `notices`, `figures`. `setBlock` on a host is sent to the guests; on a guest
   it throws. URL parameters `join=<code>` (in test mode: join at once; otherwise the world

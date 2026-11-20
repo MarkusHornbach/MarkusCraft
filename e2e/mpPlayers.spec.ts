@@ -167,7 +167,8 @@ test('Phase 6 AC6.2, AC6.3, AC6.6: figure, name tag, head and draw calls', async
   await setPose(host.page, { yaw: Math.PI });
   await untilNet(
     guest.page,
-    (n) => Math.abs(Math.abs(n.players.find((p) => p.host)?.yaw ?? 0) - Math.PI) < 0.01,
+    // The drawn pose, which follows the received one by the interpolation delay.
+    (n) => Math.abs(Math.abs(n.players.find((p) => p.host)?.renderYaw ?? 0) - Math.PI) < 0.01,
   );
   await guest.page.evaluate(() => window.__mc.whenIdle());
   const turned = await capture(guest.page);

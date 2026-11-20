@@ -112,6 +112,7 @@ export interface GameState {
       renderX: number;
       renderY: number;
       renderZ: number;
+      renderYaw: number;
     }[];
     /** Round trip of the last ping to the host (guests only). */
     rttMs: number | null;
