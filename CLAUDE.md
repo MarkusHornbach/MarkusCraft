@@ -43,7 +43,8 @@ game in a procedurally generated world"; everything in it is original work.
      servers on a Raspberry Pi; the host validates every action and saves every guest's
      items. Four parts with separate pull requests: A connection test, B together in
      Creative, C Gathering together, D measure and harden (plan: `docs/phase-6-plan.md`;
-     it replaces `docs/phase-2-plan.md`, Part B)
+     it replaces `docs/phase-2-plan.md`, Part B; reports: `docs/phase-6a-report.md`,
+     `docs/phase-6b-report.md`)
   7. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
 
 ## Hard rules
@@ -119,6 +120,10 @@ src/
                      benchEnv.ts (browser, GPU and screen for a performance test result),
                      backGuard.ts (one history entry, so the browser's Back stays in the game),
                      netConfig.ts (pure: build variables and URL parameters → NetConfig),
+                     multiplayer.ts (`Multiplayer`: opens or joins a room, drives the
+                     session from frames and a 250 ms timer, notices, wake lock, room
+                     list; loads the session code lazily), playerIdentity.ts (player key
+                     and name in local storage, stored only once multiplayer is used),
                      buildCommit.ts (pure: the build id; used by vite.config.ts),
                      peerTransport.ts (Signaling, Connection, RoomDirectory with peerjs;
                      own chunk, dynamic import)
@@ -132,7 +137,15 @@ src/
                      (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
   net/               pure (Phase 6): transport.ts (Connection, Signaling, RoomDirectory,
                      Network), memoryTransport.ts (fake clock, seeded delays), netTest.ts
-                     (ids, messages and one run of the network test, candidate pair, texts)
+                     (ids, messages and one run of the network test, candidate pair, texts),
+                     protocol.ts (messages, `encodeMessage`, validating decoders per
+                     direction, `validPose`), roomCode.ts (codes, peer ids, names, player
+                     keys), snapshot.ts (edits → snapshot parts → edits, `worldHash`),
+                     HostSession.ts (the host: players, `applyAction` per player, relay,
+                     time of day; `local` is the host's own `Session`), ClientSession.ts
+                     (the guest: join, sync, pose, ping, reconnect; a `Session`),
+                     interpolation.ts (`PoseBuffer`, `RemoteRoster`), authority.ts
+                     (`FarReader`: blocks of chunks the host has not loaded)
   items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
                      slots), hardness.ts (break times, tool speed, gating, drop table),
                      recipes.ts (recipe table, stations near a player, recipe status)
@@ -156,7 +169,8 @@ src/
                      GamepadSource.ts (polls `navigator.getGamepads`, chooses the pad,
                      feeds Input in play, hands the frame to `Game` otherwise)
   render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts,
-                     BreakOverlay.ts (cracks on the block being broken, one draw call)
+                     BreakOverlay.ts (cracks on the block being broken, one draw call),
+                     RemotePlayers.ts (other players: body and head box, name tag)
     textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts,
                      itemIcons.ts (icons of items that are no blocks), cracks.ts (pure)
   ui/                Hud.ts (bar with counts, break progress, notices), blockIcon.ts,
@@ -170,14 +184,18 @@ src/
                      "Interrupted"), NetTestScreen.ts (the network test; own chunk, loaded
                      on its first use), FocusManager.ts (the controller's focus on a screen,
                      the focus frame), PadHints.ts (the hint bar), padGlyphs.ts (button
-                     glyphs drawn on canvases)
+                     glyphs drawn on canvases), JoinSection.ts ("Join a world" on the
+                     world menu), RoomPanel.ts ("Playing together" in the pause menu)
   util/              rng.ts, noise.ts, math.ts
   testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts,
                      lightChecksum.ts, lightScenes.ts (tables with emitters, artificial
-                     volumes), lightEdits.ts (a lit test world, random edits)
+                     volumes), lightEdits.ts (a lit test world, random edits), netRig.ts
+                     (a host and guests over the memory transport with a fake clock)
 e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts,
                      multiplayer.ts (several players in their own contexts, `netQuery`,
-                     `openNetTest`), sites.ts
+                     `openNetTest`, `openTestPlayer`, `hostRoom`, `joinRoom`, `untilNet`),
+                     mp*.spec.ts (tests with several game pages; project `multiplayer`),
+                     sites.ts
                      (tree, beach and rock near the start point), lightScenes.ts (tunnel,
                      room with a window, roof over a chunk corner), gamepad.ts (the fake
                      controller), recipeRows.ts (recipe rows that never move),
@@ -223,7 +241,9 @@ sides in turn.
   Never read a result from `submit`'s return: a later session may answer asynchronously.
   `applyAction` is pure and never mutates its inputs; `PlayerRecord`s are immutable.
   `src/actions/pipeline.test.ts` fails if `.setBlock(` is called anywhere but in
-  `actions/Session.ts` and once in `Game.ts` (the test API tool), if a slot-changing
+  `actions/Session.ts`, `net/HostSession.ts` (the host applies an action),
+  `net/ClientSession.ts` (a guest applies the host's blocks) and once in `Game.ts` (the
+  test API tool), if a slot-changing
   inventory function is called outside `src/actions/` (one call in `Game.ts` for `give`),
   or if `replaceRecord` is called outside the two test tools. Slots in actions and records
   count from 0; keys, HUD and `getState().selectedSlot` count from 1.
@@ -444,6 +464,26 @@ sides in turn.
   the same build sees each other. Single-player loads neither `peerjs` nor the network
   test's chunk and requests nothing outside its origin (AC1.7). Time reaches `src/net/` as
   `nowMs`, randomness as bytes (`crypto.getRandomValues` in the shell).
+- **Rooms (Phase 6 part B).** `Game.session` is a `LocalSession` in single-player, the
+  host's `HostSession.local` while hosting, or the guest's `ClientSession`; `Multiplayer`
+  swaps it through `useSession` (`Game` never asks which). The host's world, mode and
+  record go into `HostSession`; every action of every player (the host's own too) goes
+  through `applyAction` there, with the acting player's record and last pose and a
+  `FarReader` for chunks the host has not loaded. A guest applies only what the host
+  sends (`blocks`, `record`, `result`); it never checks actions itself. **A guest's world
+  is never saved** (the autosave writes nothing while `role` is `guest`, no world lock;
+  `Game.openGuestWorld` loads it with `loadWorld`, after a reconnect at the player's own
+  pose). While a room is open or joined, the pause menu and the inventory do not pause the
+  world (the frame still steps; `Input` gives no input while paused), the time of day comes
+  from the room (`Multiplayer.timeOfDay`: the host's wall clock, the guest's last pong), and
+  a 250 ms timer keeps the session answering in a hidden tab. The host needs no timer of
+  its own: it relays poses from frames and from its message handlers (at most every 50 ms)
+  and answers pings. Gathering worlds cannot be opened in Part B (`TEXT_GATHERING_LATER`).
+  `HostSession`, `ClientSession` and `protocol.ts` are a chunk of their own, loaded the
+  first time a room is opened, joined or listed. The player key and name
+  (`markuscraft.player.v1`) are stored only once multiplayer is used or a name typed:
+  single-player leaves no trace. Notices ("Anna joined") use wall-clock time
+  (`NET_NOTICE_MS`, at most `NET_NOTICES_MAX`).
 - **The network test (Phase 6 part A)** is a screen of its own (`nettest`), opened by
   "Network test" on the settings page; "Back" returns there. Its test id is
   `mc-<build>-t-<4 characters>`; it lists the others from PeerJS discovery every 3 s,
@@ -562,6 +602,22 @@ active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused
 - Run the browser suite alone: a build or `npm run check` in parallel makes menu tests
   time out. A vertical finger drag that starts on the inventory overlay is a scroll
   gesture for the browser and cancels the touch; tests drag sideways there.
+- **Tests with several game pages** are files named `mp<Name>.spec.ts`. They run in the
+  Playwright project `multiplayer` with one worker, next to the `game` project: with more
+  software-rendered pages at once, WebRTC connections between them starve on a 4-core
+  machine and take more than 15 s. Room tests use `openTestPlayer` (test mode, seed 1337,
+  noon, frozen, the local server), `hostRoom`, `joinRoom` (waits until the guest's world is
+  ready), `joinError` and `untilNet`. Room codes in tests must use the code alphabet (no
+  I, O, 0, 1). Test API of Part B: `__mc.net.host({ code?, build? })`,
+  `net.join(code, { name?, checksum?, build? })` (`checksum` forces a terrain mismatch,
+  `build` another build), `net.rooms()`, `net.leave()`, `net.sendRaw(message)`,
+  `net.dropConnection()`, `suspendFrames(on)`; `getState().net` has `role`, `status`,
+  `roomCode`, `selfId`, `players` (with `renderX/Y/Z`, where the figure is drawn),
+  `rttMs`, `lastResult` (the host's last answer, also to raw messages), `worldHash`,
+  `lastError`, `notices`, `figures`. `setBlock` on a host is sent to the guests; on a guest
+  it throws. URL parameters `join=<code>` (in test mode: join at once; otherwise the world
+  menu's "Join world CODE") and `name=<text>`. A crash without goodbye:
+  `Page.crash` through a CDP session.
 - **Multiplayer tests** use `test` from `e2e/multiplayer.ts`: `players.open()` makes a
   player in its own browser context with the console checks. Playwright starts the local
   PeerJS server (`npm run signal`, `127.0.0.1:9000`, discovery on) next to the preview
@@ -745,7 +801,11 @@ hold:
 - Phase 6 part A (connection test: transport, local signaling server, network test):
   implemented (report: `docs/phase-6a-report.md`). Read its "Decisions and deviations"
   before changing the network layer, the network test or the multiplayer tests.
-- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), part A implemented. Four parts,
+- Phase 6 part B (together in Creative: protocol, host and guest sessions, figures and
+  name tags, "Join a world", "Playing together", leaving and reconnecting): implemented
+  (report: `docs/phase-6b-report.md`). Read its "Decisions and deviations" before
+  changing the sessions, the protocol, the menus of rooms or the multiplayer tests.
+- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A and B implemented. Four parts,
   each in its own session with its own pull request, in order: **A** connection test
   (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's NET
   tests of A in `docs/device-tests.md` show a working connection), **C** Gathering
