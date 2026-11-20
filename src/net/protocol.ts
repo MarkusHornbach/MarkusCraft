@@ -173,15 +173,25 @@ const BUILD_LENGTH = 40;
 const ID_MAX = 0x7fffffff;
 const TIME_MAX = 8.64e15;
 
-/** A pose within the bounds the host accepts; pitch is clamped. */
+/**
+ * A pose: finite numbers. Whether it lies inside the world is the host's rule
+ * (`validPose`), which drops a pose outside without counting it as a protocol error.
+ */
 function pose(m: Fields): NetPose {
   return {
-    x: num(m, 'x', -POSE_LIMIT_XZ, POSE_LIMIT_XZ),
-    y: num(m, 'y', POSE_MIN_Y, POSE_MAX_Y),
-    z: num(m, 'z', -POSE_LIMIT_XZ, POSE_LIMIT_XZ),
+    x: num(m, 'x', -1e12, 1e12),
+    y: num(m, 'y', -1e12, 1e12),
+    z: num(m, 'z', -1e12, 1e12),
     yaw: num(m, 'yaw', -1e6, 1e6),
-    pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, num(m, 'pitch', -10, 10))),
+    pitch: num(m, 'pitch', -1e6, 1e6),
   };
+}
+
+/** The host's bounds for poses; pitch is clamped rather than refused. */
+export function validPose(p: NetPose): NetPose | null {
+  if (Math.abs(p.x) > POSE_LIMIT_XZ || Math.abs(p.z) > POSE_LIMIT_XZ) return null;
+  if (p.y < POSE_MIN_Y || p.y > POSE_MAX_Y) return null;
+  return { ...p, pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, p.pitch)) };
 }
 
 function playerInfo(value: unknown): PlayerInfo {

@@ -82,7 +82,7 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
     expect(bad('{"t":"ping","ts":1e999}')).toBe(true);
     expect(bad(JSON.stringify({ t: 'ping', ts: Number.NaN }))).toBe(true);
     expect(bad(JSON.stringify({ t: 'pose', ...POSE, x: Infinity, tp: false }))).toBe(true);
-    expect(bad(JSON.stringify({ t: 'pose', ...POSE, y: 9999, tp: false }))).toBe(true);
+    expect(bad(JSON.stringify({ t: 'pose', ...POSE, y: 1e13, tp: false }))).toBe(true);
     expect(bad(JSON.stringify({ t: 'pose', ...POSE, tp: 1 }))).toBe(true);
     expect(bad(JSON.stringify({ t: 'hello', build: 'b', key: KEY, name: 'x'.repeat(65) }))).toBe(
       true,
