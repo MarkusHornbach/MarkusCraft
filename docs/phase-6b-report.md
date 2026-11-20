@@ -75,30 +75,30 @@ STUN) and that Part B may start. Nothing was copied from it.
 
 ## Acceptance criteria
 
-| AC     | Where / how                                                                                                                        |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| AC3.1  | `src/net/protocol.test.ts` "every guest/host message survives encode → decode"                                                     |
-| AC3.2  | `src/net/protocol.test.ts` "protocol decoder (Phase 6 AC3.2)" (types, NaN, infinities, fractions, lengths, actions, records, 10 000 random strings) |
-| AC3.3  | `src/net/roomCode.test.ts` "room codes"                                                                                            |
-| AC3.4  | `src/net/roomCode.test.ts` "names and player keys"                                                                                 |
-| AC3.5  | `src/net/snapshot.test.ts`                                                                                                         |
-| AC4.1  | `src/net/sessions.test.ts` "joining"                                                                                               |
-| AC4.2–4.4 | `sessions.test.ts` "actions"                                                                                                    |
-| AC4.5  | `sessions.test.ts` "admission" (also the version message, the terrain check, an unreachable server)                                |
-| AC4.6  | `sessions.test.ts` "poses"                                                                                                         |
-| AC4.7  | `sessions.test.ts` "time" (60 s without host frames)                                                                               |
-| AC4.8, AC4.9 | `sessions.test.ts` "convergence" (2 000 seeded actions, a guest joining midway; edits during a snapshot)                     |
-| AC4.10 | `sessions.test.ts` "protocol errors"                                                                                               |
-| AC4.11 | `sessions.test.ts` "the guest state machine"                                                                                       |
-| AC4.12 | `src/net/interpolation.test.ts`                                                                                                    |
-| AC4.13 | `sessions.test.ts` "far chunks"                                                                                                    |
-| AC4.14 | Line coverage of `src/net/` 97 % (`npm run test:coverage`, see "Measured numbers")                                                 |
-| AC5.1–5.12 | `e2e/mpRooms.spec.ts`, one test each ("Phase 6 AC5.x")                                                                         |
-| AC6.1–6.7 | `e2e/mpPlayers.spec.ts`; AC6.8 in `sessions.test.ts` "an unchanged pose is not sent again …"                                    |
-| AC6.9  | References `remote-player` and `remote-player-night`, looked at (below)                                                            |
-| AC7.1–7.13 | `e2e/mpMenus.spec.ts`, one test per criterion (AC7.4 and AC7.6 share one)                                                      |
-| AC7.14 | References `join-section`, `room-panel`; changed references regenerated (below)                                                    |
-| AC7.15 | `README.md` "Playing together", `CLAUDE.md`, `docs/device-tests.md` (NET-5 to NET-12), this report, the pull request             |
+| AC           | Where / how                                                                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC3.1        | `src/net/protocol.test.ts` "every guest/host message survives encode → decode"                                                                      |
+| AC3.2        | `src/net/protocol.test.ts` "protocol decoder (Phase 6 AC3.2)" (types, NaN, infinities, fractions, lengths, actions, records, 10 000 random strings) |
+| AC3.3        | `src/net/roomCode.test.ts` "room codes"                                                                                                             |
+| AC3.4        | `src/net/roomCode.test.ts` "names and player keys"                                                                                                  |
+| AC3.5        | `src/net/snapshot.test.ts`                                                                                                                          |
+| AC4.1        | `src/net/sessions.test.ts` "joining"                                                                                                                |
+| AC4.2–4.4    | `sessions.test.ts` "actions"                                                                                                                        |
+| AC4.5        | `sessions.test.ts` "admission" (also the version message, the terrain check, an unreachable server)                                                 |
+| AC4.6        | `sessions.test.ts` "poses"                                                                                                                          |
+| AC4.7        | `sessions.test.ts` "time" (60 s without host frames)                                                                                                |
+| AC4.8, AC4.9 | `sessions.test.ts` "convergence" (2 000 seeded actions, a guest joining midway; edits during a snapshot)                                            |
+| AC4.10       | `sessions.test.ts` "protocol errors"                                                                                                                |
+| AC4.11       | `sessions.test.ts` "the guest state machine"                                                                                                        |
+| AC4.12       | `src/net/interpolation.test.ts`                                                                                                                     |
+| AC4.13       | `sessions.test.ts` "far chunks"                                                                                                                     |
+| AC4.14       | Line coverage of `src/net/` 97 % (`npm run test:coverage`, see "Measured numbers")                                                                  |
+| AC5.1–5.12   | `e2e/mpRooms.spec.ts`, one test each ("Phase 6 AC5.x")                                                                                              |
+| AC6.1–6.7    | `e2e/mpPlayers.spec.ts`; AC6.8 in `sessions.test.ts` "an unchanged pose is not sent again …"                                                        |
+| AC6.9        | References `remote-player` and `remote-player-night`, looked at (below)                                                                             |
+| AC7.1–7.13   | `e2e/mpMenus.spec.ts`, one test per criterion (AC7.4 and AC7.6 share one)                                                                           |
+| AC7.14       | References `join-section`, `room-panel`; changed references regenerated (below)                                                                     |
+| AC7.15       | `README.md` "Playing together", `CLAUDE.md`, `docs/device-tests.md` (NET-5 to NET-12), this report, the pull request                                |
 
 No criterion was cut: AC7.12 (the controller), the version message of AC7.2 and "Copy
 join link" are all built and tested.
