@@ -3,6 +3,7 @@ import type { ActionResult } from '../actions/apply';
 import type { GameMode, ItemStack } from '../actions/playerRecord';
 import type { BenchResult } from '../bench/benchReport';
 import type { Network } from '../net/transport';
+import type { RoomList } from './multiplayer';
 import type { MoveMode } from '../player/player';
 import type { NetTestState } from '../ui/NetTestScreen';
 
@@ -87,8 +88,40 @@ export interface GameState {
    */
   net: {
     role: 'off' | 'host' | 'guest';
+    status: 'offline' | 'connecting' | 'syncing' | 'online' | 'reconnecting';
     available: boolean;
     build: string;
+    roomCode: string | null;
+    /** The id the room gave this player. */
+    selfId: number | null;
+    /**
+     * Everyone in the room: the last pose known (`x` …) and, for the others, where the
+     * figure is drawn now (`renderX` …; the own player's pose for itself).
+     */
+    players: {
+      id: number;
+      name: string;
+      slot: number;
+      self: boolean;
+      host: boolean;
+      x: number;
+      y: number;
+      z: number;
+      yaw: number;
+      pitch: number;
+      renderX: number;
+      renderY: number;
+      renderZ: number;
+    }[];
+    /** Round trip of the last ping to the host (guests only). */
+    rttMs: number | null;
+    /** The host's last answer to this guest (also to raw messages), or null. */
+    lastResult: { seq: number; ok: boolean; reason: string | null } | null;
+    /** Order-independent hash of the world's edits: equal on all players, equal worlds. */
+    worldHash: number;
+    lastError: string | null;
+    /** The multiplayer notices on screen ("Anna joined"). */
+    notices: string[];
     test: NetTestState | null;
   };
   player: {
@@ -209,6 +242,26 @@ export interface TestApi {
    * signaling server. Tests drive its signaling and connections directly.
    */
   netNetwork(): Promise<Network | null>;
+  /** Multiplayer (Phase 6 part B). */
+  net: {
+    /** Opens the open world to others; resolves with the room code. */
+    host(options?: { code?: string; build?: string }): Promise<string>;
+    /** Joins a room; resolves when synced, rejects with the text of the reason. */
+    join(
+      code: string,
+      options?: { name?: string; checksum?: number; build?: string },
+    ): Promise<void>;
+    /** The room list as the world menu shows it. */
+    rooms(): Promise<RoomList>;
+    /** Leaves (guest) or closes (host) the room. */
+    leave(): void;
+    /** Any message to the host, past the encoder. */
+    sendRaw(message: unknown): void;
+    /** Kills the guest's transport without a goodbye. */
+    dropConnection(): void;
+  };
+  /** The frame loop skips all work while on (a hidden tab). */
+  suspendFrames(on: boolean): void;
   /** Shows the sheet of all controller glyphs over the game (reference screenshot). */
   glyphSheet(): void;
   /** Advance exactly `n` fixed simulation steps and render once. */

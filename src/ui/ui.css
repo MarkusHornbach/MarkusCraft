@@ -184,6 +184,27 @@ canvas {
   display: block;
 }
 
+/* Multiplayer notices: who joined or left, the connection. */
+.net-notices {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.net-notice {
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background: rgba(20, 24, 32, 0.6);
+}
+
 /* How many items a slot holds: bottom right, readable on every icon. */
 .slot-count,
 .recipe-result-count {

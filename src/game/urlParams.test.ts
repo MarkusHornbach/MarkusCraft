@@ -16,11 +16,16 @@ describe('parseParams', () => {
       world: 'Test',
       mode: 'creative',
       bench: 'off',
+      join: null,
+      name: null,
     });
   });
   it('reads all parameters', () => {
     expect(
-      parseParams('?seed=42&time=0.75&freeze=1&test=1&touch=1&save=1&world=%20Second%20', random),
+      parseParams(
+        '?seed=42&time=0.75&freeze=1&test=1&touch=1&save=1&world=%20Second%20&join=ab-cd%20ef&name=Ann',
+        random,
+      ),
     ).toEqual({
       seed: 42,
       seedFromUrl: true,
@@ -33,7 +38,13 @@ describe('parseParams', () => {
       world: 'Second',
       mode: 'creative',
       bench: 'off',
+      join: 'ABCDEF',
+      name: 'Ann',
     });
+  });
+  it('Phase 6 AC7.3: an invalid join code counts as none', () => {
+    expect(parseParams('?join=ABC', random).join).toBeNull();
+    expect(parseParams('?join=abcdef', random).join).toBe('ABCDEF');
   });
   it('normalises seeds to unsigned 32-bit and ignores invalid input', () => {
     expect(parseParams('?seed=-1', random).seed).toBe(4294967295);

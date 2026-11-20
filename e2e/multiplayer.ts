@@ -115,3 +115,73 @@ export async function untilNetTest(
   if (!last) throw new Error('the network test is not open');
   return last;
 }
+
+/** URL parameters of a multiplayer test page: test mode, seed 1337, noon, frozen clock. */
+export function testQuery(extra: Record<string, string> = {}): string {
+  return netQuery({ test: '1', seed: '1337', time: '0.25', freeze: '1', ...extra });
+}
+
+/** A player in test mode on the local server; waits until its world is ready. */
+export async function openTestPlayer(
+  players: Players,
+  options: PlayerOptions & { query?: Record<string, string> } = {},
+): Promise<Player> {
+  const player = await players.open(options);
+  await player.page.goto(`/${testQuery(options.query)}`);
+  await player.page.waitForFunction(
+    () => window.__mc !== undefined && window.__mc.isReady(),
+    null,
+    {
+      timeout: 60_000,
+    },
+  );
+  return player;
+}
+
+/** Opens the page's world to others; returns the room code. */
+export function hostRoom(
+  page: Page,
+  options: { code?: string; build?: string } = {},
+): Promise<string> {
+  return page.evaluate((o) => window.__mc.net.host(o), options);
+}
+
+/** Joins a room and waits until the guest's world is ready. */
+export async function joinRoom(
+  page: Page,
+  code: string,
+  options: { name?: string; checksum?: number; build?: string } = {},
+): Promise<void> {
+  await page.evaluate(([c, o]) => window.__mc.net.join(c, o), [code, options] as const);
+  await page.waitForFunction(() => window.__mc.isReady(), null, { timeout: 60_000 });
+}
+
+/** Joins and returns the error text instead of throwing. */
+export function joinError(
+  page: Page,
+  code: string,
+  options: { checksum?: number; build?: string } = {},
+): Promise<string | null> {
+  return page.evaluate(
+    ([c, o]) =>
+      window.__mc.net.join(c, o).then(
+        () => null,
+        (e: Error) => e.message,
+      ),
+    [code, options] as const,
+  );
+}
+
+/** `getState().net` of a page. */
+export function netOf(page: Page) {
+  return page.evaluate(() => window.__mc.getState().net);
+}
+
+/** Waits until `check` holds for the page's `getState().net`. */
+export async function untilNet(
+  page: Page,
+  check: (net: Awaited<ReturnType<typeof netOf>>) => boolean,
+  timeout = 15_000,
+): Promise<void> {
+  await expect.poll(async () => check(await netOf(page)), { timeout, intervals: [100] }).toBe(true);
+}

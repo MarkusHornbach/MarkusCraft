@@ -1,5 +1,6 @@
 // URL parameters that make a session reproducible (seed, time of day, test mode).
 import type { GameMode } from '../actions/playerRecord';
+import { normalizeRoomCode } from '../net/roomCode';
 import { normalizeName } from '../save/saveFormat';
 import { START_TIME_OF_DAY } from './config';
 
@@ -25,6 +26,10 @@ export interface GameParams {
    * with that suite, `sample` shows the result screen with a built-in result.
    */
   bench: 'off' | 'full' | 'quick' | 'sample';
+  /** A room code to join (`join=`), normalised; null if none or invalid. */
+  join: string | null;
+  /** A player name for multiplayer (`name=`); null keeps the stored one. */
+  name: string | null;
 }
 
 /** Parses the query string. `randomSeed` supplies the seed when the URL has none. */
@@ -62,5 +67,7 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
     world: normalizeName(query.get('world') ?? '', 'Test'),
     mode: query.get('mode') === 'gathering' ? 'gathering' : 'creative',
     bench: test ? 'off' : bench,
+    join: normalizeRoomCode(query.get('join') ?? ''),
+    name: query.get('name'),
   };
 }

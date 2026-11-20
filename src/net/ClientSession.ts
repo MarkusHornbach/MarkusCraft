@@ -115,6 +115,8 @@ export class ClientSession implements Session {
   private lastPose: NetPose | null = null;
   private lastPoseMs = -Infinity;
   private pendingTeleport = false;
+  /** The host's last answer, also to messages no `submit` sent (tests of the host). */
+  lastResult: { seq: number; ok: boolean; reason: string | null } | null = null;
   /** Poses sent so far (tests count them). */
   posesSent = 0;
 
@@ -327,6 +329,7 @@ export class ClientSession implements Session {
     }
     switch (m.t) {
       case 'result': {
+        this.lastResult = { seq: m.seq, ok: m.ok, reason: m.ok ? null : m.reason };
         const action = this.pending.get(m.seq);
         if (!action) return;
         this.pending.delete(m.seq);

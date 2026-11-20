@@ -3,7 +3,7 @@ import type { Action } from '../actions/actions';
 import { type ActionResult, type BlockChange, heldItem } from '../actions/apply';
 import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
 import { type PlayerRecord } from '../actions/playerRecord';
-import { LocalSession } from '../actions/Session';
+import { LocalSession, type Session } from '../actions/Session';
 import { type BenchResult, issueText, parseIssueBody } from '../bench/benchReport';
 import { type BenchHost, BenchRunner } from '../bench/BenchRunner';
 import { SAMPLE_RESULT } from '../bench/sampleResult';
@@ -48,6 +48,9 @@ import { TouchHud } from '../ui/TouchHud';
 import { WorldMenu } from '../ui/WorldMenu';
 import type { NetTestScreen } from '../ui/NetTestScreen';
 import type { Network } from '../net/transport';
+import type { Welcome } from '../net/protocol';
+import { worldHash } from '../net/snapshot';
+import { Multiplayer } from './multiplayer';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
@@ -140,6 +143,9 @@ interface BenchRun {
   wake: WakeLockSentinel | null;
   wakeGranted: boolean;
 }
+
+/** A session as `Game` uses it; the test tools may replace a record where it can. */
+type GameSession = Session & { replaceRecord?: (record: PlayerRecord) => void };
 
 /** A problem the world menu tells the player about. */
 class MenuProblem extends Error {}
@@ -250,8 +256,15 @@ export class Game {
   private fpsFrames = 0;
   private fpsTime = 0;
   private readonly root: HTMLElement;
-  /** Every change to blocks and to the player's items goes through the session. */
-  private session: LocalSession;
+  /**
+   * Every change to blocks and to the player's items goes through the session: a local
+   * one in single-player, the host's own door into its room, or a guest's session.
+   */
+  private session: GameSession;
+  /** Multiplayer (Phase 6): the room this page hosts or has joined. */
+  private readonly mp: Multiplayer;
+  /** Test tool: the frame loop does nothing (a hidden tab). */
+  private framesSuspended = false;
   private gameMode: GameMode = 'creative';
   /** Simulation steps since the world was opened: the clock of the action layer. */
   private simSteps = 0;
@@ -286,6 +299,8 @@ export class Game {
   constructor(container: HTMLElement, params: GameParams) {
     this.params = params;
     this.netConfig = readNetConfig(window.location.search);
+    this.mp = this.createMultiplayer();
+    if (params.name !== null) this.mp.setName(params.name);
     this.time = params.time;
     this.world = new World(0);
 
@@ -461,8 +476,14 @@ export class Game {
       this.interruptBench('hidden');
       void this.saveNow();
     });
-    window.addEventListener('pagehide', () => void this.saveNow());
+    window.addEventListener('pagehide', () => {
+      // The others learn at once that this player or this room is gone.
+      this.mp.leave();
+      void this.saveNow();
+    });
     installTestApi(this.createTestApi());
+    // `join=CODE` in test mode joins at once (the world menu offers it otherwise).
+    if (params.test && params.join) void this.joinRoom(params.join).catch(() => {});
   }
 
   private createChunkManager(radius: number): ChunkManager {
@@ -503,6 +524,8 @@ export class Game {
    * `edits` is taken over by the new world.
    */
   loadWorld(meta: WorldMeta, edits: WorldEdits): void {
+    // A room belongs to its world: another world closes it.
+    if (this.mp.role === 'host') this.mp.leave();
     this.renderer.clearChunkMeshes();
     this.world = new World(meta.seed, meta.generatorVersion, edits);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
@@ -557,8 +580,8 @@ export class Game {
     const store = this.store;
     return new Autosave(async (batch: SaveBatch) => {
       const meta = this.meta;
-      // The world of the performance test is never stored.
-      if (!meta || this.world !== world || this.bench) return;
+      // The world of the performance test is never stored, nor a guest's copy of a room.
+      if (!meta || this.world !== world || this.bench || this.mp.role === 'guest') return;
       const start = performance.now();
       // Both calls take their snapshot at once, before anything is awaited.
       const chunks = store.saveChunks(meta.id, world.edits, batch.chunks);
@@ -750,6 +773,14 @@ export class Game {
       return;
     }
     if (this.menuBusy || !this.meta) return;
+    if (this.mp.role === 'guest') {
+      // "Leave world": nothing of a guest's world is kept.
+      this.mp.leave();
+      this.leaveGuestWorld('');
+      return;
+    }
+    // The room closes for everyone before the host's world is saved and closed.
+    this.mp.leave();
     this.setMenuBusy(true);
     try {
       await this.saveNow();
@@ -766,6 +797,7 @@ export class Game {
 
   /** Leaves the open world: frees its meshes and its tab lock. Nothing is saved here. */
   private closeWorld(): void {
+    if (this.mp.role === 'host') this.mp.leave();
     this.meta = null;
     this.renderer.clearChunkMeshes();
     this.world = new World(0);
@@ -849,12 +881,147 @@ export class Game {
   }
 
   private netState(): GameState['net'] {
+    const p = this.player;
+    const own = { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
     return {
-      role: 'off',
+      role: this.mp.role,
+      status: this.mp.status,
       available: this.netConfig.signal !== null,
       build: __BUILD_COMMIT__,
+      roomCode: this.mp.roomCode,
+      selfId: this.mp.selfId,
+      players: this.mp.players(own).map((player) => {
+        const drawn = player.self ? null : this.drawnPose(player.id);
+        return {
+          ...player,
+          renderX: drawn ? drawn.x : player.x,
+          renderY: drawn ? drawn.y : player.y,
+          renderZ: drawn ? drawn.z : player.z,
+        };
+      }),
+      rttMs: this.mp.client?.rttMs ?? null,
+      lastResult: this.mp.client?.lastResult ?? null,
+      worldHash: worldHash(this.world.edits),
+      lastError: this.mp.lastError,
+      notices: this.mp.currentNotices(),
       test: this.netTestScreen?.isOpen ? this.netTestScreen.state : null,
     };
+  }
+
+  /** Where another player is drawn now, or null if it is not drawn. */
+  private drawnPose(id: number): { x: number; y: number; z: number } | null {
+    const roster = this.mp.host?.roster ?? this.mp.client?.roster;
+    return roster?.get(id)?.poses.sample(performance.now()) ?? null;
+  }
+
+  /** The multiplayer controller and what it may do with the game. */
+  private createMultiplayer(): Multiplayer {
+    return new Multiplayer({
+      world: () => this.world,
+      worldName: () => this.meta?.name ?? null,
+      mode: () => this.gameMode,
+      record: () => this.session.record,
+      pose: () => {
+        const p = this.player;
+        return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
+      },
+      time: () => this.time,
+      frozen: () => this.params.freeze,
+      listener: {
+        onBlocks: (changes) => this.onBlocksChanged(changes),
+        onPlayer: (record) => this.onPlayerChanged(record),
+        onResult: (action, result) => this.onActionResult(action, result),
+      },
+      openGuestWorld: (welcome, edits, rejoin) => this.openGuestWorld(welcome, edits, rejoin),
+      useSession: (session, record) => this.useSession(session, record),
+      guestEnded: (text) => this.leaveGuestWorld(text),
+      roleChanged: () => this.onNetRoleChanged(),
+      loadNetwork: () => this.loadNetwork(this.netConfig.iceServers),
+      build: __BUILD_COMMIT__,
+      available: this.netConfig.signal !== null,
+    });
+  }
+
+  /** The session `Game` hands its actions to; null: a local one with this record. */
+  private useSession(session: Session | null, record: PlayerRecord): void {
+    this.session = session ?? this.createSession(record);
+    this.breakActive = false;
+    this.onPlayerChanged(this.session.record);
+    this.hud.setSelected(this.selectedSlot, false);
+  }
+
+  /**
+   * A guest's world arrived: it is opened like a stored world but never saved. After a
+   * reconnect the player stays where it is.
+   */
+  private openGuestWorld(welcome: Welcome, edits: WorldEdits, rejoin: boolean): World {
+    const p = this.player;
+    const now = Date.now();
+    const pose = rejoin ? { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch } : welcome.pose;
+    const moveMode = rejoin ? p.mode : 'walk';
+    this.loadWorld(
+      {
+        id: 'guest',
+        name: welcome.worldName,
+        seed: welcome.seed,
+        mode: welcome.mode,
+        generatorVersion: welcome.generatorVersion,
+        formatVersion: SAVE_FORMAT_VERSION,
+        createdMs: now,
+        playedMs: now,
+        time: welcome.time,
+        pose,
+        moveMode,
+        player: welcome.record,
+      },
+      edits,
+    );
+    this.mp.noteTeleport();
+    return this.world;
+  }
+
+  /** A guest's room is over (left, closed by the host, lost): back to the world list. */
+  private leaveGuestWorld(text: string): void {
+    if (!this.pauseScreen) {
+      // Test mode has no menus: a fresh world in memory, as at the start.
+      this.loadWorld(
+        this.newWorldMeta(this.params.world, this.params.seed, this.params.time, this.params.mode),
+        new Map(),
+      );
+      return;
+    }
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.hideInventory();
+    this.paused = true;
+    this.closeWorld();
+    this.showScreen('worlds');
+    this.worldMenu?.setMessage(text);
+    void this.refreshWorldList();
+  }
+
+  /** The room was opened, joined, left or lost. */
+  private onNetRoleChanged(): void {
+    // Menus follow in step 7.
+  }
+
+  /**
+   * Joins a room as a guest. Like a play button, the way it was pressed decides mouse or
+   * touch mode; the world arrives when the host has sent it.
+   */
+  private async joinRoom(
+    code: string,
+    options: { name?: string; checksum?: number; build?: string } = {},
+  ): Promise<void> {
+    try {
+      await this.mp.join(code, options);
+    } catch (error) {
+      this.worldMenu?.setMessage(this.mp.lastError ?? '');
+      throw error;
+    }
+    if (!this.pauseScreen) return;
+    this.markMetaDirty();
+    if (this.mode === 'touch' || this.input.pointerLocked || this.padActive) this.setPaused(false);
+    else this.showScreen('pause');
   }
 
   // --- performance test (not in test mode) ---------------------------------------------
@@ -1427,6 +1594,11 @@ export class Game {
 
   private frame(ms: number): void {
     requestAnimationFrame((next) => this.frame(next));
+    if (this.framesSuspended) {
+      // As in a hidden tab: nothing runs, and no burst of steps follows afterwards.
+      this.lastFrameMs = ms;
+      return;
+    }
     // The time since the last frame, with the chunk work that was done since then.
     const frameMs = ms - this.lastFrameMs;
     if (this.meta) this.perf.record(ms, frameMs, this.chunkWorkMs);
@@ -1445,8 +1617,12 @@ export class Game {
     // The controller first: its input counts for this frame's steps and look.
     this.gamepad.poll(elapsed * 1000);
 
-    // In test mode the simulation only advances through `__mc.step()`.
-    if (!this.params.test && !this.paused) {
+    // The room's sessions: messages that wait, poses, the time of day.
+    this.mp.frame(performance.now());
+
+    // In test mode the simulation only advances through `__mc.step()`. A shared world goes
+    // on behind the pause menu (the player gets no input there).
+    if (!this.params.test && (!this.paused || this.mp.active)) {
       this.accumulator += elapsed;
       let steps = 0;
       while (this.accumulator >= SIM_DT && steps < MAX_STEPS_PER_FRAME) {
@@ -1456,6 +1632,8 @@ export class Game {
       }
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
     }
+    const roomTime = this.mp.timeOfDay(performance.now());
+    if (roomTime !== null) this.time = roomTime;
 
     if (!this.paused && !this.inventoryOpen && !this.bench) {
       const look = this.input.consumeLook();
@@ -1589,6 +1767,7 @@ export class Game {
     const now = this.nowMs();
     const pickup = this.pickup && now <= this.pickup.untilMs ? this.pickup : null;
     const padNotice = this.padNotice && now <= this.padNotice.untilMs ? this.padNotice : null;
+    this.hud.setNetNotices(this.mp.currentNotices());
     this.hud.setNotice(
       padNotice ? padNotice.text : pickup ? `+${pickup.count} ${itemLabel(pickup.item)}` : null,
     );
@@ -2062,9 +2241,12 @@ export class Game {
 
   /** Test tool: sets a block directly, past the action layer. */
   private testSetBlock(x: number, y: number, z: number, id: number): void {
+    // A guest's world is the host's: it changes only through the host.
+    if (this.mp.role === 'guest') throw new Error('setBlock is not available on a guest');
     if (!this.world.setBlock(x, y, z, id)) return;
     this.markChunkDirty(x, z);
     this.remeshAround(x, z);
+    this.mp.host?.broadcastBlocks([{ x, y, z, id }]);
   }
 
   /** Test tool: puts items into the inventory, past the action layer. */
@@ -2072,13 +2254,16 @@ export class Game {
     if (!isItem(item) || !Number.isInteger(count) || count < 1) return;
     const record = this.session.record;
     const { slots } = addItems(record.slots, item, count);
-    this.session.replaceRecord({ ...record, slots });
+    const session = this.session;
+    if (session.replaceRecord) session.replaceRecord({ ...record, slots });
   }
 
   /** Test tool: empties all slots. */
   private testClearInventory(): void {
     const record = this.session.record;
-    this.session.replaceRecord({ ...record, slots: record.slots.map(() => null) });
+    const session = this.session;
+    if (session.replaceRecord)
+      session.replaceRecord({ ...record, slots: record.slots.map(() => null) });
   }
 
   /** Test tool: hands any value to the session as an action and returns the answer. */
@@ -2211,6 +2396,8 @@ export class Game {
     applyLook(p, yaw, pitch);
     this.rememberPosition();
     this.markMetaDirty();
+    // The others snap to the new place instead of seeing the player glide there.
+    this.mp.noteTeleport();
     // A teleport changes which chunks are needed: not idle until the next frame says so.
     this.updateChunkCenter();
   }
@@ -2246,6 +2433,7 @@ export class Game {
       lightChecksum: () => lightChecksumOf((cx, cz) => this.world.lightOf(cx, cz)),
       setTime: (t) => {
         this.time = wrapTime(t);
+        this.mp.setTime(this.time);
         this.markMetaDirty();
       },
       save: () => this.saveNow(),
@@ -2256,6 +2444,24 @@ export class Game {
         this.netConfig.signal ? this.loadNetwork(this.netConfig.iceServers) : Promise.resolve(null),
       glyphSheet: () => {
         if (!this.root.querySelector('.pad-glyph-sheet')) this.root.appendChild(glyphSheet());
+      },
+      net: {
+        host: (options) => this.mp.openRoom(options),
+        join: (code, options) => this.joinRoom(code, options),
+        rooms: () => this.mp.rooms(),
+        leave: () => {
+          if (this.mp.role === 'guest') {
+            this.mp.leave();
+            this.leaveGuestWorld('');
+          } else {
+            this.mp.leave();
+          }
+        },
+        sendRaw: (message) => this.mp.sendRaw(message),
+        dropConnection: () => this.mp.dropConnection(),
+      },
+      suspendFrames: (on) => {
+        this.framesSuspended = on;
       },
       openWorld: (name, seed, mode) => this.openNamedWorld(name, seed, mode ?? this.params.mode),
       step: (n) => {
