@@ -310,16 +310,28 @@ with every device in the home Wi-Fi (not a guest network). Open the world menu, 
 **Settings → Network test**, on both devices of a pair at the same time. Paste the text of
 **Copy result** after "Result:", or note candidate pair, round trip and throughput.
 
-- [ ] **NET-1** (6A) PC and phone: each shows "Signaling: Connected" and its test code;
+- [x] **NET-1** (6A) PC and phone: each shows "Signaling: Connected" and its test code;
       press **Connect** next to the other device on one of them. Both show a candidate
       pair, a round trip, a throughput and "Direct connection OK". _PC, Phone._ Result:
-- [ ] **NET-2** (6A) The same for phone and tablet, and for tablet and PC. _Phone, Tablet,
-      PC._ Result:
-- [ ] **NET-3** (6A) The pairs of NET-1 and NET-2 with **Use STUN: off** on both devices
+      passed (2026-11-20, build a7b0df5, Chrome 157 on Windows and on Android). Two runs
+      with STUN on: candidate pair host → host over the global IPv6 address, round trip
+      6.0 ms and 5.5 ms (median of 20), throughput 6.00 MB/s and 8.59 MB/s, "Direct
+      connection OK".
+- [x] **NET-2** (6A) The same for phone and tablet, and for tablet and PC. _Phone, Tablet,
+      PC._ Result: passed (2026-11-20, build a7b0df5). Tablet and PC with STUN on: host →
+      host over IPv6, round trip 6.0 ms, throughput 5.97 MB/s, "Direct connection OK".
+      Phone and tablet: passed (owner, no numbers recorded).
+- [x] **NET-3** (6A) The pairs of NET-1 and NET-2 with **Use STUN: off** on both devices
       (press it, wait for "Connected", connect again): does it still connect? Which
       candidate pair is used now? Result:
-- [ ] **NET-4** (6A) With all three devices on the network test: each lists the other two
+      passed (2026-11-20, build a7b0df5). PC and phone with STUN off: still host → host
+      over IPv6, round trip 5.8 ms, throughput 4.65 MB/s, "Direct connection OK". Tablet
+      and PC, phone and tablet: passed (owner, no numbers recorded). STUN is not needed on
+      this home network; it stays as a safety net for devices without IPv6.
+- [x] **NET-4** (6A) With all three devices on the network test: each lists the other two
       under "Others testing now" within a few seconds, and "Discovery" says "On". Result:
+      passed (2026-11-20): PC, phone and tablet each listed the other two, "Discovery"
+      showed "On".
 
 ---
 
