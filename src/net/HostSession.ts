@@ -37,6 +37,7 @@ import {
   type RelayedPose,
   decodeGuestMessage,
   encodeMessage,
+  compactPose,
   validPose,
 } from './protocol';
 import { normalizePlayerName, uniqueName } from './roomCode';
@@ -119,6 +120,8 @@ interface Member {
   /** Messages not handed to the channel yet: they keep their order behind the snapshot. */
   queue: string[];
   lastHeardMs: number;
+  /** The round trip the guest last reported in its ping (the debug overlay). */
+  rttMs: number | null;
   errors: number;
   /** Actions of the current second (the rate limit) and when that second began. */
   rateCount: number;
@@ -223,6 +226,7 @@ export class HostSession {
       sent: new Map(),
       queue: [],
       lastHeardMs: now,
+      rttMs: null,
       errors: 0,
       rateCount: 0,
       rateStartMs: now,
@@ -265,6 +269,13 @@ export class HostSession {
       fly: m.fly,
       busy: m.busy,
     }));
+  }
+
+  /** The guests' round trips as they last reported them, by player id (debug overlay). */
+  roundTrips(): { id: number; name: string; rttMs: number | null }[] {
+    return [...this.members.values()]
+      .filter((m) => m !== this.self)
+      .map((m) => ({ id: m.id, name: m.name, rttMs: m.rttMs }));
   }
 
   /**
@@ -458,6 +469,7 @@ export class HostSession {
         if (!this.overRate(member, now)) this.applyProfile(member, message.name, message.look);
         break;
       case 'ping':
+        if (message.rtt !== undefined) member.rttMs = message.rtt;
         this.send(member, {
           t: 'pong',
           ts: message.ts,
@@ -557,6 +569,7 @@ export class HostSession {
       sent: new Map(),
       queue: [],
       lastHeardMs: now,
+      rttMs: null,
       errors: 0,
       rateCount: 0,
       rateStartMs: now,
@@ -801,7 +814,7 @@ export class HostSession {
         if (from.poseVersion <= sent) continue;
         poses.push({
           id: from.id,
-          ...from.pose,
+          ...compactPose(from.pose),
           tp: from.tpVersion > sent,
           fly: from.fly,
           busy: from.busy,

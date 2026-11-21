@@ -5,13 +5,25 @@ import {
   BENCH_EDIT_INTERVAL,
   BENCH_TORCH_MOVE_SHARE,
   BENCH_FLY_STOP_STEPS,
+  BENCH_GENERATOR_VERSION,
+  BENCH_GUEST_ARC,
+  BENCH_GUEST_BUSY_STEPS,
+  BENCH_GUEST_EDIT_INTERVAL,
+  BENCH_GUEST_LOOKS,
+  BENCH_GUEST_RADII,
+  BENCH_SEED,
   BENCH_QUICK_DIVISOR,
   BENCH_QUICK_MIN_STEPS,
   BENCH_QUICK_RENDER_DISTANCES,
   BENCH_QUICK_WARMUP_STEPS,
   BENCH_RENDER_DISTANCES,
   BENCH_WARMUP_STEPS,
+  SIM_HZ,
+  WALK_SPEED,
 } from '../game/config';
+import { generateChunk, getTerrain } from '../world/generation/terrain';
+import { Block } from '../world/blocks';
+import { blockIndex, chunkKey, toChunkCoord, toLocalCoord } from '../world/chunk';
 import type { MoveInput } from '../player/physics';
 import { NO_INPUT } from '../player/physics';
 import type { MoveMode } from '../player/player';
@@ -44,6 +56,28 @@ export interface Scenario {
   input(step: number, steps: number): MoveInput;
   /** The action to submit before this step, or null. Warm-up steps have none. */
   action(step: number, steps: number): Action | null;
+  /** Simulated guests in a room the page hosts while the scenario runs (Phase 6 part E). */
+  guests?: GuestScript;
+}
+
+/** Where a simulated guest is before a step, and whether it holds break. */
+export interface GuestPose {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  pitch: number;
+  busy: boolean;
+}
+
+/** What the simulated guests of a scenario do; counted in steps like the player's script. */
+export interface GuestScript {
+  /** The look of each guest (1–8); its length is the number of guests. */
+  looks: readonly number[];
+  /** Guest `guest`'s pose before this step (warm-up steps are negative). */
+  pose(guest: number, step: number, steps: number): GuestPose;
+  /** The guest's action before this step, or null. Warm-up steps have none. */
+  action(guest: number, step: number, steps: number): Action | null;
 }
 
 const DEG = Math.PI / 180;
@@ -145,6 +179,162 @@ function torchAction(step: number, steps: number): Action | null {
   return k < n ? { kind: 'place', ...cell, slot: TORCH_SLOT } : { kind: 'break', ...cell };
 }
 
+/** `players`: the player stands at the start point, facing north, a little down. */
+const PLAYERS_PITCH = -10 * DEG;
+const PLAYERS_TERRAIN = getTerrain(BENCH_SEED);
+
+/** Angle of guest `g` on its arc at `step` (0 straight ahead) and the way it walks (±1). */
+function guestAngle(g: number, step: number): { a: number; dir: number } {
+  const radius = BENCH_GUEST_RADII[g];
+  // One swing there and back covers the arc twice, at walking speed.
+  const periodSteps = ((4 * BENCH_GUEST_ARC * radius) / WALK_SPEED) * SIM_HZ;
+  let u = (step / periodSteps + g / BENCH_GUEST_RADII.length) % 1;
+  if (u < 0) u += 1;
+  return u < 0.5
+    ? { a: BENCH_GUEST_ARC * (-1 + 4 * u), dir: 1 }
+    : { a: BENCH_GUEST_ARC * (3 - 4 * u), dir: -1 };
+}
+
+/** The point at `radius` from the start point in the direction `a` (yaw convention). */
+function arcPoint(radius: number, a: number): { x: number; z: number } {
+  return { x: BENCH_SPAWN.x - radius * Math.sin(a), z: BENCH_SPAWN.z - radius * Math.cos(a) };
+}
+
+/** Feet height on the terrain (trees left out: a guest walks through them). */
+function groundAt(x: number, z: number): number {
+  return PLAYERS_TERRAIN.heightAt(Math.floor(x), Math.floor(z)) + 1;
+}
+
+/** Where guest `g` walks at `step`, facing the way it goes. */
+function guestWalk(g: number, step: number): { x: number; y: number; z: number; yaw: number } {
+  const { a, dir } = guestAngle(g, step);
+  const radius = BENCH_GUEST_RADII[g];
+  const p = arcPoint(radius, a);
+  // Facing where it walks: the tangent of the arc.
+  const dx = -radius * Math.cos(a) * dir;
+  const dz = radius * Math.sin(a) * dir;
+  return { x: p.x, y: groundAt(p.x, p.z), z: p.z, yaw: Math.atan2(-dx, -dz) };
+}
+
+function guestPose(g: number, step: number, steps: number): GuestPose {
+  return { ...guestWalk(g, step), pitch: PLAYERS_PITCH, busy: guestBusy(g, step, steps) };
+}
+
+/** First step of guest `g`'s edits: the guests take turns. */
+function editOffset(g: number): number {
+  return Math.round((g * BENCH_GUEST_EDIT_INTERVAL) / BENCH_GUEST_RADII.length);
+}
+
+/** How many edits guest `g` makes in a window of `steps`: whole pairs of place and break. */
+function editCount(g: number, steps: number): number {
+  const count = Math.max(
+    0,
+    Math.floor((steps - 1 - editOffset(g)) / BENCH_GUEST_EDIT_INTERVAL) + 1,
+  );
+  return count - (count % 2);
+}
+
+/** The guest holds break in the steps that lead up to one of its breaks. */
+function guestBusy(g: number, step: number, steps: number): boolean {
+  const since = step - editOffset(g);
+  if (since < 0) return false;
+  const next = Math.floor(since / BENCH_GUEST_EDIT_INTERVAL) + 1;
+  const untilNext = next * BENCH_GUEST_EDIT_INTERVAL - since;
+  return next % 2 === 1 && next < editCount(g, steps) && untilNext <= BENCH_GUEST_BUSY_STEPS;
+}
+
+/**
+ * Guest `g`'s action at `step`: every `BENCH_GUEST_EDIT_INTERVAL` steps it places a block
+ * on the ground outside its arc, and breaks it with the next edit; a window ends with
+ * every block broken again.
+ */
+function guestAction(g: number, step: number, steps: number): Action | null {
+  const since = step - editOffset(g);
+  const interval = BENCH_GUEST_EDIT_INTERVAL;
+  if (since < 0 || since % interval !== 0) return null;
+  const index = since / interval;
+  if (index >= editCount(g, steps)) return null;
+  const placeStep = step - (index % 2) * interval;
+  const cell = guestCell(g, placeStep);
+  return index % 2 === 0 ? { kind: 'place', ...cell, slot: 0 } : { kind: 'break', ...cell };
+}
+
+/** Chunks of the test world as generated (no edits), for the cells of the guests. */
+const PLAYERS_CHUNKS = new Map<string, Uint8Array>();
+
+function generatedBlock(x: number, y: number, z: number): number {
+  const cx = toChunkCoord(x);
+  const cz = toChunkCoord(z);
+  const key = chunkKey(cx, cz);
+  let blocks = PLAYERS_CHUNKS.get(key);
+  if (!blocks) {
+    blocks = generateChunk(BENCH_SEED, cx, cz, BENCH_GENERATOR_VERSION);
+    PLAYERS_CHUNKS.set(key, blocks);
+  }
+  return blocks[blockIndex(toLocalCoord(x), y, toLocalCoord(z))];
+}
+
+/** The cell on the ground of a column is free, and so are the two above it (no leaves). */
+function freeGround(x: number, y: number, z: number): boolean {
+  return (
+    generatedBlock(x, y, z) === Block.AIR &&
+    generatedBlock(x, y + 1, z) === Block.AIR &&
+    generatedBlock(x, y + 2, z) === Block.AIR
+  );
+}
+
+/** Turns (radians) from the guest's direction tried for its cell: straight out first. */
+const CELL_TURNS: readonly number[] = [
+  0,
+  ...Array.from({ length: 16 }, (_, i) => [-(i + 1) * 0.05, (i + 1) * 0.05]).flat(),
+];
+
+/**
+ * The cell a guest places a block in at `step`: on the ground outside its arc, where the
+ * generated world has nothing (a little further out, or to the side, next to a tree).
+ */
+export function guestCell(g: number, step: number): { x: number; y: number; z: number } {
+  const { a } = guestAngle(g, step);
+  const placeAt = guestWalk(g, step);
+  const breakAt = guestWalk(g, step + BENCH_GUEST_EDIT_INTERVAL);
+  // Within reach from where it places and from where it breaks, with room to spare.
+  const near = (cell: { x: number; y: number; z: number }, p: typeof placeAt): boolean =>
+    Math.hypot(cell.x + 0.5 - p.x, cell.y + 0.5 - p.y - 1.62, cell.z + 0.5 - p.z) <= 5.5;
+  // No guest stands in the cell when it is placed.
+  const free = (cell: { x: number; z: number }): boolean =>
+    BENCH_GUEST_RADII.every((_, h) => {
+      const o = guestWalk(h, step);
+      return Math.abs(o.x - cell.x - 0.5) > 1 || Math.abs(o.z - cell.z - 0.5) > 1;
+    });
+  const radius = BENCH_GUEST_RADII[g];
+  // Outward offsets between this arc and the next, then turns to either side.
+  let first: { x: number; y: number; z: number } | null = null;
+  for (const turn of CELL_TURNS) {
+    for (const out of [1.5, 1, 2]) {
+      const p = arcPoint(radius + out, a + turn);
+      const x = Math.floor(p.x);
+      const z = Math.floor(p.z);
+      const cell = { x, y: PLAYERS_TERRAIN.heightAt(x, z) + 1, z };
+      first ??= cell;
+      const ok =
+        freeGround(cell.x, cell.y, cell.z) &&
+        near(cell, placeAt) &&
+        near(cell, breakAt) &&
+        free(cell);
+      if (ok) return cell;
+    }
+  }
+  // Never reached on the scenario's route (the tests place every cell).
+  return first ?? { x: 0, y: 0, z: 0 };
+}
+
+/** The three simulated guests of `players`. */
+export const PLAYERS_GUESTS: GuestScript = {
+  looks: BENCH_GUEST_LOOKS,
+  pose: (g, step, steps) => guestPose(g, step, steps),
+  action: (g, step, steps) => (step < 0 ? null : guestAction(g, step, steps)),
+};
+
 /** The scenario table. Append new scenarios; never change one without a new version. */
 export const SCENARIOS: readonly Scenario[] = [
   {
@@ -200,6 +390,16 @@ export const SCENARIOS: readonly Scenario[] = [
     time: TORCH_TIME,
     input: (step, steps) => (step >= torchMoveStart(steps) ? PASS_INPUT : NO_INPUT),
     action: torchAction,
+  },
+  {
+    id: 'players',
+    version: 1,
+    label: 'four players',
+    steps: 1200,
+    start: { ...BENCH_SPAWN, yaw: 0, pitch: PLAYERS_PITCH, mode: 'walk' },
+    input: () => NO_INPUT,
+    action: noAction,
+    guests: PLAYERS_GUESTS,
   },
 ];
 

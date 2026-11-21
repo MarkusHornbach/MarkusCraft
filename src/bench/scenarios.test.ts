@@ -279,9 +279,20 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       ['fly', 1, 1200, 'flying'],
       ['edit', 1, 900, 'building'],
       ['torches', 1, 1200, 'torches at night'],
+      ['players', 1, 1200, 'four players'],
     ]);
-    expect(SCENARIOS.map((s) => s.time ?? null)).toEqual([null, null, null, null, 0.75]);
-    expect(BENCH_SUITE_VERSION).toBe(2);
+    expect(SCENARIOS.map((s) => s.time ?? null)).toEqual([null, null, null, null, 0.75, null]);
+    // Only `players` has simulated guests (Phase 6 AC15.1), three of them in looks 2, 5, 8.
+    expect(SCENARIOS.map((s) => s.guests?.looks ?? null)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+      [2, 5, 8],
+    ]);
+    expect(getScenario('players')?.start).toMatchObject({ ...BENCH_SPAWN, yaw: 0, mode: 'walk' });
+    expect(BENCH_SUITE_VERSION).toBe(3);
   });
 
   it('the full suite: both render distances, then standing once more', () => {
@@ -292,15 +303,17 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       'fly@5',
       'edit@5',
       'torches@5',
+      'players@5',
       'stand@8',
       'walk@8',
       'fly@8',
       'edit@8',
       'torches@8',
+      'players@8',
       'stand@5',
     ]);
     expect(full.map((e) => e.steps)).toEqual([
-      600, 1200, 1200, 900, 1200, 600, 1200, 1200, 900, 1200, 600,
+      600, 1200, 1200, 900, 1200, 1200, 600, 1200, 1200, 900, 1200, 1200, 600,
     ]);
     expect(full.every((e) => e.warmup === 120)).toBe(true);
     // A fresh world per block.
@@ -310,7 +323,9 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       false,
       false,
       false,
+      false,
       true,
+      false,
       false,
       false,
       false,
@@ -324,8 +339,8 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
     const quick = buildSuite('quick');
     expect(quick.map((e) => e.scenario.id)).toEqual(full.map((e) => e.scenario.id));
     expect(quick.map((e) => e.fresh)).toEqual(full.map((e) => e.fresh));
-    expect(quick.map((e) => e.renderDistance)).toEqual([2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 2]);
-    expect(quick.map((e) => e.steps)).toEqual([30, 60, 60, 45, 60, 30, 60, 60, 45, 60, 30]);
+    expect(quick.map((e) => e.renderDistance)).toEqual([2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 2]);
+    expect(quick.map((e) => e.steps)).toEqual([30, 60, 60, 45, 60, 60, 30, 60, 60, 45, 60, 60, 30]);
     expect(quick.every((e) => e.warmup === 6)).toBe(true);
   });
 });

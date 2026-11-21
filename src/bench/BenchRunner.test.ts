@@ -57,6 +57,25 @@ class FakeHost implements BenchHost {
   heapMb(): number | null {
     return 42.4;
   }
+  /** Frames until the simulated guests are in the room after `openGuests`. */
+  guestFrames = 0;
+  guestSteps: number[] = [];
+  guestsOpen = false;
+  openGuests(): void {
+    this.log.push('guests open');
+    this.guestsOpen = true;
+    this.guestFrames = 2;
+  }
+  guestsReady(): boolean {
+    return !this.guestsOpen || this.guestFrames <= 0;
+  }
+  stepGuests(step: number): void {
+    this.guestSteps.push(step);
+  }
+  closeGuests(): void {
+    if (this.guestsOpen) this.log.push('guests close');
+    this.guestsOpen = false;
+  }
 }
 
 interface Run {
@@ -109,6 +128,7 @@ function start(suite: SuiteKind, frameMs = 16, stepsPerFrame = 1): Run {
         if (host.input && host.input.forward > 0) host.movingSteps++;
       }
       host.busy--;
+      host.guestFrames--;
     }
     return frames;
   };
@@ -126,7 +146,7 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
       suite.map((e) => [e.scenario.id, e.renderDistance, e.scenario.version]),
     );
     expect(run.progress.map((p) => [p.index, p.total, p.scenario])).toEqual(
-      suite.map((e, i) => [i + 1, 11, e.scenario.id]),
+      suite.map((e, i) => [i + 1, 13, e.scenario.id]),
     );
     expect(run.progress[2].label).toBe('flying');
     // A fresh world per block, and the player put in place for every scenario.
@@ -151,7 +171,17 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
     });
     expect(result.env).toEqual({ ...SAMPLE_RESULT.env, input: 'mouse', hz: 63 });
     expect(run.runner.running).toBe(false);
-    expect(run.runner.total).toBe(11);
+    expect(run.runner.total).toBe(13);
+    // The simulated guests of `players`: opened when it is prepared, ready before its
+    // warm-up, stepped with every step of it and closed when it ends.
+    expect(run.host.log.filter((line) => line.startsWith('guests'))).toEqual([
+      'guests open',
+      'guests close',
+      'guests open',
+      'guests close',
+    ]);
+    expect(run.host.guestSteps.length).toBe(2 * (6 + 60));
+    expect(run.host.guestSteps.slice(0, 7)).toEqual([-6, -5, -4, -3, -2, -1, 0]);
     // The record is one the issue format carries.
     expect(parseIssueBody(issueText(result))).toEqual(result);
   });
@@ -214,7 +244,9 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
       null,
       null,
       null,
+      null,
       0,
+      null,
       null,
       null,
       null,
@@ -242,9 +274,9 @@ describe('BenchRunner (Phase 4P AC2.1)', () => {
 
   it('a slower last scenario sets the throttling flag', () => {
     const run = start('quick');
-    run.play(() => run.runner.progress.index === 11);
+    run.play(() => run.runner.progress.index === 13);
     const slow = start('quick');
-    slow.play(() => slow.runner.progress.index === 11);
+    slow.play(() => slow.runner.progress.index === 13);
     // The same run, but the last scenario with frames of 20 ms instead of 16.
     let now = slow.now();
     while (slow.runner.running) {
@@ -266,7 +298,7 @@ describe('BenchRunner cut-offs (Phase 4P AC2.2)', () => {
     run.play();
     const result = run.result;
     if (!result) throw new Error('no result');
-    expect(result.scenarios.length).toBe(11);
+    expect(result.scenarios.length).toBe(13);
     expect(result.scenarios.every((s) => s.cut)).toBe(true);
     const stand = result.scenarios[0];
     expect(stand.ms).toBeGreaterThan(1500);
@@ -274,7 +306,7 @@ describe('BenchRunner cut-offs (Phase 4P AC2.2)', () => {
     // Exactly three times is not cut.
     const edge = start('quick', 50);
     edge.play();
-    expect(edge.result?.scenarios.map((s) => s.cut)).toEqual(new Array(11).fill(false));
+    expect(edge.result?.scenarios.map((s) => s.cut)).toEqual(new Array(13).fill(false));
   });
 
   it('gives up waiting for idle chunks after 120 s and marks the scenario', () => {

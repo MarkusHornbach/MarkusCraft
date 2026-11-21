@@ -7,7 +7,7 @@ import { LocalSession, type Session } from '../actions/Session';
 import { type BenchResult, issueText, parseIssueBody } from '../bench/benchReport';
 import { type BenchHost, BenchRunner } from '../bench/BenchRunner';
 import { SAMPLE_RESULT } from '../bench/sampleResult';
-import type { SuiteKind } from '../bench/scenarios';
+import type { GuestScript, SuiteKind } from '../bench/scenarios';
 import { GamepadSource, type PadTarget } from '../input/GamepadSource';
 import { Input, type PressAction } from '../input/Input';
 import { PadButton, type PadFrame } from '../input/padMapping';
@@ -148,7 +148,11 @@ interface BenchRun {
   debug: boolean;
   wake: WakeLockSentinel | null;
   wakeGranted: boolean;
+  /** Most figures of other players drawn at once (the scenario `players`). */
+  figures: number;
 }
+
+type SimRoomModule = typeof import('../bench/simGuests');
 
 /** A session as `Game` uses it; the test tools may replace a record where it can. */
 type GameSession = Session & { replaceRecord?: (record: PlayerRecord) => void };
@@ -211,6 +215,11 @@ export class Game {
   private benchPhase: BenchPhase | null = null;
   private benchSuite: SuiteKind = 'full';
   private bench: BenchRun | null = null;
+  /** The simulated guests of the scenario `players`, their chunk, and what was asked for. */
+  private simRoom: import('../bench/simGuests').SimRoom | null = null;
+  private simModule: Promise<SimRoomModule | null> | null = null;
+  private simWanted: { script: GuestScript } | null = null;
+  private lastBenchFigures = 0;
   /** The result on the result screen. */
   private benchResult: BenchResult | null = null;
   private benchStop: BenchStop | null = null;
@@ -983,8 +992,10 @@ export class Game {
 
   /** The other players' figures at their interpolated poses (after the light uniforms). */
   private updateFigures(): void {
-    const roster = this.mp.host?.roster ?? this.mp.client?.roster ?? null;
-    const now = performance.now();
+    const sim = this.simRoom;
+    const roster = sim?.roster ?? this.mp.host?.roster ?? this.mp.client?.roster ?? null;
+    // The simulated guests live on the simulation's clock.
+    const now = sim ? sim.nowMs : performance.now();
     this.renderer.remotePlayers.update(
       roster
         ? roster.list().map((p) => ({
@@ -1338,8 +1349,14 @@ export class Game {
       debug: this.debug.visible,
       wake: null,
       wakeGranted: false,
+      figures: 0,
     };
     this.bench = run;
+    // The simulated guests' code is a chunk of its own, loaded when a run starts.
+    this.simModule ??= import('../bench/simGuests').then(
+      (module) => module,
+      () => null,
+    );
     this.benchPhase = 'running';
     this.benchResult = null;
     this.benchStop = null;
@@ -1393,7 +1410,39 @@ export class Game {
       pendingChunks: () => this.chunkManager.pending,
       missingMeshDistance: () => this.chunkManager.missingMeshDistance(),
       heapMb,
+      openGuests: (script) => this.openSimRoom(script),
+      guestsReady: () => this.simWanted === null || this.simRoom?.ready === true,
+      stepGuests: (step, steps) => this.simRoom?.step(step, steps),
+      closeGuests: () => this.closeSimRoom(),
     };
+  }
+
+  /**
+   * The room of simulated guests of a run: made as soon as its chunk is loaded. It plays
+   * in the run's world, next to the player's own session.
+   */
+  private openSimRoom(script: GuestScript): void {
+    this.closeSimRoom();
+    const wanted = { script };
+    this.simWanted = wanted;
+    void (this.simModule ?? Promise.resolve(null)).then((module) => {
+      if (this.simWanted !== wanted || !this.bench) return;
+      if (!module) return;
+      const p = this.player;
+      this.simRoom = new module.SimRoom({
+        world: this.world,
+        hostPose: () => ({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch }),
+        hostRecord: this.session.record,
+        script,
+        onBlocks: (changes) => this.onBlocksChanged(changes),
+      });
+    });
+  }
+
+  private closeSimRoom(): void {
+    this.simWanted = null;
+    this.simRoom?.close();
+    this.simRoom = null;
   }
 
   /** One frame of a run: the rules that throw it away, then the runner. */
@@ -1408,6 +1457,8 @@ export class Game {
       this.interruptBench('resize');
       return;
     }
+    this.simRoom?.frame();
+    run.figures = Math.max(run.figures, this.renderer.remotePlayers.drawn);
     run.runner.frame(ms, frameMs, chunkWorkMs);
   }
 
@@ -1437,6 +1488,8 @@ export class Game {
 
   /** Leaves the test world and puts settings, input and overlay back. */
   private endBench(run: BenchRun): void {
+    this.closeSimRoom();
+    this.lastBenchFigures = run.figures;
     this.bench = null;
     void run.wake?.release().catch(() => {});
     this.input.setScript(null);
@@ -2469,6 +2522,7 @@ export class Game {
       onGround: p.onGround,
       inWater: p.inWater,
       target: t ? `${getBlockDef(t.id).name} at ${t.x} / ${t.y} / ${t.z}` : null,
+      net: this.mp.debugInfo(performance.now()),
     });
   }
 
@@ -2637,6 +2691,7 @@ export class Game {
       total: progress?.total ?? 0,
       scenario: progress?.scenario ?? null,
       reason: this.benchPhase === 'interrupted' ? this.benchStop : null,
+      figures: this.bench?.figures ?? this.lastBenchFigures,
     };
   }
 

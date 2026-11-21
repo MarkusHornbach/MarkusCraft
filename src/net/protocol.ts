@@ -96,7 +96,8 @@ export type GuestMessage =
   | { t: 'action'; seq: number; action: Action }
   | ({ t: 'pose'; tp: boolean; fly: boolean; busy: boolean } & NetPose)
   | { t: 'profile'; name: string; look: number }
-  | { t: 'ping'; ts: number }
+  /** `rtt`: the guest's last round trip (Part E), shown on the host's debug overlay. */
+  | { t: 'ping'; ts: number; rtt?: number }
   | { t: 'bye' };
 
 export type ResultMessage =
@@ -121,6 +122,20 @@ export type HostMessage =
 
 export type Decoded<T> = { ok: true; message: T } | { ok: false; error: string };
 
+/**
+ * A pose with its numbers cut to what a figure shows: millimetres and a tenth of a
+ * milliradian. The relayed poses are most of a room's traffic (AC14.6).
+ */
+export function compactPose(p: NetPose): NetPose {
+  return {
+    x: Math.round(p.x * 1000) / 1000,
+    y: Math.round(p.y * 1000) / 1000,
+    z: Math.round(p.z * 1000) / 1000,
+    yaw: Math.round(p.yaw * 10_000) / 10_000,
+    pitch: Math.round(p.pitch * 10_000) / 10_000,
+  };
+}
+
 /** Text of a message. Records travel in the save format's encoding. */
 export function encodeMessage(message: GuestMessage | HostMessage): string {
   if (message.t === 'welcome') {
@@ -128,6 +143,18 @@ export function encodeMessage(message: GuestMessage | HostMessage): string {
   }
   if (message.t === 'record')
     return JSON.stringify({ t: 'record', record: encodePlayer(message.record) });
+  if (message.t === 'poses') {
+    // Most of a room's traffic: flags that are false are left out (AC14.6).
+    return JSON.stringify({
+      t: 'poses',
+      poses: message.poses.map(({ tp, fly, busy, ...rest }) => ({
+        ...rest,
+        ...(tp ? { tp } : {}),
+        ...(fly ? { fly } : {}),
+        ...(busy ? { busy } : {}),
+      })),
+    });
+  }
   return JSON.stringify(message);
 }
 
@@ -145,6 +172,11 @@ function int(m: Fields, key: string, min: number, max: number): number {
   const v = m[key];
   if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max) fail(key);
   return v;
+}
+
+/** A boolean that is false when left out. */
+function flag(m: Fields, key: string): boolean {
+  return m[key] === undefined ? false : bool(m, key);
 }
 
 function num(m: Fields, key: string, min: number, max: number): number {
@@ -187,6 +219,8 @@ const NAME_LENGTH = PLAYER_NAME_MAX + 8;
 const BUILD_LENGTH = 40;
 const ID_MAX = 0x7fffffff;
 const TIME_MAX = 8.64e15;
+/** A round trip longer than a minute is no round trip. */
+const RTT_MAX = 60_000;
 
 /**
  * A pose: finite numbers. Whether it lies inside the world is the host's rule
@@ -303,7 +337,11 @@ export function decodeGuestMessage(text: unknown): Decoded<GuestMessage> {
           busy: bool(m, 'busy'),
         };
       case 'ping':
-        return { t: 'ping', ts: num(m, 'ts', -TIME_MAX, TIME_MAX) };
+        return {
+          t: 'ping',
+          ts: num(m, 'ts', -TIME_MAX, TIME_MAX),
+          ...(m.rtt === undefined ? {} : { rtt: num(m, 'rtt', 0, RTT_MAX) }),
+        };
       default:
         return fail('unknown type');
     }
@@ -411,9 +449,9 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
             return {
               id: int(p, 'id', 0, ID_MAX),
               ...pose(p),
-              tp: bool(p, 'tp'),
-              fly: bool(p, 'fly'),
-              busy: bool(p, 'busy'),
+              tp: flag(p, 'tp'),
+              fly: flag(p, 'fly'),
+              busy: flag(p, 'busy'),
             };
           }),
         };
