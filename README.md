@@ -299,8 +299,10 @@ test**, or open the game with `?bench=1` at the end of its address (a bookmark o
 page lists what to do first – plug in the charger, close other apps and tabs, switch the
 battery saver off – and nothing is measured before you press **Start**.
 
-The test then plays by itself for about four minutes: standing, walking, flying and
-building in a throwaway world, at render distance 5 and at 8. Do not touch the screen and
+The test then plays by itself for about four minutes: standing, walking, flying,
+building, torches at night and four players (three simulated players walk and build in
+front of you, played inside the page without any network) in a throwaway world, at render
+distance 5 and at 8. Do not touch the screen and
 do not switch away: hiding the page, turning the device upright, resizing the window or
 leaving fullscreen ends the run with "Interrupted – nothing was recorded". **Cancel** (or
 Esc) stops it as well.
@@ -362,6 +364,19 @@ everyone.
   world is shared, the game keeps the screen on where the browser allows it.
 - **Everyone needs the same build**: a device with an older page gets "Different game
   version. Reload the page on both devices."
+
+**What goes where.** The Pi's signaling server sees which devices open or join a world
+(their random ids and the network addresses they connect from) and passes on the
+handshake data that lets two browsers find each other; it sees no game data. The players'
+browsers learn each other's addresses in the home network, because they connect
+directly. Everything of the game itself – blocks, movement, items, names and looks – goes
+directly between the browsers, never through the Pi or the internet.
+
+**Debug overlay in a room:** F3 (on touch devices the "Debug overlay" switch in the pause
+menu) shows five more lines while a world is shared: the role, room code and number of
+players; the round trip to the host (on the host: what each guest reports); how the
+connection runs ("direct" between local addresses, "via STUN", or "relay"); the state of
+the connection to the signaling server; and messages and kilobytes per second in and out.
 
 **Troubleshooting:** all devices must be in the same home network. Guest Wi-Fi networks
 usually isolate devices from each other, and a VPN on a device can hide the home network;

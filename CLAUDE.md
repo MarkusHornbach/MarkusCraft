@@ -47,8 +47,7 @@ game in a procedurally generated world"; everything in it is original work.
      chosen in "Your player" on the settings page), E measure and harden (plan:
      `docs/phase-6-plan.md`, all parts in it; it replaces `docs/phase-2-plan.md`, Part B;
      reports: `docs/phase-6a-report.md`, `docs/phase-6b-report.md`,
-     `docs/phase-6c-report.md`, `docs/phase-6d-report.md`; E will write
-     `docs/phase-6e-report.md`). Part D was inserted after C; the former Part D "Measure
+     `docs/phase-6c-report.md`, `docs/phase-6d-report.md`, `docs/phase-6e-report.md`). Part D was inserted after C; the former Part D "Measure
      and harden" is now Part E (steps 14–16, AC14.x–AC16.x)
   7. **Personalization** – custom blocks, textures, characters beyond the eight looks of
      Phase 6 part D (a free character editor, the held item, other players' cracks), names,
@@ -136,7 +135,9 @@ src/
                      peerTransport.ts (Signaling, Connection, RoomDirectory with peerjs;
                      own chunk, dynamic import)
   bench/             the performance test (pure): scenarios.ts (scenario table, scripts,
-                     suites), benchStats.ts (numbers of one measurement window),
+                     suites, the guests' script of `players`), simGuests.ts (`SimRoom`:
+                     the simulated guests over the memory transport), benchStats.ts
+                     (numbers of one measurement window),
                      verdict.ts (lights, throttling flag, Web Workers line), benchReport.ts
                      (result record ⇄ issue text, issue link, `parseIssueBody`),
                      BenchRunner.ts (state machine of a run, `BenchHost`), sampleResult.ts
@@ -155,7 +156,8 @@ src/
                      interpolation.ts (`PoseBuffer`, `RemoteRoster`), authority.ts
                      (`FarReader`: blocks of chunks the host has not loaded), breakTiming.ts
                      (`breakDueMs`: the grace for early breaks; `BreakClock`: break starts
-                     on the screen's clock)
+                     on the screen's clock), traffic.ts (`TrafficMeter`, `countedNetwork`:
+                     messages and bytes of a room's connections)
   items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
                      slots), hardness.ts (break times, tool speed, gating, drop table),
                      recipes.ts (recipe table, stations near a player, recipe status)
@@ -214,7 +216,8 @@ src/
 e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts,
                      multiplayer.ts (several players in their own contexts, `netQuery`,
                      `openNetTest`, `openTestPlayer`, `hostRoom`, `joinRoom`, `untilNet`),
-                     mp*.spec.ts (tests with several game pages; project `multiplayer`),
+                     mp*.spec.ts (tests with several game pages; project `multiplayer`;
+                     mpHarden.spec.ts: overlay, host without frames, soak, large world),
                      sites.ts
                      (tree, beach and rock near the start point), lightScenes.ts (tunnel,
                      room with a window, roof over a chunk corner), gamepad.ts (the fake
@@ -560,6 +563,21 @@ lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX
   sent at once. `markuscraft.player.v1` holds `{ key, name, look }`; a record without a
   valid look loads as 0, and `saveIdentity` leaves a stored record that says the same
   untouched.
+- **Measure and harden (Phase 6 part E).** The F3 overlay has five network rows, shown
+  only in a room (`netRows`, `Multiplayer.debugInfo`): role, status, code and players;
+  the round trip (a guest's own; on the host what each guest reports in `ping.rtt`); the
+  link of each connection from `getStats()` every 2 s (`linkKind`: "direct", "via STUN",
+  "relay"); the signaling state; messages and bytes per second in and out over the last
+  2 s, counted by a `TrafficMeter` around the room's network (`countedNetwork`).
+  `traffic.ts` and the stats code are in the lazy session chunk. Relayed poses are cut to
+  millimetres and 1e-4 rad (`compactPose`) and leave out flags that are false: with four
+  moving players the host sends about 13 kB/s (AC14.6, limit 20). The scenario `players`
+  (suite version 3) hosts a `SimRoom` in the run's world: three `ClientSession`s over a
+  memory network with no delay, joined during `settle` (`BenchHost.guestsReady`), stepped
+  with the simulation (`stepGuests`, the room's clock is simulation time, which the
+  figures are drawn by), closed when the scenario ends; its chunk is loaded when a run
+  starts. The guests walk arcs in front of the player (`BENCH_GUEST_RADII`) and place and
+  break a block every 30 steps in looks 2, 5 and 8.
 - **The network test (Phase 6 part A)** is a screen of its own (`nettest`), opened by
   "Network test" on the settings page; "Back" returns there. Its test id is
   `mc-<build>-t-<4 characters>`; it lists the others from PeerJS discovery every 3 s,
@@ -612,12 +630,13 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   performance test instead of the world menu, `bench=quick` the same with the quick suite
   (render distances 2 and 3, a twentieth of the steps; what the browser tests run),
   `bench=sample` the result screen with the built-in `SAMPLE_RESULT`. `getState().bench`
-  is null outside the test, otherwise `{ phase, suite, index, total, scenario, reason }`;
+  is null outside the test, otherwise `{ phase, suite, index, total, scenario, reason,
+figures }` (`figures`: most other players' figures drawn at once during the run);
   `__mc.benchResult()` returns the record on the result screen or null. The run is driven
   by its own buttons (`.bench-start-button`, `.bench-cancel-button`, …). Tests of a run
   wait on `getState().bench`, give themselves four minutes and never assert on a
   measured time or a light; the rules that throw a run away apply once the progress line
-  shows "scenario 1 of 11" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by
+  shows "scenario 1 of 13" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by
   hand: `node scripts/benchRun.mjs [1|quick] [folder]` against the preview server (the
   full suite takes about three minutes in a cloud session).
 - With `test=1` the world lives in memory (`MemoryStore`) and is never stored.
@@ -899,12 +918,17 @@ hold:
   head icons in the player list): implemented (report: `docs/phase-6d-report.md`). Read its
   "Decisions and deviations" before changing the figure, the looks, the identity record or
   "Your player".
-- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A, B, C and D implemented. Five
+- Phase 6 part E (measure and harden: the F3 network rows, round trips on the host, the
+  traffic meter, compact poses, the hidden-host, soak and large-world tests, the
+  performance test scenario `players` with simulated guests, suite version 3):
+  implemented (report: `docs/phase-6e-report.md`). Read its "Decisions and deviations"
+  before changing the overlay, the relayed poses or the scenario `players`.
+- Phase 6 (multiplayer): complete with parts A–E (`docs/phase-6-plan.md`). Five
   parts, each in its own session with its own pull request, in order: **A** connection
   test (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's
   NET tests of A in `docs/device-tests.md` show a working connection), **C** Gathering
   together (steps 8–10), **D** player figure (steps 11–13, plan sections 5.14 and 5.15;
-  implemented), **E** measure and harden (steps 14–16). Part D was inserted by the
+  implemented), **E** measure and harden (steps 14–16; implemented). Part D was inserted by the
   owner on 2026-11-21 (plan section 3, change 14); the former Part D is Part E, unchanged
   in content, its device tests NET-17 to NET-19 keep their ids, and "Part D" or "AC11.x"
   in the reports of Parts B and C mean Part E and AC14.x. The servers on the Pi are built
