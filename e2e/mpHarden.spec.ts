@@ -14,7 +14,6 @@ import {
 } from './multiplayer';
 
 test.setTimeout(240_000);
-test.describe.configure({ mode: 'serial' });
 
 const STONE = 3;
 const AIR = 0;
@@ -94,7 +93,8 @@ test('Phase 6 AC14.2: a host without frames serves its guests: edits, poses and 
   const hostState = await host.page.evaluate(() => window.__mc.getState().player);
   const cell = {
     x: Math.floor(hostState.x) + 2,
-    y: Math.floor(hostState.y) + 4,
+    // High in the air: free whatever the terrain does there.
+    y: 120,
     z: Math.floor(hostState.z),
   };
   await host.page.evaluate(() => window.__mc.suspendFrames(true));
@@ -116,9 +116,11 @@ test('Phase 6 AC14.2: a host without frames serves its guests: edits, poses and 
   }, cell);
   expect(confirmed.ok).toBe(true);
   expect(confirmed.ms).toBeLessThan(2000);
+  const placed = await a.page.evaluate((c) => window.__mc.getBlock(c.x, c.y, c.z), cell);
+  expect(placed).not.toBe(AIR);
   await expect
     .poll(() => b.page.evaluate((c) => window.__mc.getBlock(c.x, c.y, c.z), cell))
-    .toBe(STONE);
+    .toBe(placed);
 
   // A sees B move.
   const bId = (await netOf(b.page)).selfId;
@@ -160,11 +162,17 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
   const play = (page: Page, i: number, from: number, to: number) =>
     page.evaluate(
       async ([i, from, to, bx, bz, y]) => {
-        const results: boolean[] = [];
+        const results: (boolean | string)[] = [];
         for (let n = from; n < to; n++) {
           // Moves a little between actions: the others see it walk.
           const x = bx + i * 6 - 9 + (n % 4) * 0.25;
           window.__mc.setPlayer({ x, y: y - 3, z: bz + 0.5, mode: 'fly', yaw: n * 0.1 });
+          if (n === from) {
+            // The first move is a long jump: the host must know the new pose before the
+            // action arrives (it checks the reach against the last pose it got).
+            await window.__mc.whenIdle();
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
           const cell = { x: bx + i * 6 - 9 + (Math.floor(n / 2) % 3) - 1, y, z: bz };
           const before = window.__mc.getState().net.lastResult?.seq ?? 0;
           const answer = window.__mc.submit(
@@ -172,7 +180,7 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
           );
           if (answer) {
             // The host's own action is answered at once.
-            results.push(answer.ok);
+            results.push(answer.ok || `${n}: host`);
           } else {
             // A guest's answer comes from the host.
             const t0 = performance.now();
@@ -180,7 +188,8 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
               if (performance.now() - t0 > 10_000) break;
               await new Promise((resolve) => setTimeout(resolve, 10));
             }
-            results.push(window.__mc.getState().net.lastResult?.ok === true);
+            const last = window.__mc.getState().net.lastResult;
+            results.push(last?.ok === true || `${n}: ${last?.reason ?? 'no answer'}`);
           }
           await new Promise((resolve) => setTimeout(resolve, 20));
         }
@@ -191,7 +200,7 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
 
   // First half: everyone at once.
   const first = await Promise.all(everyone.map((p, i) => play(p.page, i, 0, 25)));
-  expect(first.flat().every((ok) => ok)).toBe(true);
+  expect(first.flat().filter((ok) => ok !== true)).toEqual([]);
   // The last guest leaves and comes back.
   const leaver = all[2];
   await leaver.page.evaluate(() => window.__mc.net.leave());
@@ -200,7 +209,7 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
   await untilNet(host.page, (net) => net.players.length === 4);
   // Second half.
   const second = await Promise.all(everyone.map((p, i) => play(p.page, i, 25, 50)));
-  expect(second.flat().every((ok) => ok)).toBe(true);
+  expect(second.flat().filter((ok) => ok !== true)).toEqual([]);
 
   // One world everywhere: every block broken again, all hashes equal.
   const hash = (await netOf(host.page)).worldHash;
