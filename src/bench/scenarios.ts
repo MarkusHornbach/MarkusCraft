@@ -179,7 +179,11 @@ function torchAction(step: number, steps: number): Action | null {
   return k < n ? { kind: 'place', ...cell, slot: TORCH_SLOT } : { kind: 'break', ...cell };
 }
 
-/** `players`: the player stands at the start point, facing north, a little down. */
+/**
+ * `players`: the player stands at the start point and looks south-south-west, the most
+ * open view from there (the woods to the north would hide the guests), a little down.
+ */
+export const PLAYERS_YAW = 195 * DEG;
 const PLAYERS_PITCH = -10 * DEG;
 const PLAYERS_TERRAIN = getTerrain(BENCH_SEED);
 
@@ -195,9 +199,10 @@ function guestAngle(g: number, step: number): { a: number; dir: number } {
     : { a: BENCH_GUEST_ARC * (3 - 4 * u), dir: -1 };
 }
 
-/** The point at `radius` from the start point in the direction `a` (yaw convention). */
+/** The point at `radius` from the start point, `a` from the way the player looks. */
 function arcPoint(radius: number, a: number): { x: number; z: number } {
-  return { x: BENCH_SPAWN.x - radius * Math.sin(a), z: BENCH_SPAWN.z - radius * Math.cos(a) };
+  const yaw = PLAYERS_YAW + a;
+  return { x: BENCH_SPAWN.x - radius * Math.sin(yaw), z: BENCH_SPAWN.z - radius * Math.cos(yaw) };
 }
 
 /** Feet height on the terrain (trees left out: a guest walks through them). */
@@ -211,8 +216,8 @@ function guestWalk(g: number, step: number): { x: number; y: number; z: number; 
   const radius = BENCH_GUEST_RADII[g];
   const p = arcPoint(radius, a);
   // Facing where it walks: the tangent of the arc.
-  const dx = -radius * Math.cos(a) * dir;
-  const dz = radius * Math.sin(a) * dir;
+  const dx = -radius * Math.cos(PLAYERS_YAW + a) * dir;
+  const dz = radius * Math.sin(PLAYERS_YAW + a) * dir;
   return { x: p.x, y: groundAt(p.x, p.z), z: p.z, yaw: Math.atan2(-dx, -dz) };
 }
 
@@ -396,7 +401,7 @@ export const SCENARIOS: readonly Scenario[] = [
     version: 1,
     label: 'four players',
     steps: 1200,
-    start: { ...BENCH_SPAWN, yaw: 0, pitch: PLAYERS_PITCH, mode: 'walk' },
+    start: { ...BENCH_SPAWN, yaw: PLAYERS_YAW, pitch: PLAYERS_PITCH, mode: 'walk' },
     input: () => NO_INPUT,
     action: noAction,
     guests: PLAYERS_GUESTS,

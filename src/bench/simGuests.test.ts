@@ -108,9 +108,10 @@ describe('the scenario players (Phase 6 AC15.1)', () => {
         const p = PLAYERS_GUESTS.pose(g, step, 1200);
         expect(p.y).toBe(terrain.heightAt(Math.floor(p.x), Math.floor(p.z)) + 1);
         expect(terrain.isUnderWater(Math.floor(p.x), Math.floor(p.z))).toBe(false);
-        // In front: within 45° of north (−Z) as seen from the player.
-        const angle = Math.atan2(-(p.x - start.x), -(p.z - start.z));
-        expect(Math.abs(angle)).toBeLessThanOrEqual(Math.PI / 4 + 1e-9);
+        // In front: within 45° of the way the player looks.
+        const angle = Math.atan2(-(p.x - start.x), -(p.z - start.z)) - start.yaw;
+        const off = Math.atan2(Math.sin(angle), Math.cos(angle));
+        expect(Math.abs(off)).toBeLessThanOrEqual(Math.PI / 4 + 1e-9);
         travelled += Math.hypot(p.x - last.x, p.z - last.z);
         last = p;
       }

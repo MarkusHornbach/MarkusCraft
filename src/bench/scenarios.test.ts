@@ -14,6 +14,7 @@ import {
   BENCH_SPAWN,
   EDIT_CELLS,
   FLY_HEIGHT,
+  PLAYERS_YAW,
   SCENARIOS,
   type Scenario,
   TORCH_CELLS,
@@ -291,7 +292,11 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       null,
       [2, 5, 8],
     ]);
-    expect(getScenario('players')?.start).toMatchObject({ ...BENCH_SPAWN, yaw: 0, mode: 'walk' });
+    expect(getScenario('players')?.start).toMatchObject({
+      ...BENCH_SPAWN,
+      yaw: PLAYERS_YAW,
+      mode: 'walk',
+    });
     expect(BENCH_SUITE_VERSION).toBe(3);
   });
 
