@@ -1,7 +1,6 @@
 // Phase 6 part D: the motion rule of other players' figures.
 import { describe, expect, it } from 'vitest';
 import { FIGURE_HEAD_YAW_MAX, FIGURE_LEG_SWING, FIGURE_SWING_MS, WALK_SPEED } from '../game/config';
-import { expectFasterThan } from '../testing/timing';
 import { mulberry32 } from '../util/rng';
 import {
   type FigureAngles,
@@ -261,29 +260,4 @@ describe('figure motion: swing', () => {
   });
 });
 
-describe('figure motion: cost', () => {
-  it('Phase 6 AC11.6: 30 000 steps take less than 20 ms; a step writes into its object', () => {
-    const rigs = [new Rig(), new Rig(), new Rig()];
-    const run = (): number => {
-      const start = performance.now();
-      for (let f = 0; f < 10_000; f++) {
-        for (let r = 0; r < 3; r++) {
-          const rig = rigs[r];
-          rig.input.x += 0.07;
-          rig.input.yaw += 0.01;
-          rig.input.busy = (f & 64) !== 0;
-          rig.input.nowMs += FRAME_MS;
-          rig.motion.step(rig.input, rig.out);
-        }
-      }
-      return performance.now() - start;
-    };
-    run();
-    let best = Infinity;
-    for (let i = 0; i < 5; i++) best = Math.min(best, run());
-    expectFasterThan(best, 20);
-    const out = rigs[0].out;
-    rigs[0].motion.step(rigs[0].input, out);
-    expect(rigs[0].out).toBe(out);
-  });
-});
+// The cost of a step (AC11.6) is measured in `figureMotionSpeed.solo.test.ts`.

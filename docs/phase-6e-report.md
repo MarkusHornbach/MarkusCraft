@@ -134,6 +134,12 @@ API), `docs/device-tests.md`, this report.
   waits until the host knows every player's pose after the long jump to the columns,
   instead of a fixed 300 ms, since the host checks reach against the last pose it got.
 
+- **Part D's timing test AC11.6 moved into a solo file**
+  (`src/player/figureMotionSpeed.solo.test.ts`). The second CI run of this pull request
+  measured 20.98 ms against its limit of 20 ms in the pass where 70 files run side by
+  side; `CLAUDE.md` puts tight wall-clock limits into solo files, which run alone. The
+  test itself is unchanged.
+
 ## Known issues
 
 - Software WebGL in the container and CI: the timings of the browser tests (joins, the
