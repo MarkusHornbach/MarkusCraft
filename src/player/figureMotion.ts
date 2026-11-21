@@ -96,6 +96,8 @@ export class FigureMotion {
     const snapped =
       dx * dx + dz * dz > SNAP_DISTANCE * SNAP_DISTANCE || input.snaps !== this.seenSnaps;
     this.seenSnaps = input.snaps;
+    // A jump carries its own facing: the body stands under the head again.
+    if (snapped) this.bodyYaw = input.yaw;
 
     // Walking speed and direction, smoothed over a few frames.
     if (dtMs > 0) {

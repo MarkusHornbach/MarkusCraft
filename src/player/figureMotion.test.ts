@@ -115,6 +115,17 @@ describe('figure motion: walking', () => {
     }
   });
 
+  it('after a teleport the body faces where the head looks', () => {
+    const rig = new Rig();
+    rig.frame();
+    rig.input.x += 3;
+    rig.input.yaw = Math.PI;
+    rig.input.snaps = 1;
+    const a = rig.frame();
+    expect(a.bodyYaw).toBe(Math.PI);
+    expect(a.headYaw).toBe(0);
+  });
+
   it('a teleport (a snap of the drawn pose) gives no swing either', () => {
     const rig = new Rig();
     rig.frame();

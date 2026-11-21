@@ -143,6 +143,14 @@ test('Phase 6 AC12.4, AC12.8: three guests, draw calls, the look and the belt', 
   }
   for (const [i, id] of ids.entries())
     await untilDrawnAt(host.page, id, hx + 0.5 + row[i], hz - 3.5);
+  // All three drawn, standing still (their limbs at rest), before the picture is taken.
+  await untilNet(host.page, (n) =>
+    ids.every((id) => {
+      const a = n.players.find((p) => p.id === id)?.anim;
+      return a !== null && a !== undefined && a.leftLeg === 0 && a.rightArm === 0;
+    }),
+  );
+  await host.page.evaluate(() => window.__mc.whenIdle());
   const image = await capture(host.page);
   const withFigures = (await state(host.page)).render.drawCalls;
   // Look 3 (Pebble): a grey top; the region is the figure's own left of the vest.
@@ -166,7 +174,10 @@ test('Phase 6 AC12.4, AC12.8: three guests, draw calls, the look and the belt', 
             ? 'yellow'
             : 'none';
   const slotColour = ['red', 'blue', 'green', 'yellow'];
-  expect(colours.map(dominant)).toEqual([slotColour[slots[0] ?? 0], slotColour[slots[1] ?? 0]]);
+  expect(colours.map(dominant), JSON.stringify({ colours, top })).toEqual([
+    slotColour[slots[0] ?? 0],
+    slotColour[slots[1] ?? 0],
+  ]);
   // AC12.4: three other players add at most six draw calls.
   for (const g of guests) await setPose(g.page, { x: hx + 300.5 });
   for (const id of ids) {

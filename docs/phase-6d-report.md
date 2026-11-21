@@ -106,6 +106,10 @@ key would otherwise change the references from run to run.
   `SNAP_DISTANCE` blocks was seen by the motion as one very fast step and made the legs
   swing. `PoseBuffer.snapsAt(now)` counts the snaps the drawn pose has gone through, and
   `FigureMotion` treats a change of that count like a long jump: no movement, no swing.
+- **A snap also turns the body under the head.** After a teleport that turned the player
+  (a test's `setPlayer`, a start pose), the 45° rule alone left the body at 45° from the
+  head, so a figure placed facing the camera showed its side. A jump carries its own
+  facing; walking and looking around follow the rules of 5.14 as planned.
 - **`FIGURE_MAX_FRAME_MS` is 1 000 ms**, not the 100 ms first chosen: software-rendered
   pages draw a few pictures a second, and a short clamp slowed the figures' clock down
   there (limbs took far longer than 200 ms of real time to come to rest).
