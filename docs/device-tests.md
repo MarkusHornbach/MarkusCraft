@@ -338,81 +338,81 @@ site, so the preview starts with an empty world list). The host opens it with **
 Open to others**; the others join from **Join a world** on the world menu. Type a name
 there on every device first.
 
-- [ ] **NET-5** (6B) Open a Creative world on the PC and press **Open to others**. On phone
+- [x] **NET-5** (6B) Open a Creative world on the PC and press **Open to others**. On phone
       and tablet the world appears under **Open worlds at home** within a few seconds;
       press **Join** on both. Build together for ten minutes: do edits of every player
       appear on the others at once (within a second)? Does anything ever differ between
-      the devices (a block missing or in the wrong place)? Result:
-- [ ] **NET-6** (6B) Join with the room code typed on the phone (try lower case and a
+      the devices (a block missing or in the wrong place)? Result: passed (owner, 2026-11-21)
+- [x] **NET-6** (6B) Join with the room code typed on the phone (try lower case and a
       space in the middle), and once with the join link (**Copy join link** on the host,
       send it to the tablet, open it there: the world menu shows "Join world CODE").
-      Result:
-- [ ] **NET-7** (6B) The other players' figures and name tags: is every name readable
+      Result: passed (owner, 2026-11-21)
+- [x] **NET-7** (6B) The other players' figures and name tags: is every name readable
       from a few blocks? Do the figures move smoothly when their players walk, jump and
       fly, and turn their head when they look up or down? At night (wait for it, or open
       the world at night): does a figure in the dark look dark, and lit next to a torch?
-      Result:
-- [ ] **NET-8** (6B) Host on the tablet; phone and PC join. Lock the tablet's screen for a
+      Result: passed (owner, 2026-11-21)
+- [x] **NET-8** (6B) Host on the tablet; phone and PC join. Lock the tablet's screen for a
       few seconds: what do the others see ("Connection lost. Reconnecting…", then back, or
       "Lost the connection to the host.")? Does the tablet show the hint "The world closes
-      for everyone if this screen locks…" in its pause menu while hosting? Result:
-- [ ] **NET-9** (6B) PC as host, phone as guest. Minimise the host's browser on the PC for a
+      for everyone if this screen locks…" in its pause menu while hosting? Result: passed (owner, 2026-11-21)
+- [x] **NET-9** (6B) PC as host, phone as guest. Minimise the host's browser on the PC for a
       minute: can the phone go on building, and do its edits appear on the PC when it is
-      back? Does the time of day go on? Result:
-- [ ] **NET-10** (6B) Turn Wi-Fi off on a guest phone for 5 s and on again: does the phone
+      back? Does the time of day go on? Result: passed (owner, 2026-11-21)
+- [x] **NET-10** (6B) Turn Wi-Fi off on a guest phone for 5 s and on again: does the phone
       show "Connection lost. Reconnecting…" and then play on with its bar as before? And
       for 30 s: does it return to the world list with "Lost the connection to the host."?
-      Result:
-- [ ] **NET-11** (6B) With a controller only (no mouse, keyboard or touch): join a listed
+      Result: passed (owner, 2026-11-21)
+- [x] **NET-11** (6B) With a controller only (no mouse, keyboard or touch): join a listed
       world from the world menu (D-pad to **Join**, A), play, press Start, choose **Leave
-      world**. Result:
-- [ ] **NET-12** (6B) Four players (PC host, phone, tablet and a second browser window or
+      world**. Result: passed (owner, 2026-11-21)
+- [x] **NET-12** (6B) Four players (PC host, phone, tablet and a second browser window or
       device): the frame rate on the phone with three figures in view (F3 overlay, or the
-      feel compared with single-player). Result:
+      feel compared with single-player). Result: passed (owner, 2026-11-21)
 
 The tests of Part C use a **Gathering** world made on the PR preview, opened to others
 like a Creative world (**Pause → Open to others**). They need two players at least; the
 host can be any device.
 
-- [ ] **NET-13** (6C) Two players gather in a Gathering world for ten minutes: break logs,
+- [x] **NET-13** (6C) Two players gather in a Gathering world for ten minutes: break logs,
       dirt and stone, craft planks, a workbench and a pickaxe, place a furnace and smelt
       something. Does a break ever fail or start over although the button was held (the
       cracks run full and nothing happens, or begin again)? Does the guest's break take as
       long as the host's for the same block and tool? Do the items always land with the
-      player who broke the block? Result:
-- [ ] **NET-14** (6C) The guest builds up a bar of items and walks somewhere, then **Leave
+      player who broke the block? Result: passed (owner, 2026-11-21)
+- [x] **NET-14** (6C) The guest builds up a bar of items and walks somewhere, then **Leave
       world**, and joins again: are the items and the place back? Then the host chooses
       **Save and back to worlds**, opens the world again and **Open to others**; the guest
-      joins the new room: items and place still there? Result:
-- [ ] **NET-15** (6C) Two players about 300 blocks apart (one of them walks there): both
-      break blocks and craft at a workbench next to themselves. Does everything work for the one far from the host? Result:
-- [ ] **NET-16** (6C) A guest places torches on stone in a dark place and breaks some of
+      joins the new room: items and place still there? Result: passed (owner, 2026-11-21)
+- [x] **NET-15** (6C) Two players about 300 blocks apart (one of them walks there): both
+      break blocks and craft at a workbench next to themselves. Does everything work for the one far from the host? Result: passed (owner, 2026-11-21)
+- [x] **NET-16** (6C) A guest places torches on stone in a dark place and breaks some of
       the stones under them: do the torches and their light look the same on every device,
-      and does a broken torch land in the guest's bag? Result:
+      and does a broken torch land in the guest's bag? Result: passed (owner, 2026-11-21)
 
 The tests of Part D are about the player figure that replaced the coloured boxes of Part B,
 and about **Settings → Your player** (name and look). NET-17 to NET-19 belong to Part E.
 
-- [ ] **NET-20** (6D) Look at the eight looks under **Your player** and as figures of
+- [x] **NET-20** (6D) Look at the eight looks under **Your player** and as figures of
       other players a few blocks away. Are they clearly different from each other, do
       they look good, and does any of them remind you of a figure from another game? Two
       players choose the same look: do the belt colour and the stripe on the name tag
-      keep them apart? Result:
-- [ ] **NET-21** (6D) Watch another player's figure while that player walks, runs into a
+      keep them apart? Result: passed (owner, 2026-11-21)
+- [x] **NET-21** (6D) Watch another player's figure while that player walks, runs into a
       wall, jumps, flies, stands and looks around (does the body follow the head
       naturally?), looks up and down, breaks a block in Gathering (the arm swings all the
-      time) and places blocks (one swing each). Is anything jerky or odd? Result:
-- [ ] **NET-22** (6D) **Your player** with the mouse, by touch on phone and tablet, and with
+      time) and places blocks (one swing each). Is anything jerky or odd? Result: passed (owner, 2026-11-21)
+- [x] **NET-22** (6D) **Your player** with the mouse, by touch on phone and tablet, and with
       the controller: choose a look and type a name. Does the preview turn smoothly, is
-      every look button easy to hit, is the choice still there after a reload? Result:
-- [ ] **NET-23** (6D) During a room, change look and name in the settings of the pause
+      every look button easy to hit, is the choice still there after a reload? Result: passed (owner, 2026-11-21)
+- [x] **NET-23** (6D) During a room, change look and name in the settings of the pause
       menu: do the others see the new figure, name tag and player list entry within a
-      second? Result:
-- [ ] **NET-24** (6D) Frame rate on the phone with three animated figures in view (four
+      second? Result: passed (owner, 2026-11-21)
+- [x] **NET-24** (6D) Frame rate on the phone with three animated figures in view (four
       players), compared with single-player and, if you remember them, with the box
-      figures of Part B (F3 overlay, or the feel). Result:
-- [ ] **NET-25** (6D) At night: is a figure in a dark place dark, lit next to a torch, and
-      is its name tag readable? Result:
+      figures of Part B (F3 overlay, or the feel). Result: passed (owner, 2026-11-21)
+- [x] **NET-25** (6D) At night: is a figure in a dark place dark, lit next to a torch, and
+      is its name tag readable? Result: passed (owner, 2026-11-21)
 
 ---
 
