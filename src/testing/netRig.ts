@@ -10,7 +10,8 @@ import { World } from '../world/World';
 import { ClientSession, type ClientStatus, type EndReason } from '../net/ClientSession';
 import { HostSession, type PeerEvent } from '../net/HostSession';
 import { MemoryNetwork, type MemorySignaling } from '../net/memoryTransport';
-import type { NetPose } from '../net/protocol';
+import type { NetPose, Welcome } from '../net/protocol';
+import type { GuestEntry } from '../save/saveFormat';
 import { playerKeyFromBytes, roomPeerId } from '../net/roomCode';
 import { worldHash } from '../net/snapshot';
 
@@ -37,6 +38,8 @@ export interface RigGuest {
   ends: EndReason[];
   worlds: number;
   key: string;
+  /** The last welcome the guest got. */
+  welcome: Welcome | null;
 }
 
 export interface RigOptions {
@@ -47,7 +50,12 @@ export interface RigOptions {
   netSeed?: number;
   frozen?: boolean;
   time?: number;
+  /** Guests the world remembers (its saved record). */
+  guests?: GuestEntry[];
 }
+
+/** The fake wall clock of a rig: milliseconds since 1970 at its start, plus the fake time. */
+export const RIG_EPOCH_MS = 1_800_000_000_000;
 
 export class Rig {
   readonly net: MemoryNetwork;
@@ -90,6 +98,8 @@ export class Rig {
       time: options.time ?? 0.25,
       frozen: options.frozen ?? false,
       clock: () => this.net.nowMs,
+      wallClock: () => RIG_EPOCH_MS + this.net.nowMs,
+      guests: options.guests,
       listener: {
         onBlocks: () => {},
         onPlayer: (record) => {
@@ -132,6 +142,7 @@ export class Rig {
       ends: [],
       worlds: 0,
       key,
+      welcome: null,
     };
     guest.client = new ClientSession({
       network: { signaling: () => this.net.signaling(), directory: this.net.directory() },
@@ -147,6 +158,7 @@ export class Rig {
       checksum: (seed, version) => options.checksum ?? terrainChecksum(seed, version),
       listener: {
         onWorld: (welcome, edits) => {
+          guest.welcome = welcome;
           guest.world = new World(welcome.seed, welcome.generatorVersion, edits);
           // The chunks around the start, as the guest's chunk manager would load them.
           for (let cz = -2; cz <= 2; cz++) {

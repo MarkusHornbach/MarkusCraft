@@ -543,6 +543,7 @@ export class Game {
       pose: { x: spawn.x + 0.5, y: spawn.y, z: spawn.z + 0.5, yaw: 0, pitch: 0 },
       moveMode: 'walk',
       player: createPlayerRecord(mode),
+      guests: [],
     };
   }
 
@@ -599,6 +600,8 @@ export class Game {
       moveMode: p.mode,
       // A break in progress is measured on a clock that restarts with the world.
       player: { ...this.session.record, breaking: null },
+      // While the world is open to others, its guests as they are now.
+      guests: this.mp.host?.guestEntries() ?? meta.guests,
     };
   }
 
@@ -972,6 +975,14 @@ export class Game {
         const p = this.player;
         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
       },
+      flying: () => this.player.mode === 'fly',
+      guests: () => this.meta?.guests ?? [],
+      keepGuests: (guests) => {
+        if (!this.meta) return;
+        this.meta = { ...this.meta, guests };
+        this.markMetaDirty();
+      },
+      guestsChanged: () => this.markMetaDirty(),
       time: () => this.time,
       frozen: () => this.params.freeze,
       listener: {
@@ -1005,7 +1016,7 @@ export class Game {
     const p = this.player;
     const now = Date.now();
     const pose = rejoin ? { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch } : welcome.pose;
-    const moveMode = rejoin ? p.mode : 'walk';
+    const moveMode = rejoin ? p.mode : welcome.moveMode;
     this.loadWorld(
       {
         id: 'guest',
@@ -1020,6 +1031,7 @@ export class Game {
         pose,
         moveMode,
         player: welcome.record,
+        guests: [],
       },
       edits,
     );

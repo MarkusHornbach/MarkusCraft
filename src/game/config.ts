@@ -178,8 +178,13 @@ export const TOUCH_RENDER_DISTANCE_DEFAULT = 5;
 export const PIXEL_RATIO_MAX = 2;
 export const TOUCH_PIXEL_RATIO_MAX = 1.5;
 
-/** Version of the save format; a world saved by a newer version is not opened. */
-export const SAVE_FORMAT_VERSION = 1;
+/**
+ * Version of the save format; a world saved by a newer version is not opened. Version 2
+ * (Phase 6 part C) adds the guests of the world; version 1 records load without any.
+ */
+export const SAVE_FORMAT_VERSION = 2;
+/** Guests a world keeps (items and place); beyond this the one seen longest ago goes. */
+export const GUESTS_MAX = 32;
 export const WORLD_NAME_MAX = 24;
 export const DEFAULT_WORLD_NAME = 'My world';
 /** Unsaved changes are written this long after the first of them. */
@@ -344,5 +349,16 @@ export const POSE_MIN_Y = -64;
 export const POSE_MAX_Y = 512;
 /** A new guest starts on free ground within this many blocks of the host. */
 export const START_POSE_RADIUS = 3;
+
+// --- Multiplayer: Gathering together (Phase 6 part C) ---
+
+/**
+ * A guest's `break` that reaches the host at most this much before its time is up is held
+ * and decided when it is due (Wi-Fi jitter shortens the time between two messages).
+ */
+export const NET_BREAK_GRACE_MS = 400;
+/** A guest's actions beyond this many within one second are refused (`rate`). */
+export const ACTION_RATE_LIMIT = 30;
+export const ACTION_RATE_WINDOW_MS = 1_000;
 /** Where a device keeps its player key and name (per site). */
 export const PLAYER_STORAGE_KEY = 'markuscraft.player.v1';

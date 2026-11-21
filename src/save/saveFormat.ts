@@ -10,6 +10,7 @@ import {
 import {
   CHUNK_VOLUME,
   DEFAULT_WORLD_NAME,
+  GUESTS_MAX,
   HOTBAR_SLOTS,
   INVENTORY_SLOTS,
   MAX_PITCH,
@@ -30,6 +31,20 @@ export interface SavedPose {
   pitch: number;
 }
 
+/**
+ * A player who played in this world as a guest (format version 2): kept by the host so
+ * that the player finds its items and its place again. `key` is the guest's player key.
+ */
+export interface GuestEntry {
+  key: string;
+  name: string;
+  record: PlayerRecord;
+  pose: SavedPose;
+  moveMode: MoveMode;
+  /** Wall-clock time (milliseconds since 1970) the host last heard of the guest. */
+  lastSeenMs: number;
+}
+
 /** Everything about a world except its edited blocks. */
 export interface WorldMeta {
   id: string;
@@ -46,6 +61,8 @@ export interface WorldMeta {
   pose: SavedPose;
   moveMode: MoveMode;
   player: PlayerRecord;
+  /** Guests of the world, at most `GUESTS_MAX` (empty for worlds never opened to others). */
+  guests: GuestEntry[];
 }
 
 /** Edits of all chunks of a world: chunk key → (block index → block id), as in `World`. */
@@ -184,7 +201,29 @@ export function encodeMeta(meta: WorldMeta): Record<string, unknown> {
     pose: { ...meta.pose },
     moveMode: meta.moveMode,
     player: encodePlayer(meta.player),
+    guests: limitGuests(meta.guests).map(encodeGuest),
   };
+}
+
+function encodeGuest(guest: GuestEntry): Record<string, unknown> {
+  return {
+    key: guest.key,
+    name: guest.name,
+    record: encodePlayer(guest.record),
+    pose: { ...guest.pose },
+    moveMode: guest.moveMode,
+    lastSeenMs: guest.lastSeenMs,
+  };
+}
+
+/** The newest `GUESTS_MAX` guests, one per key, newest first. */
+export function limitGuests(guests: readonly GuestEntry[]): GuestEntry[] {
+  const byKey = new Map<string, GuestEntry>();
+  for (const guest of guests) {
+    const known = byKey.get(guest.key);
+    if (!known || known.lastSeenMs < guest.lastSeenMs) byKey.set(guest.key, guest);
+  }
+  return [...byKey.values()].sort((a, b) => b.lastSeenMs - a.lastSeenMs).slice(0, GUESTS_MAX);
 }
 
 /** The plain form of a player record, as stored and as sent over the network. */
@@ -217,16 +256,22 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
     if (!isFiniteIn(value.createdMs, 0, TIME_LIMIT)) return damaged;
     if (!isFiniteIn(value.playedMs, 0, TIME_LIMIT)) return damaged;
     if (!isFiniteIn(value.time, 0, 1) || value.time === 1) return damaged;
-    const pose = value.pose;
-    if (!isObject(pose)) return damaged;
-    if (!isFiniteIn(pose.x, -COORD_LIMIT, COORD_LIMIT)) return damaged;
-    if (!isFiniteIn(pose.z, -COORD_LIMIT, COORD_LIMIT)) return damaged;
-    if (!isFiniteIn(pose.y, -1000, 100000)) return damaged;
-    if (!isFiniteIn(pose.yaw, -Math.PI, Math.PI)) return damaged;
-    if (!isFiniteIn(pose.pitch, -MAX_PITCH, MAX_PITCH)) return damaged;
+    const pose = decodePose(value.pose);
+    if (!pose) return damaged;
     if (value.moveMode !== 'walk' && value.moveMode !== 'fly') return damaged;
     const player = decodePlayer(value.player);
     if (!player) return damaged;
+    // Version 1 knew no guests. A guest entry that does not check out is dropped: it
+    // never makes the world itself damaged.
+    let guests: GuestEntry[] = [];
+    if (value.formatVersion >= 2) {
+      if (!Array.isArray(value.guests)) return damaged;
+      guests = limitGuests(
+        (value.guests as unknown[])
+          .map(decodeGuest)
+          .filter((guest): guest is GuestEntry => guest !== null),
+      );
+    }
     return {
       ok: true,
       value: {
@@ -235,18 +280,53 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
         seed: value.seed,
         mode,
         generatorVersion: value.generatorVersion,
-        formatVersion: value.formatVersion,
+        // Read records are migrated: saving them again writes the current version.
+        formatVersion: SAVE_FORMAT_VERSION,
         createdMs: value.createdMs,
         playedMs: value.playedMs,
         time: value.time,
-        pose: { x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw, pitch: pose.pitch },
+        pose,
         moveMode: value.moveMode,
         player,
+        guests,
       },
     };
   } catch {
     return damaged;
   }
+}
+
+function decodePose(value: unknown): SavedPose | null {
+  if (!isObject(value)) return null;
+  const { x, y, z, yaw, pitch } = value;
+  if (!isFiniteIn(x, -COORD_LIMIT, COORD_LIMIT)) return null;
+  if (!isFiniteIn(z, -COORD_LIMIT, COORD_LIMIT)) return null;
+  if (!isFiniteIn(y, -1000, 100000)) return null;
+  if (!isFiniteIn(yaw, -Math.PI, Math.PI)) return null;
+  if (!isFiniteIn(pitch, -MAX_PITCH, MAX_PITCH)) return null;
+  return { x, y, z, yaw, pitch };
+}
+
+const PLAYER_KEY_PATTERN = /^[0-9a-f]{32}$/;
+const GUEST_NAME_MAX = 64;
+
+function decodeGuest(value: unknown): GuestEntry | null {
+  if (!isObject(value)) return null;
+  if (typeof value.key !== 'string' || !PLAYER_KEY_PATTERN.test(value.key)) return null;
+  if (typeof value.name !== 'string' || value.name.length > GUEST_NAME_MAX) return null;
+  const record = decodePlayer(value.record);
+  const pose = decodePose(value.pose);
+  if (!record || !pose) return null;
+  if (value.moveMode !== 'walk' && value.moveMode !== 'fly') return null;
+  if (!isFiniteIn(value.lastSeenMs, 0, TIME_LIMIT)) return null;
+  return {
+    key: value.key,
+    name: value.name,
+    record,
+    pose,
+    moveMode: value.moveMode,
+    lastSeenMs: value.lastSeenMs,
+  };
 }
 
 // --- chunk records -----------------------------------------------------------------

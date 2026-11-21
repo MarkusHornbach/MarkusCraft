@@ -20,7 +20,8 @@ import type { GameMode, PlayerRecord } from './playerRecord';
  * Why an action was refused. Short identifiers; the user interface maps them to texts.
  * `missing` also stands for an empty slot and for ingredients a recipe is short of;
  * `station` for a recipe whose workbench or furnace is not within reach; `support` for a
- * block that needs a solid cube below it (the torch).
+ * block that needs a solid cube below it (the torch); `rate` for a guest that sent too
+ * many actions within a second (the host's rule, Phase 6 part C; no text on screen).
  */
 export type RejectReason =
   | 'reach'
@@ -32,6 +33,7 @@ export type RejectReason =
   | 'station'
   | 'support'
   | 'mode'
+  | 'rate'
   | 'invalid';
 
 export interface BlockChange {

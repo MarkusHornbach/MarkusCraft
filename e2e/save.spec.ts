@@ -241,3 +241,100 @@ test('a world with 50 000 edits saves in under 2 s and loads in under 3 s (Phase
     1 + (249 % 9),
   );
 });
+
+// Written by the last build before Phase 6 part C (format version 1; the same record as in
+// `src/save/guests.test.ts`): a Gathering world with a pickaxe, torches and coal.
+const PHASE_5_META = {
+  id: 'wp5-fixture001',
+  name: 'Phase 5 world',
+  seed: 1337,
+  mode: 'gathering',
+  generatorVersion: 1,
+  formatVersion: 1,
+  createdMs: 1810000000000,
+  playedMs: 1810000720000,
+  time: 0.45,
+  pose: { x: 10.5, y: 64, z: -2.5, yaw: -1.5, pitch: 0.2 },
+  moveMode: 'walk',
+  player: {
+    slots: [
+      { item: 265, count: 1 },
+      { item: 19, count: 14 },
+      { item: 4, count: 23 },
+      ...Array.from({ length: 6 }, () => null),
+      { item: 256, count: 5 },
+      ...Array.from({ length: 26 }, () => null),
+    ],
+    selectedSlot: 1,
+    breaking: null,
+  },
+};
+const PHASE_5_CHUNK = {
+  key: 'wp5-fixture001|0,0',
+  worldId: 'wp5-fixture001',
+  cx: 0,
+  cz: 0,
+  edits: [5 + 5 * 16 + 100 * 256, 8],
+};
+
+function storedRecords(page: Page): Promise<{ worlds: unknown[] }> {
+  return page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open('markuscraft');
+        open.onerror = () => reject(new Error('open failed'));
+        open.onsuccess = () => {
+          const request = open.result.transaction('worlds').objectStore('worlds').getAll();
+          request.onsuccess = () => {
+            open.result.close();
+            resolve({ worlds: request.result });
+          };
+        };
+      }),
+  );
+}
+
+test('Phase 6 AC8.5: a world saved by the Phase 5 build still opens and is saved as version 2', async ({
+  page,
+}) => {
+  // Any stored world creates the database; then the old records are written into it.
+  await openGame(page, { save: true, world: 'Other' });
+  await page.evaluate(
+    ([meta, chunk]) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('markuscraft');
+        open.onerror = () => reject(new Error('open failed'));
+        open.onsuccess = () => {
+          const tx = open.result.transaction(['worlds', 'chunks'], 'readwrite');
+          tx.objectStore('worlds').put(meta);
+          tx.objectStore('chunks').put(chunk);
+          tx.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+          tx.onerror = () => reject(new Error('write failed'));
+        };
+      }),
+    [PHASE_5_META, PHASE_5_CHUNK] as const,
+  );
+  await openGame(page, { save: true, world: 'Phase 5 world' });
+  const state = await getState(page);
+  expect(state.world?.id).toBe('wp5-fixture001');
+  expect(state.mode).toBe('gathering');
+  expect(state.selectedSlot).toBe(2);
+  expect(state.inventory.slots.slice(0, 3)).toEqual(PHASE_5_META.player.slots.slice(0, 3));
+  expect(state.player.x).toBeCloseTo(10.5, 5);
+  expect(await getBlock(page, 5, 100, 5)).toBe(8);
+  // Something changes (the time of day), the world is saved.
+  await page.evaluate(async () => {
+    window.__mc.setTime(0.3);
+    await window.__mc.save();
+  });
+  const meta = (await storedRecords(page)).worlds.find(
+    (w) => (w as { id: string }).id === 'wp5-fixture001',
+  ) as Record<string, unknown>;
+  expect(meta.formatVersion).toBe(2);
+  expect(meta.guests).toEqual([]);
+  expect(meta.player).toEqual(PHASE_5_META.player);
+  expect(meta.createdMs).toBe(PHASE_5_META.createdMs);
+});

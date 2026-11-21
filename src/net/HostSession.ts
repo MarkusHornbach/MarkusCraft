@@ -18,6 +18,8 @@ import {
 } from '../game/config';
 import { BLOCK_SOLID, Block } from '../world/blocks';
 import { wrapTime } from '../world/dayNight';
+import type { MoveMode } from '../player/player';
+import { type GuestEntry, limitGuests } from '../save/saveFormat';
 import type { World } from '../world/World';
 import { FarReader } from './authority';
 import { RemoteRoster } from './interpolation';
@@ -61,6 +63,13 @@ export interface HostOptions {
   frozen: boolean;
   /** Milliseconds of a steady clock (wall-clock time in the browser). */
   clock: () => number;
+  /**
+   * Milliseconds since 1970, for the `lastSeenMs` of saved guests; `clock` if not given
+   * (only the order of the times matters).
+   */
+  wallClock?: () => number;
+  /** The guests the world remembers: a returning guest gets its items and place back. */
+  guests?: readonly GuestEntry[];
   listener: HostListener;
 }
 
@@ -73,6 +82,7 @@ interface Member {
   conn: Connection | null;
   record: PlayerRecord;
   pose: NetPose;
+  moveMode: MoveMode;
   /** Raised with every new pose; the version of the last teleport. */
   poseVersion: number;
   tpVersion: number;
@@ -117,6 +127,11 @@ export function startPoseNear(
   return { ...near };
 }
 
+/** A saved pose as a pose of the protocol. */
+function wrapPose(p: { x: number; y: number; z: number; yaw: number; pitch: number }): NetPose {
+  return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
+}
+
 function samePose(a: NetPose, b: NetPose): boolean {
   return a.x === b.x && a.y === b.y && a.z === b.z && a.yaw === b.yaw && a.pitch === b.pitch;
 }
@@ -128,8 +143,11 @@ export class HostSession {
   private readonly members = new Map<number, Member>();
   private readonly byConn = new Map<Connection, Member>();
   private readonly strangers = new Map<Connection, Stranger>();
-  /** Records of guests who left, by player key: a returning guest gets its record back. */
-  private readonly departed = new Map<string, PlayerRecord>();
+  /**
+   * Guests who are not in the room, by player key: those the world remembers and those
+   * who left. A returning guest gets its record and place back.
+   */
+  private readonly departed = new Map<string, GuestEntry>();
   private readonly self: Member;
   private nextId = 2;
   private lastRelayMs = -Infinity;
@@ -147,6 +165,10 @@ export class HostSession {
     this.baseTime = options.time;
     this.baseMs = now;
     this.frozenTime = options.frozen;
+    for (const guest of options.guests ?? []) {
+      // The host's own key is the host, never one of its guests.
+      if (guest.key !== options.hostKey) this.departed.set(guest.key, guest);
+    }
     this.self = {
       id: 1,
       name: normalizePlayerName(options.hostName, parseInt(options.hostKey.slice(0, 4), 16) || 0),
@@ -156,6 +178,7 @@ export class HostSession {
       // A break measured on the single-player clock means nothing on the room's clock.
       record: { ...options.hostRecord, breaking: null },
       pose: options.hostPose(),
+      moveMode: 'walk',
       poseVersion: 1,
       tpVersion: 1,
       sent: new Map(),
@@ -197,6 +220,33 @@ export class HostSession {
       host: m === this.self,
       pose: { ...m.pose },
     }));
+  }
+
+  /**
+   * The guests the world keeps: everyone who is in the room now or was before, newest first, at most `GUESTS_MAX`. Records carry no break in progress.
+   */
+  guestEntries(): GuestEntry[] {
+    const now = this.wallNow();
+    const present = [...this.members.values()]
+      .filter((m) => m !== this.self)
+      .map((m) => this.entryOf(m, now));
+    return limitGuests([...this.departed.values(), ...present]);
+  }
+
+  private entryOf(member: Member, lastSeenMs: number): GuestEntry {
+    const p = member.pose;
+    return {
+      key: member.key,
+      name: member.name,
+      record: { ...member.record, breaking: null },
+      pose: { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch },
+      moveMode: member.moveMode,
+      lastSeenMs,
+    };
+  }
+
+  private wallNow(): number {
+    return (this.o.wallClock ?? this.o.clock)();
   }
 
   // --- time of day ---------------------------------------------------------------------
@@ -276,6 +326,7 @@ export class HostSession {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    const now = this.wallNow();
     for (const member of this.members.values()) {
       if (member.conn) {
         this.send(member, { t: 'bye' });
@@ -283,7 +334,9 @@ export class HostSession {
       }
     }
     for (const member of [...this.members.values()]) {
-      if (member !== this.self) this.members.delete(member.id);
+      if (member === this.self) continue;
+      this.departed.set(member.key, this.entryOf(member, now));
+      this.members.delete(member.id);
     }
     this.roster.clear();
   }
@@ -323,6 +376,7 @@ export class HostSession {
         this.act(member, message.action, message.seq);
         break;
       case 'pose':
+        if (this.o.mode === 'creative') member.moveMode = message.fly ? 'fly' : 'walk';
         this.receivePose(member, message, message.tp, now);
         break;
       case 'ping':
@@ -402,9 +456,12 @@ export class HostSession {
     let slot = 0;
     while (slots.has(slot)) slot++;
     this.refreshHostPose();
-    const pose = startPoseNear(this.reader, this.self.pose);
-    const record = this.departed.get(key) ?? createPlayerRecord(this.o.mode);
+    // A returning guest comes back where it left, with its items; a new one next to the host.
+    const known = this.departed.get(key);
     this.departed.delete(key);
+    const pose = known ? wrapPose(known.pose) : startPoseNear(this.reader, this.self.pose);
+    const record = known ? known.record : createPlayerRecord(this.o.mode);
+    const moveMode: MoveMode = known && this.o.mode === 'creative' ? known.moveMode : 'walk';
     const member: Member = {
       id: this.nextId++,
       name,
@@ -413,6 +470,7 @@ export class HostSession {
       conn,
       record,
       pose,
+      moveMode,
       poseVersion: 1,
       tpVersion: 1,
       sent: new Map(),
@@ -448,6 +506,7 @@ export class HostSession {
       players: others,
       record,
       pose,
+      moveMode,
       parts: parts.length,
     });
     parts.forEach((chunks, part) => this.send(member, { t: 'snapshot', part, chunks }));
@@ -464,8 +523,8 @@ export class HostSession {
     if (this.members.get(member.id) !== member || member === this.self) return;
     this.members.delete(member.id);
     if (member.conn) this.byConn.delete(member.conn);
-    // Kept while the room is open: a guest that comes back gets its items again.
-    this.departed.set(member.key, { ...member.record, breaking: null });
+    // A guest that comes back gets its items and its place again (saved with the world).
+    this.departed.set(member.key, this.entryOf(member, this.wallNow()));
     for (const other of this.members.values()) {
       if (other.conn) this.send(other, { t: 'left', id: member.id, reason });
     }

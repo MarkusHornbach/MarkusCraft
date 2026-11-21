@@ -276,6 +276,11 @@ describe('save format', () => {
   });
 });
 
+/** A version 1 record as version 2 writes it: the same fields, no guests. */
+function migrated(text: string): string {
+  return JSON.stringify({ ...(JSON.parse(text) as object), formatVersion: 2, guests: [] });
+}
+
 describe('worlds of earlier versions', () => {
   // Written by the game as of Phase 3 part A (format version 1), before Gathering existed.
   const PART_A_META =
@@ -303,8 +308,8 @@ describe('worlds of earlier versions', () => {
       [100, 8],
       [2000, 0],
     ]);
-    // Saving it again writes the same record: nothing about the format changed.
-    expect(JSON.stringify(encodeMeta(meta))).toBe(PART_A_META);
+    // Saving it again writes the same record, migrated to version 2 (Phase 6 part C).
+    expect(JSON.stringify(encodeMeta(meta))).toBe(migrated(PART_A_META));
   });
 });
 
@@ -336,9 +341,8 @@ describe('a world saved by Part B (Phase 3 AC10.6)', () => {
       [31001, 7],
       [5, 12],
     ]);
-    // Saving it again writes the same records: Part C did not change the format.
-    expect(JSON.stringify(encodeMeta(meta))).toBe(PART_B_META);
-    expect(SAVE_FORMAT_VERSION).toBe(1);
+    // Saving it again writes the same record, migrated to version 2 (Phase 6 part C).
+    expect(JSON.stringify(encodeMeta(meta))).toBe(migrated(PART_B_META));
   });
 });
 
@@ -359,7 +363,7 @@ describe('worlds with torches (Phase 4 AC6.9)', () => {
       [13106, 0],
       [13362, 9],
     ]);
-    expect(JSON.stringify(encodeMeta(decoded.value.meta))).toBe(LIGHT_META);
+    expect(JSON.stringify(encodeMeta(decoded.value.meta))).toBe(migrated(LIGHT_META));
   });
 
   it('keeps torches in the world and in the inventory through encode and decode', () => {

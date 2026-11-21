@@ -15,6 +15,7 @@ import {
   WORLD_HEIGHT,
   WORLD_NAME_MAX,
 } from '../game/config';
+import type { MoveMode } from '../player/player';
 import { decodePlayer, encodePlayer } from '../save/saveFormat';
 import { isPlayerKey } from './roomCode';
 
@@ -67,6 +68,8 @@ export interface Welcome {
   players: PlayerInfo[];
   record: PlayerRecord;
   pose: NetPose;
+  /** Walking or flying at the start (a returning guest as it left; Part C). */
+  moveMode: MoveMode;
   /** Number of snapshot parts that follow. */
   parts: number;
 }
@@ -81,7 +84,7 @@ export type GuestMessage =
   | { t: 'info' }
   | { t: 'hello'; build: string; key: string; name: string }
   | { t: 'action'; seq: number; action: Action }
-  | ({ t: 'pose'; tp: boolean } & NetPose)
+  | ({ t: 'pose'; tp: boolean; fly: boolean } & NetPose)
   | { t: 'ping'; ts: number }
   | { t: 'bye' };
 
@@ -241,6 +244,7 @@ const REJECT_REASONS: readonly RejectReason[] = [
   'station',
   'support',
   'mode',
+  'rate',
   'invalid',
 ];
 
@@ -271,7 +275,7 @@ export function decodeGuestMessage(text: unknown): Decoded<GuestMessage> {
         return { t: 'action', seq: int(m, 'seq', 0, ID_MAX), action: action.action };
       }
       case 'pose':
-        return { t: 'pose', ...pose(m), tp: bool(m, 'tp') };
+        return { t: 'pose', ...pose(m), tp: bool(m, 'tp'), fly: bool(m, 'fly') };
       case 'ping':
         return { t: 'ping', ts: num(m, 'ts', -TIME_MAX, TIME_MAX) };
       default:
@@ -317,6 +321,8 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
           players: arr(m, 'players', NET_MAX_PLAYERS).map(playerInfo),
           record: record(m.record),
           pose: pose(obj(m.pose, 'pose')),
+          moveMode:
+            m.moveMode === 'fly' ? 'fly' : m.moveMode === 'walk' ? 'walk' : fail('moveMode'),
           parts: int(m, 'parts', 0, ID_MAX),
         };
       case 'snapshot': {
