@@ -16,7 +16,7 @@ when NET-1 to NET-4 show a working connection).
   - `memoryTransport.ts`: `MemoryNetwork` with a fake clock (`advance(ms)`), seeded delays,
     per-connection order (a later message never overtakes an earlier one), closing reported
     to both ends after the messages sent before it, `reachable` and `discovery` switches and
-    `lose()` for a lost signaling server. Part B's sessions and Part D's simulated guests
+    `lose()` for a lost signaling server. Part B's sessions and Part E's (then Part D's) simulated guests
     build on it.
   - `netTest.ts`: test ids `mc-<build>-t-<code>` (4 characters of the room alphabet),
     the messages of the test and their validating decoder, `NetTestRun` (hello, 20 pings

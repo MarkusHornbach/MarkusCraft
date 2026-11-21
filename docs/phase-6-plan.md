@@ -7,14 +7,20 @@ system, back guard). `docs/phase-2-plan.md`, Part B, is the earlier multiplayer 
 this plan replaces it and takes over what still fits. Do not implement Part B of the
 Phase 2 plan.
 
-Phase 6 has four parts with separate sessions, branches, reports and pull requests:
+Phase 6 has five parts with separate sessions, branches, reports and pull requests:
 
 | Part | Content              | Steps | Report                    | Starts when                                                    |
 | ---- | -------------------- | ----- | ------------------------- | -------------------------------------------------------------- |
 | A    | Connection test      | 1–2   | `docs/phase-6a-report.md` | Now, from `main`                                               |
 | B    | Together in Creative | 3–7   | `docs/phase-6b-report.md` | After A is merged **and** the owner's NET tests of A succeeded |
 | C    | Gathering together   | 8–10  | `docs/phase-6c-report.md` | After B is merged                                              |
-| D    | Measure and harden   | 11–13 | `docs/phase-6d-report.md` | After C is merged                                              |
+| D    | Player figure        | 11–13 | `docs/phase-6d-report.md` | After C is merged                                              |
+| E    | Measure and harden   | 14–16 | `docs/phase-6e-report.md` | After D is merged                                              |
+
+Part D was inserted after Part C had been merged (change 14 in section 3). Until then the
+part "Measure and harden" was Part D with steps 11–13 and criteria AC11.1–AC13.2; it is now
+Part E with steps 14–16 and criteria AC14.1–AC16.2, unchanged in content. Reports of
+Parts B and C that name "Part D" or "AC11.x" mean Part E and AC14.x.
 
 Each part is implemented autonomously in one cloud session: do not ask the owner
 questions. Where this plan leaves a detail open, choose the simplest option and note it in
@@ -52,46 +58,62 @@ not built now.
 
 ## 2. Decisions made with the owner
 
-| Topic               | Decision                                                                                                                                                                                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Where it is played  | From the Pi-served builds (the main build and the PR previews), which are secure contexts. **The Pi's main build becomes the home of shared worlds.** Worlds live per site (origin): GitHub Pages stays a single-player site, every PR preview starts with an empty world list. Moving worlds between sites is not part of this phase |
-| Players             | Up to 4 including the host, on the home network                                                                                                                                                                                                                                                                                       |
-| Topology            | Star over WebRTC data channels: every guest connects only to the host; the host relays                                                                                                                                                                                                                                                |
-| Signaling           | The `peerjs` client against the owner's own PeerJS server on the Pi (`wss`, behind the existing wildcard certificate). Its address comes from the build variable `VITE_SIGNAL_URL`, overridable by the URL parameter `signal`. No address in the repository                                                                           |
-| ICE servers         | A STUN server on the Pi (`VITE_STUN_URLS`, URL parameter `stun`), so the devices learn their real LAN addresses even where `.local` names (mDNS) cannot be resolved. No TURN, no public STUN                                                                                                                                          |
-| Finding a room      | A list "Open worlds at home" on the world menu, from the PeerJS server's discovery list (`allow_discovery`). Only rooms of the same build are listed. The room code and the join link `?join=CODE` remain as a fallback                                                                                                               |
-| Handshake           | Joining needs the same build id (the commit, `__BUILD_COMMIT__`) and the same terrain checksum, computed at runtime on both devices                                                                                                                                                                                                   |
-| Authority           | The host validates and applies every action through `applyAction`, for each player against that player's own `PlayerRecord`, and owns the time of day. Each device owns its player's position and look; the host only sanity-checks poses                                                                                             |
-| Far chunks          | The host reads blocks it has not loaded "on the side": terrain generated into a small cache plus the recorded edits, with no light and no meshes (5.6)                                                                                                                                                                                |
-| Smelting            | The two seconds of the furnace stay a progress bar in the client, as today. The host does not enforce them                                                                                                                                                                                                                            |
-| Identity            | Each device keeps a random player key and a name in local storage. The host keys its guest records by the player key; names may change and collide                                                                                                                                                                                    |
-| When the host goes  | Guests keep nothing. They see why and return to the world list. A lost connection is retried for 10 s first. Items and positions stay in the host's save                                                                                                                                                                              |
-| Menus               | Hosting: "Open to others" in the pause menu of an open world. Joining: a section "Join a world" on the world menu (room list, code field, name field). Joining never replaces an open world. While a room is open or joined, the pause menu does not pause the world                                                                  |
-| Where a guest shows | A new guest appears next to the host; a returning guest (Part C) where they left                                                                                                                                                                                                                                                      |
-| Other players       | A placeholder figure (body and head box) in one of four colours with a name tag. No held item, no cracks of others' breaking. Real characters are Phase 7                                                                                                                                                                             |
-| Phones as host      | Allowed. While a room is open or joined the page holds a screen wake lock. In touch mode the host sees a hint that the world closes for everyone if the screen locks or the app changes                                                                                                                                               |
-| Performance test    | A new scenario `players`: the page is the host of three simulated guests that run inside it over an in-memory connection, walk and edit around the player (Part D)                                                                                                                                                                    |
-| Parts               | Four parts: **A** connection test, **B** together in Creative, **C** Gathering together, **D** measure and harden                                                                                                                                                                                                                     |
+| Topic               | Decision                                                                                                                                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where it is played  | From the Pi-served builds (the main build and the PR previews), which are secure contexts. **The Pi's main build becomes the home of shared worlds.** Worlds live per site (origin): GitHub Pages stays a single-player site, every PR preview starts with an empty world list. Moving worlds between sites is not part of this phase             |
+| Players             | Up to 4 including the host, on the home network                                                                                                                                                                                                                                                                                                   |
+| Topology            | Star over WebRTC data channels: every guest connects only to the host; the host relays                                                                                                                                                                                                                                                            |
+| Signaling           | The `peerjs` client against the owner's own PeerJS server on the Pi (`wss`, behind the existing wildcard certificate). Its address comes from the build variable `VITE_SIGNAL_URL`, overridable by the URL parameter `signal`. No address in the repository                                                                                       |
+| ICE servers         | A STUN server on the Pi (`VITE_STUN_URLS`, URL parameter `stun`), so the devices learn their real LAN addresses even where `.local` names (mDNS) cannot be resolved. No TURN, no public STUN                                                                                                                                                      |
+| Finding a room      | A list "Open worlds at home" on the world menu, from the PeerJS server's discovery list (`allow_discovery`). Only rooms of the same build are listed. The room code and the join link `?join=CODE` remain as a fallback                                                                                                                           |
+| Handshake           | Joining needs the same build id (the commit, `__BUILD_COMMIT__`) and the same terrain checksum, computed at runtime on both devices                                                                                                                                                                                                               |
+| Authority           | The host validates and applies every action through `applyAction`, for each player against that player's own `PlayerRecord`, and owns the time of day. Each device owns its player's position and look; the host only sanity-checks poses                                                                                                         |
+| Far chunks          | The host reads blocks it has not loaded "on the side": terrain generated into a small cache plus the recorded edits, with no light and no meshes (5.6)                                                                                                                                                                                            |
+| Smelting            | The two seconds of the furnace stay a progress bar in the client, as today. The host does not enforce them                                                                                                                                                                                                                                        |
+| Identity            | Each device keeps a random player key and a name in local storage. The host keys its guest records by the player key; names may change and collide                                                                                                                                                                                                |
+| When the host goes  | Guests keep nothing. They see why and return to the world list. A lost connection is retried for 10 s first. Items and positions stay in the host's save                                                                                                                                                                                          |
+| Menus               | Hosting: "Open to others" in the pause menu of an open world. Joining: a section "Join a world" on the world menu (room list, code field, name field). Joining never replaces an open world. While a room is open or joined, the pause menu does not pause the world                                                                              |
+| Where a guest shows | A new guest appears next to the host; a returning guest (Part C) where they left                                                                                                                                                                                                                                                                  |
+| Other players       | Part B: a placeholder figure (body and head box) in one of four colours with a name tag. Part D: a blocky figure (head, body, two arms, two legs) with code-generated textures, one of eight looks chosen by the player, animated from the received movement, the slot colour as an accent. No held item, no cracks of others' breaking (Phase 7) |
+| Phones as host      | Allowed. While a room is open or joined the page holds a screen wake lock. In touch mode the host sees a hint that the world closes for everyone if the screen locks or the app changes                                                                                                                                                           |
+| Performance test    | A new scenario `players`: the page is the host of three simulated guests that run inside it over an in-memory connection, walk and edit around the player (Part E)                                                                                                                                                                                |
+| Parts               | Five parts: **A** connection test, **B** together in Creative, **C** Gathering together, **D** player figure, **E** measure and harden                                                                                                                                                                                                            |
 
 ## 3. Changes to the original scope
 
 The owner's starting scope was challenged during planning. Agreed changes:
 
-| #   | Change                                                                                                                                                                                     | Reason                                                                                                                                                                                                                                                                                        |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | A STUN server on the Pi is added (a pi-infra task); the game takes a configurable list of ICE servers. Still no TURN and no internet                                                       | Without STUN, Chrome offers only host candidates hidden behind random `.local` names. Some Android versions, mesh Wi-Fi systems and routers that filter multicast cannot resolve them, and the connection fails silently. A STUN server inside the LAN reports each device's real LAN address |
-| 2   | Part A is a small connection test that the owner runs on phone, tablet and computer before the game is built on top of it                                                                  | The network at home (Wi-Fi, Pi, mDNS, certificates, discovery) is the largest unknown and cannot be tested in a cloud session. Finding a problem after a large part would waste it                                                                                                            |
-| 3   | The signaling and STUN addresses come from build variables (`VITE_SIGNAL_URL`, `VITE_STUN_URLS`), not from `config.ts`. Builds without them show multiplayer as unavailable                | The repository is public; an address in `config.ts` would publish the owner's private home domain in the code and in every GitHub Pages build                                                                                                                                                 |
-| 4   | Added: a list of open worlds at home from the PeerJS server's discovery list; room codes and `?join=CODE` stay as a fallback                                                               | Room codes are awkward on a phone keyboard and cannot be typed with a controller (Phase 5 notes). The server is the owner's own, so discovery can be switched on                                                                                                                              |
-| 5   | Answer to an open question: guests keep no copy when the host goes; they return to the world list. The host saves each guest's items and position, keyed by a random player key per device | Worlds are saved since Phase 3; a copy would fork the world into two diverging versions. With the guest's records in the host's save nothing is lost, and a returning guest gets their items back. A name alone can collide or change                                                         |
-| 6   | The handshake compares the build id and a runtime terrain checksum instead of protocol, generator, recipe and light versions                                                               | A build id is stricter and simpler: it also catches a changed block or item table, PR previews of different branches and stale tabs. The runtime terrain checksum catches what a build id cannot: a browser engine that computes the terrain differently                                      |
-| 7   | Hosting from the pause menu of an open world, joining from the world menu only. A new guest appears next to the host                                                                       | Joining from the world menu never discards or replaces an open world, and it needs no "discard my world" confirmation. Starting next to the host is what players at home want                                                                                                                 |
-| 8   | Answer to an open question: the smelting time stays client-side                                                                                                                            | Every player runs the same code, so everyone waits. Smelting changes only the smelter's own items, never the shared world; protection against modified clients is not a goal at home                                                                                                          |
-| 9   | Answer to an open question: the host reads chunks it has not loaded on the side (generated terrain plus edits in a small cache)                                                            | Guests may explore apart. Loading and lighting the areas of all guests would cost up to four times the host's chunk work, too much for a phone host. The read on the side needs no light and no meshes and also suits a later Node host                                                       |
-| 10  | Answer to an open question: phones and tablets may host, with a wake lock and a hint                                                                                                       | Two tablets should be able to play without a computer. Android freezes a page when the screen locks or another app comes to the front; the wake lock prevents auto-locking, and the hint explains the rest                                                                                    |
-| 11  | The other players are shown as the figure alone: no held item, no cracks of their breaking                                                                                                 | Keeps the phase smaller; both fit better with real characters in Phase 7                                                                                                                                                                                                                      |
-| 12  | The multiplayer scenario of the performance test plays three simulated guests inside the page over an in-memory connection                                                                 | The test must run on one device without a second person or the network, and give comparable numbers on every device                                                                                                                                                                           |
-| 13  | Four parts: A connection test, B together in Creative, C Gathering together, D measure and harden                                                                                          | Each part can be tried on real devices from its PR preview. Gathering needs the most host-side rules (break timing over the network, far chunks, saved guest records), so it gets its own part; Creative play together is useful before that                                                  |
+| #   | Change                                                                                                                                                                                                                                                                                                                          | Reason                                                                                                                                                                                                                                                                                        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | A STUN server on the Pi is added (a pi-infra task); the game takes a configurable list of ICE servers. Still no TURN and no internet                                                                                                                                                                                            | Without STUN, Chrome offers only host candidates hidden behind random `.local` names. Some Android versions, mesh Wi-Fi systems and routers that filter multicast cannot resolve them, and the connection fails silently. A STUN server inside the LAN reports each device's real LAN address |
+| 2   | Part A is a small connection test that the owner runs on phone, tablet and computer before the game is built on top of it                                                                                                                                                                                                       | The network at home (Wi-Fi, Pi, mDNS, certificates, discovery) is the largest unknown and cannot be tested in a cloud session. Finding a problem after a large part would waste it                                                                                                            |
+| 3   | The signaling and STUN addresses come from build variables (`VITE_SIGNAL_URL`, `VITE_STUN_URLS`), not from `config.ts`. Builds without them show multiplayer as unavailable                                                                                                                                                     | The repository is public; an address in `config.ts` would publish the owner's private home domain in the code and in every GitHub Pages build                                                                                                                                                 |
+| 4   | Added: a list of open worlds at home from the PeerJS server's discovery list; room codes and `?join=CODE` stay as a fallback                                                                                                                                                                                                    | Room codes are awkward on a phone keyboard and cannot be typed with a controller (Phase 5 notes). The server is the owner's own, so discovery can be switched on                                                                                                                              |
+| 5   | Answer to an open question: guests keep no copy when the host goes; they return to the world list. The host saves each guest's items and position, keyed by a random player key per device                                                                                                                                      | Worlds are saved since Phase 3; a copy would fork the world into two diverging versions. With the guest's records in the host's save nothing is lost, and a returning guest gets their items back. A name alone can collide or change                                                         |
+| 6   | The handshake compares the build id and a runtime terrain checksum instead of protocol, generator, recipe and light versions                                                                                                                                                                                                    | A build id is stricter and simpler: it also catches a changed block or item table, PR previews of different branches and stale tabs. The runtime terrain checksum catches what a build id cannot: a browser engine that computes the terrain differently                                      |
+| 7   | Hosting from the pause menu of an open world, joining from the world menu only. A new guest appears next to the host                                                                                                                                                                                                            | Joining from the world menu never discards or replaces an open world, and it needs no "discard my world" confirmation. Starting next to the host is what players at home want                                                                                                                 |
+| 8   | Answer to an open question: the smelting time stays client-side                                                                                                                                                                                                                                                                 | Every player runs the same code, so everyone waits. Smelting changes only the smelter's own items, never the shared world; protection against modified clients is not a goal at home                                                                                                          |
+| 9   | Answer to an open question: the host reads chunks it has not loaded on the side (generated terrain plus edits in a small cache)                                                                                                                                                                                                 | Guests may explore apart. Loading and lighting the areas of all guests would cost up to four times the host's chunk work, too much for a phone host. The read on the side needs no light and no meshes and also suits a later Node host                                                       |
+| 10  | Answer to an open question: phones and tablets may host, with a wake lock and a hint                                                                                                                                                                                                                                            | Two tablets should be able to play without a computer. Android freezes a page when the screen locks or another app comes to the front; the wake lock prevents auto-locking, and the hint explains the rest                                                                                    |
+| 11  | The other players are shown as the figure alone: no held item, no cracks of their breaking                                                                                                                                                                                                                                      | Keeps the phase smaller; both fit better with real characters in Phase 7                                                                                                                                                                                                                      |
+| 12  | The multiplayer scenario of the performance test plays three simulated guests inside the page over an in-memory connection                                                                                                                                                                                                      | The test must run on one device without a second person or the network, and give comparable numbers on every device                                                                                                                                                                           |
+| 13  | Four parts: A connection test, B together in Creative, C Gathering together, D measure and harden (five since change 14)                                                                                                                                                                                                        | Each part can be tried on real devices from its PR preview. Gathering needs the most host-side rules (break timing over the network, far chunks, saved guest records), so it gets its own part; Creative play together is useful before that                                                  |
+| 14  | **Renumbering (owner, 2026-11-21).** A new Part D "Player figure" (steps 11–13) is inserted. The former Part D "Measure and harden" becomes Part E (steps 14–16, criteria AC14.1–AC16.2), unchanged in content; its device tests NET-17 to NET-19 keep their ids. The real figure, listed as Phase 7 before, moves into Phase 6 | The figure is what players see of each other in multiplayer, and Part E's scenario `players` should measure the real figure, not the placeholder                                                                                                                                              |
+| 15  | The slot colour stays on the figure as an accent (the belt) and on the name tag plate (a stripe); the room panel keeps its swatch. Two players may choose the same look                                                                                                                                                         | With free looks two players can look the same; the accent tells them apart without taking a look away from anyone                                                                                                                                                                             |
+| 16  | A player who never chose a look gets one derived from the player key ("Automatic"): the same device always looks the same, different devices usually differ. Old stored identities load as "Automatic"                                                                                                                          | One fixed default would make every player who never opens the picker look alike                                                                                                                                                                                                               |
+| 17  | The picker is a section "Your player" on the settings page with the name field and the look; the name field of "Join a world" stays and shows the same name. Both are stored in `markuscraft.player.v1`, only once chosen                                                                                                       | Name and look belong together; the settings page is reachable from the world menu and from the pause menu of a world, so a host can change them without leaving                                                                                                                               |
+| 18  | Name and look can be changed during a room: a new message `profile` updates every device within a second; the host applies the name suffix again                                                                                                                                                                                | The settings page is reachable while a room is open; a change that shows only after rejoining would look broken                                                                                                                                                                               |
+| 19  | The pose carries a flag `busy` (the player holds break on a block); the relayed poses carry `busy` and `fly`. The arm swings while `busy`, and once per block change the player caused                                                                                                                                          | In Gathering a break takes seconds and the others learn of it only when the block changes; without the flag the arm would swing only at the end. `fly` keeps the legs still in flight                                                                                                         |
+| 20  | The head takes the received yaw and pitch; the body turns towards the walking direction and otherwise follows the head once it is more than 45° off                                                                                                                                                                             | Turning the whole body with every look around looks mechanical; the rule is small and pure                                                                                                                                                                                                    |
+| 21  | Eight looks with short names (Fern, Ember, Pebble, River, Moss, Dune, Frost, Plum) plus "Automatic", in a 3 × 3 grid of head icons                                                                                                                                                                                              | Names make the choice readable for the controller focus and for screen readers; 3 × 3 fits mouse, touch and pad                                                                                                                                                                               |
+| 22  | The player list of "Playing together" shows a head icon of each player's look next to the swatch                                                                                                                                                                                                                                | The look becomes recognisable in the list; the icon is drawn from the same generated texture                                                                                                                                                                                                  |
+| 23  | Each figure costs two draw calls (figure and name tag): the six parts are one mesh whose limbs the vertex shader turns. AC6.6 of Part B (at most 4) is tightened to 2                                                                                                                                                           | Six meshes would be seven draw calls per figure; four players on a phone must stay smooth                                                                                                                                                                                                     |
+| 24  | The rotating preview uses a small WebGL renderer of its own while the settings page shows it; without WebGL there it shows the head icon                                                                                                                                                                                        | The game's canvas lies under the menus; a second small context is the simplest and is released when the page closes                                                                                                                                                                           |
+
+Changes 15–22 were agreed with the owner in the planning of Part D (2026-11-21). Changes 23
+and 24 are technical choices of that planning, shown to the owner with the plan; so is one
+sentence added to Part E's step 15: its simulated guests use three different looks and set
+`busy` while they break, so the scenario measures the animated figure.
 
 Clarifications, stated so nobody is surprised:
 
@@ -110,8 +132,11 @@ Clarifications, stated so nobody is surprised:
 
 Internet play; TURN relays; public signaling or STUN servers; accounts and passwords; text
 or voice chat; host migration; kicking or banning; the Pi or a Node process as host (only
-keep the code ready for it, 5.1); several controllers or players on one device; real
-character models, animations, the held item or other players' cracks (Phase 7); moving
+keep the code ready for it, 5.1); several controllers or players on one device; for the
+figure (Part D): the held item, other players' cracks, a third-person camera, the own hand
+or arm in the first-person view, a free character editor (single parts or colours), custom
+or uploaded skins, any figure, skin or name like another game's (all Phase 7 or never);
+moving
 worlds between sites (export/import); a copy of the world on guests; host-side smelting
 time; prediction or rollback of edits on guests; movement prediction or lag compensation;
 collision between players; spectators; protection against modified clients beyond the
@@ -147,7 +172,11 @@ src/render/RemotePlayers.ts (B) figures and name tags
 src/ui/NetTestScreen.ts  (A) the network test
 src/ui/JoinSection.ts    (B) "Join a world" on the world menu
 src/ui/RoomPanel.ts      (B) "Open to others" and the player list in the pause menu
-src/bench/               (D) the scenario `players` and its simulated guests
+src/player/looks.ts      (D) the table of looks, `lookForKey`, `resolveLook`
+src/player/figureMotion.ts (D) received movement → angles of head, body and limbs
+src/render/textures/figureTexture.ts (D) the looks painted into one atlas (pure)
+src/ui/PlayerSection.ts  (D) "Your player": name, look picker, rotating preview
+src/bench/               (E) the scenario `players` and its simulated guests
 scripts/signalServer.mjs (A) local PeerJS server for tests and development
 e2e/multiplayer.ts       (A, B) opens several players in separate browser contexts
 ```
@@ -237,7 +266,7 @@ troubleshooting.
 - Reachable with mouse, touch and controller (the focus system works on it as on every
   screen; it has no text field).
 
-### 5.5 Protocol (Part B, extended in C)
+### 5.5 Protocol (Part B, extended in C and D)
 
 Every message is `{ t: <type>, ... }`. Compatibility is decided by the build id
 (decision 6), so the protocol has no version number of its own. The decoder validates every field (types, finite numbers, integer ranges, string lengths,
@@ -346,7 +375,7 @@ device joining the same room gets `duplicate`.
 - Other players are drawn `INTERP_DELAY_MS = 100` in the past, linearly interpolated
   between received poses; yaw takes the short way round. If no newer pose exists, the last
   one is held. A jump of more than `SNAP_DISTANCE = 8` blocks or a teleport flag snaps.
-- **Figure:** a body box and a head box, 1.8 blocks tall and 0.6 wide like the collision
+- **Figure (Part B; replaced in Part D by 5.14):** a body box and a head box, 1.8 blocks tall and 0.6 wide like the collision
   box, in the player's colour (4 fixed colours by slot), with a darker face side on the
   head. It turns with yaw, the head tilts with pitch. It is lit like the terrain at its
   position (sky and block light of the cell at its eyes, daylight, the Brightness floor)
@@ -416,7 +445,7 @@ In play:
 
 - Notices "<name> joined", "<name> left" and the connection notices, in the existing notice
   area, `NET_NOTICE_MS = 5000` each, at most 4.
-- F3 overlay (Part D): role, room code, players, round-trip time to the host, candidate
+- F3 overlay (Part E): role, room code, players, round-trip time to the host, candidate
   type (direct, via STUN), signaling state, messages and bytes per second in and out.
 
 ### 5.12 What pi-infra must provide (not built in this repository)
@@ -464,6 +493,138 @@ advances only the own simulation; network messages are handled whenever they arr
 `join=<code>` and `name=<text>` work with `test=1` too (join at once). Multiplayer test
 pages pass `signal=http://127.0.0.1:9000/` and `stun=none`.
 
+Part D adds: `getState().player { name, choice, look }` (the stored choice 0–8 and the
+resolved look); in `getState().net.players` per player `look`, `busy`, `fly` and
+`anim { bodyYaw, headYaw, headPitch, leftArm, rightArm, leftLeg, rightLeg }` (the angles
+drawn in the last frame); `getState().ui.preview { frames } | null` (frames the preview
+drew; null while it does not exist); `__mc.figureSheet()` shows every look from the front
+and the back on one page (reference `figure-sheet`, like `glyphSheet()`). The URL
+parameter `look=<0–8>` works with `test=1` too.
+
+### 5.14 The player figure (Part D)
+
+What a player sees of every other player. The own figure is drawn only in the preview of
+"Your player" (5.15); the first-person view does not change.
+
+**Shape.** Six boxes: head, body, two arms, two legs, measured in figure texels and
+scaled so that the figure is `PLAYER_HEIGHT` (1.8) tall. Starting values (`config.ts`):
+legs 4 × 11 × 4 (width × height × depth), body 8 × 11 × 5, arms 3 × 10 × 3, head 7 × 7 × 7,
+29 texels in all. These proportions are this game's own and differ on purpose from the
+best-known blocky figure (hard rule 1): a smaller head, thinner arms, a deeper body. The
+pivots are the hips, the shoulders and the neck.
+
+**Looks.** `src/player/looks.ts` holds the table: ids 1–8 with a name and the colours and
+styles the painter uses (skin tone, hair colour and style, top colour and pattern,
+trousers or skirt, shoes). Starting names: Fern, Ember, Pebble, River, Moss, Dune, Frost,
+Plum. Choice 0 is "Automatic". The ids travel in the protocol and are stored on the device:
+the table is append-only and pinned by `looks.test.ts`, like block and item ids.
+
+- `lookForKey(key)` is 1 + (the first byte of the player key mod 8): the same device looks
+  the same every time.
+- `resolveLook(choice, key)`: a choice of 1–8 is the look; 0 or anything invalid is
+  `lookForKey(key)`.
+- The looks cover a range of skin tones and both short and long hair; none of them uses
+  the colour scheme of a well-known default skin (a turquoise top with blue trousers and
+  short brown hair, or its orange-haired variant with a green top).
+
+**Texture.** `src/render/textures/figureTexture.ts` is a pure painter like `tiles.ts`:
+seeded, no DOM, it writes RGBA into a typed array. It paints every look into one atlas
+with a texture layout of this game's own (not the 64 × 64 layout of another game): faces
+of each part side by side, one texel per figure texel, a little seeded noise in cloth and
+hair, eyes and a mouth on the head's front, hair on top, back and sides. The belt (a band
+at the bottom of the body) is marked as accent in the atlas and tinted with the player's
+slot colour in the shader, so one atlas serves every slot. Nearest filtering, no mipmaps
+beyond what keeps distant figures free of shimmer. The same painter gives the head icon
+(the front of the head) for the picker and the player list.
+
+**Motion.** `src/player/figureMotion.ts` (pure, no allocations per call) turns what a figure
+receives into angles, once per rendered frame per figure. Input: the drawn pose (the
+interpolated pose of 5.9), the frame time, `fly`, `busy` and the count of block changes
+the player caused. Output: body yaw, the head's yaw relative to the body and its pitch,
+and the angles of both arms and legs. Starting values in `config.ts`:
+
+- **Walking.** The horizontal speed comes from the drawn pose's movement, smoothed. Legs
+  swing in opposite directions; the amplitude rises with the speed up to
+  `FIGURE_LEG_SWING = 0.6` rad at walking speed and no further; the phase advances with
+  the distance walked (`FIGURE_STRIDE`), so faster walking means faster steps. Arms swing
+  against the legs at half the amplitude. When the player stops, the limbs come to rest
+  within `FIGURE_SETTLE_MS = 200`. A snap (5.9) counts as no movement.
+- **Flying** (`fly`): the legs stay still and the arms hang; only the swing below moves.
+- **Head and body.** The head takes the received yaw and pitch. While walking the body
+  turns towards the walking direction (walking backwards: towards the opposite of it), at
+  most `FIGURE_BODY_TURN` rad/s. Standing, the body follows only when the head is more
+  than `FIGURE_HEAD_YAW_MAX = 45°` off. The head is never more than 45° off the body.
+- **Swing.** While `busy`, the right arm swings in a cycle of `FIGURE_SWING_MS = 300`; a
+  block change caused by the player starts one swing if none is running. The swing
+  replaces the walking movement of that arm.
+
+**Rendering** (`src/render/RemotePlayers.ts`, rewritten). One geometry for all figures:
+the six boxes with UVs into the atlas, the face shade as vertex colour (as today) and a
+part index. The vertex shader turns each part about its pivot by per-figure uniforms
+(limb angles, head yaw and pitch, the look's place in the atlas, the accent colour); the
+body yaw is the object's rotation. One `ShaderMaterial` per figure, the atlas and geometry
+shared. **Two draw calls per figure**: the figure and its name tag. Light as in Part B
+(one sample at the eyes, daylight, Brightness floor), fogged like the terrain; at night
+the figure is dark where the terrain is dark and does not glow. The name tag stays as it
+is, with a stripe of the slot colour at its left edge; it is drawn again when the name
+changes. Per frame and figure: one motion step and a few uniform writes, no allocation.
+
+**Protocol additions** (same build id on both sides, so no versioning):
+
+| Direction    | Message             | Change                                                                               |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
+| guest → host | `hello`             | `look` (1–8, resolved on the device before sending)                                  |
+| host → guest | `welcome`, `joined` | every player entry has `look`                                                        |
+| guest → host | `profile`           | new: `name`, `look`; counts towards the rate limit                                   |
+| host → all   | `profile`           | new: `id`, `name` (with the suffix of 5.8 applied again), `look`; also to the sender |
+| guest → host | `pose`              | `busy` (boolean)                                                                     |
+| host → guest | `poses`             | every entry has `fly` and `busy`                                                     |
+
+The host's own player changes its profile through `HostSession` (no message). A saved
+guest entry gets the new name; the look is not saved with the world (every `hello` brings
+it). The decoders validate the new fields like all others: `look` an integer 1–8, `busy`
+and `fly` booleans, names as in 5.8.
+
+**Busy.** `Game` sets `busy` while the player holds break on a targeted block (a break in
+progress in Gathering; in Creative, where breaking is instant, while the button is held
+and the crosshair is on a block). The host's own player's `busy` is read like its pose.
+
+### 5.15 "Your player" (Part D)
+
+A section on the settings page (the pause screen without its world parts, reachable from
+the world menu, and the settings of the pause menu of a world):
+
+- **Name**: the same value as the name field of "Join a world"; changing one changes the
+  other. Normalised as in 5.8 when it is used.
+- **Preview**: a canvas of about 160 × 200 CSS px showing the own figure in the chosen look,
+  walking on the spot and turning once every 8 s, lit evenly, with the accent of slot 1.
+  It uses a small `WebGLRenderer` of its own, created when the section becomes visible and
+  disposed when the settings page closes, drawing at most 30 frames per second and only
+  while visible. If WebGL cannot be created there, the preview shows the look's head icon
+  and nothing is logged. The look's name is written under it.
+- **Look picker**: nine buttons in a 3 × 3 grid, "Automatic" first, then the eight looks,
+  each a head icon with the name under it; "Automatic" shows the icon of the look it
+  resolves to. The chosen button is marked. `aria-label` "Look: Fern" and "Look: Automatic
+  (Fern)" (what `ui.focus` reports). At least 48 × 48 CSS px in touch mode. With the
+  controller the buttons take part in the focus system like any button; the name field is
+  a text field and is not focusable, as in "Join a world".
+- **Storage**: `markuscraft.player.v1` gets `look` (0–8). A stored record without it (Part
+  B and C) or with an invalid value loads as 0 (Automatic). As before nothing is stored
+  until a room is opened or joined, a name typed, or a look chosen; single-player and the
+  performance test leave no trace.
+- **During a room**: a new look is sent at once, a new name when the field is left or
+  Enter is pressed (`profile`). The others' figure, name tag and player list change
+  within a second.
+- **Player list** of "Playing together": each row gets the head icon of the player's look
+  next to the slot swatch.
+- URL parameter `look=<0–8>` (like `name=`), for tests and for trying looks.
+
+**For Part E.** Nothing has to be built ahead for the scenario `players`: its simulated
+guests go through the same `HostSession`, roster and `RemotePlayers`, so their figures are
+animated by what they send. Part E's script should give them three different looks and
+set `busy` while they break. Part D adds the Node timing of the motion rule (AC11.6) and the
+draw call bound (AC12.4) that the scenario then measures on real devices.
+
 ## 6. Test strategy
 
 The rules of `CLAUDE.md` stay in force: unit tests in Node, browser tests against the
@@ -501,6 +662,11 @@ their room codes). `npm run signal` starts it for trying two tabs with `npm run 
   `remote-player-night` (B): the same at midnight (the figure must not glow).
 - `join-section` (B): the world menu with two rooms listed; `room-panel` (B): the pause
   menu while hosting with two players and a fixed code.
+- `figure-sheet` (D): all eight looks from the front and the back, from
+  `__mc.figureSheet()`; `player-section` (D): "Your player" with a chosen look (the preview
+  masked or stopped at a fixed angle).
+- Part D regenerates `remote-player` and `remote-player-night` (the new figure, standing,
+  at the same pose) and `room-panel` (head icons).
 - Regenerate the world menu, pause and settings references the new sections change, and
   look at each (`CLAUDE.md`, text-only references).
 
@@ -777,45 +943,157 @@ translation; `authority.ts` complete; stations on the host; rate limit.
   rule), `device-tests.md` (NET-13 to NET-16), `docs/phase-6c-report.md`. One pull request
   into `main`.
 
-### Part D – Measure and harden (steps 11–13)
+### Part D – Player figure (steps 11–13)
 
-### Step 11 – Overlay and hidden host
+Precondition: Part C is merged. Read 5.14 and 5.15 first. Tests of Part B that check the
+figure (AC6.2 "the host's colour dominates", AC6.6 "at most 4 draw calls", AC6.7, AC6.9)
+are adapted to the new figure; say how in the report.
 
-- AC11.1 E2E: the F3 overlay shows role, room code, player count, a numeric round-trip time,
+### Step 11 – Looks, texture, motion (pure)
+
+`src/player/looks.ts`, `src/render/textures/figureTexture.ts`, `src/player/figureMotion.ts`,
+the constants in `config.ts`, the identity record with `look`.
+
+- AC11.1 Unit: `looks.test.ts` pins the table (ids 1–8, names, order). `lookForKey` gives
+  1–8 and the same look for the same key; over 10 000 seeded random keys every look gets
+  between 9 % and 16 %. `resolveLook` returns a choice of 1–8 unchanged and
+  `lookForKey(key)` for 0, 9, −1, 2.5 and non-numbers.
+- AC11.2 Unit: the painter is deterministic (a recorded checksum of the atlas, set once in
+  this step; like the terrain checksum it changes only with an intended change of the
+  looks, noted in the report). Every texel a part uses is opaque; every look has accent
+  texels on the body; the head and body texels of any two looks differ in at least 20 %
+  of their texels.
+- AC11.3 Unit (motion, walking): a figure standing still has all limb angles 0; walking at
+  walking speed the legs swing in opposite directions with an amplitude of at least 80 % of
+  `FIGURE_LEG_SWING`, never more than it at any speed, with a step period that halves when
+  the speed doubles; the arms swing against the legs; after stopping, all limb angles are
+  below 0.01 rad within 200 ms; a snap of 20 blocks gives no swing.
+- AC11.4 Unit (motion, head and body): the head's yaw relative to the body never exceeds
+  45° (10 000 seeded random pose sequences); standing, a head turn of 30° leaves the body
+  where it is, one of 90° turns it until 45° remain; walking, the body faces the walking
+  direction within 0.5 s, and walking backwards it faces the head's direction; `fly`
+  keeps the legs at 0.
+- AC11.5 Unit (motion, swing): while `busy` the right arm swings with a period of 300 ms
+  (± one frame); one block change starts exactly one swing; a block change during a
+  swing starts no second one.
+- AC11.6 Unit: 30 000 motion steps (three figures, 10 000 frames) take less than 20 ms
+  (`expectFasterThan`); the step allocates nothing (it writes into an object it is given).
+- AC11.7 Unit: an identity record of Part B (`{ key, name }`) parses with choice 0; an
+  invalid `look` (9, −1, "3", 2.5) parses as 0; `{ key, name, look }` survives a round
+  trip.
+
+### Step 12 – The figure in the game and over the network
+
+The protocol additions of 5.14, `HostSession` and `ClientSession` with looks, `profile`,
+`busy` and `fly`; `RemotePlayers` rewritten; `Game` sets `busy`; the test API of 5.13.
+
+- AC12.1 Unit: the new and changed messages survive encode → decode; the decoder rejects,
+  without throwing, `look` 0, 9 or 2.5, `busy` or `fly` that are not booleans, a `profile`
+  with an invalid name, and the 10 000 random strings of AC3.2.
+- AC12.2 Unit (memory transport): every player's look reaches everyone in `welcome` and
+  `joined`; a guest's `profile` reaches the host and all others within one relay, and the
+  host's own profile change reaches all guests; a name taken in the room gets its suffix
+  again and the sender learns it; the host's saved guest entry carries the new name;
+  `profile` counts towards the rate limit.
+- AC12.3 Unit: `busy` and `fly` reach every other player in `poses`; a change of `busy`
+  alone is sent as a changed pose, an unchanged pose with an unchanged `busy` is not.
+- AC12.4 E2E: each other player adds at most 2 draw calls (replaces AC6.6); with three
+  guests the host's draw calls grow by at most 6.
+- AC12.5 E2E: a guest walks forward for 60 steps; on the host, during the walk the
+  guest's `anim` has leg angles of opposite sign and more than 0.2 rad, the pixels of the
+  legs' region on the host's screen change between two frames 100 ms apart, and within
+  0.5 s after the stop every limb angle is below 0.01 rad.
+- AC12.6 E2E: the host, standing, turns by 90° and looks down 0.6 rad; on the guest the
+  host's `anim.headYaw` is at most 45° off the body, the body has turned, and
+  `anim.headPitch` is within 0.01 of the host's pitch.
+- AC12.7 E2E: in a Gathering world a guest holds break on a log; on the host the guest is
+  `busy` and its right arm angle changes sign at least twice within one second; in a
+  Creative world one placed block gives one swing on the other player.
+- AC12.8 E2E: a guest opened with `look=3` is listed with look 3 on the host and the
+  projected region of its body on the host's screen is dominated by look 3's top colour;
+  two guests with the same look have different accent colours (state), and the belt
+  region shows each one's slot colour.
+- AC12.9 E2E: AC6.7 for the new figure: at midnight in an unlit place it is at most a
+  third as bright (linear) as at noon; next to a torch it is brighter than without.
+- AC12.10 E2E: a page whose local storage holds an identity record of Part B joins with
+  the look `lookForKey(key)`, and the record is not rewritten until something changes.
+- AC12.11 References `remote-player`, `remote-player-night` regenerated and `figure-sheet`
+  created; looked at: the figure upright on the ground, head, arms and legs in place,
+  the look's colours and the belt visible, not glowing at night, the name readable; the
+  sheet shows eight clearly different looks, none of them like a well-known figure of
+  another game.
+
+### Step 13 – "Your player", player list, report, pull request
+
+`PlayerSection` on the settings page, the preview, the head icons in the room panel,
+the URL parameter `look`.
+
+- AC13.1 E2E (without `test=1`): the settings page from the world menu shows "Your
+  player" with the name field, the preview and nine look buttons; choosing "Ember" marks
+  it, `getState().player` reports it, and it survives a reload. A name typed there shows
+  in "Join a world" and the other way round.
+- AC13.2 E2E: while the section is visible, `ui.preview.frames` grows and two pictures of
+  the preview 1 s apart differ; after closing the settings page `ui.preview` is null and
+  the preview's WebGL context is gone (the page has one context again). With WebGL made
+  unavailable for the preview (test option), the head icon shows and nothing is logged.
+- AC13.3 E2E: during a room a guest changes its look and its name in the settings of its
+  pause menu; within 2 s the host lists the new look and name, the host's room panel shows
+  the new name and head icon, and the figure's name tag was drawn again.
+- AC13.4 E2E: with the fake controller only, from the world menu: open the settings, move
+  the focus to a look, A chooses it, B goes back; `ui.focus` reports "Look: …" on the way.
+- AC13.5 E2E (touch, 640 × 360): the section is reachable by scrolling, the look buttons
+  are at least 48 × 48 CSS px, and a tap chooses a look.
+- AC13.6 E2E: playing single-player and running the quick performance test leave
+  `markuscraft.player.v1` unset; choosing a look sets it.
+- AC13.7 E2E: every row of the room panel's player list has the head icon of its
+  player's look.
+- AC13.8 References `player-section` created, `room-panel` and the changed settings and
+  pause references regenerated; all looked at.
+- AC13.9 Hard rule 1 checked for the proportions, the texture layout, the colours and the
+  names of the looks (in the report). `README.md` ("Playing together": your look),
+  `CLAUDE.md`, `device-tests.md` (NET-20 to NET-25), `docs/phase-6d-report.md`. One pull
+  request into `main`.
+
+### Part E – Measure and harden (steps 14–16)
+
+### Step 14 – Overlay and hidden host
+
+- AC14.1 E2E: the F3 overlay shows role, room code, player count, a numeric round-trip time,
   the candidate type and messages per second, on host and guest.
-- AC11.2 E2E: with `suspendFrames(true)` on the host, a guest's edit is confirmed within
+- AC14.2 E2E: with `suspendFrames(true)` on the host, a guest's edit is confirmed within
   2 s, guest A sees guest B move, and unfrozen time advances on the guests.
-- AC11.3 E2E soak: four players; each performs 50 actions and moves; one guest leaves and
+- AC14.3 E2E soak: four players; each performs 50 actions and moves; one guest leaves and
   rejoins midway. At the end all four `worldHash` values are equal, no page logged an error
   or warning, and the host's JS heap grew by less than 50 MB.
-- AC11.4 E2E: a guest joins a host with 50 000 edits and has the host's `worldHash` within
+- AC14.4 E2E: a guest joins a host with 50 000 edits and has the host's `worldHash` within
   20 s.
-- AC11.5 Node: validating and applying an action on the host takes less than 0.2 ms on
+- AC14.5 Node: validating and applying an action on the host takes less than 0.2 ms on
   average over 10 000 actions; one relay of 4 moving players less than 1 ms.
-- AC11.6 Node: with 4 moving players the host sends less than 20 kB per second in total
+- AC14.6 Node: with 4 moving players the host sends less than 20 kB per second in total
   (measured in the memory transport; the number goes into the report).
 
-### Step 12 – Performance test scenario `players`
+### Step 15 – Performance test scenario `players`
 
 Three simulated guests inside the page: `HostSession` with three `ClientSession`s over the
 memory transport, driven by the scenario script (walk routes around the player, break and
-place blocks at a fixed rate), with figures drawn. Suite version 3.
+place blocks at a fixed rate), with the figures of Part D drawn and animated (three
+different looks, `busy` while breaking). Suite version 3.
 
-- AC12.1 Unit: `scenarios.test.ts` pins the new scenario (id `players`, version 1, steps,
+- AC15.1 Unit: `scenarios.test.ts` pins the new scenario (id `players`, version 1, steps,
   script) and `BENCH_SUITE_VERSION = 3`; the guests' actions are the same in every run
   (seeded).
-- AC12.2 E2E: the quick suite runs through with the new row; the record has the scenario;
+- AC15.2 E2E: the quick suite runs through with the new row; the record has the scenario;
   three figures were drawn during it (state).
-- AC12.3 The run stays free of side effects as before (no save, no network: nothing
+- AC15.3 The run stays free of side effects as before (no save, no network: nothing
   outside the origin is requested during the run).
 
-### Step 13 – Documentation, report, pull request
+### Step 16 – Documentation, report, pull request
 
-- AC13.1 Hard rule 1 checked for the figure, colours and all texts.
-- AC13.2 `README.md` complete ("Playing together", what goes where: the Pi sees addresses
+- AC16.1 Hard rule 1 checked for all texts of Part E (the figure was checked in Part D).
+- AC16.2 `README.md` complete ("Playing together", what goes where: the Pi sees addresses
   and handshake data, players see each other's LAN addresses, game data goes directly).
   `CLAUDE.md` with Phase 6 complete, `device-tests.md` (NET-17 to NET-19, PERF line for the
-  new scenario), `docs/phase-6d-report.md`. One pull request into `main`.
+  new scenario), `docs/phase-6e-report.md`. One pull request into `main`.
 
 ## 8. Risks and fallbacks
 
@@ -831,6 +1109,10 @@ place blocks at a fixed rate), with figures drawn. Suite version 3.
 | A hidden host tab's timers are throttled to once a minute              | By design the host needs no timer (5.1); the guest's ping drives heartbeat and time. If guests are still dropped, measure in the report                                                 |
 | Wi-Fi jitter beyond the grace makes guests' breaks fail                | Raise `NET_BREAK_GRACE_MS` (a constant); the unit test of AC9.1 shows the margin                                                                                                        |
 | Replacing the world in place for a guest proves fragile                | Use `Game.loadWorld` (it already swaps world, chunk manager, meshes, player and session); never reload the page                                                                         |
+| The preview's own WebGL context fails or is lost on a phone            | The preview shows the head icon (5.15); the picker works without it. If creating it costs a visible hitch, create it once per page instead of per visit and record it                   |
+| Animated figures cost too much on the phone (NET-24, Part E's numbers) | Figures farther than 32 blocks keep their last angles and skip the motion step; record it. The draw calls stay at two                                                                   |
+| The new figure reads as a copy of a well-known one                     | Change proportions and colours until it does not (hard rule 1); the AC11.2 checksum is set again and the change is noted                                                                |
+| Part D turns out larger than one session                               | Keep the order; do not cut tests. Cut in this order and record each cut: the head icons in the room panel (AC13.7), the live name change (keep the live look), the preview's walking    |
 | Part B turns out larger than one session                               | Keep the order; do not cut tests. Cut in this order and record each cut: AC7.12 (controller join), the version message for codes of other builds (AC7.2, second half), "Copy join link" |
 
 ## 9. Tests on real devices (to be added to `docs/device-tests.md`)
@@ -861,10 +1143,28 @@ be sharpened by the implementing session.
   closed and reopened the world?
 - **NET-15** (6C) Two players far apart (300 blocks) both break and craft.
 - **NET-16** (6C) Torches placed and broken by a guest look the same on all devices.
-- **NET-17** (6D) The F3 network lines on host and guest during play.
-- **NET-18** (6D) Performance test with the new scenario on PC, phone and tablet (PERF
+- **NET-17** (6E) The F3 network lines on host and guest during play.
+- **NET-18** (6E) Performance test with the new scenario on PC, phone and tablet (PERF
   tests).
-- **NET-19** (6D, optional) A second browser (Firefox) as guest.
+- **NET-19** (6E, optional) A second browser (Firefox) as guest.
+- **NET-20** (6D) The eight looks on "Your player" and as figures a few blocks away: are
+  they clearly different, do they look good, does any of them remind you of a figure from
+  another game? Do two players with the same look stay apart by the belt and the name
+  tag stripe?
+- **NET-21** (6D) Animation of another player: walking, running into a wall, jumping,
+  flying, standing and looking around (does the body follow the head naturally?), looking
+  up and down, breaking in Gathering (the arm swings all the time) and placing (one
+  swing). Anything jerky or odd?
+- **NET-22** (6D) "Your player" with mouse, touch (phone and tablet) and the controller:
+  choose a look and type a name; does the preview turn smoothly, is every look button
+  easy to hit, is the choice still there after a reload?
+- **NET-23** (6D) During a room, change look and name in the pause menu's settings: do
+  the others see the new figure, name tag and player list entry within a second?
+- **NET-24** (6D) Frame rate on the phone with three animated figures in view (four
+  players), compared with single-player and with Part B's figures if you remember them
+  (F3 or the feel).
+- **NET-25** (6D) At night: is a figure in the dark dark, lit next to a torch, and its name
+  tag readable?
 
 ## 10. Notes for later phases
 
@@ -872,9 +1172,11 @@ be sharpened by the implementing session.
   file-based `WorldStore` and a WebRTC library for Node (or a WebSocket transport through
   the Pi, since the Pi is on the LAN anyway). The host's own player becomes optional; the
   world's owner would no longer need to be online.
-- **Personalization (Phase 7):** the figure is one class (`RemotePlayers`); real
-  characters, the held item and other players' cracks replace or extend it. Names already
-  travel in the protocol.
+- **Personalization (Phase 7):** the figure of Part D is one class (`RemotePlayers`) with a
+  table of looks (`looks.ts`) and a pure painter (`figureTexture.ts`). A free character
+  editor would replace the table entry by stored parameters sent in `profile`; the held
+  item and other players' cracks extend `RemotePlayers`. Names and looks already travel in
+  the protocol.
 - **Moving worlds between sites:** an export/import of one world file would let worlds go
   from GitHub Pages or a PR preview to the Pi's main build.
 - **Internet play** would need TURN or a relay and is a separate decision.

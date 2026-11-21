@@ -193,7 +193,7 @@ join link" are all built and tested.
 - Software WebGL in the container and CI: frame rates and connection times of the
   browser tests say nothing about real devices.
 - A room list refresh connects to every listed room every 3 s while the world menu is
-  shown. With few rooms at home this is cheap; Part D's measurements can show whether the
+  shown. With few rooms at home this is cheap; Part E's measurements (Part D when this was written) can show whether the
   interval should grow.
 - The host keeps the records of guests who left only in memory (Part C saves them).
 
@@ -312,4 +312,4 @@ NET-7, NET-8, NET-9, NET-10, NET-11, NET-12** (6B). No test became obsolete.
   (`HostSession` takes `clock`); Part C's break timing can use it as it is, and
   `ClientSession` needs the local start time translation of plan 5.7.
 - The room list's `info` round per room is the most frequent traffic on the signaling
-  server; if Part D measures it as a cost, cache the details of a room for a few refreshes.
+  server; if Part E (then Part D) measures it as a cost, cache the details of a room for a few refreshes.

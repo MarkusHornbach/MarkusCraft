@@ -41,11 +41,18 @@ game in a procedurally generated world"; everything in it is original work.
      the world they play to others, the others join from a list of open worlds at home or
      with a room code, peer-to-peer over WebRTC with the owner's own PeerJS and STUN
      servers on a Raspberry Pi; the host validates every action and saves every guest's
-     items. Four parts with separate pull requests: A connection test, B together in
-     Creative, C Gathering together, D measure and harden (plan: `docs/phase-6-plan.md`;
-     it replaces `docs/phase-2-plan.md`, Part B; reports: `docs/phase-6a-report.md`,
-     `docs/phase-6b-report.md`, `docs/phase-6c-report.md`)
-  7. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
+     items. Five parts with separate pull requests: A connection test, B together in
+     Creative, C Gathering together, D player figure (a blocky figure with head, body,
+     arms and legs, eight looks generated in code, animated from the received movement,
+     chosen in "Your player" on the settings page), E measure and harden (plan:
+     `docs/phase-6-plan.md`, all parts in it; it replaces `docs/phase-2-plan.md`, Part B;
+     reports: `docs/phase-6a-report.md`, `docs/phase-6b-report.md`,
+     `docs/phase-6c-report.md`; D and E will write `docs/phase-6d-report.md` and
+     `docs/phase-6e-report.md`). Part D was inserted after C; the former Part D "Measure
+     and harden" is now Part E (steps 14–16, AC14.x–AC16.x)
+  7. **Personalization** – custom blocks, textures, characters beyond the eight looks of
+     Phase 6 part D (a free character editor, the held item, other players' cracks), names,
+     effects (not yet planned)
 
 ## Hard rules
 
@@ -839,12 +846,16 @@ hold:
   host clock, the grace rule, the rate limit, Gathering worlds opened to others):
   implemented (report: `docs/phase-6c-report.md`). Read its "Decisions and deviations"
   before changing the save format, timed breaking in rooms or the sessions.
-- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A, B and C implemented. Four parts,
-  each in its own session with its own pull request, in order: **A** connection test
-  (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's NET
-  tests of A in `docs/device-tests.md` show a working connection), **C** Gathering
-  together (steps 8–10), **D** measure and harden (steps 11–13). The servers on the Pi
-  are built separately in the owner's `pi-infra` repository (plan section 5.12).
+- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A, B and C implemented. Five
+  parts, each in its own session with its own pull request, in order: **A** connection
+  test (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's
+  NET tests of A in `docs/device-tests.md` show a working connection), **C** Gathering
+  together (steps 8–10), **D** player figure (steps 11–13, plan sections 5.14 and 5.15;
+  planned, not started), **E** measure and harden (steps 14–16). Part D was inserted by the
+  owner on 2026-11-21 (plan section 3, change 14); the former Part D is Part E, unchanged
+  in content, its device tests NET-17 to NET-19 keep their ids, and "Part D" or "AC11.x"
+  in the reports of Parts B and C mean Part E and AC14.x. The servers on the Pi are built
+  separately in the owner's `pi-infra` repository (plan section 5.12).
 - Phase 7 (personalization): not yet planned.
 - Fix of flaky controller tests (focus one frame late, back pairing in wall-clock time,
   two tests that depended on round-trip timing):
