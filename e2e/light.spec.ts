@@ -249,8 +249,8 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
   }
   expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
 
-  // Something changes (the time of day), the world is saved: the records keep their
-  // format, and nothing about light is in them.
+  // Something changes (the time of day), the world is saved: nothing about light is
+  // in the records.
   await page.evaluate(async () => {
     window.__mc.setTime(0.3);
     await window.__mc.save();
@@ -260,8 +260,11 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
     string,
     unknown
   >;
-  expect(Object.keys(meta).sort()).toEqual(Object.keys(PART_C_META).sort());
-  expect(meta.formatVersion).toBe(1);
+  // Saved again, the record is migrated to format version 2 (Phase 6 part C): the same
+  // fields plus an empty list of guests.
+  expect(Object.keys(meta).sort()).toEqual([...Object.keys(PART_C_META), 'guests'].sort());
+  expect(meta.formatVersion).toBe(2);
+  expect(meta.guests).toEqual([]);
   expect(meta.generatorVersion).toBe(1);
   expect(meta.time).toBeCloseTo(0.3, 9);
   expect(meta.player).toEqual(PART_C_META.player);

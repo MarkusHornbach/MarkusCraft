@@ -17,6 +17,7 @@ export function sampleMeta(overrides: Partial<WorldMeta> = {}): WorldMeta {
     pose: { x: 0.5, y: 57, z: 4.5, yaw: 1, pitch: -0.5 },
     moveMode: 'walk',
     player: createPlayerRecord('creative'),
+    guests: [],
     ...overrides,
   };
 }

@@ -252,7 +252,7 @@ test('Phase 6 AC7.9: a guest whose connection dropped is back with the edits and
 });
 
 test.describe('five players', () => {
-  test('Phase 6 AC7.10: a fifth player sees "Room is full"; Gathering cannot be opened yet', async ({
+  test('Phase 6 AC7.10: a fifth player sees "Room is full"; Gathering can be opened (Part C)', async ({
     players,
   }) => {
     const host = await openTestPlayer(players);
@@ -269,13 +269,12 @@ test.describe('five players', () => {
     await expect(fifth.page.locator('.join-status')).toHaveText('Room is full', {
       timeout: 15_000,
     });
-    // A Gathering world: the button is disabled with its reason.
+    // A Gathering world can be opened to others since Part C: the button is enabled and
+    // has no note.
     await createWorld(fifth.page, { mode: 'gathering' });
     await pause(fifth.page);
-    await expect(fifth.page.locator('.room-open-button')).toBeDisabled();
-    await expect(fifth.page.locator('.room-panel .room-note')).toHaveText(
-      'Gathering worlds can be shared from a later version.',
-    );
+    await expect(fifth.page.locator('.room-open-button')).toBeEnabled();
+    await expect(fifth.page.locator('.room-panel .room-note')).toHaveCount(0);
   });
 });
 

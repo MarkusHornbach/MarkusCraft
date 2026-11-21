@@ -44,7 +44,7 @@ game in a procedurally generated world"; everything in it is original work.
      items. Four parts with separate pull requests: A connection test, B together in
      Creative, C Gathering together, D measure and harden (plan: `docs/phase-6-plan.md`;
      it replaces `docs/phase-2-plan.md`, Part B; reports: `docs/phase-6a-report.md`,
-     `docs/phase-6b-report.md`)
+     `docs/phase-6b-report.md`, `docs/phase-6c-report.md`)
   7. **Personalization** – custom blocks, textures, characters, names, effects (not yet planned)
 
 ## Hard rules
@@ -145,11 +145,14 @@ src/
                      time of day; `local` is the host's own `Session`), ClientSession.ts
                      (the guest: join, sync, pose, ping, reconnect; a `Session`),
                      interpolation.ts (`PoseBuffer`, `RemoteRoster`), authority.ts
-                     (`FarReader`: blocks of chunks the host has not loaded)
+                     (`FarReader`: blocks of chunks the host has not loaded), breakTiming.ts
+                     (`breakDueMs`: the grace for early breaks; `BreakClock`: break starts
+                     on the screen's clock)
   items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
                      slots), hardness.ts (break times, tool speed, gating, drop table),
                      recipes.ts (recipe table, stations near a player, recipe status)
-  save/              pure: saveFormat.ts (records, validation, names, seeds), WorldStore.ts
+  save/              pure: saveFormat.ts (records with the world's guests, validation, names,
+                     seeds), WorldStore.ts
                      (interface + MemoryStore)
   world/             blocks.ts (block + tile table), chunk.ts, World.ts, ChunkManager.ts,
                      raycast.ts, dayNight.ts (time → sun, sky colours, daylight)
@@ -250,7 +253,8 @@ sides in turn.
 - **Actions and reasons.** `break`, `place`, `selectSlot`, `startBreak`, `moveStack`,
   `discard`, `setBarSlot` (Creative only), `craft { recipe }` (Gathering only). A refusal
   carries a short reason (`reach`, `unbreakable`, `occupied`, `full`, `early`, `missing`,
-  `mode`, `station`, `support`, `invalid`) that the UI maps to a text; `ActionResult.notices`
+  `mode`, `station`, `support`, `rate`, `invalid`) that the UI maps to a text (`rate`, a
+  room's limit for guests, has none); `ActionResult.notices`
   is a list of `{ item, count }`, not of strings. A `break` may return two block changes:
   the broken cell, then the cell above it if a block that needs support stands there.
 - **Block flags and shapes.** `solid` means "collides with the player" (physics,
@@ -375,8 +379,13 @@ sides in turn.
   (`src/testing/terrainChecksum.ts`) must never change; it is checked in Node and in the
   browser.
 - **Saving.** A world is one `WorldMeta` record plus one record per edited chunk
-  (`save/saveFormat.ts`, `SAVE_FORMAT_VERSION`). Decoding validates every field and never
-  throws; a change to the format needs a new format version and a migration. Stores
+  (`save/saveFormat.ts`, `SAVE_FORMAT_VERSION`, now 2). Decoding validates every field and
+  never throws; a change to the format needs a new format version and a migration.
+  Version 2 (Phase 6 part C) adds `guests`: `{ key, name, record, pose, moveMode,
+lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX` (32,
+  newest by `lastSeenMs`, one per key); a guest entry that does not check out is dropped
+  and never makes the world damaged. Version 1 records load with no guests and are
+  written back as version 2 (decoded metas always carry the current version). Stores
   implement `WorldStore`: `IdbStore` (database `markuscraft`, stores `worlds` and
   `chunks`) in normal play and with `save=1`, `MemoryStore` in test mode. `Autosave`
   decides when to write; `Game` marks chunks and the meta record dirty.
@@ -473,17 +482,35 @@ sides in turn.
   sends (`blocks`, `record`, `result`); it never checks actions itself. **A guest's world
   is never saved** (the autosave writes nothing while `role` is `guest`, no world lock;
   `Game.openGuestWorld` loads it with `loadWorld`, after a reconnect at the player's own
-  pose). While a room is open or joined, the pause menu and the inventory do not pause the
+  pose). The host keeps every guest's record, pose and movement mode (`HostSession`
+  `departed` and `guestEntries()`), saved with the world's meta (`currentMeta` asks the
+  room; closing the room hands them to `Game.keepGuests`); a returning key gets them back
+  in `welcome` (`moveMode` there, `fly` in `pose`), a new one starts next to the host.
+  While a room is open or joined, the pause menu and the inventory do not pause the
   world (the frame still steps; `Input` gives no input while paused), the time of day comes
   from the room (`Multiplayer.timeOfDay`: the host's wall clock, the guest's last pong), and
   a 250 ms timer keeps the session answering in a hidden tab. The host needs no timer of
   its own: it relays poses from frames and from its message handlers (at most every 50 ms)
-  and answers pings. Gathering worlds cannot be opened in Part B (`TEXT_GATHERING_LATER`).
+  and answers pings. Both modes can be opened to others.
   `HostSession`, `ClientSession` and `protocol.ts` are a chunk of their own, loaded the
   first time a room is opened, joined or listed. The player key and name
   (`markuscraft.player.v1`) are stored only once multiplayer is used or a name typed:
   single-player leaves no trace. Notices ("Anna joined") use wall-clock time
   (`NET_NOTICE_MS`, at most `NET_NOTICES_MAX`).
+- **Gathering together (Phase 6 part C).** While a room is open the action clock of every
+  player, the host's own too, is the host's `performance.now()`; records' `breaking` from
+  before the room is cleared. The screens measure break progress on their own simulation
+  clock: `BreakClock` (in `ClientSession` and `HostLocalSession`) replaces a record's
+  `breaking.startMs` with the screen's time of the `startBreak`. **The grace rule:** a
+  `break` that reaches the host at most `NET_BREAK_GRACE_MS` (400) before it is due is
+  held (`breakDueMs`) and decided in the next message handler, `update` or local action
+  after the due time; the player's later actions wait behind it in order. Earlier is
+  `early`, as before; `Game` then starts the break over. `Game` sends one `startBreak` or
+  `break` at a time (`breakInFlight`, cleared by its answer or a new session). More than
+  `ACTION_RATE_LIMIT` (30) actions of a guest within one second are refused `rate` (the
+  host's own player has no limit). Every guest action reads blocks through `FarReader`
+  (reach, water, support, tools, stations within 5), also far from the host. Smelting
+  stays on the guest's screen.
 - **The network test (Phase 6 part A)** is a screen of its own (`nettest`), opened by
   "Network test" on the settings page; "Back" returns there. Its test id is
   `mc-<build>-t-<4 characters>`; it lists the others from PeerJS discovery every 3 s,
@@ -574,7 +601,8 @@ parameters so tests are deterministic. Details are specified in `docs/phase-1-pl
   `tap` of the D-pad.
 - Test API beyond Phase 2: `submit(action)` (returns the session's answer),
   `save()`, `openWorld(name, seed, mode?)` (switch worlds in place), `terrainChecksum()`,
-  `give(item, count)`, `clearInventory()`; `getState()` has `mode`, `world`,
+  `give(item, count, player?)` (on a host with a guest's id: into that guest's
+  inventory, Phase 6 part C), `clearInventory()`; `getState()` has `mode`, `world`,
   `save { dirty, lastError, lastSaveMs, lastLoadMs }`, `inventory`,
   `breaking { x, y, z, progress } | null`, `ui { screen, tab }`,
   `recipes [{ id, name, craftable, missing, stationMissing }]` in table order (ids 1–20),
@@ -615,7 +643,9 @@ active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused
   `roomCode`, `selfId`, `players` (with `renderX/Y/Z/Yaw`, where the figure is drawn),
   `rttMs`, `lastResult` (the host's last answer, also to raw messages), `worldHash`,
   `lastError`, `notices`, `figures`. `setBlock` on a host is sent to the guests; on a guest
-  it throws. URL parameters `join=<code>` (in test mode: join at once; otherwise the world
+  it throws. A guest in Gathering whose breaks are timed steps with `stepPaced(page, n)`
+  (`e2e/multiplayer.ts`, no faster than real time): the host measures breaks on its own
+  clock. URL parameters `join=<code>` (in test mode: join at once; otherwise the world
   menu's "Join world CODE") and `name=<text>`. A crash without goodbye:
   `Page.crash` through a CDP session.
 - **Multiplayer tests** use `test` from `e2e/multiplayer.ts`: `players.open()` makes a
@@ -805,7 +835,11 @@ hold:
   name tags, "Join a world", "Playing together", leaving and reconnecting): implemented
   (report: `docs/phase-6b-report.md`). Read its "Decisions and deviations" before
   changing the sessions, the protocol, the menus of rooms or the multiplayer tests.
-- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A and B implemented. Four parts,
+- Phase 6 part C (Gathering together: guests in the host's save, format version 2, the
+  host clock, the grace rule, the rate limit, Gathering worlds opened to others):
+  implemented (report: `docs/phase-6c-report.md`). Read its "Decisions and deviations"
+  before changing the save format, timed breaking in rooms or the sessions.
+- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A, B and C implemented. Four parts,
   each in its own session with its own pull request, in order: **A** connection test
   (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's NET
   tests of A in `docs/device-tests.md` show a working connection), **C** Gathering

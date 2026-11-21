@@ -50,7 +50,7 @@ import type { NetTestScreen } from '../ui/NetTestScreen';
 import type { Network } from '../net/transport';
 import type { Welcome } from '../net/protocol';
 import { worldHash } from '../net/snapshot';
-import { Multiplayer, TEXT_GATHERING_LATER } from './multiplayer';
+import { Multiplayer } from './multiplayer';
 import { JoinSection, type RoomListView, TEXT_UNAVAILABLE } from '../ui/JoinSection';
 import { RoomPanel } from '../ui/RoomPanel';
 import { CRACK_STAGES } from '../render/textures/cracks';
@@ -284,6 +284,11 @@ export class Game {
   private target: RayHit | null = null;
   /** Gathering: the session confirmed the break that the held button is working on. */
   private breakActive = false;
+  /**
+   * Gathering: a `startBreak` or `break` was submitted and the session has not answered
+   * yet. A room's host answers a moment later; until then nothing is sent again.
+   */
+  private breakInFlight = false;
   /** The pickup notice on screen ("+2 Dirt") and the action time until it stays. */
   private pickup: { item: number; count: number; untilMs: number } | null = null;
   /** "Inventory full" shows until this action time. */
@@ -543,6 +548,7 @@ export class Game {
       pose: { x: spawn.x + 0.5, y: spawn.y, z: spawn.z + 0.5, yaw: 0, pitch: 0 },
       moveMode: 'walk',
       player: createPlayerRecord(mode),
+      guests: [],
     };
   }
 
@@ -568,6 +574,7 @@ export class Game {
     this.simSteps = 0;
     this.repeatTimer = 0;
     this.breakActive = false;
+    this.breakInFlight = false;
     this.pickup = null;
     this.fullUntilMs = -1;
     this.supportUntilMs = -1;
@@ -599,6 +606,8 @@ export class Game {
       moveMode: p.mode,
       // A break in progress is measured on a clock that restarts with the world.
       player: { ...this.session.record, breaking: null },
+      // While the world is open to others, its guests as they are now.
+      guests: this.mp.host?.guestEntries() ?? meta.guests,
     };
   }
 
@@ -972,6 +981,15 @@ export class Game {
         const p = this.player;
         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
       },
+      flying: () => this.player.mode === 'fly',
+      actionClock: () => this.nowMs(),
+      guests: () => this.meta?.guests ?? [],
+      keepGuests: (guests) => {
+        if (!this.meta) return;
+        this.meta = { ...this.meta, guests };
+        this.markMetaDirty();
+      },
+      guestsChanged: () => this.markMetaDirty(),
       time: () => this.time,
       frozen: () => this.params.freeze,
       listener: {
@@ -993,6 +1011,8 @@ export class Game {
   private useSession(session: Session | null, record: PlayerRecord): void {
     this.session = session ?? this.createSession(record);
     this.breakActive = false;
+    // An answer of the session before will not come.
+    this.breakInFlight = false;
     this.onPlayerChanged(this.session.record);
     this.hud.setSelected(this.selectedSlot, false);
   }
@@ -1005,7 +1025,7 @@ export class Game {
     const p = this.player;
     const now = Date.now();
     const pose = rejoin ? { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch } : welcome.pose;
-    const moveMode = rejoin ? p.mode : 'walk';
+    const moveMode = rejoin ? p.mode : welcome.moveMode;
     this.loadWorld(
       {
         id: 'guest',
@@ -1020,6 +1040,7 @@ export class Game {
         pose,
         moveMode,
         player: welcome.record,
+        guests: [],
       },
       edits,
     );
@@ -1061,12 +1082,7 @@ export class Game {
       role: this.mp.role,
       code: this.mp.roomCode,
       players: players.map(({ id, name, slot, host, self }) => ({ id, name, slot, host, self })),
-      disabledReason:
-        this.netConfig.signal === null
-          ? TEXT_UNAVAILABLE
-          : this.gameMode !== 'creative'
-            ? TEXT_GATHERING_LATER
-            : null,
+      disabledReason: this.netConfig.signal === null ? TEXT_UNAVAILABLE : null,
       touch: this.mode === 'touch',
       message: this.roomMessage,
     });
@@ -1544,6 +1560,11 @@ export class Game {
     this.lastResult = result;
     // A malformed value is refused and reported as it came: it may not be an object.
     if (!result.ok && (typeof action !== 'object' || action === null)) return;
+    if (action.kind === 'startBreak' || action.kind === 'break') this.breakInFlight = false;
+    // A `break` the host found too early (its clock against the screen's): start over.
+    if (action.kind === 'break' && !result.ok && result.reason === 'early') {
+      this.breakActive = false;
+    }
     if (action.kind === 'startBreak') {
       // The break runs from now on, or it does not start at all.
       this.breakActive = result.ok;
@@ -1889,23 +1910,31 @@ export class Game {
       this.breakActive = false;
       return;
     }
+    // Waiting for the session's answer to the last `startBreak` or `break`.
+    if (this.breakInFlight) return;
     const started = this.session.record.breaking;
     const same = started && started.x === t.x && started.y === t.y && started.z === t.z;
     if (!this.breakActive || !started || !same) {
       this.breakActive = false;
-      this.session.submit({ kind: 'startBreak', x: t.x, y: t.y, z: t.z });
+      this.submitBreak({ kind: 'startBreak', x: t.x, y: t.y, z: t.z });
       // A block without break time (the torch) comes off in the step of its start, once
       // the session has accepted it; a session that answers later gets the next step.
       if (!this.breakActive || breakTimeMs(t.id, heldItem(this.session.record)) !== 0) return;
-      this.session.submit({ kind: 'break', x: t.x, y: t.y, z: t.z });
+      this.submitBreak({ kind: 'break', x: t.x, y: t.y, z: t.z });
       this.updateTarget();
       return;
     }
     const required = breakTimeMs(t.id, heldItem(this.session.record)) ?? 0;
     // The tolerance keeps 36 steps of 1/60 s from falling just short of 600 ms.
     if (this.nowMs() - started.startMs < required - 1e-6) return;
-    this.session.submit({ kind: 'break', x: t.x, y: t.y, z: t.z });
+    this.submitBreak({ kind: 'break', x: t.x, y: t.y, z: t.z });
     this.updateTarget();
+  }
+
+  /** A `startBreak` or `break` of the held button; nothing more until it is answered. */
+  private submitBreak(action: Action): void {
+    this.breakInFlight = true;
+    this.session.submit(action);
   }
 
   /** The timed break on screen, or null while none runs. */
@@ -2413,12 +2442,17 @@ export class Game {
     this.mp.host?.broadcastBlocks([{ x, y, z, id }]);
   }
 
-  /** Test tool: puts items into the inventory, past the action layer. */
-  private testGive(item: number, count: number): void {
+  /**
+   * Test tool: puts items into the inventory, past the action layer; on a host with
+   * `player`, into that guest's inventory.
+   */
+  private testGive(item: number, count: number, player?: number): void {
     if (!isItem(item) || !Number.isInteger(count) || count < 1) return;
-    const record = this.session.record;
+    const session: { record: PlayerRecord; replaceRecord?: (r: PlayerRecord) => void } | null =
+      player === undefined ? this.session : (this.mp.host?.guestRecordDoor(player) ?? null);
+    if (!session) throw new Error(`No guest with id ${String(player)}`);
+    const record = session.record;
     const { slots } = addItems(record.slots, item, count);
-    const session = this.session;
     if (session.replaceRecord) session.replaceRecord({ ...record, slots });
   }
 
@@ -2601,7 +2635,7 @@ export class Game {
         this.markMetaDirty();
       },
       save: () => this.saveNow(),
-      give: (item, count) => this.testGive(item, count),
+      give: (item, count, player) => this.testGive(item, count, player),
       clearInventory: () => this.testClearInventory(),
       benchResult: () => (this.benchPhase === 'result' ? this.benchResult : null),
       netNetwork: () =>

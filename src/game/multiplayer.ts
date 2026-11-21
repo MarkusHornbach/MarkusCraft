@@ -15,7 +15,7 @@ import type { ClientSession, EndReason, JoinFailure } from '../net/ClientSession
 import type { HostSession, PeerEvent } from '../net/HostSession';
 import type { NetPose, RoomInfo, Welcome } from '../net/protocol';
 import { makeRoomCode, normalizeRoomCode, roomCodeOf, roomPeerId } from '../net/roomCode';
-import type { WorldEdits } from '../save/saveFormat';
+import type { GuestEntry, WorldEdits } from '../save/saveFormat';
 import { type Network, SignalError, type Signaling } from '../net/transport';
 import type { World } from '../world/World';
 import { terrainChecksum } from '../world/generation/terrain';
@@ -34,7 +34,6 @@ export const JOIN_TEXT: Record<JoinFailure | 'unavailable', string> = {
   unavailable: 'Multiplayer is not available in this build.',
 };
 
-export const TEXT_GATHERING_LATER = 'Gathering worlds can be shared from a later version.';
 export const TEXT_HOST_CLOSED = 'The host closed the world.';
 export const TEXT_HOST_LOST = 'Lost the connection to the host.';
 export const TEXT_RECONNECTING = 'Connection lost. Reconnecting…';
@@ -53,6 +52,14 @@ export interface MultiplayerGame {
   mode(): 'creative' | 'gathering';
   record(): PlayerRecord;
   pose(): NetPose;
+  flying(): boolean;
+  /** The clock the game measures break progress on (its simulation time). */
+  actionClock(): number;
+  /** The guests the open world remembers, and where they go when its room closes. */
+  guests(): readonly GuestEntry[];
+  keepGuests(guests: GuestEntry[]): void;
+  /** The guests in the room changed (joined, left, played): the world's record is unsaved. */
+  guestsChanged(): void;
   time(): number;
   frozen(): boolean;
   /** The game's listener: blocks, record and answers of its own player. */
@@ -162,6 +169,7 @@ export class Multiplayer {
   }
 
   private onPeer(event: PeerEvent): void {
+    if (this.host) this.game.guestsChanged();
     this.notice(event.kind === 'joined' ? `${event.name} joined` : `${event.name} left`);
   }
 
@@ -173,8 +181,6 @@ export class Multiplayer {
     const worldName = this.game.worldName();
     if (worldName === null) throw new Error('No world is open');
     if (!this.game.available) throw new Error(JOIN_TEXT.unavailable);
-    // Gathering needs the host-side rules of Part C (break timing, saved guests).
-    if (this.game.mode() !== 'creative') throw new Error(TEXT_GATHERING_LATER);
     const network = await this.game.loadNetwork();
     const build = options.build ?? this.game.build;
     const signaling = network.signaling();
@@ -214,6 +220,9 @@ export class Multiplayer {
       time: this.game.time(),
       frozen: this.game.frozen(),
       clock: () => performance.now(),
+      localClock: () => this.game.actionClock(),
+      wallClock: () => Date.now(),
+      guests: this.game.guests(),
       listener: { ...this.wrap(this.game.listener), onPeer: (e) => this.onPeer(e) },
     });
     signaling.onConnection = (conn) => host.accept(conn);
@@ -262,6 +271,7 @@ export class Multiplayer {
       code,
       randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
       clock: () => performance.now(),
+      actionClock: () => this.game.actionClock(),
       checksum: (seed, version) => options.checksum ?? terrainChecksum(seed, version),
       listener: {
         ...this.wrap(this.game.listener),
@@ -312,6 +322,8 @@ export class Multiplayer {
     if (this.role === 'host' && this.host) {
       const host = this.host;
       host.close();
+      // The guests who were in the room stay in the world's record.
+      this.game.keepGuests(host.guestEntries());
       const signaling = this.signaling;
       window.setTimeout(() => signaling?.close(), CLOSE_DELAY_MS);
       this.game.useSession(null, host.hostRecord);
@@ -353,12 +365,15 @@ export class Multiplayer {
   /** The work of a frame: the session, and the guest's pose. */
   frame(nowMs: number): void {
     this.host?.update(nowMs);
+    // Guests play without the host's steps (a test, a paused host): their records and poses
+    // are part of the world's record.
+    if (this.host && this.host.playerCount > 1) this.game.guestsChanged();
     const client = this.client;
     if (!client) return;
     client.update(nowMs);
     // The update may have ended the room (the host was lost).
     if (this.client !== client) return;
-    client.setPose(this.game.pose(), nowMs, this.teleported);
+    client.setPose(this.game.pose(), nowMs, this.teleported, this.game.flying());
     this.teleported = false;
   }
 

@@ -185,3 +185,23 @@ export async function untilNet(
 ): Promise<void> {
   await expect.poll(async () => check(await netOf(page)), { timeout, intervals: [100] }).toBe(true);
 }
+
+/**
+ * Advances a test-mode page by `steps` simulation steps no faster than real time (60 per
+ * second). A room's host measures a guest's break on its own clock (Phase 6 part C), so a
+ * guest that steps faster than time passes sends its `break` too early.
+ */
+export async function stepPaced(page: Page, steps: number): Promise<void> {
+  await page.evaluate(async (n) => {
+    const start = performance.now();
+    let done = 0;
+    while (done < n) {
+      await new Promise((resolve) => setTimeout(resolve, 16));
+      const due = Math.min(n, Math.floor(((performance.now() - start) * 60) / 1000));
+      if (due > done) {
+        window.__mc.step(due - done);
+        done = due;
+      }
+    }
+  }, steps);
+}

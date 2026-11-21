@@ -327,9 +327,10 @@ replaces it.
 ### Playing together
 
 Up to four people play in one world on the home network, connected directly between the
-browsers. Creative worlds can be shared now; Gathering worlds follow in a later version.
+browsers. Creative and Gathering worlds can both be shared; the world's mode applies to
+everyone.
 
-- **Open a world to others:** play a Creative world, open the pause menu and press
+- **Open a world to others:** play a world, open the pause menu and press
   **Open to others**. The menu shows the **room code** in large letters, **Copy join
   link**, the list of players (with "(host)" and "(you)") and **Close to others**. The
   world goes on while the pause menu is open; only your own player stands still.
@@ -338,6 +339,11 @@ browsers. Creative worlds can be shared now; Gathering worlds follow in a later 
   case, spaces and hyphens do not matter) and press **Join**. A join link (`?join=CODE`)
   shows **Join world CODE** as the main button. The world comes from the host; it is never
   saved on the guest's device.
+- **Your items stay with the world.** The host's device saves every guest's items and
+  place with the world. Join it again from the same device and browser (also after the
+  host closed and reopened the world) and you are back where you left, with your bar and
+  your bag. In a Gathering world the host decides every break and every craft: what you
+  gather goes into your own bag, and breaking takes as long as alone.
 - **Leave:** **Leave world** in the guest's pause menu. When the host presses **Close to
   others**, leaves the world or closes the tab, every guest returns to the world list and
   sees "The host closed the world." If the connection to the host breaks, the guest shows
