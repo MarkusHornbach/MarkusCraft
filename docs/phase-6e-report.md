@@ -128,6 +128,12 @@ API), `docs/device-tests.md`, this report.
   shows the new scenario; the `bench-result` reference was regenerated (9.5 % of pixels
   changed: the new row, and the rows below it moved down). `bench-start` did not change.
 
+- **CI's time limit is 110 minutes** (was 80). The first CI run of this pull request was
+  cut off at 80 minutes during the multiplayer tests: Parts D and E added about 15
+  minutes of them. In that run the soak (AC14.3) had failed on the slower runner; it now
+  waits until the host knows every player's pose after the long jump to the columns,
+  instead of a fixed 300 ms, since the host checks reach against the last pose it got.
+
 ## Known issues
 
 - Software WebGL in the container and CI: the timings of the browser tests (joins, the
@@ -136,7 +142,7 @@ API), `docs/device-tests.md`, this report.
 - The overlay's "Link" stays "–" for the first 2 s of a room (the first statistics).
 - A guest's round trip on the host is its last report: it lags its ping by one second.
 - `mpMenus.spec.ts` "Phase 6 AC7.10" fails in this container on `main` as well (see
-  "Full browser run"); not touched here.
+  "Full browser run") but passes in CI: a limit of this container, not touched here.
 - The Part C report's suggestion to show the time between `startBreak` and `break` in the
   overlay was not built: it is not part of AC14.1, and NET-13 showed no failing breaks.
 

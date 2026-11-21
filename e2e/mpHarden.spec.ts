@@ -167,12 +167,6 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
           // Moves a little between actions: the others see it walk.
           const x = bx + i * 6 - 9 + (n % 4) * 0.25;
           window.__mc.setPlayer({ x, y: y - 3, z: bz + 0.5, mode: 'fly', yaw: n * 0.1 });
-          if (n === from) {
-            // The first move is a long jump: the host must know the new pose before the
-            // action arrives (it checks the reach against the last pose it got).
-            await window.__mc.whenIdle();
-            await new Promise((resolve) => setTimeout(resolve, 300));
-          }
           const cell = { x: bx + i * 6 - 9 + (Math.floor(n / 2) % 3) - 1, y, z: bz };
           const before = window.__mc.getState().net.lastResult?.seq ?? 0;
           const answer = window.__mc.submit(
@@ -198,7 +192,30 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
       [i, from, to, bx, bz, y] as const,
     );
 
+  /**
+   * Everyone jumps to its column, and the test waits until the host knows all four poses:
+   * the host checks the reach of an action against the last pose it got, and a slow
+   * runner can deliver an action before the pose of a long jump.
+   */
+  const toColumns = async (): Promise<void> => {
+    await Promise.all(
+      everyone.map((p, i) =>
+        p.page.evaluate(([x, yy, z]) => window.__mc.setPlayer({ x, y: yy, z, mode: 'fly' }), [
+          bx + i * 6 - 9,
+          y - 3,
+          bz + 0.5,
+        ] as const),
+      ),
+    );
+    await untilNet(
+      host.page,
+      (net) => net.players.length === 4 && net.players.every((p) => Math.abs(p.y - (y - 3)) < 0.01),
+      30_000,
+    );
+  };
+
   // First half: everyone at once.
+  await toColumns();
   const first = await Promise.all(everyone.map((p, i) => play(p.page, i, 0, 25)));
   expect(first.flat().filter((ok) => ok !== true)).toEqual([]);
   // The last guest leaves and comes back.
@@ -208,12 +225,13 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
   await joinRoom(leaver.page, code);
   await untilNet(host.page, (net) => net.players.length === 4);
   // Second half.
+  await toColumns();
   const second = await Promise.all(everyone.map((p, i) => play(p.page, i, 25, 50)));
   expect(second.flat().filter((ok) => ok !== true)).toEqual([]);
 
   // One world everywhere: every block broken again, all hashes equal.
   const hash = (await netOf(host.page)).worldHash;
-  for (const p of all) await untilNet(p.page, (net) => net.worldHash === hash);
+  for (const p of all) await untilNet(p.page, (net) => net.worldHash === hash, 30_000);
   for (const p of everyone) {
     const blocks = await p.page.evaluate(
       ([bx, bz, y]) => {
