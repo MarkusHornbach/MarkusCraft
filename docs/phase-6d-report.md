@@ -147,6 +147,11 @@ key would otherwise change the references from run to run.
 - **The look is resolved before sending**: `hello` and `profile` carry 1–8, never 0, as the
   plan says; the host keeps no "Automatic".
 
+- **The `pause-screen` reference allows 8 % of pixels to differ** (was 5 %). CI's system
+  font changed 3.7 % of this text-only screen before; with the nine look names and the
+  name field of "Your player" it is 6 % (CI run of the PR, everything else green). 8 % is
+  what `sectionShot` already allows the join section and the room panel for the same reason.
+
 ## Known issues
 
 - Nothing measured on real devices yet: NET-20 to NET-25.
