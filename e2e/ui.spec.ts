@@ -275,7 +275,12 @@ test('matches the pause screen reference screenshot (AC11.6)', async ({ page }) 
   });
   // Text-only screen: CI renders the system font slightly differently (3.7 % of pixels),
   // so this reference uses the raised tolerance the phase plan allows (section 5.5).
-  await expect(page).toHaveScreenshot('pause-screen.png', { maxDiffPixelRatio: 0.05 });
+  await expect(page).toHaveScreenshot('pause-screen.png', {
+    maxDiffPixelRatio: 0.05,
+    // "Your player" (Phase 6 part D): the preview moves and "Automatic" shows the look of a
+    // random player key.
+    mask: [page.locator('.player-preview'), page.locator('.look-button[data-look="0"] canvas')],
+  });
 });
 
 test('shows a readable message when WebGL2 is unavailable', async ({ page }) => {
