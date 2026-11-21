@@ -18,12 +18,14 @@ describe('parseParams', () => {
       bench: 'off',
       join: null,
       name: null,
+      look: null,
+      previewGl: true,
     });
   });
   it('reads all parameters', () => {
     expect(
       parseParams(
-        '?seed=42&time=0.75&freeze=1&test=1&touch=1&save=1&world=%20Second%20&join=ab-cd%20ef&name=Ann',
+        '?seed=42&time=0.75&freeze=1&test=1&touch=1&save=1&world=%20Second%20&join=ab-cd%20ef&name=Ann&look=3&previewgl=0',
         random,
       ),
     ).toEqual({
@@ -40,6 +42,8 @@ describe('parseParams', () => {
       bench: 'off',
       join: 'ABCDEF',
       name: 'Ann',
+      look: 3,
+      previewGl: false,
     });
   });
   it('Phase 6 AC7.3: an invalid join code counts as none', () => {
@@ -75,5 +79,12 @@ describe('parseParams', () => {
     expect(bench('?bench=yes')).toBe('off');
     expect(bench('?bench=1&test=1')).toBe('off');
     expect(bench('?test=1&bench=quick')).toBe('off');
+  });
+
+  it('look= is a choice 0–8 or nothing (Phase 6 part D)', () => {
+    const look = (v: string): number | null => parseParams(`?look=${v}`, () => 1).look;
+    expect(look('0')).toBe(0);
+    expect(look('8')).toBe(8);
+    for (const v of ['9', '-1', '2.5', 'x', '', '12']) expect(look(v)).toBeNull();
   });
 });

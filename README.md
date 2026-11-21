@@ -348,6 +348,15 @@ everyone.
   others**, leaves the world or closes the tab, every guest returns to the world list and
   sees "The host closed the world." If the connection to the host breaks, the guest shows
   "Connection lost. Reconnecting…" and tries again for 10 seconds.
+- **Your look:** **Settings → Your player** has your name (the same as under **Join a
+  world**), a turning preview of your figure and nine buttons: **Automatic** (a look that
+  comes from your device, the same every time) and eight looks: Fern, Ember, Pebble,
+  River, Moss, Dune, Frost and Plum. The others see your figure in that look, walking,
+  turning its head and swinging its arm when you break or place blocks. Your belt and the
+  stripe on your name tag have your colour in the room, so two players with the same look
+  stay apart. Name and look can be changed during a room in the pause menu's settings; the
+  others see the change at once. Nothing is stored until you choose a look, type a name
+  or play together.
 - **Phones and tablets may host,** but the world closes for everyone if the host's screen
   locks or another app comes to the front. A computer is the more reliable host. While a
   world is shared, the game keeps the screen on where the browser allows it.

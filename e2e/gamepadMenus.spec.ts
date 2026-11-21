@@ -520,6 +520,11 @@ test.describe('references', () => {
     await page.locator('canvas.game-canvas').evaluate((node) => {
       (node as HTMLElement).style.visibility = 'hidden';
     });
-    await expect(page).toHaveScreenshot('pad-pause.png', { maxDiffPixelRatio: 0.05 });
+    await expect(page).toHaveScreenshot('pad-pause.png', {
+      maxDiffPixelRatio: 0.05,
+      // "Your player" (Phase 6 part D): the preview moves and "Automatic" shows the look of a
+      // random player key.
+      mask: [page.locator('.player-preview'), page.locator('.look-button[data-look="0"] canvas')],
+    });
   });
 });

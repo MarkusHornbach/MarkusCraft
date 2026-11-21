@@ -26,7 +26,7 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 6 part C (Gathering together: section 10, NET-13 to NET-16 added);
+Last updated: Phase 6 part D (player figure: section 10, NET-20 to NET-25 added);
 2026-11-21.
 
 ---
@@ -389,6 +389,30 @@ host can be any device.
 - [ ] **NET-16** (6C) A guest places torches on stone in a dark place and breaks some of
       the stones under them: do the torches and their light look the same on every device,
       and does a broken torch land in the guest's bag? Result:
+
+The tests of Part D are about the player figure that replaced the coloured boxes of Part B,
+and about **Settings → Your player** (name and look). NET-17 to NET-19 belong to Part E.
+
+- [ ] **NET-20** (6D) Look at the eight looks under **Your player** and as figures of
+      other players a few blocks away. Are they clearly different from each other, do
+      they look good, and does any of them remind you of a figure from another game? Two
+      players choose the same look: do the belt colour and the stripe on the name tag
+      keep them apart? Result:
+- [ ] **NET-21** (6D) Watch another player's figure while that player walks, runs into a
+      wall, jumps, flies, stands and looks around (does the body follow the head
+      naturally?), looks up and down, breaks a block in Gathering (the arm swings all the
+      time) and places blocks (one swing each). Is anything jerky or odd? Result:
+- [ ] **NET-22** (6D) **Your player** with the mouse, by touch on phone and tablet, and with
+      the controller: choose a look and type a name. Does the preview turn smoothly, is
+      every look button easy to hit, is the choice still there after a reload? Result:
+- [ ] **NET-23** (6D) During a room, change look and name in the settings of the pause
+      menu: do the others see the new figure, name tag and player list entry within a
+      second? Result:
+- [ ] **NET-24** (6D) Frame rate on the phone with three animated figures in view (four
+      players), compared with single-player and, if you remember them, with the box
+      figures of Part B (F3 overlay, or the feel). Result:
+- [ ] **NET-25** (6D) At night: is a figure in a dark place dark, lit next to a torch, and
+      is its name tag readable? Result:
 
 ---
 

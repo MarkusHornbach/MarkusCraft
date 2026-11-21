@@ -20,6 +20,7 @@ import { type Network, SignalError, type Signaling } from '../net/transport';
 import type { World } from '../world/World';
 import { terrainChecksum } from '../world/generation/terrain';
 import { type PlayerIdentity, loadIdentity, saveIdentity } from './playerIdentity';
+import { isLookChoice, resolveLook } from '../player/looks';
 
 /** Texts of everything that can go wrong when joining, as the world menu shows them. */
 export const JOIN_TEXT: Record<JoinFailure | 'unavailable', string> = {
@@ -53,6 +54,8 @@ export interface MultiplayerGame {
   record(): PlayerRecord;
   pose(): NetPose;
   flying(): boolean;
+  /** The player holds break on a block (the others' figure swings its arm). */
+  busy(): boolean;
   /** The clock the game measures break progress on (its simulation time). */
   actionClock(): number;
   /** The guests the open world remembers, and where they go when its room closes. */
@@ -104,8 +107,12 @@ export interface NetPlayerState {
   id: number;
   name: string;
   slot: number;
+  /** The figure's look (1–8). */
+  look: number;
   self: boolean;
   host: boolean;
+  fly: boolean;
+  busy: boolean;
   x: number;
   y: number;
   z: number;
@@ -154,6 +161,31 @@ export class Multiplayer {
     saveIdentity(this.identity);
   }
 
+  /** The look this device's figure has (1–8): the chosen one, or the key's. */
+  get look(): number {
+    return resolveLook(this.identity.look, this.identity.key);
+  }
+
+  /** A new choice of look (0 Automatic, 1–8); the others see it at once. */
+  setLook(choice: number): void {
+    if (!isLookChoice(choice)) return;
+    this.identity = { ...this.identity, look: choice };
+    saveIdentity(this.identity);
+    this.sendProfile();
+  }
+
+  /** The name field was left or Enter pressed: the others learn the name. */
+  commitName(): void {
+    this.sendProfile();
+  }
+
+  private sendProfile(): void {
+    if (this.host) this.host.setHostProfile(this.identity.name, this.look);
+    else if (this.client?.status === 'online') {
+      this.client.setProfile(this.identity.name, this.look);
+    }
+  }
+
   // --- notices -----------------------------------------------------------------------
 
   notice(text: string): void {
@@ -170,6 +202,11 @@ export class Multiplayer {
 
   private onPeer(event: PeerEvent): void {
     if (this.host) this.game.guestsChanged();
+    if (event.kind === 'profile') {
+      // The player list shows the new name and look.
+      this.game.roleChanged();
+      return;
+    }
     this.notice(event.kind === 'joined' ? `${event.name} joined` : `${event.name} left`);
   }
 
@@ -217,6 +254,8 @@ export class Multiplayer {
       hostKey: this.identity.key,
       hostRecord: this.game.record(),
       hostPose: () => this.game.pose(),
+      hostLook: this.look,
+      hostFlags: () => ({ fly: this.game.flying(), busy: this.game.busy() }),
       time: this.game.time(),
       frozen: this.game.frozen(),
       clock: () => performance.now(),
@@ -268,6 +307,7 @@ export class Multiplayer {
       build: options.build ?? this.game.build,
       key: this.identity.key,
       name: this.identity.name,
+      look: this.look,
       code,
       randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
       clock: () => performance.now(),
@@ -373,7 +413,7 @@ export class Multiplayer {
     client.update(nowMs);
     // The update may have ended the room (the host was lost).
     if (this.client !== client) return;
-    client.setPose(this.game.pose(), nowMs, this.teleported, this.game.flying());
+    client.setPose(this.game.pose(), nowMs, this.teleported, this.game.flying(), this.game.busy());
     this.teleported = false;
   }
 
@@ -468,8 +508,11 @@ export class Multiplayer {
         id: p.id,
         name: p.name,
         slot: p.slot,
+        look: p.look,
         self: p.host,
         host: p.host,
+        fly: p.fly,
+        busy: p.busy,
         ...(p.host ? ownPose : p.pose),
       }));
     }
@@ -479,16 +522,22 @@ export class Multiplayer {
       id: p.id,
       name: p.name,
       slot: p.slot,
+      look: p.look,
       self: false,
       host: p.host,
+      fly: p.fly,
+      busy: p.busy,
       ...(p.poses.latest ?? { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }),
     }));
     const self = {
       id: client.selfId,
       name: client.selfName ?? '',
       slot: client.selfSlot,
+      look: client.selfLook,
       self: true,
       host: false,
+      fly: this.game.flying(),
+      busy: this.game.busy(),
       ...ownPose,
     };
     return [self, ...others].sort((a, b) => a.id - b.id);

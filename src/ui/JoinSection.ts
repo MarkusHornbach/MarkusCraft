@@ -50,6 +50,11 @@ export class JoinSection {
   private shown = '';
   private linkCode: string | null = null;
 
+  /** The name changed elsewhere ("Your player"). */
+  setName(name: string): void {
+    if (this.nameInput.value !== name) this.nameInput.value = name;
+  }
+
   constructor(options: JoinSectionOptions) {
     this.element = element('section', 'join-section');
     this.element.appendChild(element('h2', 'pause-heading', 'Join a world'));

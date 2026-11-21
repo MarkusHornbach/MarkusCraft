@@ -128,8 +128,8 @@ lastSeenMs }`, at most `GUESTS_MAX = 32` (`limitGuests`: one entry per key, newe
 
 - A host whose page is hidden decides a held break only on its timer (throttled by the
   browser) or with the guest's next message (a ping every second at the latest), so a
-  guest's break can come up to a second late while the host is hidden. Part D's hidden
-  host test (AC11.2) can measure it.
+  guest's break can come up to a second late while the host is hidden. Part E's hidden
+  host test (AC14.2; Part D and AC11.2 when this was written) can measure it.
 - Smelting time is not checked by the host (plan decision 8).
 - A guest whose clock runs much faster than the host's (more than the grace plus 100 ms
   per break) has its breaks start over. Real devices run their simulation at real time;
@@ -192,7 +192,7 @@ NET-15, NET-16** (6C). No test became obsolete.
 
 ## Suggestions for the next part
 
-- Part D's soak (AC11.3) can play in a Gathering world: the rate limit and the grace are
+- Part E's soak (AC14.3; Part D and AC11.3 when this was written) can play in a Gathering world: the rate limit and the grace are
   the rules most likely to show a difference between devices.
 - If NET-13 shows breaks starting over, measure the time between `startBreak` and `break`
   on the host (a number for the F3 overlay of AC11.1) before raising the grace.

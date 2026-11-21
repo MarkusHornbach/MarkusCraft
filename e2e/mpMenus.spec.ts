@@ -37,7 +37,8 @@ async function menuPlayer(
 
 /** A player that created a Creative world and paused it (mouse released). */
 async function pausedHost(players: Players, name: string, options = {}): Promise<Player> {
-  const host = await menuPlayer(players, name, options, { seed: '1337' });
+  // A fixed look: one from the random player key would change the room panel's icons.
+  const host = await menuPlayer(players, name, options, { seed: '1337', look: '1' });
   await createWorld(host.page);
   await pause(host.page);
   return host;
@@ -434,8 +435,47 @@ test('Phase 6 AC7.14: reference screenshots of the join section and the room pan
   for (const page of [a.page, b.page]) await page.close();
   const host = await pausedHost(players, 'Ada');
   await hostRoom(host.page, { code: 'HAPPY2' });
-  const bo = await openTestPlayer(players, { query: { name: 'Bo' } });
+  const bo = await openTestPlayer(players, { query: { name: 'Bo', look: '5' } });
   await joinRoom(bo.page, 'HAPPY2');
   await untilList(host.page, ['Ada (host) (you)', 'Bo'], 10_000);
   await sectionShot(host.page, host.page.locator('.room-panel'), 'room-panel.png');
+});
+
+test('Phase 6 AC13.3, AC13.7: a guest changes look and name in its pause menu; the list shows heads', async ({
+  players,
+}) => {
+  const host = await pausedHost(players, 'Ada');
+  const code = await hostRoom(host.page);
+  const bo = await menuPlayer(players, 'Bo', {}, { look: '3' });
+  await joinRoom(bo.page, code);
+  await bo.page.locator('.pause-screen:not(.hidden)').waitFor();
+  await untilList(host.page, ['Ada (host) (you)', 'Bo']);
+  // AC13.7: every row has the head icon of its player's look.
+  const heads = (page: typeof host.page): Promise<string[]> =>
+    page
+      .locator('.room-panel .room-player .head-icon')
+      .evaluateAll((nodes) => nodes.map((n) => (n as HTMLElement).dataset.look ?? ''));
+  await expect.poll(() => heads(host.page)).toEqual(['1', '3']);
+  await expect.poll(() => heads(bo.page)).toEqual(['1', '3']);
+  const boId = (await netOf(bo.page)).selfId;
+  const tagDraws = async (): Promise<number> =>
+    (await netOf(host.page)).players.find((p) => p.id === boId)?.tagDraws ?? 0;
+  await untilNet(host.page, (n) => n.players.some((p) => p.id === boId));
+  const drawsBefore = await tagDraws();
+  // AC13.3: Bo picks another look and types another name in the pause menu's settings.
+  await bo.page.getByRole('button', { name: 'Look: River' }).click();
+  const field = bo.page.locator('#player-section-name');
+  await field.fill('Bodo');
+  await field.press('Enter');
+  const changed = Date.now();
+  await untilNet(
+    host.page,
+    (n) => n.players.some((p) => p.id === boId && p.name === 'Bodo' && p.look === 4),
+    2000,
+  );
+  expect(Date.now() - changed).toBeLessThan(2000);
+  await untilList(host.page, ['Ada (host) (you)', 'Bodo']);
+  await expect.poll(() => heads(host.page)).toEqual(['1', '4']);
+  await expect.poll(tagDraws).toBeGreaterThan(drawsBefore);
+  await untilList(bo.page, ['Ada (host)', 'Bodo (you)']);
 });
