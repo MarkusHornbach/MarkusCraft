@@ -21,6 +21,7 @@ import {
 import { BLOCK_SOLID, Block } from '../world/blocks';
 import { wrapTime } from '../world/dayNight';
 import { breakTimeMs } from '../items/hardness';
+import { lookForKey } from '../player/looks';
 import type { MoveMode } from '../player/player';
 import { type GuestEntry, limitGuests } from '../save/saveFormat';
 import type { World } from '../world/World';
@@ -45,7 +46,14 @@ import type { Connection } from './transport';
 /** Something that happened to the other players, for notices and the player list. */
 export type PeerEvent =
   | { kind: 'joined'; id: number; name: string; slot: number }
-  | { kind: 'left'; id: number; name: string; reason: LeftReason };
+  | { kind: 'left'; id: number; name: string; reason: LeftReason }
+  | { kind: 'profile'; id: number; name: string; look: number };
+
+/** The flags of a player's pose: flying, and holding break on a block. */
+export interface PoseFlags {
+  fly: boolean;
+  busy: boolean;
+}
 
 export interface HostListener extends SessionListener {
   onPeer(event: PeerEvent): void;
@@ -63,6 +71,10 @@ export interface HostOptions {
   hostRecord: PlayerRecord;
   /** The host's own player, read whenever its pose matters. */
   hostPose: () => NetPose;
+  /** The look of the host's figure (1–8); from the key if not given. */
+  hostLook?: number;
+  /** Whether the host's player flies and holds break; read like its pose. */
+  hostFlags?: () => PoseFlags;
   time: number;
   frozen: boolean;
   /**
@@ -90,10 +102,14 @@ interface Member {
   id: number;
   name: string;
   slot: number;
+  look: number;
   key: string;
   conn: Connection | null;
   record: PlayerRecord;
   pose: NetPose;
+  /** Flying and holding break, relayed with the pose. */
+  fly: boolean;
+  busy: boolean;
   moveMode: MoveMode;
   /** Raised with every new pose; the version of the last teleport. */
   poseVersion: number;
@@ -193,11 +209,14 @@ export class HostSession {
       id: 1,
       name: normalizePlayerName(options.hostName, parseInt(options.hostKey.slice(0, 4), 16) || 0),
       slot: 0,
+      look: options.hostLook ?? lookForKey(options.hostKey),
       key: options.hostKey,
       conn: null,
       // A break measured on the single-player clock means nothing on the room's clock.
       record: { ...options.hostRecord, breaking: null },
       pose: options.hostPose(),
+      fly: false,
+      busy: false,
       moveMode: 'walk',
       poseVersion: 1,
       tpVersion: 1,
@@ -234,15 +253,41 @@ export class HostSession {
   }
 
   /** Everyone in the room, the host first. */
-  players(): { id: number; name: string; slot: number; host: boolean; pose: NetPose }[] {
+  players(): (PlayerInfo & PoseFlags)[] {
     this.refreshHostPose();
     return [...this.members.values()].map((m) => ({
       id: m.id,
       name: m.name,
       slot: m.slot,
+      look: m.look,
       host: m === this.self,
       pose: { ...m.pose },
+      fly: m.fly,
+      busy: m.busy,
     }));
+  }
+
+  /**
+   * The host's own name or look changed: every guest learns it (`profile`). The name gets
+   * a suffix if a guest has it.
+   */
+  setHostProfile(name: string, look: number): void {
+    if (this.closed) return;
+    this.applyProfile(this.self, name, look);
+  }
+
+  private applyProfile(member: Member, wanted: string, look: number): void {
+    const taken = [...this.members.values()].filter((m) => m !== member).map((m) => m.name);
+    const digits = parseInt(member.key.slice(0, 4), 16) || 0;
+    const name = uniqueName(normalizePlayerName(wanted, digits), taken);
+    member.name = name;
+    member.look = look;
+    if (member !== this.self) this.roster.setProfile(member.id, name, look);
+    // Also to the sender: it learns the name the room uses.
+    for (const other of this.members.values()) {
+      if (other.conn) this.send(other, { t: 'profile', id: member.id, name, look });
+    }
+    this.o.listener.onPeer({ kind: 'profile', id: member.id, name, look });
   }
 
   /**
@@ -406,7 +451,11 @@ export class HostSession {
         break;
       case 'pose':
         if (this.o.mode === 'creative') member.moveMode = message.fly ? 'fly' : 'walk';
-        this.receivePose(member, message, message.tp, now);
+        this.receivePose(member, message, message.tp, message, now);
+        break;
+      case 'profile':
+        // A change of name or look counts like an action; beyond the limit it is dropped.
+        if (!this.overRate(member, now)) this.applyProfile(member, message.name, message.look);
         break;
       case 'ping':
         this.send(member, {
@@ -474,10 +523,10 @@ export class HostSession {
       return;
     }
     this.strangers.delete(conn);
-    this.admit(conn, message.key, message.name, now);
+    this.admit(conn, message.key, message.name, message.look, now);
   }
 
-  private admit(conn: Connection, key: string, wanted: string, now: number): void {
+  private admit(conn: Connection, key: string, wanted: string, look: number, now: number): void {
     const taken = [...this.members.values()].map((m) => m.name);
     const digits = parseInt(key.slice(0, 4), 16);
     const name = uniqueName(normalizePlayerName(wanted, digits), taken);
@@ -495,10 +544,13 @@ export class HostSession {
       id: this.nextId++,
       name,
       slot,
+      look,
       key,
       conn,
       record,
       pose,
+      fly: moveMode === 'fly',
+      busy: false,
       moveMode,
       poseVersion: 1,
       tpVersion: 1,
@@ -514,6 +566,7 @@ export class HostSession {
       id: m.id,
       name: m.name,
       slot: m.slot,
+      look: m.look,
       host: m === this.self,
       pose: { ...m.pose },
     }));
@@ -545,9 +598,10 @@ export class HostSession {
     this.send(member, { t: 'ready' });
     for (const other of this.members.values()) {
       if (other !== member && other.conn)
-        this.send(other, { t: 'joined', id: member.id, name, slot });
+        this.send(other, { t: 'joined', id: member.id, name, slot, look });
     }
-    this.roster.add(member.id, name, slot, false, pose, now);
+    this.roster.add(member.id, name, slot, look, false, pose, now);
+    this.roster.setFlags(member.id, member.fly, false);
     this.o.listener.onPeer({ kind: 'joined', id: member.id, name, slot });
   }
 
@@ -629,6 +683,7 @@ export class HostSession {
         this.reader.noteEdit(c.x, c.y, c.z, c.id);
       }
       if (result.blocks.length > 0) {
+        if (member !== this.self) this.roster.noteEdit(member.id);
         this.sendBlocks(result.blocks, member.id);
         this.o.listener.onBlocks(result.blocks);
       }
@@ -698,24 +753,38 @@ export class HostSession {
 
   // --- poses -----------------------------------------------------------------------------
 
-  private receivePose(member: Member, raw: NetPose, teleport: boolean, now: number): void {
+  private receivePose(
+    member: Member,
+    raw: NetPose,
+    teleport: boolean,
+    flags: PoseFlags,
+    now: number,
+  ): void {
     const pose = validPose(raw);
     if (!pose) return;
     const p: NetPose = { x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw, pitch: pose.pitch };
-    if (samePose(p, member.pose) && !teleport) return;
+    const sameFlags = flags.fly === member.fly && flags.busy === member.busy;
+    if (samePose(p, member.pose) && sameFlags && !teleport) return;
     member.pose = p;
+    member.fly = flags.fly;
+    member.busy = flags.busy;
     member.poseVersion++;
     if (teleport) member.tpVersion = member.poseVersion;
     this.roster.push(member.id, p, now, teleport);
+    this.roster.setFlags(member.id, flags.fly, flags.busy);
     // A host without frames relays from here.
     this.relay(now);
   }
 
   private refreshHostPose(): void {
     const pose = this.o.hostPose();
-    if (samePose(pose, this.self.pose)) return;
-    this.self.pose = { x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw, pitch: pose.pitch };
-    this.self.poseVersion++;
+    const flags = this.o.hostFlags?.() ?? { fly: false, busy: false };
+    const self = this.self;
+    if (samePose(pose, self.pose) && flags.fly === self.fly && flags.busy === self.busy) return;
+    self.pose = { x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw, pitch: pose.pitch };
+    self.fly = flags.fly;
+    self.busy = flags.busy;
+    self.poseVersion++;
   }
 
   /** Changed poses to every guest, at most `POSE_SEND_HZ` times a second, never back. */
@@ -730,7 +799,13 @@ export class HostSession {
         if (from === to) continue;
         const sent = to.sent.get(from.id) ?? 0;
         if (from.poseVersion <= sent) continue;
-        poses.push({ id: from.id, ...from.pose, tp: from.tpVersion > sent });
+        poses.push({
+          id: from.id,
+          ...from.pose,
+          tp: from.tpVersion > sent,
+          fly: from.fly,
+          busy: from.busy,
+        });
         to.sent.set(from.id, from.poseVersion);
       }
       if (poses.length > 0) this.send(to, { t: 'poses', poses });

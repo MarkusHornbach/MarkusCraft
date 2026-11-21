@@ -4,6 +4,7 @@ import type { GameMode, ItemStack } from '../actions/playerRecord';
 import type { BenchResult } from '../bench/benchReport';
 import type { Network } from '../net/transport';
 import type { RoomList } from './multiplayer';
+import type { FigureAngles } from '../player/figureMotion';
 import type { MoveMode } from '../player/player';
 import type { NetTestState } from '../ui/NetTestScreen';
 
@@ -54,6 +55,8 @@ export interface GameState {
      * is open), so that tests of earlier phases that compare `ui` as a whole still match.
      */
     focus?: string;
+    /** The preview of "Your player": frames it drew; null while it does not exist. */
+    preview: { frames: number } | null;
   };
   /**
    * Every recipe in the order of the recipe list (craftable ones first): whether it can
@@ -102,8 +105,13 @@ export interface GameState {
       id: number;
       name: string;
       slot: number;
+      /** The figure's look (1–8, Part D). */
+      look: number;
       self: boolean;
       host: boolean;
+      /** Flying, and holding break on a block (relayed with the pose). */
+      fly: boolean;
+      busy: boolean;
       x: number;
       y: number;
       z: number;
@@ -113,6 +121,10 @@ export interface GameState {
       renderY: number;
       renderZ: number;
       renderYaw: number;
+      /** The angles the figure was drawn with in the last frame; null if it is not drawn. */
+      anim: FigureAngles | null;
+      /** How often the figure's name tag was drawn (a new name draws it again). */
+      tagDraws: number;
     }[];
     /** Round trip of the last ping to the host (guests only). */
     rttMs: number | null;
@@ -128,6 +140,13 @@ export interface GameState {
     test: NetTestState | null;
   };
   player: {
+    /**
+     * "Your player" (Phase 6 part D): the name as typed, the stored choice of look
+     * (0 Automatic, 1–8) and the look it resolves to.
+     */
+    name: string;
+    choice: number;
+    look: number;
     x: number;
     y: number;
     z: number;
@@ -270,6 +289,8 @@ export interface TestApi {
   suspendFrames(on: boolean): void;
   /** Shows the sheet of all controller glyphs over the game (reference screenshot). */
   glyphSheet(): void;
+  /** Shows every look from the front and the back over the game (reference screenshot). */
+  figureSheet(): void;
   /** Advance exactly `n` fixed simulation steps and render once. */
   step(n: number): void;
 }

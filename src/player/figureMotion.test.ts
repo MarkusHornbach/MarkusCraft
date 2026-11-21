@@ -27,6 +27,7 @@ class Rig {
     fly: false,
     busy: false,
     edits: 0,
+    snaps: 0,
   };
 
   frame(ms = FRAME_MS): FigureAngles {
@@ -111,6 +112,17 @@ describe('figure motion: walking', () => {
       rig.walk(start, WALK_SPEED, 0.4);
       for (let t = 0; t < 200 - 1e-6; t += FRAME_MS) rig.frame();
       for (const limb of LIMBS) expect(Math.abs(rig.out[limb])).toBeLessThan(0.01);
+    }
+  });
+
+  it('a teleport (a snap of the drawn pose) gives no swing either', () => {
+    const rig = new Rig();
+    rig.frame();
+    rig.input.x += 3;
+    rig.input.snaps = 1;
+    for (let i = 0; i < 30; i++) {
+      const a = rig.frame();
+      for (const limb of LIMBS) expect(a[limb]).toBe(0);
     }
   });
 

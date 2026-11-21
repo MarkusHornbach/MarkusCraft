@@ -33,6 +33,7 @@ import { DebugOverlay } from '../ui/DebugOverlay';
 import { FocusManager } from '../ui/FocusManager';
 import type { PadHint } from '../ui/PadHints';
 import { glyphSheet } from '../ui/padGlyphs';
+import { figureSheet } from '../ui/figureIcons';
 import { Hud } from '../ui/Hud';
 import { InventoryScreen } from '../ui/InventoryScreen';
 import { type InputMode, PauseScreen, SAVE_FAILED_TEXT } from '../ui/PauseScreen';
@@ -317,6 +318,7 @@ export class Game {
     this.netConfig = readNetConfig(window.location.search);
     this.mp = this.createMultiplayer();
     if (params.name) this.mp.setName(params.name);
+    if (params.look !== null) this.mp.setLook(params.look);
     this.time = params.time;
     this.world = new World(0);
 
@@ -932,12 +934,15 @@ export class Game {
       selfId: this.mp.selfId,
       players: this.mp.players(own).map((player) => {
         const drawn = player.self ? null : this.drawnPose(player.id);
+        const figure = player.self ? null : this.renderer.remotePlayers.state(player.id);
         return {
           ...player,
           renderX: drawn ? drawn.x : player.x,
           renderY: drawn ? drawn.y : player.y,
           renderZ: drawn ? drawn.z : player.z,
           renderYaw: drawn ? drawn.yaw : player.yaw,
+          anim: figure?.anim ?? null,
+          tagDraws: figure?.tagDraws ?? 0,
         };
       }),
       rttMs: this.mp.client?.rttMs ?? null,
@@ -956,12 +961,34 @@ export class Game {
     const now = performance.now();
     this.renderer.remotePlayers.update(
       roster
-        ? roster
-            .list()
-            .map((p) => ({ id: p.id, name: p.name, slot: p.slot, pose: p.poses.sample(now) }))
+        ? roster.list().map((p) => ({
+            id: p.id,
+            name: p.name,
+            slot: p.slot,
+            look: p.look,
+            pose: p.poses.sample(now),
+            fly: p.fly,
+            busy: p.busy,
+            edits: p.edits,
+            snaps: p.poses.snapsAt(now),
+          }))
         : [],
       (x, y, z) => this.lightAt(x, y, z),
+      now,
     );
+  }
+
+  /** The preview of "Your player" for the test API. */
+  private previewState(): { frames: number } | null {
+    return null;
+  }
+
+  /**
+   * The player holds break on a block it aims at (the others' figure swings its arm): a
+   * break in progress in Gathering, the held button in Creative.
+   */
+  private holdingBreak(): boolean {
+    return !this.paused && this.target !== null && this.input.isHeld('break');
   }
 
   /** Where another player is drawn now, or null if it is not drawn. */
@@ -982,6 +1009,7 @@ export class Game {
         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
       },
       flying: () => this.player.mode === 'fly',
+      busy: () => this.holdingBreak(),
       actionClock: () => this.nowMs(),
       guests: () => this.meta?.guests ?? [],
       keepGuests: (guests) => {
@@ -2503,6 +2531,7 @@ export class Game {
         screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play',
         tab: this.inventoryOpen ? this.inventoryScreen.currentTab : null,
         ...(this.focus.description !== null ? { focus: this.focus.description } : {}),
+        preview: this.previewState(),
       },
       recipes: this.recipeStatuses().map((status) => ({
         id: status.id,
@@ -2515,6 +2544,9 @@ export class Game {
       bench: this.benchState(),
       net: this.netState(),
       player: {
+        name: this.mp.identity.name,
+        choice: this.mp.identity.look,
+        look: this.mp.look,
         x: p.x,
         y: p.y,
         z: p.z,
@@ -2642,6 +2674,9 @@ export class Game {
         this.netConfig.signal ? this.loadNetwork(this.netConfig.iceServers) : Promise.resolve(null),
       glyphSheet: () => {
         if (!this.root.querySelector('.pad-glyph-sheet')) this.root.appendChild(glyphSheet());
+      },
+      figureSheet: () => {
+        if (!this.root.querySelector('.figure-sheet')) this.root.appendChild(figureSheet());
       },
       net: {
         host: (options) => this.mp.openRoom(options),

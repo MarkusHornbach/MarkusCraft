@@ -7,6 +7,8 @@ interface TimedPose extends NetPose {
   atMs: number;
   /** The player jumped here (teleport or a long way): no blending into this pose. */
   snap: boolean;
+  /** Snaps received up to this pose, this one included. */
+  snaps: number;
 }
 
 /** Poses kept per player: enough for the delay at 20 per second, with room for jitter. */
@@ -36,7 +38,9 @@ export class PoseBuffer {
         SNAP_DISTANCE * SNAP_DISTANCE;
     // Poses never go back in time, even if the clock was adjusted.
     const at = last ? Math.max(atMs, last.atMs) : atMs;
-    this.poses.push({ ...pose, atMs: at, snap: teleport || far || last === undefined });
+    const snap = teleport || far || last === undefined;
+    const snaps = (last?.snaps ?? 0) + (snap ? 1 : 0);
+    this.poses.push({ ...pose, atMs: at, snap, snaps });
     if (this.poses.length > KEEP) this.poses.shift();
   }
 
@@ -44,6 +48,20 @@ export class PoseBuffer {
   get latest(): NetPose | null {
     const last = this.poses[this.poses.length - 1];
     return last ? strip(last) : null;
+  }
+
+  /**
+   * How many snaps the pose drawn at `nowMs` has gone through: a figure counts a change
+   * as a jump, not as movement.
+   */
+  snapsAt(nowMs: number): number {
+    const t = nowMs - INTERP_DELAY_MS;
+    let snaps = this.poses[0]?.snaps ?? 0;
+    for (const p of this.poses) {
+      if (p.atMs > t) break;
+      snaps = p.snaps;
+    }
+    return snaps;
   }
 
   /** The pose to draw at `nowMs`, or null before the first pose. */
@@ -80,8 +98,15 @@ export interface RemotePlayer {
   id: number;
   name: string;
   slot: number;
+  /** The figure's look (1–8). */
+  look: number;
   host: boolean;
   poses: PoseBuffer;
+  /** As last received: flying, and holding break on a block. */
+  fly: boolean;
+  busy: boolean;
+  /** Block changes this player caused (the figure swings its arm for each). */
+  edits: number;
 }
 
 /** The other players of a room, with their pose buffers. */
@@ -93,13 +118,35 @@ export class RemoteRoster {
     id: number,
     name: string,
     slot: number,
+    look: number,
     host: boolean,
     pose: NetPose | null,
     atMs: number,
   ): void {
     const poses = new PoseBuffer();
     if (pose) poses.push(pose, atMs, true);
-    this.players.set(id, { id, name, slot, host, poses });
+    this.players.set(id, { id, name, slot, look, host, poses, fly: false, busy: false, edits: 0 });
+  }
+
+  /** A new name or look (`profile`). */
+  setProfile(id: number, name: string, look: number): void {
+    const player = this.players.get(id);
+    if (!player) return;
+    player.name = name;
+    player.look = look;
+  }
+
+  setFlags(id: number, fly: boolean, busy: boolean): void {
+    const player = this.players.get(id);
+    if (!player) return;
+    player.fly = fly;
+    player.busy = busy;
+  }
+
+  /** The player changed blocks. */
+  noteEdit(id: number): void {
+    const player = this.players.get(id);
+    if (player) player.edits++;
   }
 
   remove(id: number): RemotePlayer | null {

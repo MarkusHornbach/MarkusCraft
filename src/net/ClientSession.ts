@@ -70,6 +70,8 @@ export interface ClientOptions {
   build: string;
   key: string;
   name: string;
+  /** The figure's look (1–8). */
+  look: number;
   code: string;
   randomBytes: (count: number) => ArrayLike<number>;
   clock: () => number;
@@ -99,6 +101,9 @@ export class ClientSession implements Session {
   selfId: number | null = null;
   selfName: string | null = null;
   selfSlot = 0;
+  /** The name and look this guest asks for (`hello`, `profile`). */
+  private name: string;
+  private look: number;
   /** The last round trip of a ping, or null before the first pong. */
   rttMs: number | null = null;
   private readonly o: ClientOptions;
@@ -122,6 +127,7 @@ export class ClientSession implements Session {
   private frozenTime = false;
   private lastPose: NetPose | null = null;
   private lastFly = false;
+  private lastBusy = false;
   private lastPoseMs = -Infinity;
   private pendingTeleport = false;
   /** The host's last answer, also to messages no `submit` sent (tests of the host). */
@@ -131,6 +137,13 @@ export class ClientSession implements Session {
 
   constructor(options: ClientOptions) {
     this.o = options;
+    this.name = options.name;
+    this.look = options.look;
+  }
+
+  /** The figure's look as this guest sent it. */
+  get selfLook(): number {
+    return this.look;
   }
 
   get code(): string {
@@ -204,7 +217,13 @@ export class ClientSession implements Session {
       conn.onMessage = (text) => this.receive(conn, text);
       conn.onClose = () => this.connectionClosed(conn);
       this.lastHeardMs = this.o.clock();
-      this.send({ t: 'hello', build: this.o.build, key: this.o.key, name: this.o.name });
+      this.send({
+        t: 'hello',
+        build: this.o.build,
+        key: this.o.key,
+        name: this.name,
+        look: this.look,
+      });
     });
   }
 
@@ -238,10 +257,20 @@ export class ClientSession implements Session {
   }
 
   /**
-   * The own pose and whether the player flies; sent at most `POSE_SEND_HZ` times a second
-   * and only when it changed.
+   * A new name or look: the host tells everyone (and answers with the name the room uses).
+   * Kept for a `hello` after a reconnect.
    */
-  setPose(pose: NetPose, nowMs: number, teleport = false, fly = false): void {
+  setProfile(name: string, look: number): void {
+    this.name = name;
+    this.look = look;
+    if (this.status === 'online') this.send({ t: 'profile', name, look });
+  }
+
+  /**
+   * The own pose, whether the player flies and whether it holds break on a block; sent at
+   * most `POSE_SEND_HZ` times a second and only when it changed.
+   */
+  setPose(pose: NetPose, nowMs: number, teleport = false, fly = false, busy = false): void {
     if (teleport) this.pendingTeleport = true;
     if (this.status !== 'online') return;
     const last = this.lastPose;
@@ -252,13 +281,15 @@ export class ClientSession implements Session {
       last.z !== pose.z ||
       last.yaw !== pose.yaw ||
       last.pitch !== pose.pitch ||
-      this.lastFly !== fly;
+      this.lastFly !== fly ||
+      this.lastBusy !== busy;
     if (!changed && !this.pendingTeleport) return;
     if (nowMs - this.lastPoseMs < 1000 / POSE_SEND_HZ - 0.5) return;
     this.lastPose = { x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw, pitch: pose.pitch };
     this.lastFly = fly;
+    this.lastBusy = busy;
     this.lastPoseMs = nowMs;
-    this.send({ t: 'pose', ...this.lastPose, tp: this.pendingTeleport, fly });
+    this.send({ t: 'pose', ...this.lastPose, tp: this.pendingTeleport, fly, busy });
     this.pendingTeleport = false;
     this.posesSent++;
   }
@@ -369,16 +400,19 @@ export class ClientSession implements Session {
           });
         }
         for (const c of changes) this.world?.setBlock(c.x, c.y, c.z, c.id);
+        if (m.by !== this.selfId) this.roster.noteEdit(m.by);
         this.o.listener.onBlocks(changes);
         break;
       }
       case 'poses':
         for (const p of m.poses) {
-          if (p.id !== this.selfId) this.roster.push(p.id, p, now, p.tp);
+          if (p.id === this.selfId) continue;
+          this.roster.push(p.id, p, now, p.tp);
+          this.roster.setFlags(p.id, p.fly, p.busy);
         }
         break;
       case 'joined':
-        this.roster.add(m.id, m.name, m.slot, false, null, now);
+        this.roster.add(m.id, m.name, m.slot, m.look, false, null, now);
         this.o.listener.onPeer({ kind: 'joined', id: m.id, name: m.name, slot: m.slot });
         break;
       case 'left': {
@@ -387,6 +421,15 @@ export class ClientSession implements Session {
           this.o.listener.onPeer({ kind: 'left', id: m.id, name: gone.name, reason: m.reason });
         break;
       }
+      case 'profile':
+        if (m.id === this.selfId) {
+          this.selfName = m.name;
+          this.look = m.look;
+        } else {
+          this.roster.setProfile(m.id, m.name, m.look);
+        }
+        this.o.listener.onPeer({ kind: 'profile', id: m.id, name: m.name, look: m.look });
+        break;
       case 'pong':
         this.rttMs = now - m.ts;
         this.adoptTime(m.time, m.frozen, now);
@@ -426,7 +469,9 @@ export class ClientSession implements Session {
         this.current = welcome.record;
         this.pending.clear();
         this.roster.clear();
-        for (const p of welcome.players) this.roster.add(p.id, p.name, p.slot, p.host, p.pose, now);
+        for (const p of welcome.players) {
+          this.roster.add(p.id, p.name, p.slot, p.look, p.host, p.pose, now);
+        }
         this.adoptTime(welcome.time, welcome.frozen, now);
         this.lastPose = null;
         this.lastPingMs = -Infinity;

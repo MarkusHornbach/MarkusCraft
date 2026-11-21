@@ -15,6 +15,7 @@ import {
   WORLD_HEIGHT,
   WORLD_NAME_MAX,
 } from '../game/config';
+import { LOOK_COUNT } from '../player/looks';
 import type { MoveMode } from '../player/player';
 import { decodePlayer, encodePlayer } from '../save/saveFormat';
 import { isPlayerKey } from './roomCode';
@@ -28,11 +29,15 @@ export interface NetPose {
   pitch: number;
 }
 
-/** A player as the others know it. `id` is given by the host; `slot` is the colour (0–3). */
+/**
+ * A player as the others know it. `id` is given by the host; `slot` is the colour (0–3);
+ * `look` the figure's look (1–8, Part D).
+ */
 export interface PlayerInfo {
   id: number;
   name: string;
   slot: number;
+  look: number;
   host: boolean;
   pose: NetPose;
 }
@@ -74,17 +79,23 @@ export interface Welcome {
   parts: number;
 }
 
-/** A pose as relayed: with the player's id and whether it jumped there. */
+/**
+ * A pose as relayed: with the player's id, whether it jumped there, flies, and holds break
+ * on a block (Part D).
+ */
 export interface RelayedPose extends NetPose {
   id: number;
   tp: boolean;
+  fly: boolean;
+  busy: boolean;
 }
 
 export type GuestMessage =
   | { t: 'info' }
-  | { t: 'hello'; build: string; key: string; name: string }
+  | { t: 'hello'; build: string; key: string; name: string; look: number }
   | { t: 'action'; seq: number; action: Action }
-  | ({ t: 'pose'; tp: boolean; fly: boolean } & NetPose)
+  | ({ t: 'pose'; tp: boolean; fly: boolean; busy: boolean } & NetPose)
+  | { t: 'profile'; name: string; look: number }
   | { t: 'ping'; ts: number }
   | { t: 'bye' };
 
@@ -102,7 +113,8 @@ export type HostMessage =
   | { t: 'record'; record: PlayerRecord }
   | { t: 'blocks'; by: number; changes: number[] }
   | { t: 'poses'; poses: RelayedPose[] }
-  | { t: 'joined'; id: number; name: string; slot: number }
+  | { t: 'joined'; id: number; name: string; slot: number; look: number }
+  | { t: 'profile'; id: number; name: string; look: number }
   | { t: 'left'; id: number; reason: LeftReason }
   | { t: 'pong'; ts: number; time: number; frozen: boolean }
   | { t: 'bye' };
@@ -197,12 +209,17 @@ export function validPose(p: NetPose): NetPose | null {
   return { ...p, pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, p.pitch)) };
 }
 
+function look(m: Fields): number {
+  return int(m, 'look', 1, LOOK_COUNT);
+}
+
 function playerInfo(value: unknown): PlayerInfo {
   const m = obj(value, 'player');
   return {
     id: int(m, 'id', 0, ID_MAX),
     name: str(m, 'name', NAME_LENGTH, 1),
     slot: int(m, 'slot', 0, NET_MAX_PLAYERS - 1),
+    look: look(m),
     host: bool(m, 'host'),
     pose: pose(obj(m.pose, 'pose')),
   };
@@ -267,15 +284,24 @@ export function decodeGuestMessage(text: unknown): Decoded<GuestMessage> {
           build: str(m, 'build', BUILD_LENGTH, 1),
           key,
           name: str(m, 'name', 64),
+          look: look(m),
         };
       }
+      case 'profile':
+        return { t: 'profile', name: str(m, 'name', 64), look: look(m) };
       case 'action': {
         const action = decodeAction(m.action);
         if (!action.ok) fail(`action: ${action.error}`);
         return { t: 'action', seq: int(m, 'seq', 0, ID_MAX), action: action.action };
       }
       case 'pose':
-        return { t: 'pose', ...pose(m), tp: bool(m, 'tp'), fly: bool(m, 'fly') };
+        return {
+          t: 'pose',
+          ...pose(m),
+          tp: bool(m, 'tp'),
+          fly: bool(m, 'fly'),
+          busy: bool(m, 'busy'),
+        };
       case 'ping':
         return { t: 'ping', ts: num(m, 'ts', -TIME_MAX, TIME_MAX) };
       default:
@@ -382,7 +408,13 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
           t: 'poses',
           poses: arr(m, 'poses', NET_MAX_PLAYERS).map((value) => {
             const p = obj(value, 'pose');
-            return { id: int(p, 'id', 0, ID_MAX), ...pose(p), tp: bool(p, 'tp') };
+            return {
+              id: int(p, 'id', 0, ID_MAX),
+              ...pose(p),
+              tp: bool(p, 'tp'),
+              fly: bool(p, 'fly'),
+              busy: bool(p, 'busy'),
+            };
           }),
         };
       case 'joined':
@@ -391,6 +423,14 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
           id: int(m, 'id', 0, ID_MAX),
           name: str(m, 'name', NAME_LENGTH, 1),
           slot: int(m, 'slot', 0, NET_MAX_PLAYERS - 1),
+          look: look(m),
+        };
+      case 'profile':
+        return {
+          t: 'profile',
+          id: int(m, 'id', 0, ID_MAX),
+          name: str(m, 'name', NAME_LENGTH, 1),
+          look: look(m),
         };
       case 'left': {
         const reason = (['leave', 'lost'] as const).find((r) => r === m.reason);

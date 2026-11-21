@@ -16,10 +16,11 @@ const RECORD = { ...createPlayerRecord('creative'), selectedSlot: 3 };
 
 const GUEST: GuestMessage[] = [
   { t: 'info' },
-  { t: 'hello', build: 'abc1234', key: KEY, name: 'Anna' },
+  { t: 'hello', build: 'abc1234', key: KEY, name: 'Anna', look: 3 },
   { t: 'action', seq: 7, action: { kind: 'place', x: 1, y: 2, z: 3, slot: 4 } },
-  { t: 'pose', ...POSE, tp: true, fly: false },
-  { t: 'pose', ...POSE, tp: false, fly: true },
+  { t: 'pose', ...POSE, tp: true, fly: false, busy: false },
+  { t: 'pose', ...POSE, tp: false, fly: true, busy: true },
+  { t: 'profile', name: 'Anna B', look: 8 },
   { t: 'ping', ts: 1234.5 },
   { t: 'bye' },
 ];
@@ -39,7 +40,7 @@ const HOST: HostMessage[] = [
     checksum: 123456789,
     time: 0.25,
     frozen: true,
-    players: [{ id: 1, name: 'Ben', slot: 0, host: true, pose: POSE }],
+    players: [{ id: 1, name: 'Ben', slot: 0, look: 1, host: true, pose: POSE }],
     record: { ...RECORD, breaking: { x: 1, y: 2, z: 3, startMs: 40 } },
     pose: POSE,
     moveMode: 'fly',
@@ -52,14 +53,15 @@ const HOST: HostMessage[] = [
   { t: 'result', seq: 5, ok: false, reason: 'rate' },
   { t: 'record', record: RECORD },
   { t: 'blocks', by: 1, changes: [1, 2, 3, 0, -5, 127, 9, 19] },
-  { t: 'poses', poses: [{ id: 2, ...POSE, tp: false }] },
-  { t: 'joined', id: 3, name: 'Cleo', slot: 2 },
+  { t: 'poses', poses: [{ id: 2, ...POSE, tp: false, fly: true, busy: false }] },
+  { t: 'joined', id: 3, name: 'Cleo', slot: 2, look: 5 },
+  { t: 'profile', id: 3, name: 'Cleo (2)', look: 2 },
   { t: 'left', id: 3, reason: 'lost' },
   { t: 'pong', ts: 1234.5, time: 0.75, frozen: false },
   { t: 'bye' },
 ];
 
-describe('protocol (Phase 6 AC3.1)', () => {
+describe('protocol (Phase 6 AC3.1, AC12.1)', () => {
   it('every guest message survives encode → decode', () => {
     for (const message of GUEST) {
       expect(decodeGuestMessage(encodeMessage(message))).toEqual({ ok: true, message });
@@ -111,6 +113,44 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
     expect(bad(JSON.stringify({ t: 'pong', ts: 1, time: 1.5, frozen: false }), false)).toBe(true);
   });
 
+  it('Phase 6 AC12.1: refuses invalid looks, flags and profiles', () => {
+    const hello = { t: 'hello', build: 'b', key: KEY, name: 'a' };
+    for (const look of [0, 9, 2.5, -1, '3', null]) {
+      expect(bad(JSON.stringify({ ...hello, look }))).toBe(true);
+      expect(bad(JSON.stringify({ t: 'profile', name: 'a', look }))).toBe(true);
+      expect(bad(JSON.stringify({ t: 'joined', id: 1, name: 'n', slot: 0, look }), false)).toBe(
+        true,
+      );
+      expect(bad(JSON.stringify({ t: 'profile', id: 1, name: 'n', look }), false)).toBe(true);
+    }
+    expect(bad(JSON.stringify(hello))).toBe(true);
+    for (const flag of [1, 'true', null]) {
+      expect(bad(JSON.stringify({ t: 'pose', ...POSE, tp: false, fly: false, busy: flag }))).toBe(
+        true,
+      );
+      expect(bad(JSON.stringify({ t: 'pose', ...POSE, tp: false, fly: flag, busy: false }))).toBe(
+        true,
+      );
+      const relayed = { id: 2, ...POSE, tp: false, fly: false, busy: false };
+      expect(bad(JSON.stringify({ t: 'poses', poses: [{ ...relayed, busy: flag }] }), false)).toBe(
+        true,
+      );
+      expect(bad(JSON.stringify({ t: 'poses', poses: [{ ...relayed, fly: flag }] }), false)).toBe(
+        true,
+      );
+    }
+    // Names: a string of at most 64 characters from a guest; 1–24 from the host.
+    for (const name of [42, null, 'x'.repeat(65)]) {
+      expect(bad(JSON.stringify({ t: 'profile', name, look: 1 }))).toBe(true);
+    }
+    for (const name of ['', 'x'.repeat(25), 7]) {
+      expect(bad(JSON.stringify({ t: 'profile', id: 1, name, look: 1 }), false)).toBe(true);
+    }
+    const welcomePlayer = { id: 1, name: 'Ben', slot: 0, host: true, pose: POSE };
+    const welcome = HOST.find((m) => m.t === 'welcome');
+    expect(bad(JSON.stringify({ ...welcome, players: [welcomePlayer] }), false)).toBe(true);
+  });
+
   it('refuses oversized messages', () => {
     const name = 'a'.repeat(MAX_MESSAGE_BYTES);
     expect(bad(JSON.stringify({ t: 'hello', build: 'b', key: KEY, name }))).toBe(true);
@@ -152,6 +192,8 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
       '0.5',
       '"welcome"',
       '"action"',
+      '"profile"',
+      '"look"',
     ];
     for (let i = 0; i < 10_000; i++) {
       let text = '';

@@ -181,7 +181,9 @@ describe('admission (Phase 6 AC4.5)', () => {
     });
     expect(rig2.host.playerCount).toBe(2);
     // A hello of another build at the same room.
-    conn.send(JSON.stringify({ t: 'hello', build: 'zzz', key: '0'.repeat(32), name: 'x' }));
+    conn.send(
+      JSON.stringify({ t: 'hello', build: 'zzz', key: '0'.repeat(32), name: 'x', look: 1 }),
+    );
     await rig2.run(100);
     expect(JSON.parse(received[1])).toEqual({ t: 'reject', reason: 'build' });
     // A connection that never says hello is closed after the join timeout.

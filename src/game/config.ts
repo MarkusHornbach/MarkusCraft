@@ -393,5 +393,5 @@ export const FIGURE_HEAD_YAW_MAX = Math.PI / 4;
 export const FIGURE_SWING_MS = 300;
 /** Largest angle of that swing. */
 export const FIGURE_SWING_ANGLE = 1.1;
-/** How far ahead of the frame before a figure's time may jump before it counts as a pause. */
-export const FIGURE_MAX_FRAME_MS = 100;
+/** A longer gap between two frames (a hidden tab) counts as this long for a figure. */
+export const FIGURE_MAX_FRAME_MS = 1_000;

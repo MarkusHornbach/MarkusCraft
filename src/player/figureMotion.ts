@@ -28,6 +28,8 @@ export interface MotionInput {
   busy: boolean;
   /** How many block changes the player caused so far (only its growth matters). */
   edits: number;
+  /** How many times the drawn pose jumped (a teleport): a change is no movement. */
+  snaps: number;
 }
 
 /** The angles to draw, in radians. Limb angles: positive swings the limb forward. */
@@ -72,6 +74,7 @@ export class FigureMotion {
   /** Start of the running swing, or null. */
   private swingStartMs: number | null = null;
   private seenEdits = 0;
+  private seenSnaps = 0;
 
   /** One frame: writes the angles into `out`. */
   step(input: MotionInput, out: FigureAngles): void {
@@ -82,6 +85,7 @@ export class FigureMotion {
       this.lastZ = input.z;
       this.bodyYaw = input.yaw;
       this.seenEdits = input.edits;
+      this.seenSnaps = input.snaps;
     }
     const dtMs = Math.min(FIGURE_MAX_FRAME_MS, Math.max(0, input.nowMs - this.lastMs));
     this.lastMs = input.nowMs;
@@ -89,7 +93,9 @@ export class FigureMotion {
     const dz = input.z - this.lastZ;
     this.lastX = input.x;
     this.lastZ = input.z;
-    const snapped = dx * dx + dz * dz > SNAP_DISTANCE * SNAP_DISTANCE;
+    const snapped =
+      dx * dx + dz * dz > SNAP_DISTANCE * SNAP_DISTANCE || input.snaps !== this.seenSnaps;
+    this.seenSnaps = input.snaps;
 
     // Walking speed and direction, smoothed over a few frames.
     if (dtMs > 0) {
