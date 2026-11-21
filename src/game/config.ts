@@ -362,3 +362,36 @@ export const ACTION_RATE_LIMIT = 30;
 export const ACTION_RATE_WINDOW_MS = 1_000;
 /** Where a device keeps its player key and name (per site). */
 export const PLAYER_STORAGE_KEY = 'markuscraft.player.v1';
+
+// --- Player figure (Phase 6 part D) ---
+
+/**
+ * The figure's parts in figure texels (width × height × depth). Proportions of this game's
+ * own: a smaller head, thinner arms and a deeper body than the best-known blocky figure.
+ * 11 + 11 + 7 = 29 texels tall, scaled to `PLAYER_HEIGHT`.
+ */
+export const FIGURE_LEG: readonly [number, number, number] = [4, 11, 4];
+export const FIGURE_BODY: readonly [number, number, number] = [8, 11, 5];
+export const FIGURE_ARM: readonly [number, number, number] = [3, 10, 3];
+export const FIGURE_HEAD: readonly [number, number, number] = [7, 7, 7];
+export const FIGURE_TEXELS_TALL = 29;
+/** Largest swing of a leg while walking, in radians (reached at walking speed). */
+export const FIGURE_LEG_SWING = 0.6;
+/** Blocks walked per full step cycle (both legs once forward). */
+export const FIGURE_STRIDE = 1.6;
+/** The limbs come to rest this long after the player stops. */
+export const FIGURE_SETTLE_MS = 200;
+/** Time constant of the smoothed walking speed and direction. */
+export const FIGURE_SPEED_SMOOTH_MS = 40;
+/** Below this speed (blocks per second) a figure counts as standing. */
+export const FIGURE_STAND_SPEED = 0.3;
+/** Fastest turn of the body towards the walking direction, in radians per second. */
+export const FIGURE_BODY_TURN = 8;
+/** The head is never turned further than this from the body. */
+export const FIGURE_HEAD_YAW_MAX = Math.PI / 4;
+/** One swing of the right arm (breaking, placing). */
+export const FIGURE_SWING_MS = 300;
+/** Largest angle of that swing. */
+export const FIGURE_SWING_ANGLE = 1.1;
+/** A longer gap between two frames (a hidden tab) counts as this long for a figure. */
+export const FIGURE_MAX_FRAME_MS = 1_000;

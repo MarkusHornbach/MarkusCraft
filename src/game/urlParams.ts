@@ -1,4 +1,5 @@
 // URL parameters that make a session reproducible (seed, time of day, test mode).
+import { isLookChoice } from '../player/looks';
 import type { GameMode } from '../actions/playerRecord';
 import { normalizeRoomCode } from '../net/roomCode';
 import { normalizeName } from '../save/saveFormat';
@@ -30,6 +31,10 @@ export interface GameParams {
   join: string | null;
   /** A player name for multiplayer (`name=`); null keeps the stored one. */
   name: string | null;
+  /** A choice of look (`look=`, 0–8, Part D); null keeps the stored one. */
+  look: number | null;
+  /** False with `previewgl=0`: the preview of "Your player" gets no WebGL (tests). */
+  previewGl: boolean;
 }
 
 /** Parses the query string. `randomSeed` supplies the seed when the URL has none. */
@@ -69,5 +74,13 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
     bench: test ? 'off' : bench,
     join: normalizeRoomCode(query.get('join') ?? ''),
     name: query.get('name'),
+    look: lookParam(query.get('look')),
+    previewGl: query.get('previewgl') !== '0',
   };
+}
+
+function lookParam(text: string | null): number | null {
+  if (text === null || !/^\d$/.test(text.trim())) return null;
+  const look = Number(text);
+  return isLookChoice(look) ? look : null;
 }

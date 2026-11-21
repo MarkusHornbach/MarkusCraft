@@ -108,9 +108,12 @@ for (const [device, view] of [
     await tapCreate(page);
     await tapMenu(page);
     // The pause menu: every button is on screen, finger-sized and free of its neighbours.
-    // "Playing together" (Phase 6) is the last section and reached by scrolling on a phone
-    // (Phase 6 AC7.13); everything else fits without scrolling.
-    const menuButtons = await boxes(page, '.pause-screen button:not(.room-panel button)');
+    // "Your player" and "Playing together" (Phase 6) are the last sections and reached by
+    // scrolling on a phone (Phase 6 AC7.13, AC13.5); everything else fits without scrolling.
+    const menuButtons = await boxes(
+      page,
+      '.pause-screen button:not(.room-panel button):not(.player-section button)',
+    );
     expect(menuButtons.map((b) => b.name)).toEqual([
       'play-button',
       'menu-button back-button',
@@ -119,7 +122,7 @@ for (const [device, view] of [
     ]);
     expectInside(menuButtons, view);
     expectFingerSized(menuButtons);
-    const inputs = await boxes(page, '.pause-screen input');
+    const inputs = await boxes(page, '.pause-screen input:not(.player-section input)');
     expect(inputs.length).toBeGreaterThanOrEqual(5);
     expectInside(inputs, view);
     expectNoOverlap([...menuButtons, ...inputs]);
@@ -127,7 +130,7 @@ for (const [device, view] of [
     expectInside(
       await boxes(
         page,
-        '.pause-buttons, .controls-list, .pause-right > .pause-section:not(.room-panel)',
+        '.pause-buttons, .controls-list, .pause-right > .pause-section:not(.room-panel):not(.player-section)',
       ),
       view,
     );

@@ -596,8 +596,15 @@ test.describe('by touch', () => {
       // Leave by the menu button and "Save and back to worlds".
       await page.locator('.touch-menu').tap();
       await page.waitForFunction(() => window.__mc.getState().paused);
-      // "Playing together" (Phase 6) is reached by scrolling: Phase 6 AC7.13.
-      check(await boxes(page, '.pause-screen button:not(.room-panel button)'), view);
+      // "Your player" and "Playing together" (Phase 6) are reached by scrolling: Phase 6
+      // AC7.13, AC13.5.
+      check(
+        await boxes(
+          page,
+          '.pause-screen button:not(.room-panel button):not(.player-section button)',
+        ),
+        view,
+      );
       await backToWorlds(page, true);
 
       // Five more worlds, so the list has to scroll on the phone.

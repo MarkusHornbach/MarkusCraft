@@ -33,6 +33,7 @@ import { DebugOverlay } from '../ui/DebugOverlay';
 import { FocusManager } from '../ui/FocusManager';
 import type { PadHint } from '../ui/PadHints';
 import { glyphSheet } from '../ui/padGlyphs';
+import { figureSheet } from '../ui/figureIcons';
 import { Hud } from '../ui/Hud';
 import { InventoryScreen } from '../ui/InventoryScreen';
 import { type InputMode, PauseScreen, SAVE_FAILED_TEXT } from '../ui/PauseScreen';
@@ -53,6 +54,8 @@ import { worldHash } from '../net/snapshot';
 import { Multiplayer } from './multiplayer';
 import { JoinSection, type RoomListView, TEXT_UNAVAILABLE } from '../ui/JoinSection';
 import { RoomPanel } from '../ui/RoomPanel';
+import { PlayerSection } from '../ui/PlayerSection';
+import { lookForKey } from '../player/looks';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
@@ -270,6 +273,7 @@ export class Game {
   private framesSuspended = false;
   /** "Join a world" on the world menu and "Playing together" in the pause menu. */
   private joinSection: JoinSection | null = null;
+  private playerSection: PlayerSection | null = null;
   private roomPanel: RoomPanel | null = null;
   /** The line of the room panel ("Opening…", an error, "Link copied"). */
   private roomMessage = '';
@@ -317,6 +321,7 @@ export class Game {
     this.netConfig = readNetConfig(window.location.search);
     this.mp = this.createMultiplayer();
     if (params.name) this.mp.setName(params.name);
+    if (params.look !== null) this.mp.setLook(params.look);
     this.time = params.time;
     this.world = new World(0);
 
@@ -452,7 +457,10 @@ export class Game {
       this.joinSection = new JoinSection({
         name: this.mp.identity.name,
         available: this.netConfig.signal !== null,
-        onName: (name) => this.mp.setName(name),
+        onName: (name) => {
+          this.mp.setName(name);
+          this.playerSection?.setName(name);
+        },
         onJoin: (code, via) => void this.joinFromMenu(code, via),
       });
       this.joinSection.setLink(params.join);
@@ -466,6 +474,25 @@ export class Game {
         onCopyLink: () => void this.copyJoinLink(),
       });
       this.pauseScreen.setRoomPanel(this.roomPanel.element);
+      this.playerSection = new PlayerSection({
+        name: this.mp.identity.name,
+        choice: this.mp.identity.look,
+        automatic: lookForKey(this.mp.identity.key),
+        previewGl: params.previewGl,
+        onName: (name) => {
+          this.mp.setName(name);
+          this.joinSection?.setName(name);
+        },
+        onNameCommit: () => {
+          this.mp.commitName();
+          this.updateRoomPanel();
+        },
+        onLook: (choice) => {
+          this.mp.setLook(choice);
+          this.updateRoomPanel();
+        },
+      });
+      this.pauseScreen.setPlayerSection(this.playerSection.element);
       this.benchScreen = new BenchScreen(this.root, {
         onStart: (via) => this.startBench(via),
         onBack: () => this.closeBench(),
@@ -700,6 +727,7 @@ export class Game {
     this.worldMenu?.setVisible(screen === 'worlds');
     this.pauseScreen?.setKind(screen === 'settings' ? 'settings' : 'pause');
     this.pauseScreen?.setVisible(screen === 'settings' || screen === 'pause');
+    this.playerSection?.setShown(screen === 'settings' || screen === 'pause');
     if (screen === 'nettest') {
       if (!this.netTestScreen?.isOpen) this.netTestScreen?.open();
     } else if (this.netTestScreen?.isOpen) {
@@ -932,12 +960,15 @@ export class Game {
       selfId: this.mp.selfId,
       players: this.mp.players(own).map((player) => {
         const drawn = player.self ? null : this.drawnPose(player.id);
+        const figure = player.self ? null : this.renderer.remotePlayers.state(player.id);
         return {
           ...player,
           renderX: drawn ? drawn.x : player.x,
           renderY: drawn ? drawn.y : player.y,
           renderZ: drawn ? drawn.z : player.z,
           renderYaw: drawn ? drawn.yaw : player.yaw,
+          anim: figure?.anim ?? null,
+          tagDraws: figure?.tagDraws ?? 0,
         };
       }),
       rttMs: this.mp.client?.rttMs ?? null,
@@ -956,12 +987,35 @@ export class Game {
     const now = performance.now();
     this.renderer.remotePlayers.update(
       roster
-        ? roster
-            .list()
-            .map((p) => ({ id: p.id, name: p.name, slot: p.slot, pose: p.poses.sample(now) }))
+        ? roster.list().map((p) => ({
+            id: p.id,
+            name: p.name,
+            slot: p.slot,
+            look: p.look,
+            pose: p.poses.sample(now),
+            fly: p.fly,
+            busy: p.busy,
+            edits: p.edits,
+            snaps: p.poses.snapsAt(now),
+          }))
         : [],
       (x, y, z) => this.lightAt(x, y, z),
+      now,
     );
+  }
+
+  /** The preview of "Your player" for the test API: no key while it does not exist. */
+  private previewState(): { preview?: { frames: number } } {
+    const preview = this.playerSection?.previewState ?? null;
+    return preview ? { preview } : {};
+  }
+
+  /**
+   * The player holds break on a block it aims at (the others' figure swings its arm): a
+   * break in progress in Gathering, the held button in Creative.
+   */
+  private holdingBreak(): boolean {
+    return !this.paused && this.target !== null && this.input.isHeld('break');
   }
 
   /** Where another player is drawn now, or null if it is not drawn. */
@@ -982,6 +1036,7 @@ export class Game {
         return { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch };
       },
       flying: () => this.player.mode === 'fly',
+      busy: () => this.holdingBreak(),
       actionClock: () => this.nowMs(),
       guests: () => this.meta?.guests ?? [],
       keepGuests: (guests) => {
@@ -1081,7 +1136,14 @@ export class Game {
     this.roomPanel.set({
       role: this.mp.role,
       code: this.mp.roomCode,
-      players: players.map(({ id, name, slot, host, self }) => ({ id, name, slot, host, self })),
+      players: players.map(({ id, name, slot, look, host, self }) => ({
+        id,
+        name,
+        slot,
+        look,
+        host,
+        self,
+      })),
       disabledReason: this.netConfig.signal === null ? TEXT_UNAVAILABLE : null,
       touch: this.mode === 'touch',
       message: this.roomMessage,
@@ -2503,6 +2565,7 @@ export class Game {
         screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play',
         tab: this.inventoryOpen ? this.inventoryScreen.currentTab : null,
         ...(this.focus.description !== null ? { focus: this.focus.description } : {}),
+        ...this.previewState(),
       },
       recipes: this.recipeStatuses().map((status) => ({
         id: status.id,
@@ -2515,6 +2578,9 @@ export class Game {
       bench: this.benchState(),
       net: this.netState(),
       player: {
+        name: this.mp.identity.name,
+        choice: this.mp.identity.look,
+        look: this.mp.look,
         x: p.x,
         y: p.y,
         z: p.z,
@@ -2642,6 +2708,9 @@ export class Game {
         this.netConfig.signal ? this.loadNetwork(this.netConfig.iceServers) : Promise.resolve(null),
       glyphSheet: () => {
         if (!this.root.querySelector('.pad-glyph-sheet')) this.root.appendChild(glyphSheet());
+      },
+      figureSheet: () => {
+        if (!this.root.querySelector('.figure-sheet')) this.root.appendChild(figureSheet());
       },
       net: {
         host: (options) => this.mp.openRoom(options),

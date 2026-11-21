@@ -42,7 +42,8 @@ describe('repository hygiene (AC12.4)', () => {
     // Phase 4 part A added three of the light; part P `bench-start` and `bench-result`.
     // Phase 5 part A added `pad-glyphs`, `pad-world-menu` and `pad-pause`; part B
     // `pad-inventory` and `pad-recipe-list`. Phase 6 part A added `net-test`; part B
-    // `remote-player`, `remote-player-night`, `join-section` and `room-panel`.
-    expect(assets.length).toBe(37);
+    // `remote-player`, `remote-player-night`, `join-section` and `room-panel`; part D
+    // `figure-sheet` and `player-section`.
+    expect(assets.length).toBe(39);
   });
 });

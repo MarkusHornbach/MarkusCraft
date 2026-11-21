@@ -50,8 +50,9 @@ interface Stage {
  * guest four blocks in front looking at the host.
  */
 async function stage(players: Players): Promise<Stage> {
-  const host = await openTestPlayer(players, { query: { name: 'Ada' } });
-  const guest = await openTestPlayer(players, { query: { name: 'Bo' } });
+  // Fixed looks: a look from the random player key would change the references.
+  const host = await openTestPlayer(players, { query: { name: 'Ada', look: '2' } });
+  const guest = await openTestPlayer(players, { query: { name: 'Bo', look: '5' } });
   const code = await hostRoom(host.page);
   await joinRoom(guest.page, code);
   const { player } = await state(host.page);
@@ -108,8 +109,11 @@ function boxRegion(distance: number, halfWidth: number, low: number, high: numbe
   return { x: 480 - half, y: top, width: 2 * half, height: bottom - top };
 }
 
-/** The host figure's body, seen from 4 blocks (inset so no edge pixel counts). */
-const BODY = boxRegion(4, 0.2, 0.2, 1.1);
+/**
+ * The host figure's body, seen from 4 blocks (inset so no edge pixel counts): the top of
+ * the figure's body, above the belt.
+ */
+const BODY = boxRegion(4, 0.15, 0.9, 1.3);
 const HEAD = boxRegion(3.8, 0.18, 1.35, 1.75);
 /** Where the name tag is, from 4 blocks: centred 2.19 blocks above the feet. */
 const TAG = boxRegion(4, 0.25, 2.06, 2.32);
@@ -126,7 +130,7 @@ function whiteShare(image: Image, region: Region): number {
   return white / (region.width * region.height);
 }
 
-/** The host's colour (slot 0, a red) dominates the region. */
+/** The top of the host's look (Ember: red and orange stripes) dominates the region. */
 function hostColourDominates(image: Image, region: Region): boolean {
   const c = meanColor(image, region);
   return c.r > c.g + 40 && c.r > c.b + 40;
@@ -157,7 +161,7 @@ test('Phase 6 AC6.1: the guest sees where the host walked', async ({ players }) 
   );
 });
 
-test('Phase 6 AC6.2, AC6.3, AC6.6: figure, name tag, head and draw calls', async ({ players }) => {
+test('Phase 6 AC6.2, AC6.3, AC12.4: figure, name tag, head and draw calls', async ({ players }) => {
   const { host, guest, hx, hz } = await stage(players);
   const seen = await capture(guest.page);
   expect(hostColourDominates(seen, BODY)).toBe(true);
@@ -180,10 +184,10 @@ test('Phase 6 AC6.2, AC6.3, AC6.6: figure, name tag, head and draw calls', async
   const empty = await capture(guest.page);
   expect(hostColourDominates(empty, BODY)).toBe(false);
   expect(whiteShare(empty, TAG)).toBeLessThan(0.005);
-  // AC6.6: one other player adds at most four draw calls.
+  // AC12.4 (replaces AC6.6): one other player adds at most two draw calls.
   const without = (await state(guest.page)).render.drawCalls;
   expect(withFigure - without).toBeGreaterThan(0);
-  expect(withFigure - without).toBeLessThanOrEqual(4);
+  expect(withFigure - without).toBeLessThanOrEqual(2);
 });
 
 test('Phase 6 AC6.4: the own figure is never drawn', async ({ players }) => {
@@ -222,7 +226,7 @@ test('Phase 6 AC6.5: no solid block in another player, a torch is fine', async (
     .toBe(TORCH);
 });
 
-test('Phase 6 AC6.7, AC6.9: the figure at noon and at midnight, with and without a torch', async ({
+test('Phase 6 AC6.7, AC6.9, AC12.9: the figure at noon and at midnight, with and without a torch', async ({
   players,
 }) => {
   const { host, guest, hx, hz } = await stage(players);

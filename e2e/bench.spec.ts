@@ -132,7 +132,7 @@ test('Phase 4P AC2.9: without bench the test is not there; test mode ignores the
 
 // --- The quick run by mouse -------------------------------------------------------------
 
-test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5: the quick run by mouse, from the world menu to a valid issue link', async ({
+test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5, Phase 6 AC13.6: the quick run by mouse, from the world menu to a valid issue link', async ({
   page,
   context,
   baseURL,

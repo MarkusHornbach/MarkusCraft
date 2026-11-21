@@ -13,6 +13,7 @@ import { MemoryNetwork, type MemorySignaling } from '../net/memoryTransport';
 import type { NetPose, Welcome } from '../net/protocol';
 import type { GuestEntry } from '../save/saveFormat';
 import { playerKeyFromBytes, roomPeerId } from '../net/roomCode';
+import { lookForKey } from '../player/looks';
 import { worldHash } from '../net/snapshot';
 
 export const BUILD = 'test123';
@@ -63,6 +64,8 @@ export class Rig {
   readonly host: HostSession;
   readonly hostSignaling: MemorySignaling;
   hostPose: NetPose;
+  /** The host's player flies or holds break (read like its pose). */
+  hostFlags = { fly: false, busy: false };
   readonly hostAnswers: Answer[] = [];
   readonly hostPeers: PeerEvent[] = [];
   hostRecord: PlayerRecord;
@@ -95,6 +98,8 @@ export class Rig {
       hostKey: playerKeyFromBytes([0xff]),
       hostRecord: this.hostRecord,
       hostPose: () => this.hostPose,
+      hostLook: 4,
+      hostFlags: () => this.hostFlags,
       time: options.time ?? 0.25,
       frozen: options.frozen ?? false,
       clock: () => this.net.nowMs,
@@ -129,7 +134,13 @@ export class Rig {
 
   /** A guest that has not joined yet. */
   guest(
-    options: { key?: string; name?: string; build?: string; checksum?: number } = {},
+    options: {
+      key?: string;
+      name?: string;
+      look?: number;
+      build?: string;
+      checksum?: number;
+    } = {},
   ): RigGuest {
     const key = options.key ?? playerKeyFromBytes([this.keyCounter++]);
     const guest: RigGuest = {
@@ -149,6 +160,7 @@ export class Rig {
       build: options.build ?? BUILD,
       key,
       name: options.name ?? `Guest${this.keyCounter}`,
+      look: options.look ?? lookForKey(key),
       code: CODE,
       randomBytes: (n) =>
         Array.from({ length: n }, (_, i) =>
