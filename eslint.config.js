@@ -42,6 +42,7 @@ export default tseslint.config(
       'src/render/textures/tiles.ts',
       'src/render/textures/itemIcons.ts',
       'src/render/textures/cracks.ts',
+      'src/render/textures/figureTexture.ts',
     ],
     rules: {
       'no-restricted-imports': [
