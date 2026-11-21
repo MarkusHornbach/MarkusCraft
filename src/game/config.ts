@@ -194,7 +194,7 @@ export const SAVE_DATABASE = 'markuscraft';
 // --- Performance test (Phase 4 part P) ---
 
 /** Raised when a scenario is added or the order of the suite changes. */
-export const BENCH_SUITE_VERSION = 2;
+export const BENCH_SUITE_VERSION = 3;
 /** Version of the result record and of the issue text built from it. */
 export const BENCH_FORMAT_VERSION = 1;
 export const BENCH_SEED = 1337;
@@ -226,6 +226,18 @@ export const BENCH_EDIT_INTERVAL = 6;
 export const BENCH_FLY_STOP_STEPS = 20;
 /** `torches`: the share of the window at its end in which the player moves past the line. */
 export const BENCH_TORCH_MOVE_SHARE = 0.4;
+/**
+ * `players` (Phase 6 part E): three simulated guests walk arcs in front of the player at
+ * these radii (blocks), at most this angle to either side, at walking speed.
+ */
+export const BENCH_GUEST_RADII: readonly number[] = [3.5, 6.5, 9.5];
+export const BENCH_GUEST_ARC = Math.PI / 4;
+/** Their looks: Ember, Moss and Plum. */
+export const BENCH_GUEST_LOOKS: readonly number[] = [2, 5, 8];
+/** Each guest acts every this many steps (place, then break the same block). */
+export const BENCH_GUEST_EDIT_INTERVAL = 30;
+/** Steps before each break in which the guest holds break (its arm swings). */
+export const BENCH_GUEST_BUSY_STEPS = 15;
 /** Smoothness light: share of long frames and 99th percentile, for green and for yellow. */
 export const BENCH_LONG_SHARE_GREEN = 0.01;
 export const BENCH_LONG_SHARE_YELLOW = 0.05;

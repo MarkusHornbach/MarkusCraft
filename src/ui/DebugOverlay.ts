@@ -1,4 +1,5 @@
-// Debug overlay (F3): live numbers about the player, the world and the renderer.
+// Debug overlay (F3): live numbers about the player, the world, the renderer and the room.
+import type { NetDebug } from '../game/multiplayer';
 
 export interface DebugInfo {
   fps: number;
@@ -28,6 +29,8 @@ export interface DebugInfo {
   onGround: boolean;
   inWater: boolean;
   target: string | null;
+  /** The room, or null in single-player. */
+  net: NetDebug | null;
 }
 
 const ROWS = [
@@ -45,8 +48,15 @@ const ROWS = [
   'time',
   'mode',
   'target',
+  'room',
+  'roundTrip',
+  'link',
+  'signal',
+  'traffic',
 ] as const;
 type Row = (typeof ROWS)[number];
+
+const NET_ROWS: readonly Row[] = ['room', 'roundTrip', 'link', 'signal', 'traffic'];
 
 const LABELS: Record<Row, string> = {
   fps: 'FPS',
@@ -63,6 +73,11 @@ const LABELS: Record<Row, string> = {
   time: 'Time',
   mode: 'Mode',
   target: 'Target',
+  room: 'Room',
+  roundTrip: 'Round trip',
+  link: 'Link',
+  signal: 'Signaling',
+  traffic: 'Traffic',
 };
 
 const COMPASS = [
@@ -92,9 +107,37 @@ export function timeName(t: number): string {
   return 'night';
 }
 
+/** The network rows of the overlay as text; single-player shows "off" in the first. */
+export function netRows(
+  net: NetDebug | null,
+): Record<'room' | 'roundTrip' | 'link' | 'signal' | 'traffic', string> {
+  if (!net) return { room: 'off', roundTrip: '–', link: '–', signal: '–', traffic: '–' };
+  const code = net.roomCode ?? '–';
+  const players = `${net.players} ${net.players === 1 ? 'player' : 'players'}`;
+  const ms = (rtt: number | null): string => (rtt === null ? '–' : `${Math.round(rtt)} ms`);
+  const roundTrip =
+    net.role === 'guest'
+      ? ms(net.rtt[0]?.rttMs ?? null)
+      : net.rtt.length === 0
+        ? 'no guests'
+        : net.rtt.map((r) => `${r.name} ${ms(r.rttMs)}`).join(', ');
+  const kb = (bytes: number): string => (bytes / 1024).toFixed(1);
+  const r = net.rates;
+  return {
+    room: `${net.role}, ${net.status}, code ${code}, ${players}`,
+    roundTrip,
+    link: net.links.length === 0 ? '–' : [...new Set(net.links)].join(', '),
+    signal: net.signal,
+    traffic:
+      `in ${r.inMsgs.toFixed(0)} msg/s ${kb(r.inBytes)} kB/s, ` +
+      `out ${r.outMsgs.toFixed(0)} msg/s ${kb(r.outBytes)} kB/s`,
+  };
+}
+
 export class DebugOverlay {
   readonly element: HTMLElement;
   private readonly values = new Map<Row, HTMLElement>();
+  private readonly lines = new Map<Row, HTMLElement>();
   private shown = false;
 
   constructor(parent: HTMLElement) {
@@ -110,6 +153,8 @@ export class DebugOverlay {
       line.append(label, value);
       this.element.appendChild(line);
       this.values.set(row, value);
+      this.lines.set(row, line);
+      if (NET_ROWS.includes(row)) line.hidden = true;
     }
     parent.appendChild(this.element);
   }
@@ -154,6 +199,17 @@ export class DebugOverlay {
     const detail = info.inWater ? ', in water' : info.onGround ? ', on ground' : '';
     this.set('mode', `${info.mode}${detail}`);
     this.set('target', info.target ?? 'none');
+    const net = netRows(info.net);
+    // The network rows are shown only in a room: single-player keeps its short overlay.
+    for (const row of NET_ROWS) {
+      const line = this.lines.get(row);
+      if (line && line.hidden !== (info.net === null)) line.hidden = info.net === null;
+    }
+    this.set('room', net.room);
+    this.set('roundTrip', net.roundTrip);
+    this.set('link', net.link);
+    this.set('signal', net.signal);
+    this.set('traffic', net.traffic);
   }
 
   private set(row: Row, text: string): void {

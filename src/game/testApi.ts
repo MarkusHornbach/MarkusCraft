@@ -86,6 +86,8 @@ export interface GameState {
     total: number;
     scenario: string | null;
     reason: BenchStop | null;
+    /** Most other players' figures drawn at once during the run (Phase 6 AC15.2). */
+    figures: number;
   } | null;
   /**
    * Multiplayer (Phase 6): the role of this page, whether this build knows a signaling

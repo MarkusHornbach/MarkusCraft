@@ -21,7 +21,13 @@ import {
   scenarioResult,
 } from './benchReport';
 import { BenchStats } from './benchStats';
-import { type ScenarioPose, type SuiteEntry, type SuiteKind, buildSuite } from './scenarios';
+import {
+  type GuestScript,
+  type ScenarioPose,
+  type SuiteEntry,
+  type SuiteKind,
+  buildSuite,
+} from './scenarios';
 import { isThrottled, workersVerdict } from './verdict';
 
 /** What the runner needs from the game. `Game` implements it; tests pass a fake. */
@@ -41,6 +47,17 @@ export interface BenchHost {
   missingMeshDistance(): number;
   /** JavaScript heap in MB, or null where the browser does not tell. */
   heapMb(): number | null;
+  /**
+   * Opens a room in the current world whose simulated guests play `script` (Phase 6 part
+   * E), replacing one before.
+   */
+  openGuests(script: GuestScript): void;
+  /** The simulated guests are in the room (true while there is none). */
+  guestsReady(): boolean;
+  /** One step of the simulated guests, after the player's input of that step. */
+  stepGuests(step: number, steps: number): void;
+  /** Ends the room of simulated guests, if there is one. */
+  closeGuests(): void;
 }
 
 /** What a finished run adds to its numbers. */
@@ -131,6 +148,7 @@ export class BenchRunner {
     if (!this.running) return;
     this.phase = 'stopped';
     this.host.setInput(NO_INPUT);
+    this.host.closeGuests();
   }
 
   /**
@@ -151,6 +169,7 @@ export class BenchRunner {
       const action = entry.scenario.action(step, entry.steps);
       if (action) this.host.submit(action);
     }
+    if (entry.scenario.guests) this.host.stepGuests(step, entry.steps);
     this.stepIndex++;
     if (this.stepIndex === 0) {
       // The window opens with the frame that follows.
@@ -194,6 +213,7 @@ export class BenchRunner {
     }
     this.host.setPlayer(entry.scenario.start);
     this.host.setTime(entry.scenario.time ?? BENCH_TIME);
+    if (entry.scenario.guests) this.host.openGuests(entry.scenario.guests);
     this.cut = false;
     this.windowDone = false;
     this.sinceMs = nowMs;
@@ -203,7 +223,8 @@ export class BenchRunner {
   private settle(nowMs: number): void {
     const entry = this.entries[this.index];
     const waited = nowMs - (this.sinceMs ?? nowMs);
-    const idle = this.host.chunksIdle();
+    // The simulated guests must be in the room as well.
+    const idle = this.host.chunksIdle() && this.host.guestsReady();
     if (!idle && waited <= BENCH_IDLE_TIMEOUT_MS) return;
     // Chunks that never came to rest: go on, and say so in the result.
     if (!idle) this.cut = true;
@@ -256,6 +277,7 @@ export class BenchRunner {
 
   private finishScenario(catchUpMs: number | null): void {
     const entry = this.entries[this.index];
+    if (entry.scenario.guests) this.host.closeGuests();
     const pending = this.pending;
     if (pending) {
       this.results.push(

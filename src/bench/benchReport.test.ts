@@ -182,7 +182,8 @@ describe('issue text and parser (Phase 4P AC1.7)', () => {
     expect(text).toContain('|stand|5|G|60|17.2|18.1|0|1.2|–|');
     expect(text).toContain('- Browser: Sample browser (not a real run)');
     expect(text).toContain('- Input: touch, 8 cores, 4 GB, 60 Hz, wake lock yes');
-    expect(lines.filter((line) => line.startsWith('|')).length).toBe(13);
+    // Two header lines and one row per scenario of the sample (13).
+    expect(lines.filter((line) => line.startsWith('|')).length).toBe(15);
     expect(text.indexOf(ISSUE_MARKER)).toBeGreaterThan(text.indexOf('- GPU:'));
     expect(text.endsWith('\n```')).toBe(true);
     expect(tableRow({ ...SAMPLE_RESULT.scenarios[0], cut: true })[2]).toBe('R (cut off)');

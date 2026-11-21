@@ -16,6 +16,7 @@ describe('src/bench is pure (Phase 4P AC1.9)', () => {
       'compare.ts',
       'sampleResult.ts',
       'scenarios.ts',
+      'simGuests.ts',
       'verdict.ts',
     ]);
   });

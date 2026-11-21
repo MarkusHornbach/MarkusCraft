@@ -17,6 +17,7 @@ import type { NetPose, RoomInfo, Welcome } from '../net/protocol';
 import { makeRoomCode, normalizeRoomCode, roomCodeOf, roomPeerId } from '../net/roomCode';
 import type { GuestEntry, WorldEdits } from '../save/saveFormat';
 import { type Network, SignalError, type Signaling } from '../net/transport';
+import type { TrafficMeter, TrafficRates } from '../net/traffic';
 import type { World } from '../world/World';
 import { terrainChecksum } from '../world/generation/terrain';
 import { type PlayerIdentity, loadIdentity, saveIdentity } from './playerIdentity';
@@ -95,6 +96,23 @@ export interface JoinOptions {
   build?: string;
 }
 
+/** What the debug overlay shows about the room (Phase 6 part E). */
+export interface NetDebug {
+  role: 'host' | 'guest';
+  status: string;
+  roomCode: string | null;
+  players: number;
+  /** The guest's round trip to the host; on the host, each guest's own report. */
+  rtt: { name: string; rttMs: number | null }[];
+  /** How each connection runs ("direct (host → host)"), or empty before the first look. */
+  links: string[];
+  signal: string;
+  rates: TrafficRates;
+}
+
+/** The connections' statistics are read this often (they are asynchronous). */
+const STATS_INTERVAL_MS = 2000;
+
 /** One row of the room list. */
 export interface RoomRow extends RoomInfo {
   code: string;
@@ -137,6 +155,10 @@ export class Multiplayer {
   private wakeWanted = false;
   /** Set by a test: the guest's next teleport is reported as such. */
   private teleported = false;
+  /** The traffic of the room's connections, and how they run. */
+  private meter: TrafficMeter | null = null;
+  private links: string[] = [];
+  private lastStatsMs = -Infinity;
 
   constructor(game: MultiplayerGame) {
     this.game = game;
@@ -218,7 +240,9 @@ export class Multiplayer {
     const worldName = this.game.worldName();
     if (worldName === null) throw new Error('No world is open');
     if (!this.game.available) throw new Error(JOIN_TEXT.unavailable);
-    const network = await this.game.loadNetwork();
+    const sessions = await loadSessions();
+    const meter = new sessions.TrafficMeter(() => performance.now());
+    const network = sessions.countedNetwork(await this.game.loadNetwork(), meter);
     const build = options.build ?? this.game.build;
     const signaling = network.signaling();
     let code: string | null = null;
@@ -243,7 +267,7 @@ export class Multiplayer {
     const world = this.game.world();
     // From now on this device is known by its key: it is kept.
     saveIdentity(this.identity);
-    const { HostSession } = await loadSessions();
+    const { HostSession } = sessions;
     const host = new HostSession({
       build,
       world,
@@ -267,6 +291,7 @@ export class Multiplayer {
     signaling.onConnection = (conn) => host.accept(conn);
     this.signaling = signaling;
     this.host = host;
+    this.useMeter(meter);
     this.roomCode = code;
     this.role = 'host';
     this.lastError = null;
@@ -292,9 +317,11 @@ export class Multiplayer {
     if (options.name !== undefined) this.setName(options.name);
     let network: Network;
     let sessions: Sessions;
+    let meter: TrafficMeter;
     try {
-      network = await this.game.loadNetwork();
       sessions = await loadSessions();
+      meter = new sessions.TrafficMeter(() => performance.now());
+      network = sessions.countedNetwork(await this.game.loadNetwork(), meter);
     } catch (error) {
       this.lastError = JOIN_TEXT.unreachable;
       throw new Error(this.lastError, { cause: error });
@@ -330,6 +357,7 @@ export class Multiplayer {
       },
     });
     this.client = client;
+    this.useMeter(meter);
     this.role = 'guest';
     this.roomCode = code;
     this.lastError = null;
@@ -404,6 +432,7 @@ export class Multiplayer {
 
   /** The work of a frame: the session, and the guest's pose. */
   frame(nowMs: number): void {
+    this.pollStats(nowMs);
     this.host?.update(nowMs);
     // Guests play without the host's steps (a test, a paused host): their records and poses
     // are part of the world's record.
@@ -543,6 +572,59 @@ export class Multiplayer {
     return [self, ...others].sort((a, b) => a.id - b.id);
   }
 
+  /** The room as the debug overlay shows it, or null while off. */
+  debugInfo(nowMs: number): NetDebug | null {
+    const meter = this.meter;
+    if (this.role === 'off' || !meter) return null;
+    const host = this.host;
+    const client = this.client;
+    let rtt: NetDebug['rtt'] = [];
+    let players = 0;
+    let signal = 'off';
+    if (host) {
+      rtt = host.roundTrips().map((g) => ({ name: g.name, rttMs: g.rttMs }));
+      players = host.playerCount;
+      signal = this.signaling?.state ?? 'off';
+    } else if (client) {
+      rtt = [{ name: 'host', rttMs: client.rttMs }];
+      players = client.status === 'online' ? client.roster.list().length + 1 : 0;
+      signal = client.signalState;
+    }
+    return {
+      role: this.role,
+      status: this.status,
+      roomCode: this.roomCode,
+      players,
+      rtt,
+      links: this.links,
+      signal,
+      rates: meter.rates(nowMs),
+    };
+  }
+
+  private useMeter(meter: TrafficMeter): void {
+    this.meter = meter;
+    this.links = [];
+    this.lastStatsMs = -Infinity;
+  }
+
+  /** Reads how the connections run, every `STATS_INTERVAL_MS` (asynchronous). */
+  private pollStats(nowMs: number): void {
+    const meter = this.meter;
+    if (!meter || nowMs - this.lastStatsMs < STATS_INTERVAL_MS) return;
+    this.lastStatsMs = nowMs;
+    const connections = meter.connections();
+    void Promise.all([loadSessions(), ...connections.map((c) => c.stats().catch(() => null))]).then(
+      ([sessions, ...all]) => {
+        if (this.meter !== meter) return;
+        this.links = all.map((entries) => {
+          const pair = entries ? sessions.selectedPair(entries) : null;
+          return pair ? sessions.linkKind(pair) : 'unknown';
+        });
+      },
+    );
+  }
+
   get status(): 'offline' | 'connecting' | 'syncing' | 'online' | 'reconnecting' {
     if (this.host) return 'online';
     return this.client?.status ?? 'offline';
@@ -578,6 +660,8 @@ export class Multiplayer {
     this.host = null;
     this.client = null;
     this.signaling = null;
+    this.meter = null;
+    this.links = [];
     this.role = 'off';
     this.roomCode = null;
     this.wakeWanted = false;
@@ -613,10 +697,12 @@ export class Multiplayer {
 
 /** The session code, in a chunk of its own: single-player never loads it. */
 async function loadSessions() {
-  const [host, client, protocol] = await Promise.all([
+  const [host, client, protocol, traffic, netTest] = await Promise.all([
     import('../net/HostSession'),
     import('../net/ClientSession'),
     import('../net/protocol'),
+    import('../net/traffic'),
+    import('../net/netTest'),
   ]);
   return {
     HostSession: host.HostSession,
@@ -624,6 +710,10 @@ async function loadSessions() {
     JoinError: client.JoinError,
     decodeHostMessage: protocol.decodeHostMessage,
     encodeMessage: protocol.encodeMessage,
+    TrafficMeter: traffic.TrafficMeter,
+    countedNetwork: traffic.countedNetwork,
+    selectedPair: netTest.selectedPair,
+    linkKind: netTest.linkKind,
   };
 }
 

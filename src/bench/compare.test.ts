@@ -22,7 +22,7 @@ describe('comparisonTable (Phase 4P AC4.1)', () => {
     ]);
     const lines = table.split('\n');
     expect(lines[0]).toMatch(/^\s+#12\s+phone\.json$/);
-    expect(lines[1]).toMatch(/^build\s+sample, suite 2\s+abc1234, suite 2 \(quick\)$/);
+    expect(lines[1]).toMatch(/^build\s+sample, suite 3\s+abc1234, suite 3 \(quick\)$/);
     expect(lines[2]).toMatch(/^date\s+2026-01-01\s+2026-02-03$/);
     expect(lines[3]).toMatch(/^device\s+touch, 800×360, 60 Hz\s+touch, 800×360, 60 Hz$/);
     expect(lines[4]).toMatch(/^ready\s+5: 2\.4 s, 8: 6\.1 s, 5: 2\.5 s\s+5: 2\.4 s/);

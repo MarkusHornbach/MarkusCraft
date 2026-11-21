@@ -315,6 +315,20 @@ export function pairText(pair: CandidatePair): string {
   return `${pair.localType} → ${pair.remoteType} (${remote})`;
 }
 
+/**
+ * How a pair connects, for the debug overlay: "direct" between local addresses, "via STUN"
+ * when one side used the address the STUN server reported, "relay" through a TURN server.
+ */
+export function linkKind(pair: CandidatePair): string {
+  const types = [pair.localType, pair.remoteType];
+  const kind = types.includes('relay')
+    ? 'relay'
+    : types.includes('srflx') || types.includes('prflx')
+      ? 'via STUN'
+      : 'direct';
+  return `${kind} (${pair.localType} → ${pair.remoteType})`;
+}
+
 // --- texts ---------------------------------------------------------------------------
 
 /** A short name of the browser and system from a user agent: "Chrome 140 on Android". */

@@ -30,7 +30,13 @@ import {
 } from './protocol';
 import { guestPeerId, roomOfAnyBuild, roomPeerId } from './roomCode';
 import { joinParts } from './snapshot';
-import { type Connection, type Network, SignalError, type Signaling } from './transport';
+import {
+  type Connection,
+  type Network,
+  SignalError,
+  type SignalState,
+  type Signaling,
+} from './transport';
 
 export type ClientStatus = 'offline' | 'connecting' | 'syncing' | 'online' | 'reconnecting';
 
@@ -148,6 +154,11 @@ export class ClientSession implements Session {
 
   get code(): string {
     return this.o.code;
+  }
+
+  /** The state of this guest's signaling connection (debug overlay). */
+  get signalState(): SignalState {
+    return this.signaling?.state ?? 'off';
   }
 
   get record(): PlayerRecord {
@@ -313,7 +324,11 @@ export class ClientSession implements Session {
       }
       if (nowMs - this.lastPingMs >= PING_INTERVAL_MS) {
         this.lastPingMs = nowMs;
-        this.send({ t: 'ping', ts: nowMs });
+        this.send(
+          this.rttMs === null
+            ? { t: 'ping', ts: nowMs }
+            : { t: 'ping', ts: nowMs, rtt: this.rttMs },
+        );
       }
       return;
     }

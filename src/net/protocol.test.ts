@@ -3,6 +3,7 @@ import { createPlayerRecord } from '../actions/playerRecord';
 import { MAX_MESSAGE_BYTES } from '../game/config';
 import { mulberry32 } from '../util/rng';
 import {
+  compactPose,
   type GuestMessage,
   type HostMessage,
   decodeGuestMessage,
@@ -22,6 +23,7 @@ const GUEST: GuestMessage[] = [
   { t: 'pose', ...POSE, tp: false, fly: true, busy: true },
   { t: 'profile', name: 'Anna B', look: 8 },
   { t: 'ping', ts: 1234.5 },
+  { t: 'ping', ts: 1234.5, rtt: 12.5 },
   { t: 'bye' },
 ];
 
@@ -61,6 +63,14 @@ const HOST: HostMessage[] = [
   { t: 'bye' },
 ];
 
+describe('compactPose (Phase 6 AC14.6)', () => {
+  it('cuts positions to millimetres and angles to a tenth of a milliradian', () => {
+    expect(
+      compactPose({ x: 1.23456789, y: -57.0004, z: 300.0006, yaw: 3.14159265, pitch: -0.12344 }),
+    ).toEqual({ x: 1.235, y: -57, z: 300.001, yaw: 3.1416, pitch: -0.1234 });
+  });
+});
+
 describe('protocol (Phase 6 AC3.1, AC12.1)', () => {
   it('every guest message survives encode → decode', () => {
     for (const message of GUEST) {
@@ -83,6 +93,9 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
 
   it('refuses wrong types, NaN, infinities, fractions, long strings, unknown types', () => {
     expect(bad('{"t":"ping","ts":"1"}')).toBe(true);
+    expect(bad('{"t":"ping","ts":1,"rtt":-1}')).toBe(true);
+    expect(bad('{"t":"ping","ts":1,"rtt":"5"}')).toBe(true);
+    expect(bad('{"t":"ping","ts":1,"rtt":1e9}')).toBe(true);
     expect(bad('{"t":"ping","ts":NaN}')).toBe(true);
     expect(bad('{"t":"ping","ts":1e999}')).toBe(true);
     expect(bad(JSON.stringify({ t: 'ping', ts: Number.NaN }))).toBe(true);
@@ -139,6 +152,17 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
         true,
       );
     }
+    // Relayed flags that are false are left out of the text and decode as false (AC14.6).
+    const compact = encodeMessage({
+      t: 'poses',
+      poses: [{ id: 2, ...POSE, tp: false, fly: true, busy: false }],
+    });
+    expect(compact).not.toContain('"tp"');
+    expect(compact).not.toContain('"busy"');
+    expect(decodeHostMessage(compact)).toEqual({
+      ok: true,
+      message: { t: 'poses', poses: [{ id: 2, ...POSE, tp: false, fly: true, busy: false }] },
+    });
     // Names: a string of at most 64 characters from a guest; 1–24 from the host.
     for (const name of [42, null, 'x'.repeat(65)]) {
       expect(bad(JSON.stringify({ t: 'profile', name, look: 1 }))).toBe(true);
