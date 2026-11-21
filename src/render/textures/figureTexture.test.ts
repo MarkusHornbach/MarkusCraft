@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { LOOKS } from '../../player/looks';
 import {
   FACE_NAMES,
+  FIGURE_VIEW_H,
+  FIGURE_VIEW_W,
   type FigurePart,
   faceRect,
   figureAtlasChecksum,
+  figureView,
   headIcon,
   lookOrigin,
   paintFigureAtlas,
@@ -87,5 +90,22 @@ describe('figure texture', () => {
     const o = lookOrigin(2);
     const at = (o.v * atlas.size + o.u) * 4;
     expect(Array.from(icon.subarray(0, 4))).toEqual(Array.from(atlas.pixels.subarray(at, at + 4)));
+  });
+
+  it('figureView shows front and back, the belt in the accent colour, air around', () => {
+    const front = figureView(atlas, 1, 'front', [255, 0, 0]);
+    const back = figureView(atlas, 1, 'back', [255, 0, 0]);
+    expect(front.length).toBe(FIGURE_VIEW_W * FIGURE_VIEW_H * 4);
+    // Beside the head there is nothing; the head and the body are opaque.
+    expect(front[3]).toBe(0);
+    const at = (x: number, y: number): number => (y * FIGURE_VIEW_W + x) * 4;
+    expect(front[at(FIGURE_VIEW_W / 2, 2) + 3]).toBe(255);
+    // A belt texel (beside the buckle, body rows 9–10) is tinted red: no green or blue.
+    const belt = at(FIGURE_VIEW_W / 2 + 4, 2 * (7 + 9) + 1);
+    expect(front[belt]).toBeGreaterThan(150);
+    expect(front[belt + 1]).toBe(0);
+    expect(front[belt + 2]).toBe(0);
+    // Front and back differ (the face).
+    expect(Buffer.from(front).equals(Buffer.from(back))).toBe(false);
   });
 });

@@ -155,11 +155,40 @@ key would otherwise change the references from run to run.
 
 ## Measured numbers
 
-FILLED_BELOW
+- **Entry chunk** (`dist/assets/index-*.js`, minified): Part C **778.67 kB**; this part
+  **798.03 kB** (+19.4 kB: painter, motion, figure model, preview, "Your player").
+  `HostSession` 10.7 → 11.6 kB, `ClientSession` 7.0 → 7.5 kB, `protocol` 4.7 → 4.9 kB,
+  `interpolation` 1.8 → 2.2 kB.
+- **AC11.6**: 30 000 motion steps (three figures, 10 000 frames) take **9.4 ms** in the
+  container (best of six rounds; the limit is 20 ms); a step allocates nothing.
+- **Draw calls**: one other player adds 2 (AC12.4); three guests add at most 6.
+- **Line coverage**: all files 98.4 %, `src/net/` 97.6 %, `figureMotion.ts` 98.8 %,
+  `looks.ts` 100 % (`npm run test:coverage`, 655 unit tests).
+- The atlas checksum of AC11.2 is `256304708`.
 
 ## Full browser run
 
-FILLED_BELOW
+The whole browser suite ran once in the container (`MC_CONTAINER_GPU_STALL=1`, 278
+tests, 38 minutes): 271 passed, 7 failed. All seven were caused by this part and are fixed:
+two layout checks of the pause menu (touch layout and the world menu by touch, each on
+phone and tablet) now leave out "Your player" like "Playing together" (both are reached by
+scrolling, and "Your player" moved after the World section in the pause menu), the
+references `pause-screen` and `pad-pause` were regenerated with the preview and the
+Automatic icon masked, and the three-guest test now waits for the figures to stand still
+(and a snap puts the body under the head, see above). The failed specs and every Part D
+spec were then run again: all passed (`touchLayout`, `worldMenu`, `ui`, `gamepadMenus`:
+57; `mpFigure`, `mpPlayers`, `mpMenus`: 26; `playerSection`: 7).
+
+References looked at (old left, new right, `scripts/compareShots.mjs`):
+
+| Reference                   | Changed        | Judgement                                                                                                                       |
+| --------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `remote-player`             | 2.0 %          | The figure in Ember's look, upright on the platform, facing the camera; red belt (slot 1), tag with a red stripe, name readable |
+| `remote-player-night`       | 0.1 %          | The figure dark like the wall behind it, no glow; tag readable                                                                  |
+| `room-panel`                | 13.3 %         | Head icons next to the swatches                                                                                                 |
+| `pause-screen`, `pad-pause` | 33.4 %, 24.5 % | "Your player" below "World"; preview and Automatic icon masked                                                                  |
+| `figure-sheet` (new)        | –              | Eight clearly different looks, front and back, with names                                                                       |
+| `player-section` (new)      | –              | Name, masked preview, the 3 × 3 picker with Moss marked                                                                         |
 
 ## For the Pi side
 
