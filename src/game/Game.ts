@@ -54,6 +54,8 @@ import { worldHash } from '../net/snapshot';
 import { Multiplayer } from './multiplayer';
 import { JoinSection, type RoomListView, TEXT_UNAVAILABLE } from '../ui/JoinSection';
 import { RoomPanel } from '../ui/RoomPanel';
+import { PlayerSection } from '../ui/PlayerSection';
+import { lookForKey } from '../player/looks';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
 import { ChunkManager } from '../world/ChunkManager';
@@ -271,6 +273,7 @@ export class Game {
   private framesSuspended = false;
   /** "Join a world" on the world menu and "Playing together" in the pause menu. */
   private joinSection: JoinSection | null = null;
+  private playerSection: PlayerSection | null = null;
   private roomPanel: RoomPanel | null = null;
   /** The line of the room panel ("Opening…", an error, "Link copied"). */
   private roomMessage = '';
@@ -454,7 +457,10 @@ export class Game {
       this.joinSection = new JoinSection({
         name: this.mp.identity.name,
         available: this.netConfig.signal !== null,
-        onName: (name) => this.mp.setName(name),
+        onName: (name) => {
+          this.mp.setName(name);
+          this.playerSection?.setName(name);
+        },
         onJoin: (code, via) => void this.joinFromMenu(code, via),
       });
       this.joinSection.setLink(params.join);
@@ -468,6 +474,25 @@ export class Game {
         onCopyLink: () => void this.copyJoinLink(),
       });
       this.pauseScreen.setRoomPanel(this.roomPanel.element);
+      this.playerSection = new PlayerSection({
+        name: this.mp.identity.name,
+        choice: this.mp.identity.look,
+        automatic: lookForKey(this.mp.identity.key),
+        previewGl: params.previewGl,
+        onName: (name) => {
+          this.mp.setName(name);
+          this.joinSection?.setName(name);
+        },
+        onNameCommit: () => {
+          this.mp.commitName();
+          this.updateRoomPanel();
+        },
+        onLook: (choice) => {
+          this.mp.setLook(choice);
+          this.updateRoomPanel();
+        },
+      });
+      this.pauseScreen.setPlayerSection(this.playerSection.element);
       this.benchScreen = new BenchScreen(this.root, {
         onStart: (via) => this.startBench(via),
         onBack: () => this.closeBench(),
@@ -702,6 +727,7 @@ export class Game {
     this.worldMenu?.setVisible(screen === 'worlds');
     this.pauseScreen?.setKind(screen === 'settings' ? 'settings' : 'pause');
     this.pauseScreen?.setVisible(screen === 'settings' || screen === 'pause');
+    this.playerSection?.setShown(screen === 'settings' || screen === 'pause');
     if (screen === 'nettest') {
       if (!this.netTestScreen?.isOpen) this.netTestScreen?.open();
     } else if (this.netTestScreen?.isOpen) {
@@ -980,7 +1006,7 @@ export class Game {
 
   /** The preview of "Your player" for the test API. */
   private previewState(): { frames: number } | null {
-    return null;
+    return this.playerSection?.previewState ?? null;
   }
 
   /**
@@ -1109,7 +1135,14 @@ export class Game {
     this.roomPanel.set({
       role: this.mp.role,
       code: this.mp.roomCode,
-      players: players.map(({ id, name, slot, host, self }) => ({ id, name, slot, host, self })),
+      players: players.map(({ id, name, slot, look, host, self }) => ({
+        id,
+        name,
+        slot,
+        look,
+        host,
+        self,
+      })),
       disabledReason: this.netConfig.signal === null ? TEXT_UNAVAILABLE : null,
       touch: this.mode === 'touch',
       message: this.roomMessage,

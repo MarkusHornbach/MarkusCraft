@@ -1,8 +1,9 @@
 // The pause menu's part about playing together (Phase 6): "Open to others" in a world of
 // one's own; while hosting the room code, "Copy join link", the players and "Close to
 // others"; as a guest the room code and the players.
-import { PLAYER_COLORS } from '../render/RemotePlayers';
+import { PLAYER_COLORS } from '../render/figureModel';
 import { button, element } from './activate';
+import { headIconCanvas } from './figureIcons';
 
 export const TEXT_PHONE_HOST =
   'The world closes for everyone if this screen locks or you switch apps. A computer is the more reliable host.';
@@ -11,6 +12,8 @@ export interface RoomPanelPlayer {
   id: number;
   name: string;
   slot: number;
+  /** The figure's look (1–8): its head icon is shown next to the swatch. */
+  look: number;
   host: boolean;
   self: boolean;
 }
@@ -68,6 +71,7 @@ export class RoomPanel {
         const swatch = element('span', 'room-swatch');
         swatch.style.background = `#${PLAYER_COLORS[p.slot % PLAYER_COLORS.length].toString(16).padStart(6, '0')}`;
         item.appendChild(swatch);
+        item.appendChild(headIconCanvas(p.look, 3));
         const marks = [p.host ? '(host)' : '', p.self ? '(you)' : ''].filter((m) => m !== '');
         item.appendChild(element('span', 'room-player-name', [p.name, ...marks].join(' ')));
         list.appendChild(item);

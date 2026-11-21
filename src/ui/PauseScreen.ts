@@ -119,6 +119,7 @@ export class PauseScreen {
   private readonly debugSwitch: HTMLInputElement;
   private readonly fullscreenButton: HTMLButtonElement;
   private readonly worldSection: HTMLElement;
+  private readonly settingsSection: HTMLElement;
   /** "Playing together" (Phase 6), in the pause menu of a world only. */
   private roomPanel: HTMLElement | null = null;
   /** A guest's world: "Leave world" instead of "Save and back to worlds". */
@@ -174,6 +175,7 @@ export class PauseScreen {
     columns.appendChild(right);
 
     const settings = element('section', 'pause-section');
+    this.settingsSection = settings;
     settings.appendChild(element('h2', 'pause-heading', 'Settings'));
     const change = (): void => options.onSettingsChange({ ...this.settings });
     const renderDistance = this.slider({
@@ -356,6 +358,11 @@ export class PauseScreen {
   private backLabel(): string {
     if (this.kind !== 'pause') return 'Back to worlds';
     return this.guest ? 'Leave world' : 'Save and back to worlds';
+  }
+
+  /** "Your player": on the settings page and in the pause menu, after the settings. */
+  setPlayerSection(section: HTMLElement): void {
+    this.settingsSection.after(section);
   }
 
   /** The "Playing together" section; shown in the pause menu of a world. */
