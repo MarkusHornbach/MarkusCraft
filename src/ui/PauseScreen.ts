@@ -119,6 +119,10 @@ export class PauseScreen {
   private readonly debugSwitch: HTMLInputElement;
   private readonly fullscreenButton: HTMLButtonElement;
   private readonly worldSection: HTMLElement;
+  /** "Playing together" (Phase 6), in the pause menu of a world only. */
+  private roomPanel: HTMLElement | null = null;
+  /** A guest's world: "Leave world" instead of "Save and back to worlds". */
+  private guest = false;
   private readonly backButton: HTMLButtonElement;
   /** "Network test": only on the settings page. */
   private readonly netTestButton: HTMLButtonElement;
@@ -326,7 +330,7 @@ export class PauseScreen {
   setKind(kind: PauseKind): void {
     this.kind = kind;
     const pause = kind === 'pause';
-    this.backButton.textContent = pause ? 'Save and back to worlds' : 'Back to worlds';
+    this.backButton.textContent = this.backLabel();
     // Where the controller's focus starts and what B does (plan 5.6).
     this.mark(this.playButton, pause, pause);
     this.mark(this.backButton, false, !pause);
@@ -336,14 +340,35 @@ export class PauseScreen {
     if (pause) {
       this.buttonRow.insertBefore(this.playButton, this.backButton);
       this.rightColumn.appendChild(this.worldSection);
+      // Last: on a phone it is reached by scrolling, the rest stays where it was.
+      if (this.roomPanel) this.rightColumn.appendChild(this.roomPanel);
       this.netTestButton.remove();
     } else {
       this.playButton.remove();
+      this.roomPanel?.remove();
       this.worldSection.remove();
       this.buttonRow.insertBefore(this.netTestButton, this.backButton.nextSibling);
     }
     this.placeFullscreenButton();
     this.renderControls();
+  }
+
+  private backLabel(): string {
+    if (this.kind !== 'pause') return 'Back to worlds';
+    return this.guest ? 'Leave world' : 'Save and back to worlds';
+  }
+
+  /** The "Playing together" section; shown in the pause menu of a world. */
+  setRoomPanel(panel: HTMLElement): void {
+    this.roomPanel = panel;
+    if (this.kind === 'pause') this.rightColumn.appendChild(panel);
+  }
+
+  /** A guest's world is left, not saved; its seed link would open another world. */
+  setGuest(guest: boolean): void {
+    this.guest = guest;
+    this.backButton.textContent = this.backLabel();
+    this.worldSection.hidden = guest;
   }
 
   /** The world the pause menu is about: its seed and the link that recreates it. */

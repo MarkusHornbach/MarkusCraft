@@ -7,12 +7,16 @@ import { describe, expect, it } from 'vitest';
  * Files that may call `setBlock`, with the number of calls each may contain.
  * - `src/actions/Session.ts`: the local session applies the result of `applyAction`.
  * - `src/game/Game.ts`: the test API's direct `setBlock` tool, nothing else.
+ * - `src/net/HostSession.ts`: the host applies the result of `applyAction` (Phase 6).
+ * - `src/net/ClientSession.ts`: a guest applies the blocks the host reports.
  * The world loader needs no call: `World.loadEdits` writes its own edit log.
  * Do not extend this list for game or UI code; build an action and submit it instead.
  */
 const ALLOWED: Record<string, number> = {
   'src/actions/Session.ts': 1,
   'src/game/Game.ts': 1,
+  'src/net/HostSession.ts': 1,
+  'src/net/ClientSession.ts': 1,
 };
 
 /** Calls of a method named `setBlock`; definitions (`setBlock(x: number, …`) do not count. */
@@ -92,7 +96,7 @@ describe('single pipeline (Phase 3 AC2.6)', () => {
     );
   });
 
-  it('World.setBlock is called only by the session and the test API', () => {
+  it('World.setBlock is called only by the sessions and the test API', () => {
     const found: Record<string, number> = {};
     for (const path of sourceFiles('src')) {
       const file = path.split('\\').join('/');

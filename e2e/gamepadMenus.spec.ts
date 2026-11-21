@@ -11,7 +11,7 @@ import {
   pauseWithMouse,
   untilPlaying,
 } from './game';
-import { BUTTON, Pad, installFakePads, polls } from './gamepad';
+import { BUTTON, Pad, focusOn, installFakePads, polls } from './gamepad';
 
 // Menus, worlds and software WebGL: several worlds are opened per test.
 test.describe.configure({ timeout: 180_000 });
@@ -88,7 +88,9 @@ test('Phase 5 AC3.1: the pad alone creates a world, plays, pauses, goes back and
     'aria-checked',
     'true',
   );
-  await focusTo(page, pad, 'Create and play', [BUTTON.DOWN, BUTTON.DOWN, BUTTON.LEFT]);
+  // The join section (Phase 6) lies below the form: walk there by position, not by path.
+  await focusOn(page, pad, '.world-create-button');
+  expect(await focusOf(page)).toBe('Create and play');
   await pad.tap(BUTTON.A);
   await untilPlaying(page);
   let state = await getState(page);
@@ -241,7 +243,9 @@ test('Phase 5 AC3.3: the pause menu and the settings page', async ({ page }) => 
   await focusTo(page, pad, 'Save and back to worlds', [BUTTON.UP, BUTTON.RIGHT]);
   await pad.tap(BUTTON.A);
   await page.locator('.world-list-view').waitFor();
-  await focusTo(page, pad, 'Settings', [BUTTON.DOWN, BUTTON.RIGHT, BUTTON.RIGHT]);
+  // The join section (Phase 6) lies below the list: walk there by position, not by path.
+  await focusOn(page, pad, '.world-settings-button');
+  expect(await focusOf(page)).toBe('Settings');
   await pad.tap(BUTTON.A);
   expect((await getState(page)).ui.screen).toBe('settings');
   expect(await focusOf(page)).toBe('Render distance');
@@ -298,7 +302,9 @@ test('Phase 5 AC3.4: the debug switch toggles with A (touch mode)', async ({ pag
   await openMenu(page, '?touch=1');
   const pad = new Pad(page);
   await pad.connect();
-  await focusTo(page, pad, 'Settings', [BUTTON.DOWN, BUTTON.RIGHT, BUTTON.RIGHT]);
+  await pad.tap(BUTTON.DOWN);
+  await focusOn(page, pad, '.world-form-settings-button');
+  expect(await focusOf(page)).toBe('Settings');
   await pad.tap(BUTTON.A);
   expect((await getState(page)).ui.screen).toBe('settings');
   await focusTo(page, pad, 'Debug overlay', Array<number>(10).fill(BUTTON.DOWN));

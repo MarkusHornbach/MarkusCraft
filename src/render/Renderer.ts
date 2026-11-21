@@ -14,6 +14,7 @@ import { aimBox } from '../world/raycast';
 import { BreakOverlay } from './BreakOverlay';
 import { ChunkMeshes } from './ChunkMeshes';
 import { type ChunkMaterials, createChunkMaterials, minLightFor } from './materials';
+import { RemotePlayers } from './RemotePlayers';
 import { Sky } from './Sky';
 import { type Atlas, buildAtlas } from './textures/atlas';
 
@@ -66,6 +67,8 @@ export class Renderer {
   private renderDistance = 8;
   private readonly highlight: THREE.LineSegments;
   private readonly breakOverlay: BreakOverlay;
+  /** The other players of a room. */
+  readonly remotePlayers: RemotePlayers;
 
   constructor(canvas: HTMLCanvasElement, options: RendererOptions) {
     this.canvas = canvas;
@@ -94,6 +97,7 @@ export class Renderer {
     this.highlight.renderOrder = 2;
     this.scene.add(this.highlight);
     this.breakOverlay = new BreakOverlay(this.scene);
+    this.remotePlayers = new RemotePlayers(this.scene, this.materials.uniforms);
   }
 
   /** Shows cracks of the given stage on a block being broken; null hides them. */

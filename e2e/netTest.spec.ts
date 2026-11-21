@@ -236,33 +236,53 @@ test('Phase 6 AC1.2: a build without a signaling server has no multiplayer', asy
 test('Phase 6 AC1.7: single-player requests nothing outside the page and never loads peerjs', async ({
   players,
 }) => {
-  test.setTimeout(120_000);
-  const { page } = await players.open();
-  const requests: string[] = [];
-  page.on('request', (request) => requests.push(request.url()));
-  // A build that knows a server: still nothing is fetched until multiplayer is used.
-  await openMenu(page, netQuery());
-  await createWorld(page, { name: 'Alone', seed: '1337' });
-  await page.waitForFunction(() => window.__mc.isReady());
-  // Play: walk and jump until the player has moved, whatever stands in the way.
-  const start = await page.evaluate(() => window.__mc.getState().player);
-  await page.keyboard.down('KeyW');
-  await page.keyboard.down('Space');
-  await page.waitForFunction(
-    ([x, z]) => {
-      const p = window.__mc.getState().player;
-      return Math.hypot(p.x - x, p.z - z) > 0.5;
-    },
-    [start.x, start.z],
-  );
-  await page.keyboard.up('Space');
-  await page.keyboard.up('KeyW');
-  const origin = new URL(page.url()).origin;
-  expect(requests.length).toBeGreaterThan(0);
-  for (const url of requests) {
-    if (url.startsWith('data:') || url.startsWith('blob:')) continue;
-    expect(new URL(url).origin, url).toBe(origin);
+  test.setTimeout(150_000);
+  /** Opens the menu with `query`, creates a world and walks; returns the requests made. */
+  const play = async (query: string, fromWorld: boolean): Promise<string[]> => {
+    const { page } = await players.open();
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await openMenu(page, query);
+    await createWorld(page, { name: 'Alone', seed: '1337' });
+    await page.waitForFunction(() => window.__mc.isReady());
+    // Part B: the world menu of a build with a server lists the open worlds at home (plan
+    // 5.11), which loads peerjs there. Playing a world requests nothing outside the page.
+    if (fromWorld) requests.length = 0;
+    // Play: walk and jump until the player has moved, whatever stands in the way.
+    const start = await page.evaluate(() => window.__mc.getState().player);
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('Space');
+    await page.waitForFunction(
+      ([x, z]) => {
+        const p = window.__mc.getState().player;
+        return Math.hypot(p.x - x, p.z - z) > 0.5;
+      },
+      [start.x, start.z],
+    );
+    await page.keyboard.up('Space');
+    await page.keyboard.up('KeyW');
+    // A few frames more: a timer of the menu would fire now.
+    await page.waitForTimeout(4000);
+    const origin = new URL(page.url()).origin;
+    return requests
+      .filter((url) => !url.startsWith('data:') && !url.startsWith('blob:'))
+      .map((url) => {
+        expect(new URL(url).origin, url).toBe(origin);
+        return url;
+      });
+  };
+  // A build without a server (GitHub Pages): nothing outside, no peerjs, from the start.
+  const alone = await play('', false);
+  expect(alone.length).toBeGreaterThan(0);
+  for (const url of alone) {
     expect(url).not.toContain('peerTransport');
+    expect(url).not.toContain('NetTestScreen');
+    expect(url).not.toContain('HostSession');
+  }
+  // A build that knows a server: while a world is played alone, nothing is requested.
+  const withServer = await play(netQuery(), true);
+  for (const url of withServer) {
+    expect(url).not.toContain('peerjs');
     expect(url).not.toContain('NetTestScreen');
   }
 });
@@ -273,7 +293,11 @@ test('Phase 6 AC2.2: an unreachable signaling server is reported and the game st
   test.setTimeout(120_000);
   const { page } = await players.open({
     // Chromium itself reports the refused WebSocket of the PeerJS client.
-    allowConsole: [/WebSocket connection to 'ws:\/\/127\.0\.0\.1:9\/peerjs/],
+    allowConsole: [
+      /WebSocket connection to 'ws:\/\/127\.0\.0\.1:9\/peerjs/,
+      // The world menu's room list asks the same port for the discovery list.
+      /Failed to load resource: net::ERR_UNSAFE_PORT/,
+    ],
   });
   const query = `?${new URLSearchParams({ signal: 'http://127.0.0.1:9/', stun: 'none' })}`;
   await openNetTest(page, query);

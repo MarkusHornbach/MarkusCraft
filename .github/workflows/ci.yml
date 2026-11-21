@@ -14,8 +14,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     # Unit tests, coverage and about 200 browser tests under software WebGL take 20–30
-    # minutes on a busy runner (Phase 5 part A added 29 browser tests).
-    timeout-minutes: 45
+    # minutes on a busy runner (Phase 5 part A added 29 browser tests). Phase 6 part B adds
+    # about 35 tests with several game pages each, run one at a time (project
+    # `multiplayer`): about 20 minutes more.
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

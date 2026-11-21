@@ -26,8 +26,8 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 6 part A (the network test: section 10, NET-1 to NET-4 added);
-2026-11-19.
+Last updated: Phase 6 part B (together in Creative: section 10, NET-5 to NET-12 added);
+2026-11-20.
 
 ---
 
@@ -332,6 +332,43 @@ with every device in the home Wi-Fi (not a guest network). Open the world menu, 
       under "Others testing now" within a few seconds, and "Discovery" says "On". Result:
       passed (2026-11-20): PC, phone and tablet each listed the other two, "Discovery"
       showed "On".
+
+The tests of Part B use a **Creative** world made on the PR preview (worlds are stored per
+site, so the preview starts with an empty world list). The host opens it with **Pause →
+Open to others**; the others join from **Join a world** on the world menu. Type a name
+there on every device first.
+
+- [ ] **NET-5** (6B) Open a Creative world on the PC and press **Open to others**. On phone
+      and tablet the world appears under **Open worlds at home** within a few seconds;
+      press **Join** on both. Build together for ten minutes: do edits of every player
+      appear on the others at once (within a second)? Does anything ever differ between
+      the devices (a block missing or in the wrong place)? Result:
+- [ ] **NET-6** (6B) Join with the room code typed on the phone (try lower case and a
+      space in the middle), and once with the join link (**Copy join link** on the host,
+      send it to the tablet, open it there: the world menu shows "Join world CODE").
+      Result:
+- [ ] **NET-7** (6B) The other players' figures and name tags: is every name readable
+      from a few blocks? Do the figures move smoothly when their players walk, jump and
+      fly, and turn their head when they look up or down? At night (wait for it, or open
+      the world at night): does a figure in the dark look dark, and lit next to a torch?
+      Result:
+- [ ] **NET-8** (6B) Host on the tablet; phone and PC join. Lock the tablet's screen for a
+      few seconds: what do the others see ("Connection lost. Reconnecting…", then back, or
+      "Lost the connection to the host.")? Does the tablet show the hint "The world closes
+      for everyone if this screen locks…" in its pause menu while hosting? Result:
+- [ ] **NET-9** (6B) PC as host, phone as guest. Minimise the host's browser on the PC for a
+      minute: can the phone go on building, and do its edits appear on the PC when it is
+      back? Does the time of day go on? Result:
+- [ ] **NET-10** (6B) Turn Wi-Fi off on a guest phone for 5 s and on again: does the phone
+      show "Connection lost. Reconnecting…" and then play on with its bar as before? And
+      for 30 s: does it return to the world list with "Lost the connection to the host."?
+      Result:
+- [ ] **NET-11** (6B) With a controller only (no mouse, keyboard or touch): join a listed
+      world from the world menu (D-pad to **Join**, A), play, press Start, choose **Leave
+      world**. Result:
+- [ ] **NET-12** (6B) Four players (PC host, phone, tablet and a second browser window or
+      device): the frame rate on the phone with three figures in view (F3 overlay, or the
+      feel compared with single-player). Result:
 
 ---
 

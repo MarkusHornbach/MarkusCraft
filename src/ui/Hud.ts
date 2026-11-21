@@ -17,6 +17,9 @@ export class Hud {
   private readonly breakFill: HTMLElement;
   private readonly notice: HTMLElement;
   private readonly message: HTMLElement;
+  /** Multiplayer notices ("Anna joined"), stacked at the top left. */
+  private readonly netNotices: HTMLElement;
+  private netShown = '';
   /** What each bar slot shows now, so that only changed slots are redrawn. */
   private readonly shown: (ItemStack | null)[] = [];
   private selected = 1;
@@ -60,6 +63,11 @@ export class Hud {
     this.notice = document.createElement('div');
     this.notice.className = 'pickup-notice';
     this.element.appendChild(this.notice);
+
+    this.netNotices = document.createElement('div');
+    this.netNotices.className = 'net-notices';
+    this.netNotices.setAttribute('role', 'status');
+    this.element.appendChild(this.netNotices);
 
     this.label = document.createElement('div');
     this.label.className = 'hotbar-label';
@@ -144,6 +152,21 @@ export class Hud {
   /** The pickup notice above the bar; null hides it. */
   setNotice(text: string | null): void {
     this.setText(this.notice, text);
+  }
+
+  /** The multiplayer notices, oldest first; an empty list shows none. */
+  setNetNotices(texts: readonly string[]): void {
+    const key = texts.join('\n');
+    if (key === this.netShown) return;
+    this.netShown = key;
+    this.netNotices.replaceChildren(
+      ...texts.map((text) => {
+        const line = document.createElement('div');
+        line.className = 'net-notice';
+        line.textContent = text;
+        return line;
+      }),
+    );
   }
 
   /** The hint under the crosshair; null hides it. */

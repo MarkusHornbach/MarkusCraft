@@ -324,35 +324,53 @@ The test stores no world and does not change your settings. The browser keeps th
 the last finished result ("Show last result" on the start page) until the next run
 replaces it.
 
-### Playing together (in preparation)
+### Playing together
 
-Multiplayer is being built (Phase 6): up to four players in one world on the home network,
-connected directly between the browsers. For now the game has only its **network test**,
-which checks whether the devices at home can reach each other before the game depends on
-it.
+Up to four people play in one world on the home network, connected directly between the
+browsers. Creative worlds can be shared now; Gathering worlds follow in a later version.
 
-Open the world menu, press **Settings**, then **Network test**, on two or more devices at
-the same time. Each device registers with the signaling server and shows its own four-letter
-test code; under **Others testing now** it lists the other devices with the test open.
-**Connect** next to one opens a direct connection and shows, on both devices, the candidate
-pair in use (`host` is a direct local address, `srflx` one learnt from the STUN server),
-the round-trip time of 20 pings and the throughput of 1 MB. The verdict line says
-"Direct connection OK" or what failed. **Use STUN** repeats the test without the STUN
-server, to find out whether it is needed at home. **Copy result** copies all numbers as a
-short text for `docs/device-tests.md`.
+- **Open a world to others:** play a Creative world, open the pause menu and press
+  **Open to others**. The menu shows the **room code** in large letters, **Copy join
+  link**, the list of players (with "(host)" and "(you)") and **Close to others**. The
+  world goes on while the pause menu is open; only your own player stands still.
+- **Join:** on the world menu, type your name under **Join a world**, then press **Join**
+  next to a world under **Open worlds at home**, or type its room code (upper or lower
+  case, spaces and hyphens do not matter) and press **Join**. A join link (`?join=CODE`)
+  shows **Join world CODE** as the main button. The world comes from the host; it is never
+  saved on the guest's device.
+- **Leave:** **Leave world** in the guest's pause menu. When the host presses **Close to
+  others**, leaves the world or closes the tab, every guest returns to the world list and
+  sees "The host closed the world." If the connection to the host breaks, the guest shows
+  "Connection lost. Reconnecting…" and tries again for 10 seconds.
+- **Phones and tablets may host,** but the world closes for everyone if the host's screen
+  locks or another app comes to the front. A computer is the more reliable host. While a
+  world is shared, the game keeps the screen on where the browser allows it.
+- **Everyone needs the same build**: a device with an older page gets "Different game
+  version. Reload the page on both devices."
+
+**Troubleshooting:** all devices must be in the same home network. Guest Wi-Fi networks
+usually isolate devices from each other, and a VPN on a device can hide the home network;
+both make direct connections impossible. **Settings → Network test** on two devices shows
+whether they can reach each other, which connection is used and how fast it is: the
+verdict line says "Direct connection OK" or what failed. **Use STUN** repeats the test
+without the STUN server; **Copy result** copies the numbers.
 
 Multiplayer needs servers that this repository does not contain. They run on the owner's
 Raspberry Pi in the home network, and only the builds the Pi serves know them:
 
-- a PeerJS signaling server (`peer` 1.0.x) with discovery switched on, reachable over
-  `wss` with a valid certificate, and allowing the origins of the game's builds (CORS);
+- a PeerJS signaling server (`peer` 1.0.x) with discovery switched on (the list of open
+  worlds), reachable over `wss` with a valid certificate, and allowing the origins of the
+  game's builds (CORS);
 - a STUN server (no TURN, no relay) on UDP 3478, reachable from the home network;
 - builds made with the variables `VITE_SIGNAL_URL` (the signaling server, for example
   `wss://<host>/`), `VITE_STUN_URLS` (comma-separated `stun:` URLs) and `BUILD_COMMIT`
   (the commit of the build; only devices running the same build see each other).
 
-Builds without `VITE_SIGNAL_URL`, such as the one on GitHub Pages, say "Multiplayer is
-not available in this build." Single-player never contacts any server.
+The Pi only sets up the connections; the game data goes directly between the browsers.
+Worlds are stored per site: the Pi's main build is the home of shared worlds, and each PR
+preview starts with an empty world list. Builds without `VITE_SIGNAL_URL`, such as the one
+on GitHub Pages, say "Multiplayer is not available in this build." Single-player never
+contacts any server.
 
 ### One-time setup for deployment
 
