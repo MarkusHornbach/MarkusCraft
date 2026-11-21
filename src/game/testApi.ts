@@ -55,8 +55,11 @@ export interface GameState {
      * is open), so that tests of earlier phases that compare `ui` as a whole still match.
      */
     focus?: string;
-    /** The preview of "Your player": frames it drew; null while it does not exist. */
-    preview: { frames: number } | null;
+    /**
+     * The preview of "Your player": pictures it drew. Left out while it does not exist,
+     * like `focus`, so that older `toEqual` checks of `ui` still match.
+     */
+    preview?: { frames: number };
   };
   /**
    * Every recipe in the order of the recipe list (craftable ones first): whether it can

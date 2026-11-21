@@ -47,7 +47,7 @@ game in a procedurally generated world"; everything in it is original work.
      chosen in "Your player" on the settings page), E measure and harden (plan:
      `docs/phase-6-plan.md`, all parts in it; it replaces `docs/phase-2-plan.md`, Part B;
      reports: `docs/phase-6a-report.md`, `docs/phase-6b-report.md`,
-     `docs/phase-6c-report.md`; D and E will write `docs/phase-6d-report.md` and
+     `docs/phase-6c-report.md`, `docs/phase-6d-report.md`; E will write
      `docs/phase-6e-report.md`). Part D was inserted after C; the former Part D "Measure
      and harden" is now Part E (steps 14–16, AC14.x–AC16.x)
   7. **Personalization** – custom blocks, textures, characters beyond the eight looks of
@@ -129,8 +129,9 @@ src/
                      netConfig.ts (pure: build variables and URL parameters → NetConfig),
                      multiplayer.ts (`Multiplayer`: opens or joins a room, drives the
                      session from frames and a 250 ms timer, notices, wake lock, room
-                     list; loads the session code lazily), playerIdentity.ts (player key
-                     and name in local storage, stored only once multiplayer is used),
+                     list; loads the session code lazily), playerIdentity.ts (player key,
+                     name and look in local storage, stored only once multiplayer is used,
+                     a name typed or a look chosen; `parseIdentity` is pure),
                      buildCommit.ts (pure: the build id; used by vite.config.ts),
                      peerTransport.ts (Signaling, Connection, RoomDirectory with peerjs;
                      own chunk, dynamic import)
@@ -169,7 +170,9 @@ src/
                      a chunk from scratch), lightUpdate.ts (after an edit), lightCheck.ts
                      (slow reference; tests and `verifyLight`)
     meshing/         mesher.ts (pure: block data in, typed arrays out), atlasLayout.ts
-  player/            player.ts (state), physics.ts, interaction.ts (break/place rules)
+  player/            player.ts (state), physics.ts, interaction.ts (break/place rules),
+                     looks.ts (the table of the figure's looks, `lookForKey`, `resolveLook`),
+                     figureMotion.ts (`FigureMotion`: pose, time, fly, busy, edits → angles)
   input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch and the
                      controller as well
                      TouchTracker.ts (pure: finger events → stick, look, buttons),
@@ -180,9 +183,14 @@ src/
                      feeds Input in play, hands the frame to `Game` otherwise)
   render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts,
                      BreakOverlay.ts (cracks on the block being broken, one draw call),
-                     RemotePlayers.ts (other players: body and head box, name tag)
+                     RemotePlayers.ts (other players: the animated figure and the name tag,
+                     two draw calls each), figureModel.ts (geometry of six boxes turned in
+                     the vertex shader, atlas texture, material, slot colours),
+                     FigurePreview.ts (the turning figure of "Your player", own WebGL)
     textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts,
-                     itemIcons.ts (icons of items that are no blocks), cracks.ts (pure)
+                     itemIcons.ts (icons of items that are no blocks), cracks.ts (pure),
+                     figureTexture.ts (pure: every look in one atlas, face layout, head
+                     icon, `figureView` for the sheet, checksum)
   ui/                Hud.ts (bar with counts, break progress, notices), blockIcon.ts,
                      itemIcon.ts, DebugOverlay.ts, settings.ts, ui.css,
                      InventoryScreen.ts (27 slots or the Creative palette, bar, bin, tabs),
@@ -195,7 +203,9 @@ src/
                      on its first use), FocusManager.ts (the controller's focus on a screen,
                      the focus frame), PadHints.ts (the hint bar), padGlyphs.ts (button
                      glyphs drawn on canvases), JoinSection.ts ("Join a world" on the
-                     world menu), RoomPanel.ts ("Playing together" in the pause menu)
+                     world menu), RoomPanel.ts ("Playing together" in the pause menu,
+                     with head icons), PlayerSection.ts ("Your player": name, preview, look
+                     picker), figureIcons.ts (head icons and the figure sheet on canvases)
   util/              rng.ts, noise.ts, math.ts
   testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts,
                      lightChecksum.ts, lightScenes.ts (tables with emitters, artificial
@@ -208,9 +218,11 @@ e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.t
                      sites.ts
                      (tree, beach and rock near the start point), lightScenes.ts (tunnel,
                      room with a window, roof over a chunk corner), gamepad.ts (the fake
-                     controller), recipeRows.ts (recipe rows that never move),
+                     controller), mpFigure.spec.ts (the figure of others),
+                     playerSection.spec.ts ("Your player"), recipeRows.ts (recipe rows that never move),
                      screenshots/
 scripts/             dev tools: signalServer.mjs (local PeerJS server, `npm run signal`),
+                     figurePreview.ts (sheet of all looks, front and back),
                      shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item icons), terrainStats.ts (terrain statistics and generation time), perf.ts
                      (generation, light, meshing, edits), compareShots.mjs (old reference
                      next to new), benchRun.mjs (plays the performance test headlessly),
@@ -239,7 +251,7 @@ sides in turn.
   `bench/` and `net/` must not import `three` or `peerjs`, touch the DOM or use
   `Math.random` / `Date.now` (enforced by ESLint rules). They are tested in Node. Only `render/`, `ui/`, `input/`
   and `game/` may use Three.js and browser APIs. The same rule covers
-  `render/textures/tiles.ts`, `itemIcons.ts` and `cracks.ts`. The core may import `game/config.ts`.
+  `render/textures/tiles.ts`, `itemIcons.ts`, `cracks.ts` and `figureTexture.ts`. The core may import `game/config.ts`.
   `input/TouchTracker.ts`, `input/padMapping.ts`, `input/focusMove.ts`,
   `game/autosave.ts`, `game/perfStats.ts`, `game/netConfig.ts` and `game/buildCommit.ts`
   follow the same discipline (no DOM,
@@ -518,6 +530,36 @@ lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX
   host's own player has no limit). Every guest action reads blocks through `FarReader`
   (reach, water, support, tools, stations within 5), also far from the host. Smelting
   stays on the guest's screen.
+- **The player figure (Phase 6 part D).** Six boxes (legs 4 × 11 × 4, body 8 × 11 × 5,
+  arms 3 × 10 × 3, head 7 × 7 × 7 texels, 29 tall = `PLAYER_HEIGHT`; proportions of this
+  game's own) in one geometry; the vertex shader turns head and limbs about their pivots
+  from per-figure uniforms, the body's yaw is the mesh rotation: **two draw calls per
+  figure** (figure and name tag). Looks are the append-only table `player/looks.ts` (ids
+  1–8, pinned by `looks.test.ts`; choice 0 is "Automatic" = `lookForKey(key)`, 1 + first
+  key byte mod 8). `figureTexture.ts` paints all looks into one 128 × 128 atlas (pinned
+  checksum in `figureTexture.test.ts`; it changes only with an intended change of the
+  looks); the belt is accent (alpha 128 on the GPU) and tinted with the slot colour, which
+  also stripes the name tag. `FigureMotion` (pure, no allocation per step) gives the
+  angles once per rendered frame: legs swing with the distance walked up to
+  `FIGURE_LEG_SWING`, rest within `FIGURE_SETTLE_MS`, none while flying or after a snap
+  (a jump beyond `SNAP_DISTANCE` or a teleport, `PoseBuffer.snapsAt`); the body turns
+  towards the walking direction (backwards: away from it) and is never more than 45° from
+  the head; the right arm swings every `FIGURE_SWING_MS` while `busy` and once per block
+  change the player caused (`RemotePlayer.edits`). Protocol: `look` in `hello`, `welcome`
+  and `joined`; `profile` (`name`, `look`; counts towards the rate limit; the host applies
+  the name suffix again and tells everyone, the sender too); `busy` in `pose`, `fly` and
+  `busy` in `poses`. The look is not saved with the world (every `hello` brings it); a
+  saved guest entry gets the new name. `busy` is `Game.holdingBreak()`: break held, a
+  block targeted, not paused.
+- **"Your player" (Phase 6 part D)** is a section of the pause screen after "Settings"
+  (settings page and pause menu): the name (the same value as the field of "Join a
+  world"; sent to the room on `change`), a preview (`FigurePreview`, its own WebGL2
+  context, created when the section is shown and in view, at most 30 pictures a second,
+  disposed with `forceContextLoss` when the page closes; without WebGL the head icon) and
+  nine look buttons (`aria-label` "Look: Fern", "Look: Automatic (Fern)"). A new look is
+  sent at once. `markuscraft.player.v1` holds `{ key, name, look }`; a record without a
+  valid look loads as 0, and `saveIdentity` leaves a stored record that says the same
+  untouched.
 - **The network test (Phase 6 part A)** is a screen of its own (`nettest`), opened by
   "Network test" on the settings page; "Back" returns there. Its test id is
   `mc-<build>-t-<4 characters>`; it lists the others from PeerJS discovery every 3 s,
@@ -650,7 +692,13 @@ active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused
   `roomCode`, `selfId`, `players` (with `renderX/Y/Z/Yaw`, where the figure is drawn),
   `rttMs`, `lastResult` (the host's last answer, also to raw messages), `worldHash`,
   `lastError`, `notices`, `figures`. `setBlock` on a host is sent to the guests; on a guest
-  it throws. A guest in Gathering whose breaks are timed steps with `stepPaced(page, n)`
+  it throws. Part D: `getState().player` also has `name`, `choice` (0–8) and `look`;
+  `net.players` has `look`, `fly`, `busy`, `anim { bodyYaw, headYaw, headPitch, leftArm,
+rightArm, leftLeg, rightLeg }` (the angles drawn in the last frame, null if not drawn)
+  and `tagDraws`; `ui.preview { frames } | null`; `__mc.figureSheet()` (reference
+  `figure-sheet`). URL parameters `look=<0–8>` and `previewgl=0` (the preview gets no
+  WebGL). Tests whose pictures show a figure or a head icon fix the look with `look=`: one
+  from the random player key would change the reference. A guest in Gathering whose breaks are timed steps with `stepPaced(page, n)`
   (`e2e/multiplayer.ts`, no faster than real time): the host measures breaks on its own
   clock. URL parameters `join=<code>` (in test mode: join at once; otherwise the world
   menu's "Join world CODE") and `name=<text>`. A crash without goodbye:
@@ -846,12 +894,17 @@ hold:
   host clock, the grace rule, the rate limit, Gathering worlds opened to others):
   implemented (report: `docs/phase-6c-report.md`). Read its "Decisions and deviations"
   before changing the save format, timed breaking in rooms or the sessions.
-- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A, B and C implemented. Five
+- Phase 6 part D (player figure: looks, figure texture, motion, the animated figure with
+  two draw calls, `profile`, `busy` and `fly`, "Your player" with preview and look picker,
+  head icons in the player list): implemented (report: `docs/phase-6d-report.md`). Read its
+  "Decisions and deviations" before changing the figure, the looks, the identity record or
+  "Your player".
+- Phase 6 (multiplayer): planned (`docs/phase-6-plan.md`), parts A, B, C and D implemented. Five
   parts, each in its own session with its own pull request, in order: **A** connection
   test (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's
   NET tests of A in `docs/device-tests.md` show a working connection), **C** Gathering
   together (steps 8–10), **D** player figure (steps 11–13, plan sections 5.14 and 5.15;
-  planned, not started), **E** measure and harden (steps 14–16). Part D was inserted by the
+  implemented), **E** measure and harden (steps 14–16). Part D was inserted by the
   owner on 2026-11-21 (plan section 3, change 14); the former Part D is Part E, unchanged
   in content, its device tests NET-17 to NET-19 keep their ids, and "Part D" or "AC11.x"
   in the reports of Parts B and C mean Part E and AC14.x. The servers on the Pi are built

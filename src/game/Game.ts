@@ -1004,9 +1004,10 @@ export class Game {
     );
   }
 
-  /** The preview of "Your player" for the test API. */
-  private previewState(): { frames: number } | null {
-    return this.playerSection?.previewState ?? null;
+  /** The preview of "Your player" for the test API: no key while it does not exist. */
+  private previewState(): { preview?: { frames: number } } {
+    const preview = this.playerSection?.previewState ?? null;
+    return preview ? { preview } : {};
   }
 
   /**
@@ -2564,7 +2565,7 @@ export class Game {
         screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play',
         tab: this.inventoryOpen ? this.inventoryScreen.currentTab : null,
         ...(this.focus.description !== null ? { focus: this.focus.description } : {}),
-        preview: this.previewState(),
+        ...this.previewState(),
       },
       recipes: this.recipeStatuses().map((status) => ({
         id: status.id,
