@@ -173,17 +173,30 @@ test('Phase 6 AC14.3: soak: four players, 50 actions each, one leaves and rejoin
             n % 2 === 0 ? { kind: 'place', ...cell, slot: 0 } : { kind: 'break', ...cell },
           );
           if (answer) {
-            // The host's own action is answered at once.
-            results.push(answer.ok || `${n}: host`);
+            // Answered at once: the host's own action, or a guest that is not online (a
+            // reconnect) refusing it on its own screen.
+            const block = window.__mc.getBlock(cell.x, cell.y, cell.z);
+            const net = window.__mc.getState().net;
+            results.push(
+              answer.ok ||
+                `${n}: ${net.role} ${i} ${answer.reason} at ${cell.x} (block ${block}, ${net.status})`,
+            );
           } else {
             // A guest's answer comes from the host.
             const t0 = performance.now();
             while ((window.__mc.getState().net.lastResult?.seq ?? 0) <= before) {
               if (performance.now() - t0 > 10_000) break;
-              await new Promise((resolve) => setTimeout(resolve, 10));
+              // `getState` is not cheap: four software-rendered pages asking it every few
+              // milliseconds starve their own timers (pings) on a busy runner.
+              await new Promise((resolve) => setTimeout(resolve, 50));
             }
             const last = window.__mc.getState().net.lastResult;
-            results.push(last?.ok === true || `${n}: ${last?.reason ?? 'no answer'}`);
+            const block = window.__mc.getBlock(cell.x, cell.y, cell.z);
+            results.push(
+              last?.ok === true ||
+                `${n}: guest ${i} ${last?.reason ?? 'no answer'} at ${cell.x} (block ${block}, ` +
+                  `seq ${last?.seq ?? 0} after ${before}, ${window.__mc.getState().net.status})`,
+            );
           }
           await new Promise((resolve) => setTimeout(resolve, 20));
         }

@@ -134,6 +134,14 @@ API), `docs/device-tests.md`, this report.
   waits until the host knows every player's pose after the long jump to the columns,
   instead of a fixed 300 ms, since the host checks reach against the last pose it got.
 
+- **The soak on a busy runner.** The third CI run showed one guest losing its connection
+  during the soak's second half (the host heard nothing from it for 5 s) and refusing
+  four actions on its own screen while it reconnected; the following actions then found
+  their cells one step behind. The test's pages had asked `getState()` every 10 ms while
+  waiting for answers, which with four software-rendered pages starves their timers (the
+  pings). They now ask every 50 ms, and a failure names the player, the reason, the block
+  in the cell and the connection status. The product behaviour (a reconnect after 5 s of
+  silence) is as planned; NET-10 checks it on real devices.
 - **Part D's timing test AC11.6 moved into a solo file**
   (`src/player/figureMotionSpeed.solo.test.ts`). The second CI run of this pull request
   measured 20.98 ms against its limit of 20 ms in the pass where 70 files run side by
