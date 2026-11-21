@@ -120,6 +120,7 @@ export class PauseScreen {
   private readonly fullscreenButton: HTMLButtonElement;
   private readonly worldSection: HTMLElement;
   private readonly settingsSection: HTMLElement;
+  private playerSection: HTMLElement | null = null;
   /** "Playing together" (Phase 6), in the pause menu of a world only. */
   private roomPanel: HTMLElement | null = null;
   /** A guest's world: "Leave world" instead of "Save and back to worlds". */
@@ -342,11 +343,13 @@ export class PauseScreen {
     if (pause) {
       this.buttonRow.insertBefore(this.playButton, this.backButton);
       this.rightColumn.appendChild(this.worldSection);
-      // Last: on a phone it is reached by scrolling, the rest stays where it was.
+      // Last: on a phone these are reached by scrolling, the rest stays where it was.
+      if (this.playerSection) this.rightColumn.appendChild(this.playerSection);
       if (this.roomPanel) this.rightColumn.appendChild(this.roomPanel);
       this.netTestButton.remove();
     } else {
       this.playButton.remove();
+      if (this.playerSection) this.settingsSection.after(this.playerSection);
       this.roomPanel?.remove();
       this.worldSection.remove();
       this.buttonRow.insertBefore(this.netTestButton, this.backButton.nextSibling);
@@ -360,9 +363,13 @@ export class PauseScreen {
     return this.guest ? 'Leave world' : 'Save and back to worlds';
   }
 
-  /** "Your player": on the settings page and in the pause menu, after the settings. */
+  /**
+   * "Your player": on the settings page after the settings; in the pause menu after the
+   * world, before "Playing together" (a phone scrolls to both).
+   */
   setPlayerSection(section: HTMLElement): void {
-    this.settingsSection.after(section);
+    this.playerSection = section;
+    this.setKind(this.kind);
   }
 
   /** The "Playing together" section; shown in the pause menu of a world. */
