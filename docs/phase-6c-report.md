@@ -146,13 +146,18 @@ lastSeenMs }`, at most `GUESTS_MAX = 32` (`limitGuests`: one entry per key, newe
 - **AC9.1** in the memory transport: 500 breaks under delays of 0–300 ms all accepted;
   with `NET_BREAK_GRACE_MS` set to 0 the first of them is refused (checked once by hand),
   so the grace is what carries them.
-- COVERAGE_LINE
+- **Line coverage** of `src/net/`: 97.4 % (statements 95.3 %, branches 91.0 %, functions
+  96.8 %); all files 98.8 % (`npm run test:coverage`, 612 unit tests).
 - Browser tests of this part in the container (one at a time): AC8.4 31 s, AC9.6 19 s,
   AC9.7 18 s, AC9.8 19 s, AC9.9 39 s.
 
 ## Full browser run
 
-FULL_RUN
+`MC_CONTAINER_GPU_STALL=1 npx playwright test`, the two projects one after the other on
+the last commit of step 9: **game** 234 passed (16.3 min), **multiplayer** 35 passed
+(13.1 min). No failures, no console errors or warnings. No reference screenshot changed:
+the texts and menus this part touches (the Gathering note of "Open to others") appear in
+no reference.
 
 ## For the Pi side
 
