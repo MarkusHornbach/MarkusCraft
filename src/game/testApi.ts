@@ -234,8 +234,11 @@ export interface TestApi {
    * not exist.
    */
   openWorld(name: string, seed: number, mode?: GameMode): Promise<void>;
-  /** Puts items into the inventory directly, as far as they fit (test tool). */
-  give(item: number, count: number): void;
+  /**
+   * Puts items into the inventory directly, as far as they fit (test tool); on a host with
+   * `player`, into that guest's inventory (Phase 6 part C).
+   */
+  give(item: number, count: number, player?: number): void;
   /** Empties the inventory directly (test tool). */
   clearInventory(): void;
   /** The result record on the performance test's result screen, or null. */

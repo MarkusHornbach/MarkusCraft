@@ -34,7 +34,6 @@ export const JOIN_TEXT: Record<JoinFailure | 'unavailable', string> = {
   unavailable: 'Multiplayer is not available in this build.',
 };
 
-export const TEXT_GATHERING_LATER = 'Gathering worlds can be shared from a later version.';
 export const TEXT_HOST_CLOSED = 'The host closed the world.';
 export const TEXT_HOST_LOST = 'Lost the connection to the host.';
 export const TEXT_RECONNECTING = 'Connection lost. Reconnecting…';
@@ -54,6 +53,8 @@ export interface MultiplayerGame {
   record(): PlayerRecord;
   pose(): NetPose;
   flying(): boolean;
+  /** The clock the game measures break progress on (its simulation time). */
+  actionClock(): number;
   /** The guests the open world remembers, and where they go when its room closes. */
   guests(): readonly GuestEntry[];
   keepGuests(guests: GuestEntry[]): void;
@@ -180,8 +181,6 @@ export class Multiplayer {
     const worldName = this.game.worldName();
     if (worldName === null) throw new Error('No world is open');
     if (!this.game.available) throw new Error(JOIN_TEXT.unavailable);
-    // Gathering needs the host-side rules of Part C (break timing, saved guests).
-    if (this.game.mode() !== 'creative') throw new Error(TEXT_GATHERING_LATER);
     const network = await this.game.loadNetwork();
     const build = options.build ?? this.game.build;
     const signaling = network.signaling();
@@ -221,6 +220,7 @@ export class Multiplayer {
       time: this.game.time(),
       frozen: this.game.frozen(),
       clock: () => performance.now(),
+      localClock: () => this.game.actionClock(),
       wallClock: () => Date.now(),
       guests: this.game.guests(),
       listener: { ...this.wrap(this.game.listener), onPeer: (e) => this.onPeer(e) },
@@ -271,6 +271,7 @@ export class Multiplayer {
       code,
       randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
       clock: () => performance.now(),
+      actionClock: () => this.game.actionClock(),
       checksum: (seed, version) => options.checksum ?? terrainChecksum(seed, version),
       listener: {
         ...this.wrap(this.game.listener),

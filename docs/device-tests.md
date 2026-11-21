@@ -26,8 +26,8 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 6 part B (together in Creative: section 10, NET-5 to NET-12 added);
-2026-11-20.
+Last updated: Phase 6 part C (Gathering together: section 10, NET-13 to NET-16 added);
+2026-11-21.
 
 ---
 
@@ -369,6 +369,26 @@ there on every device first.
 - [ ] **NET-12** (6B) Four players (PC host, phone, tablet and a second browser window or
       device): the frame rate on the phone with three figures in view (F3 overlay, or the
       feel compared with single-player). Result:
+
+The tests of Part C use a **Gathering** world made on the PR preview, opened to others
+like a Creative world (**Pause → Open to others**). They need two players at least; the
+host can be any device.
+
+- [ ] **NET-13** (6C) Two players gather in a Gathering world for ten minutes: break logs,
+      dirt and stone, craft planks, a workbench and a pickaxe, place a furnace and smelt
+      something. Does a break ever fail or start over although the button was held (the
+      cracks run full and nothing happens, or begin again)? Does the guest's break take as
+      long as the host's for the same block and tool? Do the items always land with the
+      player who broke the block? Result:
+- [ ] **NET-14** (6C) The guest builds up a bar of items and walks somewhere, then **Leave
+      world**, and joins again: are the items and the place back? Then the host chooses
+      **Save and back to worlds**, opens the world again and **Open to others**; the guest
+      joins the new room: items and place still there? Result:
+- [ ] **NET-15** (6C) Two players about 300 blocks apart (one of them walks there): both
+      break blocks and craft at a workbench next to themselves. Does everything work for the one far from the host? Result:
+- [ ] **NET-16** (6C) A guest places torches on stone in a dark place and breaks some of
+      the stones under them: do the torches and their light look the same on every device,
+      and does a broken torch land in the guest's bag? Result:
 
 ---
 

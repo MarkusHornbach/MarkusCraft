@@ -2,10 +2,12 @@
 // with `applyAction` against the acting player, the relay of blocks and poses, and the
 // time of day. Pure: a later Node host can run it with any `Connection`.
 import { type Action, decodeAction } from '../actions/actions';
-import { type BlockChange, applyAction } from '../actions/apply';
+import { type BlockChange, applyAction, heldItem } from '../actions/apply';
 import { type GameMode, type PlayerRecord, createPlayerRecord } from '../actions/playerRecord';
 import type { Session, SessionListener } from '../actions/Session';
 import {
+  ACTION_RATE_LIMIT,
+  ACTION_RATE_WINDOW_MS,
   DAY_LENGTH_SECONDS,
   DUPLICATE_STALE_MS,
   HEARTBEAT_TIMEOUT_MS,
@@ -18,10 +20,12 @@ import {
 } from '../game/config';
 import { BLOCK_SOLID, Block } from '../world/blocks';
 import { wrapTime } from '../world/dayNight';
+import { breakTimeMs } from '../items/hardness';
 import type { MoveMode } from '../player/player';
 import { type GuestEntry, limitGuests } from '../save/saveFormat';
 import type { World } from '../world/World';
 import { FarReader } from './authority';
+import { BreakClock, breakDueMs } from './breakTiming';
 import { RemoteRoster } from './interpolation';
 import {
   type GuestMessage,
@@ -61,8 +65,16 @@ export interface HostOptions {
   hostPose: () => NetPose;
   time: number;
   frozen: boolean;
-  /** Milliseconds of a steady clock (wall-clock time in the browser). */
+  /**
+   * Milliseconds of a steady clock (wall-clock time in the browser). It is the action
+   * clock of every player while the room is open, the host's own too.
+   */
   clock: () => number;
+  /**
+   * The clock the host's own screen measures break progress on (its simulation time);
+   * `clock` if not given. Records the host's player sees carry its times (`BreakClock`).
+   */
+  localClock?: () => number;
   /**
    * Milliseconds since 1970, for the `lastSeenMs` of saved guests; `clock` if not given
    * (only the order of the times matters).
@@ -92,6 +104,14 @@ interface Member {
   queue: string[];
   lastHeardMs: number;
   errors: number;
+  /** Actions of the current second (the rate limit) and when that second began. */
+  rateCount: number;
+  rateStartMs: number;
+  /**
+   * A `break` that arrived a little early, held until `dueMs`, with the member's later
+   * actions behind it (they keep their order).
+   */
+  held: { dueMs: number; queue: { action: Action; seq: number }[] } | null;
 }
 
 /** A connection that has not said `hello` (yet): a room-list query or a joining guest. */
@@ -185,6 +205,9 @@ export class HostSession {
       queue: [],
       lastHeardMs: now,
       errors: 0,
+      rateCount: 0,
+      rateStartMs: now,
+      held: null,
     };
     this.members.set(1, this.self);
     this.local = new HostLocalSession(this);
@@ -284,6 +307,7 @@ export class HostSession {
    * channels, drops silent guests. Late or missing calls only delay these.
    */
   update(nowMs: number = this.o.clock()): void {
+    this.releaseHeld(nowMs);
     this.relay(nowMs);
     for (const member of this.members.values()) {
       if (member.conn) this.flush(member);
@@ -369,11 +393,16 @@ export class HostSession {
       return;
     }
     member.lastHeardMs = now;
-    // A host without frames relays from its message handlers (at most every 50 ms).
+    // A host without frames relays and decides held breaks from its message handlers.
+    this.releaseHeld(now);
     this.relay(now);
     switch (message.t) {
       case 'action':
-        this.act(member, message.action, message.seq);
+        if (this.overRate(member, now)) {
+          this.send(member, { t: 'result', seq: message.seq, ok: false, reason: 'rate' });
+        } else {
+          this.act(member, message.action, message.seq);
+        }
         break;
       case 'pose':
         if (this.o.mode === 'creative') member.moveMode = message.fly ? 'fly' : 'walk';
@@ -477,6 +506,9 @@ export class HostSession {
       queue: [],
       lastHeardMs: now,
       errors: 0,
+      rateCount: 0,
+      rateStartMs: now,
+      held: null,
     };
     const others: PlayerInfo[] = [...this.members.values()].map((m) => ({
       id: m.id,
@@ -534,8 +566,50 @@ export class HostSession {
 
   // --- actions ---------------------------------------------------------------------------
 
-  /** Validates and applies one action of a player; answers the sender, tells everyone. */
+  /** A guest's action beyond `ACTION_RATE_LIMIT` within one second is refused. */
+  private overRate(member: Member, now: number): boolean {
+    if (now - member.rateStartMs >= ACTION_RATE_WINDOW_MS) {
+      member.rateStartMs = now;
+      member.rateCount = 0;
+    }
+    member.rateCount++;
+    return member.rateCount > ACTION_RATE_LIMIT;
+  }
+
+  /**
+   * One action of a player, in order: behind a held `break`, held itself if it is a
+   * little early, or decided at once.
+   */
   private act(member: Member, action: Action, seq: number): void {
+    if (member.held) {
+      member.held.queue.push({ action, seq });
+      return;
+    }
+    if (this.o.mode === 'gathering' && action.kind === 'break') {
+      const block = this.reader.getBlock(action.x, action.y, action.z);
+      const required = breakTimeMs(block, heldItem(member.record));
+      const due = breakDueMs(member.record, action, required, this.o.clock());
+      if (due !== null) {
+        member.held = { dueMs: due, queue: [{ action, seq }] };
+        return;
+      }
+    }
+    this.decide(member, action, seq);
+  }
+
+  /** Held actions whose `break` is due now are decided, in order. */
+  private releaseHeld(now: number): void {
+    for (const member of this.members.values()) {
+      const held = member.held;
+      if (!held || now < held.dueMs) continue;
+      member.held = null;
+      // A later `break` in the queue may be held again; what follows it waits behind it.
+      for (const item of held.queue) this.act(member, item.action, item.seq);
+    }
+  }
+
+  /** Validates and applies one action of a player; answers the sender, tells everyone. */
+  private decide(member: Member, action: Action, seq: number): void {
     this.refreshHostPose();
     const poses = [...this.members.values()].map((m) => m.pose);
     const result = applyAction(
@@ -560,7 +634,7 @@ export class HostSession {
       }
       if (result.player) {
         member.record = result.player;
-        if (member === this.self) this.o.listener.onPlayer(result.player);
+        if (member === this.self) this.o.listener.onPlayer(this.local.view(result.player));
         else this.send(member, { t: 'record', record: result.player });
       }
     }
@@ -575,7 +649,13 @@ export class HostSession {
 
   /** The host's own action, from its local door. */
   actLocal(action: Action): void {
+    this.releaseHeld(this.o.clock());
     this.act(this.self, action, 0);
+  }
+
+  /** The clock of the host's own screen. */
+  localNow(): number {
+    return (this.o.localClock ?? this.o.clock)();
   }
 
   /** The host's own action could not even be decoded. */
@@ -583,10 +663,28 @@ export class HostSession {
     this.o.listener.onResult(action, { ok: false, reason: 'invalid' });
   }
 
+  /**
+   * Test tool: a guest's record and a way to replace it past the action layer (the
+   * guest gets it as from an action); null for an id that is no guest.
+   */
+  guestRecordDoor(
+    id: number,
+  ): { record: PlayerRecord; replaceRecord(record: PlayerRecord): void } | null {
+    const member = this.members.get(id);
+    if (!member || member === this.self) return null;
+    return {
+      record: member.record,
+      replaceRecord: (record) => {
+        member.record = record;
+        this.send(member, { t: 'record', record });
+      },
+    };
+  }
+
   /** Test tool: the host's record past the action layer. */
   replaceHostRecord(record: PlayerRecord): void {
     this.self.record = record;
-    this.o.listener.onPlayer(record);
+    this.o.listener.onPlayer(this.local.view(record));
   }
 
   private sendBlocks(changes: readonly BlockChange[], by: number = this.self.id): void {
@@ -665,13 +763,22 @@ export class HostSession {
 /** The host's own player as a `Session`: its actions take the same path as a guest's. */
 export class HostLocalSession implements Session {
   private readonly host: HostSession;
+  private readonly clock = new BreakClock();
+  /** The host's record as its screen sees it: break start times on the screen's clock. */
+  private shown: { raw: PlayerRecord; view: PlayerRecord } | null = null;
 
   constructor(host: HostSession) {
     this.host = host;
   }
 
   get record(): PlayerRecord {
-    return this.host.hostRecord;
+    return this.view(this.host.hostRecord);
+  }
+
+  /** The record with the break start on the screen's clock (cached per record). */
+  view(raw: PlayerRecord): PlayerRecord {
+    if (this.shown?.raw !== raw) this.shown = { raw, view: this.clock.view(raw) };
+    return this.shown.view;
   }
 
   submit(action: Action): void {
@@ -680,6 +787,7 @@ export class HostLocalSession implements Session {
       this.host.reportInvalid(action);
       return;
     }
+    this.clock.noteSubmit(decoded.action, this.host.localNow());
     this.host.actLocal(decoded.action);
   }
 

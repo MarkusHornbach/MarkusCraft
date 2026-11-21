@@ -4,7 +4,6 @@
 import { PLAYER_COLORS } from '../render/RemotePlayers';
 import { button, element } from './activate';
 
-export const TEXT_GATHERING_LATER = 'Gathering worlds can be shared from a later version.';
 export const TEXT_PHONE_HOST =
   'The world closes for everyone if this screen locks or you switch apps. A computer is the more reliable host.';
 

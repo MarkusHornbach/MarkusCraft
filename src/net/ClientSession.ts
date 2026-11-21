@@ -15,6 +15,7 @@ import {
 } from '../game/config';
 import type { WorldEdits } from '../save/saveFormat';
 import { wrapTime } from '../world/dayNight';
+import { BreakClock } from './breakTiming';
 import type { PeerEvent } from './HostSession';
 import { RemoteRoster } from './interpolation';
 import {
@@ -72,6 +73,11 @@ export interface ClientOptions {
   code: string;
   randomBytes: (count: number) => ArrayLike<number>;
   clock: () => number;
+  /**
+   * The clock the guest's screen measures break progress on (its simulation time);
+   * `clock` if not given. Records carry its times instead of the host's (`BreakClock`).
+   */
+  actionClock?: () => number;
   /** The terrain checksum this device computes for a seed and generator version. */
   checksum: (seed: number, generatorVersion: number) => number;
   listener: ClientListener;
@@ -100,7 +106,9 @@ export class ClientSession implements Session {
   private conn: Connection | null = null;
   private attempt: Attempt | null = null;
   private world: GuestWorld | null = null;
+  /** The record as the screen sees it: break start times on the screen's clock. */
   private current: PlayerRecord | null = null;
+  private readonly breakClock = new BreakClock();
   private seq = 0;
   private readonly pending = new Map<number, Action>();
   private joinStartMs = 0;
@@ -220,6 +228,7 @@ export class ClientSession implements Session {
     }
     const seq = ++this.seq;
     this.pending.set(seq, action);
+    this.breakClock.noteSubmit(action, (this.o.actionClock ?? this.o.clock)());
     this.send({ t: 'action', seq, action });
   }
 
@@ -346,8 +355,8 @@ export class ClientSession implements Session {
         break;
       }
       case 'record':
-        this.current = m.record;
-        this.o.listener.onPlayer(m.record);
+        this.current = this.breakClock.view(m.record);
+        this.o.listener.onPlayer(this.current);
         break;
       case 'blocks': {
         const changes: BlockChange[] = [];
