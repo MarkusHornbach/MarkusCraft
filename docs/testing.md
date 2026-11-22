@@ -1,0 +1,125 @@
+# Testing reference
+
+Read on demand. The rules for writing browser specs are in `e2e/CLAUDE.md`; the short list
+every session needs is in the root `CLAUDE.md`, "Headless testing".
+
+The game exposes a test API on `window.__mc` (`src/game/testApi.ts`) and accepts URL
+parameters so tests are deterministic. Details are specified in `docs/phase-1-plan.md`
+(section "Test strategy"); this file is the current reference.
+
+## Unit tests
+
+`npm test` takes about half a minute: the four `lightEdits*.slow.test.ts` files check the
+light against the slow reference after each of 2 000 random edits. The three passes and
+`expectFasterThan`: root `CLAUDE.md`, "Project structure".
+
+## URL parameters
+
+- `?seed=<int>` fixes the world, `?time=<0..1>` sets the time of day, `?freeze=1` stops
+  the clock, `?test=1` runs without menus and pointer lock and with fixed settings,
+  `?touch=1` forces touch mode (shows the touch controls without a touch on the play
+  button).
+- With `test=1` the world lives in memory (`MemoryStore`) and is never stored. `save=1`
+  (with `test=1`) uses IndexedDB and opens the world named by `world=<name>` (default
+  "Test"), creating it from `seed`. Each Playwright test has its own browser context and
+  therefore an empty IndexedDB; persistence tests reload inside one context.
+- `mode=gathering` or `mode=creative` (with `test=1`; default Creative) sets the game mode
+  of the test world.
+- `?bench=1`, `bench=quick`, `bench=sample`: see "Performance test" below.
+- `look=<0–8>` and `previewgl=0` (the preview gets no WebGL), Phase 6 part D.
+- `join=<code>` (in test mode: join at once; otherwise the world menu's "Join world CODE")
+  and `name=<text>`; `signal` and `stun` (`src/game/CLAUDE.md`).
+- Without `test=1` the page starts in the world menu and `?seed=` only pre-fills the "New
+  world" form.
+
+## Test API
+
+- Base (Phase 1): see `docs/phase-1-plan.md`, "Test strategy" (`step(n)`, `isReady()`,
+  `whenIdle()`, `getState()`, …). In test mode the simulation only advances through
+  `__mc.step(n)`.
+- Beyond Phase 2: `submit(action)` (returns the session's answer), `save()`,
+  `openWorld(name, seed, mode?)` (switch worlds in place), `terrainChecksum()`,
+  `give(item, count, player?)` (on a host with a guest's id: into that guest's inventory,
+  Phase 6 part C), `clearInventory()`; `getState()` has `mode`, `world`,
+  `save { dirty, lastError, lastSaveMs, lastLoadMs }`, `inventory`,
+  `breaking { x, y, z, progress } | null`, `ui { screen, tab }`,
+  `recipes [{ id, name, craftable, missing, stationMissing }]` in table order (ids 1–20),
+  and `smelting { recipe, progress } | null`. `setBlock`, `give` and `clearInventory` are
+  direct tools past the action layer.
+- Light (Phase 4): `getLight(x, y, z)` → `{ sky, block }` or null in a chunk that is not
+  lit; `verifyLight()` → number of wrong cells (0 is correct; slow); `lightChecksum()`;
+  `getState()` has `chunks.lit`, `chunks.relight`, `settings.brightness` and
+  `perf { chunkWorkAvgMs, chunkWorkMaxMs, longFrames, frames }` (last ten seconds).
+- Phase 5: `getState().pad { connected, active, polls, unsupported }`, `ui.focus`
+  (aria-label, text or id of the focused element; the key is left out while there is no
+  focus, so older `toEqual` checks of `ui` hold), `settings.padSensitivity` and
+  `settings.padInvertY`; `glyphSheet()` shows all controller glyphs (reference
+  `pad-glyphs`).
+- Phase 6 part D: `getState().player` also has `name`, `choice` (0–8) and `look`;
+  `ui.preview { frames } | null`; `__mc.figureSheet()` (reference `figure-sheet`).
+
+## Controller
+
+Controller tests call `installFakePads(page)` (`e2e/gamepad.ts`) before `goto`; it
+replaces `navigator.getGamepads` with pads in `window.__fakePads`. `new Pad(page)` has
+`connect()` (with a wake-up tap of Select, as a real browser reports a pad only after a
+press; `connect({ holding })` connects with buttons down, `wake: false` without the tap),
+`disconnect()`, `press`, `release`, `tap`, `trigger(button, value)` and
+`stick('left' | 'right', x, y)` (y down). A test that measures how far a stick moved
+something uses `stickFor(which, x, y, count)`, which holds it for exactly `count` polls
+inside one page call: between two separate calls it stays out as long as the round trips
+take. `e2e/gamepadInventory.spec.ts` walks the inventory with `focusOn(page, pad,
+selector)`, which taps the D-pad towards an element (rows first) without knowing the
+layout. Each call applies the change and reads the poll count in one page call, then waits
+until `getState().pad.polls` grew by two; `tap` holds the button for exactly one poll
+(held longer, a slow frame could make the D-pad repeat after `PAD_NAV_DELAY_MS`, as it
+should). `BUTTON` has the standard indices.
+
+## Multiplayer
+
+- Part A: `__mc.netNetwork()` gives a test the page's PeerJS network to drive directly;
+  outside a room `getState().net` is `{ role, available, build, test }`, with `test` the
+  network test's state while its screen is open.
+- Part B: `__mc.net.host({ code?, build? })`, `net.join(code, { name?, checksum?, build?
+})` (`checksum` forces a terrain mismatch, `build` another build), `net.rooms()`,
+  `net.leave()`, `net.sendRaw(message)`, `net.dropConnection()`, `suspendFrames(on)`;
+  `getState().net` has `role`, `status`, `roomCode`, `selfId`, `players` (with
+  `renderX/Y/Z/Yaw`, where the figure is drawn), `rttMs`, `lastResult` (the host's last
+  answer, also to raw messages), `worldHash`, `lastError`, `notices`, `figures`. `setBlock`
+  on a host is sent to the guests; on a guest it throws.
+- Part D: `net.players` has `look`, `fly`, `busy`, `anim { bodyYaw, headYaw, headPitch,
+leftArm, rightArm, leftLeg, rightLeg }` (the angles drawn in the last frame, null if not
+  drawn) and `tagDraws`. Tests whose pictures show a figure or a head icon fix the look
+  with `look=`: one from the random player key would change the reference.
+- A guest in Gathering whose breaks are timed steps with `stepPaced(page, n)`
+  (`e2e/multiplayer.ts`, no faster than real time): the host measures breaks on its own
+  clock. A crash without goodbye: `Page.crash` through a CDP session.
+
+## Performance test
+
+`?bench=1` (never with `test=1`, where it is ignored) opens the start page of the
+performance test instead of the world menu, `bench=quick` the same with the quick suite
+(render distances 2 and 3, a twentieth of the steps; what the browser tests run),
+`bench=sample` the result screen with the built-in `SAMPLE_RESULT`. `getState().bench` is
+null outside the test, otherwise `{ phase, suite, index, total, scenario, reason,
+figures }` (`figures`: most other players' figures drawn at once during the run);
+`__mc.benchResult()` returns the record on the result screen or null. The run is driven by
+its own buttons (`.bench-start-button`, `.bench-cancel-button`, …). Tests of a run wait on
+`getState().bench`, give themselves four minutes and never assert on a measured time or a
+light; the rules that throw a run away apply once the progress line shows "scenario 1 of
+13" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by hand:
+`node scripts/benchRun.mjs [1|quick] [folder]` against the preview server (the full suite
+takes about three minutes in a cloud session).
+
+## Regenerating references of the world
+
+Anything that changes light, the mesher or the shader: first copy `e2e/screenshots/` out
+of the repository, regenerate with `npx playwright test --update-snapshots=all`, then
+`node scripts/compareShots.mjs <old copy> <sheet folder>` writes one sheet per reference
+with the old picture left and the new one right, and prints how many pixels changed. Open
+every sheet with the Read tool and judge it against the checklist of
+`docs/phase-4-plan.md`, section 6.5; the report gets one line per reference. A change the
+checklist does not explain is a defect, not a new reference.
+
+For a quick look at any pose: `npm run build`, `npm run preview`, then
+`node scripts/shot.mjs "?test=1&seed=1337" out.png`.

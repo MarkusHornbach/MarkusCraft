@@ -16,7 +16,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:update": "npm run build && playwright test --update-snapshots",
-    "check": "npm run typecheck && npm run lint && npm run test",
+    "docs:budget": "node scripts/ci/docsBudget.mjs",
+    "check": "npm run typecheck && npm run lint && npm run docs:budget && npm run test",
     "check:all": "npm run check && npm run test:e2e"
   },
   "dependencies": {
