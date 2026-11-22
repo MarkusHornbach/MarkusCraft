@@ -58,8 +58,8 @@ input (keys, mouse, fingers, controller) ──► Input ──► Game (fixed 6
 
 - `changes` (always): `full`: push to `main` yes; pull request yes unless only `.md` files;
   other pushes no.
-- `checks` (always): npm ci, actionlint (pinned, SHA-256 checked), lint, type
-  check, unit tests with coverage, unit tests with time limits.
+- `checks` (always): npm ci, actionlint (pinned, SHA-256 checked), lint, docs
+  budget, type check, unit tests with coverage, unit tests with time limits.
 - `build` (`full`): `npm run build`, uploads `dist/` (artifact `dist`).
 - `e2e-game` (`full`, after `build`): four shards, `--project=game` with the specs of
   `e2e/shards.json`, blob report each.
@@ -71,8 +71,13 @@ input (keys, mouse, fingers, controller) ──► Input ──► Game (fixed 6
 - `CI result` (always): the one required check: green only if every job that had to run
   passed and the others were skipped.
 
+**Rebalancing:** a session that sees a green run above 25 minutes, or a shard above 15,
+rebalances (`node scripts/ci/timings.mjs --assign <shard>=<json>... > e2e/shards.json`,
+then `npm run format`) or adds a shard in its own part, and records it in its report.
+Timing data: the `report` job's summary and its artifact `e2e-timings`.
+
 Time limits per job: `changes` 5, `checks` 15, `build` 10, each shard 30, `report` 10,
-`CI result` 5 minutes. `e2e/shards.json` is made by `--assign` from the `e2e-timings`
+`CI result` 5 minutes. **Spec lists per shard:** `e2e/shards.json` is made by `--assign` from the `e2e-timings`
 JSON, longest spec first onto the shard with the least time; `timings.mjs --files <project> <n>`
 gives a shard job its list; a new spec file needs nothing (it runs in the last shard of its
 project until the next rebalancing places it). The artifact `e2e-timings` holds one JSON

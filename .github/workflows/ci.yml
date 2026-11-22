@@ -57,6 +57,8 @@ jobs:
           "$RUNNER_TEMP/actionlint" -color
       - name: Lint
         run: npm run lint
+      - name: Docs budget
+        run: npm run docs:budget
       - name: Type check
         run: npm run typecheck
       - name: Unit tests with coverage

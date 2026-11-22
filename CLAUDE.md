@@ -169,12 +169,12 @@ deviations" of the reports whose status row names it:
   `dist/`), `npm run preview` (serve the build), `npm run signal` (local PeerJS server on
   `127.0.0.1:9000`, multiplayer tests)
 - `npm run typecheck` (`tsc --noEmit`), `npm run lint` (ESLint + Prettier check),
-  `npm run format` (apply Prettier)
+  `npm run format` (apply Prettier), `npm run docs:budget` (`scripts/ci/docsBudget.mjs`)
 - `npm test` (unit tests: ordinary, then solo, then slow files), `npm run test:coverage`
   (with coverage, 85 % line threshold, used by CI)
 - `npm run test:e2e` (build, then Playwright against the preview server),
   `npm run test:e2e:update` (same, regenerating reference screenshots)
-- `npm run check`: `typecheck` + `lint` + `test` (fast gate for every commit);
+- `npm run check`: `typecheck` + `lint` + `docs:budget` + `test` (gate for every commit);
   `npm run check:all`: `check` + `build` + `test:e2e` (only for references and CI-only
   failures)
 
@@ -191,12 +191,8 @@ skipped. What each job does: `docs/architecture.md`, "CI jobs".
   cancelled; others are cancelled by a newer one of the same event and ref. Docs-only pull
   requests skip the browser tests; `CI result` is still green.
 - **Time budget:** `checks` within 8 minutes, a pull request run within 25 minutes. A
-  session that sees a green run above 25 minutes, or a shard above 15, rebalances
-  (`node scripts/ci/timings.mjs --assign <shard>=<json>... > e2e/shards.json`, then
-  `npm run format`) or adds a shard in its own part, and records it in its report.
-- **Spec lists per shard:** `e2e/shards.json`; a spec it does not name runs in the last
-  shard of its project, so it is never lost. Timing data: the `report` job's summary and
-  its artifact `e2e-timings`.
+  session that sees a green run above 25 minutes, or a shard above 15, rebalances the spec
+  lists of `e2e/shards.json` or adds a shard (how: `docs/architecture.md`, "CI jobs").
 - **The local rule:** after each plan step run `npm run check` and `npm run build`, plus
   the browser specs the step touches or could affect (`npx playwright test <files>`, with
   `MC_CONTAINER_GPU_STALL=1` in a cloud session); name them in the commit message body or
@@ -244,8 +240,8 @@ passed and the obsolete ones. The owner fills them out, for all phases.
   line in "Where the rules are" if it is new ground.
 - Paths are written in backticks (the link check sees them), as plain paths, never
   `@`-imports (those would load the file into every session again).
-- `node scripts/ci/docsBudget.mjs` must pass: root at most 25 000 bytes, each nested file
-  at most 8 000, no missing path.
+- `npm run docs:budget` (in `npm run check` and `checks`) must pass: root at most 25 000
+  bytes, each nested file at most 8 000, no missing path.
 
 ## Definition of Done (per phase or phase part)
 
