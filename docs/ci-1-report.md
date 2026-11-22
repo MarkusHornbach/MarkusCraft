@@ -121,12 +121,13 @@ browser tests' summed test time also differs from run to run by up to a third, s
 
 ### Full runs of the pull request after balancing
 
-| Run  | Head    |       `checks` result after start | Whole run (start → `CI result`) | `CI result`                           |
-| ---- | ------- | --------------------------------: | ------------------------------: | ------------------------------------- |
-| #174 | 2fab5e9 |                           5.5 min |                        12.6 min | green                                 |
-| #178 | 1acf087 |                           4.5 min |                        13.2 min | green                                 |
-| #180 | 520dcfa |                           4.4 min |                        13.6 min | red: `gamepadMenus` AC3.7 (section 6) |
-| #183 | 70b1713 | 6.0 min (25 s of it in the queue) |                        16.9 min | green                                 |
+| Run  | Head    |       `checks` result after start | Whole run (start → `CI result`) | `CI result`                                              |
+| ---- | ------- | --------------------------------: | ------------------------------: | -------------------------------------------------------- |
+| #174 | 2fab5e9 |                           5.5 min |                        12.6 min | green                                                    |
+| #178 | 1acf087 |                           4.5 min |                        13.2 min | green                                                    |
+| #180 | 520dcfa |                           4.4 min |                        13.6 min | red: `gamepadMenus` AC3.7 (section 6)                    |
+| #183 | 70b1713 | 6.0 min (25 s of it in the queue) |                        16.9 min | green                                                    |
+| #185 | 297d51f |                                 – |                               – | red: `gamepadMenus` AC3.7 (game 4); not measured further |
 
 ### Per shard (job time, minutes) and the 1.3× rule
 
@@ -220,10 +221,10 @@ shard is the one in `e2e/shards.json`.
 
 - **Three timing-dependent browser tests failed** in the runs of this pull request, on code
   this round did not touch; each passed in the other runs. The first fails often enough to
-  matter: **2 of the 6 full runs** (#168, #180) were red because of it alone, so on the
+  matter: **3 of the 8 full runs** (#168, #180, #185) were red because of it alone, so on the
   sharded layout `CI result` will be red now and then until it is fixed (section 7):
   - `gamepadMenus.spec.ts` "Phase 5 AC3.7: B and a browser Back held up by a slow frame act
-    once" (runs #168 and #180, both in the shard with `gamepadMenus.spec.ts`): still paused
+    once" (runs #168, #180 and #185, each in the shard with `gamepadMenus.spec.ts`): still paused
     after B and Back. The test calls `history.back()` only
     after its 600 ms busy wait; if the `popstate` then arrives more than one frame after the
     frame in which the poll saw B, the guard counts it as a second Back
