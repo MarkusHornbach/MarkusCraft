@@ -1,42 +1,42 @@
 {
   "game": [
     [
-      "fullscreen.spec.ts",
+      "gamepad.spec.ts",
       "gamepadInventory.spec.ts",
-      "inventoryScreen.spec.ts",
-      "netTest.spec.ts",
       "padSoak.spec.ts",
       "player.spec.ts",
-      "smoke.spec.ts"
-    ],
-    [
-      "bench.spec.ts",
-      "crafting.spec.ts",
-      "night.spec.ts",
-      "playerSection.spec.ts",
-      "torchSoak.spec.ts",
-      "touch.spec.ts",
-      "touchLayout.spec.ts",
-      "world.spec.ts"
-    ],
-    [
-      "gamepad.spec.ts",
-      "gamepadMenus.spec.ts",
-      "gathering.spec.ts",
-      "interaction.spec.ts",
-      "sky.spec.ts",
+      "smoke.spec.ts",
       "soak.spec.ts",
-      "terrain.spec.ts"
+      "worldMenu.spec.ts"
+    ],
+    [
+      "breaking.spec.ts",
+      "fullscreen.spec.ts",
+      "inventoryScreen.spec.ts",
+      "light.spec.ts",
+      "night.spec.ts",
+      "touch.spec.ts",
+      "touchLayout.spec.ts"
     ],
     [
       "actions.spec.ts",
-      "breaking.spec.ts",
+      "crafting.spec.ts",
+      "gathering.spec.ts",
       "inventory.spec.ts",
-      "light.spec.ts",
-      "save.spec.ts",
+      "sky.spec.ts",
+      "terrain.spec.ts",
       "torch.spec.ts",
-      "ui.spec.ts",
-      "worldMenu.spec.ts"
+      "ui.spec.ts"
+    ],
+    [
+      "bench.spec.ts",
+      "gamepadMenus.spec.ts",
+      "interaction.spec.ts",
+      "netTest.spec.ts",
+      "playerSection.spec.ts",
+      "save.spec.ts",
+      "torchSoak.spec.ts",
+      "world.spec.ts"
     ]
   ],
   "multiplayer": [
