@@ -6,7 +6,7 @@ references and the performance test are in `docs/testing.md`.
 ## Files
 
 - `fixtures.ts` (fails any test whose page logs a console error or warning), `game.ts`
-  (opens the game and wraps the test API), `helpers.ts` (measures pixels), `touch.ts`,
+  (opens the game and wraps the test API), `e2e/helpers.ts` (measures pixels), `touch.ts`,
   `gamepad.ts` (the fake controller), `sites.ts` (tree, beach and rock near the start
   point), `lightScenes.ts` (tunnel, room with a window, roof over a chunk corner),
   `recipeRows.ts` (recipe rows that never move), `screenshots/`
@@ -85,6 +85,8 @@ context with the console checks. Playwright starts the local PeerJS server
 (test mode, seed 1337, noon, frozen, the local server), `hostRoom`, `joinRoom` (waits until
 the guest's world is ready), `joinError` and `untilNet`. Room codes in tests must use the
 code alphabet (no I, O, 0, 1).
+
+## Multiplayer tests
 
 Every build's ids carry its build id, so tests running alongside see each other's
 devices: a test that needs a list of only its own devices (the `net-test` reference)

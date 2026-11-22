@@ -53,7 +53,8 @@ workers) adds a scenario: one entry in `SCENARIOS` with its script, and its row 
 itself. A changed scenario (script, steps, warm-up) gets a new version; adding a scenario
 or changing the order raises `BENCH_SUITE_VERSION`. Results of different versions of a
 scenario are never compared (`compare.ts` keeps them in separate rows).
-`scenarios.test.ts` pins the table.
+`scenarios.test.ts` pins the table. Scenarios added by later parts: `torches` (Phase 4
+part B, suite version 2) and `players` (below, suite version 3).
 
 ## The scenario `players` (Phase 6 part E)
 

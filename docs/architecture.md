@@ -51,6 +51,33 @@ input (keys, mouse, fingers, controller) ──► Input ──► Game (fixed 6
 - **The back guard** lives in `src/game/backGuard.ts`; its rule is in
   `src/input/CLAUDE.md`, as it pairs with the pad's B.
 
+## CI jobs
+
+`.github/workflows/ci.yml`; the summary and the rules for sessions are in the root
+`CLAUDE.md`, section "CI".
+
+- `changes` (always): `full`: push to `main` yes; pull request yes unless only `.md` files;
+  other pushes no.
+- `checks` (always): npm ci, actionlint (pinned, SHA-256 checked), lint, type
+  check, unit tests with coverage, unit tests with time limits.
+- `build` (`full`): `npm run build`, uploads `dist/` (artifact `dist`).
+- `e2e-game` (`full`, after `build`): four shards, `--project=game` with the specs of
+  `e2e/shards.json`, blob report each.
+- `e2e-mp` (`full`, after `build`): three shards, `--project=multiplayer` with the specs of
+  `e2e/shards.json`, each with its own signaling server.
+- `report` (`full`, after the shards): merges the blobs into HTML and JSON, timing summary
+  in the job summary, artifacts `e2e-timings` (90 days) and, when a shard failed,
+  `playwright-report` (14 days).
+- `CI result` (always): the one required check: green only if every job that had to run
+  passed and the others were skipped.
+
+Time limits per job: `changes` 5, `checks` 15, `build` 10, each shard 30, `report` 10,
+`CI result` 5 minutes. `e2e/shards.json` is made by `--assign` from the `e2e-timings`
+JSON, longest spec first onto the shard with the least time; `timings.mjs --files <project> <n>`
+gives a shard job its list; a new spec file needs nothing (it runs in the last shard of its
+project until the next rebalancing places it). The artifact `e2e-timings` holds one JSON
+per shard, `game-N.json` / `mp-N.json`, the merged `merged.json` and `summary.md`.
+
 ## Files of directories without a nested `CLAUDE.md`
 
 - `src/main.ts`: entry point: reads URL params, checks WebGL2, starts the game.

@@ -7,6 +7,12 @@ The game exposes a test API on `window.__mc` (`src/game/testApi.ts`) and accepts
 parameters so tests are deterministic. Details are specified in `docs/phase-1-plan.md`
 (section "Test strategy"); this file is the current reference.
 
+## Unit tests
+
+`npm test` takes about half a minute: the four `lightEdits*.slow.test.ts` files check the
+light against the slow reference after each of 2 000 random edits. The three passes and
+`expectFasterThan`: root `CLAUDE.md`, "Project structure".
+
 ## URL parameters
 
 - `?seed=<int>` fixes the world, `?time=<0..1>` sets the time of day, `?freeze=1` stops

@@ -67,7 +67,7 @@ remeshes them before it loads anything (`relight`). After an edit only the edite
 own chunk is remeshed in the same frame (`ChunkManager.remeshAfterEdit`); the other
 chunks of `chunksAffectedByEdit` join that queue (`queueRemesh`), and the frame of an edit
 gives the chunk manager only what is left of `CHUNK_BUDGET_MS` (Phase 4 part E).
-`whenIdle` and `isReady` wait for both.
+`whenIdle` and `isReady` wait for both. Why only the edited chunk: `docs/phase-4-edit-cost.md`.
 
 ## Generator version
 
