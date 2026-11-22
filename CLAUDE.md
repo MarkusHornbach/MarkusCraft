@@ -231,8 +231,8 @@ scripts/             dev tools: signalServer.mjs (local PeerJS server, `npm run 
                      next to new), benchRun.mjs (plays the performance test headlessly),
                      perfRuns.ts (comparison table from saved `perf-run` issues), editCost.ts
                      (where an edit's time goes on the `edit` route; run it bundled)
-docs/                phase plans and phase reports; device-tests.md (the one checklist of tests
-                     on real devices, filled out by the owner)
+docs/                phase plans and phase reports, ci-1-plan.md (CI round 1); device-tests.md
+                     (the one checklist of tests on real devices, filled out by the owner)
 .github/workflows/   ci.yml, deploy.yml
 ```
 
@@ -934,6 +934,11 @@ hold:
   in the reports of Parts B and C mean Part E and AC14.x. The servers on the Pi are built
   separately in the owner's `pi-infra` repository (plan section 5.12).
 - Phase 7 (personalization): not yet planned.
+- CI 1 (parallel browser tests, triggers, timing; a round of work on the pipeline, not a
+  game phase): planned (plan: `docs/ci-1-plan.md`, report to come: `docs/ci-1-report.md`).
+  One implementation session, one pull request. Until it is merged, `ci.yml` is the single
+  job described in the plan's section 1; section 6 of the plan lists what changes in this
+  file when it is built (CI layout, time budget, the local rule for browser tests).
 - Fix of flaky controller tests (focus one frame late, back pairing in wall-clock time,
   two tests that depended on round-trip timing):
   report `docs/fix-pad-flaky-report.md`.
