@@ -3,55 +3,9 @@
 A personalized voxel sandbox game that runs in the browser. The genre is "block-building
 game in a procedurally generated world"; everything in it is original work.
 
-## Vision
-
-- First-person voxel world: explore procedurally generated terrain, break and place blocks.
-- Runs as a static site (GitHub Pages), no server. Desktop browsers with keyboard + mouse;
-  from Phase 2 also Android phones and tablets with touch controls.
-- Built in seven phases, each planned with the owner and then implemented autonomously:
-  1. **Core** – chunked terrain, movement and collision, break/place, day/night, basic UI
-     (plan: `docs/phase-1-plan.md`, report: `docs/phase-1-report.md`)
-  2. **Touch controls** – on-screen controls for Android phones and tablets
-     (plan: `docs/phase-2-plan.md`, Part A; report: `docs/phase-2a-report.md`)
-  3. **Gathering & Crafting** – named worlds saved in the browser, a game mode per world
-     (Creative as before, or Gathering: no flying, limited items, peaceful), inventory,
-     timed breaking, ores, tools, a recipe list with workbench and furnace. Every change
-     to the world or a player's items goes through one action layer, so multiplayer can
-     be added without restructuring. Four parts with separate pull requests: A foundation,
-     B gathering, C crafting (plan: `docs/phase-3-plan.md`; reports: `docs/phase-3a-report.md`,
-     `docs/phase-3b-report.md`, `docs/phase-3c-report.md`). Its optional part D (Web
-     Workers) was never started and is replaced by Phase 4 part C
-  4. **Light & Torches** – sky light and block light per block cell, derived from the
-     blocks and never saved; dark tunnels and rooms, a darker night, a Brightness setting,
-     and the torch, the first block that is not a cube. Five parts with separate pull
-     requests: A light, P performance test run on real devices, B torch, C Web Workers
-     (optional), and E edits without hitches, added after P (plan: `docs/phase-4-plan.md`,
-     for part P `docs/phase-4p-plan.md`, for part E `docs/phase-4e-plan.md`;
-     reports: `docs/phase-4a-report.md`, `docs/phase-4p-report.md`, `docs/phase-4e-report.md`,
-     `docs/phase-4b-report.md`)
-  5. **Gamepad controls** – a controller with the standard layout as a third input source
-     next to mouse/keyboard and touch, on desktop browsers and in Chrome on Android; it
-     feeds `Input` and is an active source on top of mouse or touch mode, not a mode of its
-     own; a generic focus system makes every screen usable with the pad. Two parts with
-     separate pull requests: A (the pad in play, the focus system, all screens but the
-     inventory, the back guard) and B (inventory, Creative palette, Crafting tab), B after
-     the polishing of those screens (plan: `docs/phase-5-plan.md`; reports:
-     `docs/phase-5a-report.md`, `docs/phase-5b-report.md`)
-  6. **Multiplayer** – up to four players in one world on the home network: a host opens
-     the world they play to others, the others join from a list of open worlds at home or
-     with a room code, peer-to-peer over WebRTC with the owner's own PeerJS and STUN
-     servers on a Raspberry Pi; the host validates every action and saves every guest's
-     items. Five parts with separate pull requests: A connection test, B together in
-     Creative, C Gathering together, D player figure (a blocky figure with head, body,
-     arms and legs, eight looks generated in code, animated from the received movement,
-     chosen in "Your player" on the settings page), E measure and harden (plan:
-     `docs/phase-6-plan.md`, all parts in it; it replaces `docs/phase-2-plan.md`, Part B;
-     reports: `docs/phase-6a-report.md`, `docs/phase-6b-report.md`,
-     `docs/phase-6c-report.md`, `docs/phase-6d-report.md`, `docs/phase-6e-report.md`). Part D was inserted after C; the former Part D "Measure
-     and harden" is now Part E (steps 14–16, AC14.x–AC16.x)
-  7. **Personalization** – custom blocks, textures, characters beyond the eight looks of
-     Phase 6 part D (a free character editor, the held item, other players' cracks), names,
-     effects (not yet planned)
+A first-person voxel world (generated terrain, break and place blocks), a static site for
+desktop browsers, Android touch and controllers, up to four players at home. Built in
+phases, each planned with the owner, then implemented autonomously ("Status").
 
 ## Hard rules
 
@@ -88,24 +42,20 @@ game in a procedurally generated world"; everything in it is original work.
 
 ## Tech stack
 
-| Concern            | Choice                                                                                                                                                                                                                |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language           | TypeScript, `strict` mode                                                                                                                                                                                             |
-| Build / dev server | Vite, `base: './'` so the build works under any path                                                                                                                                                                  |
-| Rendering          | Three.js (WebGL2)                                                                                                                                                                                                     |
-| Unit tests         | Vitest (Node environment)                                                                                                                                                                                             |
-| Browser tests      | Playwright (`@playwright/test`), Chromium, software WebGL                                                                                                                                                             |
-| Lint / format      | ESLint (typescript-eslint) + Prettier                                                                                                                                                                                 |
-| Multiplayer        | `peerjs` client (dynamic import), `peer` 1.0.2 as local test server                                                                                                                                                   |
-| Package manager    | npm, lockfile committed                                                                                                                                                                                               |
-| Runtime            | Node 22 (`.nvmrc`)                                                                                                                                                                                                    |
-| CI / deploy        | GitHub Actions: `checks` on every push; the full suite (build, four `game` and three `multiplayer` shards, merged report) on pull requests and `main`; one required check, `CI result`; deploy `main` to GitHub Pages |
+- Language: TypeScript, `strict` mode
+- Build / dev server: Vite, `base: './'` so the build works under any path
+- Rendering: Three.js (WebGL2)
+- Unit tests: Vitest (Node environment)
+- Browser tests: Playwright (`@playwright/test`), Chromium, software WebGL
+- Lint / format: ESLint (typescript-eslint) + Prettier
+- Package manager: npm, lockfile committed
+- Runtime: Node 22 (`.nvmrc`)
+- CI / deploy: GitHub Actions (section "CI"); deploy `main` to GitHub Pages
 
-Keep runtime dependencies minimal: `three` and `peerjs` (Phase 6, the WebRTC client,
-loaded with a dynamic import only when multiplayer is used), unless a phase plan says
-otherwise. `peer` (the PeerJS server, pinned to the Pi's version 1.0.2) is a dev
-dependency for the local signaling server of the tests. Noise, RNG, physics and meshing
-are implemented in this repo.
+Keep runtime dependencies minimal: `three` and `peerjs` (the WebRTC client, loaded with a
+dynamic import only when multiplayer is used), unless a phase plan says otherwise; `peer`
+(the PeerJS server, pinned to the Pi's version 1.0.2) is a dev dependency for the tests'
+local signaling server. Noise, RNG, physics and meshing are implemented in this repo.
 
 ### Playwright in cloud sessions
 
@@ -117,286 +67,44 @@ a later session, update the pin to match and regenerate the reference screenshot
 
 ## Project structure
 
-```
-index.html
-src/
-  main.ts            entry point: reads URL params, checks WebGL2, starts the game
-  game/              Game.ts (loop, wiring, screens, world loading), config.ts (all constants),
-                     testApi.ts, urlParams.ts, autosave.ts (pure: when to write what),
-                     idbStore.ts (WorldStore on IndexedDB), worldLock.ts (one tab per world),
-                     perfStats.ts (pure: frames and chunk work of the last ten seconds),
-                     benchEnv.ts (browser, GPU and screen for a performance test result),
-                     backGuard.ts (one history entry, so the browser's Back stays in the game),
-                     netConfig.ts (pure: build variables and URL parameters → NetConfig),
-                     multiplayer.ts (`Multiplayer`: opens or joins a room, drives the
-                     session from frames and a 250 ms timer, notices, wake lock, room
-                     list; loads the session code lazily), playerIdentity.ts (player key,
-                     name and look in local storage, stored only once multiplayer is used,
-                     a name typed or a look chosen; `parseIdentity` is pure),
-                     buildCommit.ts (pure: the build id; used by vite.config.ts),
-                     peerTransport.ts (Signaling, Connection, RoomDirectory with peerjs;
-                     own chunk, dynamic import)
-  bench/             the performance test (pure): scenarios.ts (scenario table, scripts,
-                     suites, the guests' script of `players`), simGuests.ts (`SimRoom`:
-                     the simulated guests over the memory transport), benchStats.ts
-                     (numbers of one measurement window),
-                     verdict.ts (lights, throttling flag, Web Workers line), benchReport.ts
-                     (result record ⇄ issue text, issue link, `parseIssueBody`),
-                     BenchRunner.ts (state machine of a run, `BenchHost`), sampleResult.ts
-                     (what `bench=sample` shows), compare.ts (table of several runs)
-  actions/           the action layer (pure): actions.ts (types, decodeAction), apply.ts
-                     (applyAction), Session.ts (Session, LocalSession), playerRecord.ts
-  net/               pure (Phase 6): transport.ts (Connection, Signaling, RoomDirectory,
-                     Network), memoryTransport.ts (fake clock, seeded delays), netTest.ts
-                     (ids, messages and one run of the network test, candidate pair, texts),
-                     protocol.ts (messages, `encodeMessage`, validating decoders per
-                     direction, `validPose`), roomCode.ts (codes, peer ids, names, player
-                     keys), snapshot.ts (edits → snapshot parts → edits, `worldHash`),
-                     HostSession.ts (the host: players, `applyAction` per player, relay,
-                     time of day; `local` is the host's own `Session`), ClientSession.ts
-                     (the guest: join, sync, pose, ping, reconnect; a `Session`),
-                     interpolation.ts (`PoseBuffer`, `RemoteRoster`), authority.ts
-                     (`FarReader`: blocks of chunks the host has not loaded), breakTiming.ts
-                     (`breakDueMs`: the grace for early breaks; `BreakClock`: break starts
-                     on the screen's clock), traffic.ts (`TrafficMeter`, `countedNetwork`:
-                     messages and bytes of a room's connections)
-  items/             pure: items.ts (item table, tools), inventory.ts (functions on the 36
-                     slots), hardness.ts (break times, tool speed, gating, drop table),
-                     recipes.ts (recipe table, stations near a player, recipe status)
-  save/              pure: saveFormat.ts (records with the world's guests, validation, names,
-                     seeds), WorldStore.ts
-                     (interface + MemoryStore)
-  world/             blocks.ts (block + tile table), chunk.ts, World.ts, ChunkManager.ts,
-                     raycast.ts, dayNight.ts (time → sun, sky colours, daylight)
-    generation/      terrain.ts (heights, rock, layers, checksum), ores.ts (veins, clay),
-                     trees.ts, spawn.ts
-    light/           lightRules.ts (levels, packing, the step rule), lightChunk.ts (light of
-                     a chunk from scratch), lightUpdate.ts (after an edit), lightCheck.ts
-                     (slow reference; tests and `verifyLight`)
-    meshing/         mesher.ts (pure: block data in, typed arrays out), atlasLayout.ts
-  player/            player.ts (state), physics.ts, interaction.ts (break/place rules),
-                     looks.ts (the table of the figure's looks, `lookForKey`, `resolveLook`),
-                     figureMotion.ts (`FigureMotion`: pose, time, fly, busy, edits → angles)
-  input/             Input.ts: keyboard/mouse/pointer-lock abstraction, fed by touch and the
-                     controller as well
-                     TouchTracker.ts (pure: finger events → stick, look, buttons),
-                     TouchControls.ts (pointer events of fingers → TouchTracker → Input),
-                     padMapping.ts (pure: `PadMapper`, one pad snapshot → `PadFrame`),
-                     focusMove.ts (pure: `nextFocus`, `nearestFocus`, `NavRepeat`),
-                     GamepadSource.ts (polls `navigator.getGamepads`, chooses the pad,
-                     feeds Input in play, hands the frame to `Game` otherwise)
-  render/            Renderer.ts, ChunkMeshes.ts, materials.ts (chunk shader), Sky.ts,
-                     BreakOverlay.ts (cracks on the block being broken, one draw call),
-                     RemotePlayers.ts (other players: the animated figure and the name tag,
-                     two draw calls each), figureModel.ts (geometry of six boxes turned in
-                     the vertex shader, atlas texture, material, slot colours),
-                     FigurePreview.ts (the turning figure of "Your player", own WebGL)
-    textures/        tiles.ts (tile painters), atlas.ts (atlas + mip levels), celestial.ts,
-                     itemIcons.ts (icons of items that are no blocks), cracks.ts (pure),
-                     figureTexture.ts (pure: every look in one atlas, face layout, head
-                     icon, `figureView` for the sheet, checksum)
-  ui/                Hud.ts (bar with counts, break progress, notices), blockIcon.ts,
-                     itemIcon.ts, DebugOverlay.ts, settings.ts, ui.css,
-                     InventoryScreen.ts (27 slots or the Creative palette, bar, bin, tabs),
-                     RecipeList.ts (the "Crafting" tab: one row per recipe),
-                     WorldMenu.ts (start screen: list of worlds, new world, delete),
-                     PauseScreen.ts (pause menu of a world; also the settings page),
-                     activate.ts (button helpers), TouchHud.ts (stick, buttons, rotate hint),
-                     BenchScreen.ts (performance test: start page, progress line, result,
-                     "Interrupted"), NetTestScreen.ts (the network test; own chunk, loaded
-                     on its first use), FocusManager.ts (the controller's focus on a screen,
-                     the focus frame), PadHints.ts (the hint bar), padGlyphs.ts (button
-                     glyphs drawn on canvases), JoinSection.ts ("Join a world" on the
-                     world menu), RoomPanel.ts ("Playing together" in the pause menu,
-                     with head icons), PlayerSection.ts ("Your player": name, preview, look
-                     picker), figureIcons.ts (head icons and the figure sheet on canvases)
-  util/              rng.ts, noise.ts, math.ts
-  testing/           helpers for tests only: timing.ts, terrainChecksum.ts, sampleWorld.ts,
-                     lightChecksum.ts, lightScenes.ts (tables with emitters, artificial
-                     volumes), lightEdits.ts (a lit test world, random edits), netRig.ts
-                     (a host and guests over the memory transport with a fake clock)
-e2e/                 Playwright tests, fixtures.ts, game.ts, helpers.ts, touch.ts,
-                     multiplayer.ts (several players in their own contexts, `netQuery`,
-                     `openNetTest`, `openTestPlayer`, `hostRoom`, `joinRoom`, `untilNet`),
-                     mp*.spec.ts (tests with several game pages; project `multiplayer`;
-                     mpHarden.spec.ts: overlay, host without frames, soak, large world),
-                     sites.ts
-                     (tree, beach and rock near the start point), lightScenes.ts (tunnel,
-                     room with a window, roof over a chunk corner), gamepad.ts (the fake
-                     controller), mpFigure.spec.ts (the figure of others),
-                     playerSection.spec.ts ("Your player"), recipeRows.ts (recipe rows that never move),
-                     screenshots/
-scripts/             dev tools: signalServer.mjs (local PeerJS server, `npm run signal`),
-                     figurePreview.ts (sheet of all looks, front and back),
-                     shot.mjs, atlasPreview.ts, iconPreview.ts (sheet of all item icons), terrainStats.ts (terrain statistics and generation time), perf.ts
-                     (generation, light, meshing, edits), compareShots.mjs (old reference
-                     next to new), benchRun.mjs (plays the performance test headlessly),
-                     perfRuns.ts (comparison table from saved `perf-run` issues), editCost.ts
-                     (where an edit's time goes on the `edit` route; run it bundled)
-  ci/                the CI jobs' logic, no dependencies: changes.mjs (does the run need
-                     the full suite), ciResult.mjs (the verdict of `CI result`), timings.mjs
-                     (blob reports' JSON → timing summary; `--assign`: spec lists per shard;
-                     `--files`: the specs of one shard job);
-                     unit tests `*.test.ts` next to them
-docs/                phase plans and phase reports, ci-1-plan.md and ci-1-report.md (CI round 1),
-                     docs-1-plan.md (Docs round 1); device-tests.md
-                     (the one checklist of tests on real devices, filled out by the owner)
-.github/workflows/   ci.yml, deploy.yml
-```
+- `index.html`, `src/main.ts` (entry point)
+- pure: `src/world/`, `src/actions/`, `src/items/`, `src/save/`, `src/net/`,
+  `src/player/`, `src/bench/`, `src/util/`
+- shell: `src/game/` (`Game.ts`, `config.ts`), `src/input/`, `src/render/` (with
+  `textures/`), `src/ui/`; `src/testing/` (test helpers)
+- `e2e/` (Playwright, `e2e/screenshots/`), `scripts/` (dev tools), `scripts/ci/` (CI
+  logic), `docs/`, `.github/workflows/`
 
-Unit tests live next to the code as `*.test.ts` (in `src/` and `scripts/ci/`). Wall-clock limits in tests go through
-`expectFasterThan` (`src/testing/timing.ts`): they are enforced by `npm test` and skipped
-under coverage, which distorts timings. CI runs both.
+Unit tests live next to the code as `*.test.ts` (in `src/` and `scripts/ci/`). Wall-clock
+limits go through `expectFasterThan` (`src/testing/timing.ts`): enforced by `npm test`,
+skipped under coverage, which distorts timings; CI runs both. `npm test` runs three passes:
+all ordinary files side by side; then `*.solo.test.ts` one after the other, alone
+(comparisons of two times with a tight limit, e.g. generation at most 20 % slower than
+Phase 1, meshing with light, which a busy machine shifts); last `*.slow.test.ts` (heavy
+tests without a tight limit, mostly comparisons with the light reference). Put a new test
+into the kind of file it belongs to; in a solo file warm both sides up and take the best of
+many rounds, the two sides in turn.
 
-`npm test` runs three passes. First all ordinary files side by side. Then the files named
-`*.solo.test.ts`, one after the other with nothing next to them: comparisons of two times
-with a tight limit (generation at most 20 % slower than Phase 1, meshing with light), which
-a busy machine shifts. Last the files named `*.slow.test.ts`: heavy tests without a tight
-limit, mostly comparisons with the light reference. Put a new test into the kind of file
-it belongs to; in a solo file warm both sides up and take the best of many rounds, the two
-sides in turn.
-
-## Architecture and code conventions
+## Architecture invariants
 
 - **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/`, `items/`,
   `bench/` and `net/` must not import `three` or `peerjs`, touch the DOM or use
-  `Math.random` / `Date.now` (enforced by ESLint rules). They are tested in Node. Only `render/`, `ui/`, `input/`
-  and `game/` may use Three.js and browser APIs. The same rule covers
-  `render/textures/tiles.ts`, `itemIcons.ts`, `cracks.ts` and `figureTexture.ts`. The core may import `game/config.ts`.
-  `input/TouchTracker.ts`, `input/padMapping.ts`, `input/focusMove.ts`,
-  `game/autosave.ts`, `game/perfStats.ts`, `game/netConfig.ts` and `game/buildCommit.ts`
-  follow the same discipline (no DOM,
-  unit-tested in Node, in the coverage scope) although they live in the shell.
+  `Math.random` / `Date.now` (enforced by ESLint rules). They are tested in Node. Only
+  `render/`, `ui/`, `input/` and `game/` may use Three.js and browser APIs. The same rule
+  covers `render/textures/tiles.ts`, `itemIcons.ts`, `cracks.ts` and `figureTexture.ts`.
+  The core may import `game/config.ts`. `input/TouchTracker.ts`, `input/padMapping.ts`,
+  `input/focusMove.ts`, `game/autosave.ts`, `game/perfStats.ts`, `game/netConfig.ts` and
+  `game/buildCommit.ts` follow the same discipline (no DOM, unit-tested in Node, in the
+  coverage scope) although they live in the shell.
 - **One pipeline for changes (action layer).** `Game` and the UI never change blocks, the
   selected slot or the inventory themselves. They build a plain action
   (`{ kind, ... }`, JSON-safe) and call `session.submit(action)`; the world and the screen
   change when the session's listener reports back (`onBlocks`, `onPlayer`, `onResult`).
   Never read a result from `submit`'s return: a later session may answer asynchronously.
-  `applyAction` is pure and never mutates its inputs; `PlayerRecord`s are immutable.
-  `src/actions/pipeline.test.ts` fails if `.setBlock(` is called anywhere but in
-  `actions/Session.ts`, `net/HostSession.ts` (the host applies an action),
-  `net/ClientSession.ts` (a guest applies the host's blocks) and once in `Game.ts` (the
-  test API tool), if a slot-changing
-  inventory function is called outside `src/actions/` (one call in `Game.ts` for `give`),
-  or if `replaceRecord` is called outside the two test tools. Slots in actions and records
-  count from 0; keys, HUD and `getState().selectedSlot` count from 1.
-- **Actions and reasons.** `break`, `place`, `selectSlot`, `startBreak`, `moveStack`,
-  `discard`, `setBarSlot` (Creative only), `craft { recipe }` (Gathering only). A refusal
-  carries a short reason (`reach`, `unbreakable`, `occupied`, `full`, `early`, `missing`,
-  `mode`, `station`, `support`, `rate`, `invalid`) that the UI maps to a text (`rate`, a
-  room's limit for guests, has none); `ActionResult.notices`
-  is a list of `{ item, count }`, not of strings. A `break` may return two block changes:
-  the broken cell, then the cell above it if a block that needs support stands there.
-- **Block flags and shapes.** `solid` means "collides with the player" (physics,
-  `isSolidAt`); `targetable` means "the crosshair can hit it" (raycast, break, place
-  against); `shape` is `cube` or `torch`; `needsSupport` marks blocks that stand on the
-  block below. `isPlaceable` = targetable and breakable; `isSupport` = solid and a cube.
-  The torch (block 19) is the one block that is targetable but not solid, not a cube, and
-  needs support. **The support rule:** placing a block with `needsSupport` needs a solid
-  cube directly below (otherwise `support`, "Needs a block underneath"); breaking the
-  block under it removes it in the same action (to air, or water by the water rule), and
-  in Gathering it goes into the inventory if it fits, otherwise it is lost; the `full`
-  checks look at the broken block's own item only. Blocks that are not solid may be
-  placed into a cell a player stands in. A block that is not a cube is aimed at through
-  its box (`aimBox` in `world/raycast.ts`: the torch 6/16 × 14/16); a ray that misses the
-  box goes on, and the target outline has the box's size. The mesher draws a torch with
-  `emitTorch` (ten quads, the light of its own cell, no ambient occlusion). Its icon is
-  painted (`itemIcons.ts`); `createItemIcon` prefers a painted icon over the cube.
-  Break time 0: `Game` submits `break` in the step in which the `startBreak` was accepted.
-- **Light.** Every cell has sky light and block light, each 0–15, in one byte
-  (`Chunk.light`, null until the chunk is lit). The rules are in `light/lightRules.ts`: a
-  step into a neighbour costs one level plus the neighbour's `opacity` (air and glass 0,
-  leaves and water 1, everything else 15); full sky light going straight down into a
-  clear cell stays full. Light is a pure function of the blocks: it is never saved, and
-  needs no save format or generator version. **The invariant:** after any edits, loads and
-  unloads the stored light of every lit chunk equals what the slow reference
-  (`lightCheck.ts`) works out from the blocks. `World.verifyLight()` counts the cells
-  that differ; tests of anything that touches blocks or chunks end with it being 0. If
-  fast code and reference disagree, the reference decides. Stored light is written only
-  by `World.light` (the lighting job, `lightChunk`) and `World.setBlock` (`updateLight`,
-  or `lightChunk` again where a chunk around the edit is not lit); `pipeline.test.ts`
-  guards that. The torch emits 14 (`TORCH_LIGHT`); tests of other emitters pass
-  `TEST_LIGHT` (`src/testing/lightScenes.ts`) with a lamp and a glowing rock through
-  `World.lightTables`. `LIGHT_CHECKSUM_1337_V1` changes only with the rules or an opacity.
-- **Chunk stages.** generated → lit (needs its 3 × 3 chunks generated) → meshed (needs its
-  3 × 3 chunks lit). To mesh radius `R`, radius `R + 1` is lit and `R + 2` generated;
-  meshes are dropped beyond `R + 1`, data beyond `R + 2`. One job handles one chunk.
-  `World.setBlock` reports chunks whose mesh shows changed light through
-  `World.onLightChange`; the chunk manager remeshes them before it loads anything
-  (`relight`). After an edit only the edited block's own chunk is remeshed in the same
-  frame (`ChunkManager.remeshAfterEdit`); the other chunks of `chunksAffectedByEdit` join
-  that queue (`queueRemesh`), and the frame of an edit gives the chunk manager only what
-  is left of `CHUNK_BUDGET_MS` (Phase 4 part E). `whenIdle` and `isReady` wait for both.
-- **Light on screen.** Vertex colour: red = face shade × ambient occlusion, green = sky
-  light, blue = block light (level ÷ 15, averaged over the up to four clear cells that
-  touch the vertex in front of the face). The vertex shader turns light into a colour
-  factor (`LIGHT_GAMMA`, daylight, `TORCH_TINT`, the floor `uMinLight` from the
-  Brightness setting); the fragment shader multiplies. Daylight is `DAYLIGHT_MIN` (0.14)
-  at midnight; the Brightness floor runs 0.02 → 0.11 (default) → 0.35 in two linear halves
-  (`minLightFor`). Dark values lose more in pixels than the factor says (sRGB is linear
-  near black): open ground at midnight is about 7 % of noon (AC8.2 in `e2e/night.spec.ts`). `meshChunk` without its third
-  argument is the mesher from before light (everything open sky), kept for tests.
-- **Performance test.** `Game` runs it as a screen of its own next to menu, game and
-  pause (`benchPhase`: `start`, `running`, `result`, `interrupted`). A run is a
-  `BenchRunner` that `Game` feeds twice: `runner.step()` before every simulation step
-  (sets the scripted input through `Input.setScript` and submits the step's action
-  through the session) and `runner.frame(now, frameMs, chunkWorkMs)` once per rendered
-  frame, with the values `PerfStats` gets. Scenarios are counted in simulation steps, so
-  every device takes the same route. While a script is set, `Input` ignores keys, mouse
-  and fingers. The run plays in a fresh Creative world of seed 1337 (`BENCH_` constants in
-  `config.ts`) with default settings and its own render distances. **It must stay free of
-  side effects:** the autosave writes nothing while `Game.bench` is set, no world lock is
-  taken, the stored settings are neither read into the run nor written, and the settings
-  in use before come back when it ends. The only thing kept is the text of the last
-  finished result in local storage (`markuscraft.lastPerfRun.v1`). A hidden page, portrait
-  in touch mode, a changed canvas size or "Cancel" throws the run away as a whole.
-- **Performance results.** Performance on real devices is measured by the performance
-  test and reported as GitHub issues with the label `perf-run` and a title starting
-  "Performance run:". A session reads them with the GitHub tools, saves each issue (JSON
-  or body text) as a file and uses `parseIssueBody` or
-  `npx vite-node scripts/perfRuns.ts <folder>`. The issue body ends with the marker
-  `<!-- markuscraft-perf v1 -->` and one `json` block holding the whole record
-  (`BenchResult`); lights are not stored but worked out from the numbers (`verdict.ts`),
-  so old runs can be judged by new thresholds. The thresholds of the lights are the
-  owner's decision. Numbers from software WebGL (cloud sessions, CI) are never evidence.
-- **Scenarios and versions.** A phase part that adds something with a cost of its own (a
-  new kind of block, creatures, workers) adds a scenario: one entry in `SCENARIOS` with
-  its script, and its row appears by itself. A changed scenario (script, steps, warm-up)
-  gets a new version; adding a scenario or changing the order raises
-  `BENCH_SUITE_VERSION`. Results of different versions of a scenario are never compared
-  (`compare.ts` keeps them in separate rows). `scenarios.test.ts` pins the table.
-- **Game modes.** A world is Creative or Gathering for ever (`WorldMeta.mode`). Creative:
-  flying, unlimited blocks, instant breaking, the palette. Gathering: no flying (key, touch
-  button, `setPlayer` and controls list), placing takes the item from the selected slot,
-  breaking is timed: `startBreak` records `record.breaking`, `break` is accepted once
-  `breakTimeMs` of simulation time has passed (otherwise `early`) and puts `dropOf(block)`
-  into the inventory (`full` if it has no room; then the block stays). `selectSlot`,
-  `moveStack`, `discard`, `craft` and a Gathering `place` clear `record.breaking`. The action clock
-  is the simulation time (`simSteps × 1000 / 60`), so notices and break times are
-  deterministic in test mode.
-- **Tools and gating.** The item in the selected slot decides: a tool of the block's class
-  (`pickaxe`, `axe`, `shovel`) divides the hand time by 2, 4 or 8 (wood, stone, iron);
-  everything else counts as the hand. Stone and coal ore yield their item only with a
-  pickaxe, iron ore only with a stone or iron one; without it the block breaks at hand
-  speed, yields nothing and is not refused by a full inventory. The HUD then shows "Needs
-  a pickaxe" / "Needs a stone pickaxe". Tools have stack size 1 and cannot be placed.
-- **Crafting.** `items/recipes.ts` is the one recipe table (ids 1–20, append-only like
-  item ids, pinned by `recipes.test.ts`). A recipe has ingredients, one result and
-  optionally a station (`workbench`, `furnace`): a placed block whose centre lies within
-  `STATION_REACH` (5) of the eye. `craft` answers `invalid` (unknown recipe), then
-  `station`, `missing`, `full`; ingredients are taken from the last slots first. The
-  furnace has no state in the world: its two seconds (`SMELT_MS`) are a progress bar in
-  `Game`, which submits `craft` when the bar is full and forgets it when the screen
-  closes. **The recipe list keeps table order** (`listRecipes`, polishing session 1):
-  rows never move, all rows have one fixed height (48 px, touch 52 px) and the action
-  column a fixed width, so crafting never changes what lies under the pointer; there is
-  no rule that ignores presses after a craft. Craftable rows are found by their highlight
-  and by the count on the "Crafting" tab (`.tab-count`, hidden at 0; the tab's
-  `aria-label` stays "Crafting"). The list keeps its scroll position while a world is
-  open (`RecipeList.restoreScroll`); `setGameMode` (a loaded world) puts it back to the
-  top. Holding "Craft" makes its first item after `CRAFT_HOLD_DELAY_MS` (500) of
-  simulation time, then one every `CRAFT_REPEAT_MS` (250); a quick press crafts once on
-  release.
+  `applyAction` is pure and never mutates its inputs; `PlayerRecord`s are immutable. Slots
+  in actions and records count from 0; keys, HUD and `getState().selectedSlot` from 1.
+  `src/actions/pipeline.test.ts` guards it; the actions and their refusal reasons:
+  `src/actions/CLAUDE.md`.
 - **Stable ids.** Block ids, item ids and recipe ids are written into save files or
   actions. The tables are append-only: never renumber or reuse an id. `blocks.test.ts`,
   `items.test.ts` and `recipes.test.ts` pin them. Every placeable block is an item with the block's id; items that are no blocks
@@ -409,189 +117,16 @@ sides in turn.
   (`src/testing/terrainChecksum.ts`) must never change; it is checked in Node and in the
   browser.
 - **Saving.** A world is one `WorldMeta` record plus one record per edited chunk
-  (`save/saveFormat.ts`, `SAVE_FORMAT_VERSION`, now 2). Decoding validates every field and
-  never throws; a change to the format needs a new format version and a migration.
-  Version 2 (Phase 6 part C) adds `guests`: `{ key, name, record, pose, moveMode,
-lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX` (32,
-  newest by `lastSeenMs`, one per key); a guest entry that does not check out is dropped
-  and never makes the world damaged. Version 1 records load with no guests and are
-  written back as version 2 (decoded metas always carry the current version). Stores
-  implement `WorldStore`: `IdbStore` (database `markuscraft`, stores `worlds` and
-  `chunks`) in normal play and with `save=1`, `MemoryStore` in test mode. `Autosave`
-  decides when to write; `Game` marks chunks and the meta record dirty.
-  `Game.loadWorld(meta, edits)` swaps world, chunk manager, meshes, player and session in
-  place. Until a world is open `Game` holds an empty placeholder world.
-- **Screens.** Outside test mode: world menu → (play) → game ⇄ pause menu → "Save and back
-  to worlds". The settings page is the pause screen without its world parts. The inventory
-  screen (`E`, `Esc`, touch button `bag`, the pad's Y) lies over the running game and
-  does not pause it; `Game` listens for its keys itself and `Input` ignores keys while it is open. The HUD
-  is hidden and the touch controls are made invisible (`covered`), not removed. Closing
-  requests the pointer lock again; if the browser refuses, the pause menu shows. In a
-  Gathering world the screen has two tabs, "Items" and "Crafting" (the recipe list); it
-  always opens on the tab it was closed with, and on "Items" after a world was loaded. Play buttons
-  request the pointer lock (mouse) or fullscreen (touch) synchronously inside the click.
-- **Mouse mode and touch mode.** `Game` runs in one of two input modes. Touch mode has the
-  on-screen controls, no pointer lock, a pixel ratio capped at 1.5 and a default render
-  distance of 5. The play button selects the mode by the pointer type that activated it;
-  phones and tablets (`pointer: coarse`) start in touch mode; `touch=1` forces it. The
-  touch controls exist in the document only in touch mode. Game logic never asks for the
-  mode: both feed `Input`.
-- **The controller (Phase 5) is an active source on top of the mode, not a third mode.**
-  `GamepadSource` polls once per rendered frame (`Game.frame`, before the steps) and is the
-  only place that reads `navigator.getGamepads`. The first standard-mapping pad on which
-  something is pressed becomes the pad; a button already down in its first snapshot does
-  nothing until released (the wake-up press). While the game is played (`padTarget` is
-  `play`) the source feeds `Input` with `setMove`, `setHeld`, `press` and `addTurn`
-  (radians, consumed per frame like the mouse), **sending only changes**, so keys and
-  fingers that hold the same action keep it; otherwise `Game.onPadFrame` gets the frame
-  (inventory: `onInventoryPadFrame`, below; a run: B/Start cancel; menus: `FocusManager`). A
-  change of target blocks every held button until it is released (`PadMapper.blockHeld`).
-  `Game.padActive` is set by a press or a stick beyond 0.5: the touch controls are covered,
-  mouse mode plays **without pointer lock** (losing the lock does not pause; Esc pauses),
-  menus show the focus frame. A mouse press on the canvas (capture listener on the root)
-  or a finger on the game view hands control back and does nothing else; moving the mouse
-  or touching in a menu only clears `padActive`. Keys never change it. Disconnecting the
-  pad in use releases everything and pauses a played world (not in test mode).
-- **The focus system.** `FocusManager` works on the topmost open screen (`Game.focusScreen`:
-  the inventory (also in test mode), world menu, pause/settings, performance test screens;
-  not during a run). Focusable: `button`, `input[type=range]`, `input[type=checkbox]`,
-  `[data-pad-focus]`; enabled, with a size, not inside `[hidden]` or `[data-pad-skip]`;
-  never text fields. It is looked up anew on every move. A screen takes part with at most
-  `data-pad-default` (where its view starts; a new visible default means a new view and
-  moves the focus there), `data-pad-back` (what B clicks) and `padpress`/`padrelease`
-  listeners (A down / A up, then `click()`). Each screen root remembers its last focus
-  (used when the view is the same). Focus is virtual: class `pad-focused` and the frame
-  `.pad-focus-frame`; DOM `focus()` is never called. Moving is `nextFocus`
-  (`focusMove.ts`): elements overlapping in the direction first, then the nearest by
-  `13 × gap² + gap across²`; an unexpected neighbour is fixed there with a unit test,
-  never per screen. Start on the pause menu continues. The right stick scrolls the scroll
-  container of the focus, or else the first visible one on the screen; a focus scrolled out
-  of its list moves to the nearest element in view. `scrollToShow` keeps the focus above the
-  hint bar. A screen with more buttons than A and B gives its own hints through the
-  `hintsFor` option (only the inventory does). A held A whose screen goes away gets a
-  `padrelease` without a click. `Game.showScreen`, `openInventory` and `hideInventory`
-  update the focus at once (`syncFocus`): a screen often changes outside a frame (a world
-  finished loading), and `ui.focus` must never name an element of a screen that is gone.
-- **The controller on the inventory (Phase 5 part B).** Marks only: `data-pad-default` on
-  the selected bar slot (Gathering), the first palette block (Creative) or, on the
-  Crafting tab, the tab itself (a "Craft" button comes and goes; a default that changed
-  would count as a new view); `data-pad-back` on "Close". `Game.onInventoryPadFrame`: Y
-  closes, Start closes and pauses, B (and the browser's Back) puts a picked slot down or
-  else closes (`InventoryScreen.cancelPick`), LB/RB change the tab (`cycleTab`, no
-  wrap-around; it ends a held "Craft"); the rest goes to `FocusManager` without B and Start.
-  `padpress` arms the click guard (a capture listener sees the non-bubbling event).
-  `RecipeList` treats `padpress` / `padrelease` on "Craft" like `pointerdown` / release, so
-  the hold, the 500 ms delay and the suppressed click after a hold are the mouse's. Slots
-  have an `aria-label` ("Slot 3: Planks"), which `ui.focus` reports; recipe buttons
-  "Craft <item>" (e.g. "Craft Stick").
-- **Back guard.** Outside test mode, while anything but the world list is shown, the page
-  holds one history entry (`backGuard.ts`); a `popstate` re-arms it and acts like the pad's
-  B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press only
-  re-arms; the window counts each frame since B (and the wait since the last one) at most
-  `BACK_PAIR_FRAME_MS` (25), so slow frames, and ordinary frames between the tasks a
-  `popstate` needs after a slow one, do not use it up (six frames at least). Back on the world list leaves the entry in place (no navigation of its own,
-  which could collide with a reload); a Back that pops it there goes back once more.
-  Whether it is armed is asked at each `popstate` (`Game.wantsBackGuard`); `update()` per
-  frame only pushes the entry.
-- **Multiplayer configuration (Phase 6).** The signaling and STUN addresses reach the game
-  only through the build variables `VITE_SIGNAL_URL` (e.g. `wss://<host>/`) and
-  `VITE_STUN_URLS` (comma-separated `stun:` URLs), overridden by the URL parameters
-  `signal` and `stun` (`stun=none` empties the list); an invalid value counts as not set.
-  Never write an address of the Pi or the owner's domain anywhere in the repository; docs
-  say "the Pi's signaling host". Without a signaling server the build says "Multiplayer is
-  not available in this build." The build id `__BUILD_COMMIT__` comes from `BUILD_COMMIT`,
-  else `GITHUB_SHA`, else git, else `dev`; every peer id starts with `mc-<build>-`, so only
-  the same build sees each other. Single-player loads neither `peerjs` nor the network
-  test's chunk and requests nothing outside its origin (AC1.7). Time reaches `src/net/` as
-  `nowMs`, randomness as bytes (`crypto.getRandomValues` in the shell).
-- **Rooms (Phase 6 part B).** `Game.session` is a `LocalSession` in single-player, the
-  host's `HostSession.local` while hosting, or the guest's `ClientSession`; `Multiplayer`
-  swaps it through `useSession` (`Game` never asks which). The host's world, mode and
-  record go into `HostSession`; every action of every player (the host's own too) goes
-  through `applyAction` there, with the acting player's record and last pose and a
-  `FarReader` for chunks the host has not loaded. A guest applies only what the host
-  sends (`blocks`, `record`, `result`); it never checks actions itself. **A guest's world
-  is never saved** (the autosave writes nothing while `role` is `guest`, no world lock;
-  `Game.openGuestWorld` loads it with `loadWorld`, after a reconnect at the player's own
-  pose). The host keeps every guest's record, pose and movement mode (`HostSession`
-  `departed` and `guestEntries()`), saved with the world's meta (`currentMeta` asks the
-  room; closing the room hands them to `Game.keepGuests`); a returning key gets them back
-  in `welcome` (`moveMode` there, `fly` in `pose`), a new one starts next to the host.
-  While a room is open or joined, the pause menu and the inventory do not pause the
-  world (the frame still steps; `Input` gives no input while paused), the time of day comes
-  from the room (`Multiplayer.timeOfDay`: the host's wall clock, the guest's last pong), and
-  a 250 ms timer keeps the session answering in a hidden tab. The host needs no timer of
-  its own: it relays poses from frames and from its message handlers (at most every 50 ms)
-  and answers pings. Both modes can be opened to others.
-  `HostSession`, `ClientSession` and `protocol.ts` are a chunk of their own, loaded the
-  first time a room is opened, joined or listed. The player key and name
-  (`markuscraft.player.v1`) are stored only once multiplayer is used or a name typed:
-  single-player leaves no trace. Notices ("Anna joined") use wall-clock time
-  (`NET_NOTICE_MS`, at most `NET_NOTICES_MAX`).
-- **Gathering together (Phase 6 part C).** While a room is open the action clock of every
-  player, the host's own too, is the host's `performance.now()`; records' `breaking` from
-  before the room is cleared. The screens measure break progress on their own simulation
-  clock: `BreakClock` (in `ClientSession` and `HostLocalSession`) replaces a record's
-  `breaking.startMs` with the screen's time of the `startBreak`. **The grace rule:** a
-  `break` that reaches the host at most `NET_BREAK_GRACE_MS` (400) before it is due is
-  held (`breakDueMs`) and decided in the next message handler, `update` or local action
-  after the due time; the player's later actions wait behind it in order. Earlier is
-  `early`, as before; `Game` then starts the break over. `Game` sends one `startBreak` or
-  `break` at a time (`breakInFlight`, cleared by its answer or a new session). More than
-  `ACTION_RATE_LIMIT` (30) actions of a guest within one second are refused `rate` (the
-  host's own player has no limit). Every guest action reads blocks through `FarReader`
-  (reach, water, support, tools, stations within 5), also far from the host. Smelting
-  stays on the guest's screen.
-- **The player figure (Phase 6 part D).** Six boxes (legs 4 × 11 × 4, body 8 × 11 × 5,
-  arms 3 × 10 × 3, head 7 × 7 × 7 texels, 29 tall = `PLAYER_HEIGHT`; proportions of this
-  game's own) in one geometry; the vertex shader turns head and limbs about their pivots
-  from per-figure uniforms, the body's yaw is the mesh rotation: **two draw calls per
-  figure** (figure and name tag). Looks are the append-only table `player/looks.ts` (ids
-  1–8, pinned by `looks.test.ts`; choice 0 is "Automatic" = `lookForKey(key)`, 1 + first
-  key byte mod 8). `figureTexture.ts` paints all looks into one 128 × 128 atlas (pinned
-  checksum in `figureTexture.test.ts`; it changes only with an intended change of the
-  looks); the belt is accent (alpha 128 on the GPU) and tinted with the slot colour, which
-  also stripes the name tag. `FigureMotion` (pure, no allocation per step) gives the
-  angles once per rendered frame: legs swing with the distance walked up to
-  `FIGURE_LEG_SWING`, rest within `FIGURE_SETTLE_MS`, none while flying or after a snap
-  (a jump beyond `SNAP_DISTANCE` or a teleport, `PoseBuffer.snapsAt`); the body turns
-  towards the walking direction (backwards: away from it) and is never more than 45° from
-  the head; the right arm swings every `FIGURE_SWING_MS` while `busy` and once per block
-  change the player caused (`RemotePlayer.edits`). Protocol: `look` in `hello`, `welcome`
-  and `joined`; `profile` (`name`, `look`; counts towards the rate limit; the host applies
-  the name suffix again and tells everyone, the sender too); `busy` in `pose`, `fly` and
-  `busy` in `poses`. The look is not saved with the world (every `hello` brings it); a
-  saved guest entry gets the new name. `busy` is `Game.holdingBreak()`: break held, a
-  block targeted, not paused.
-- **"Your player" (Phase 6 part D)** is a section of the pause screen after "Settings"
-  (settings page and pause menu): the name (the same value as the field of "Join a
-  world"; sent to the room on `change`), a preview (`FigurePreview`, its own WebGL2
-  context, created when the section is shown and in view, at most 30 pictures a second,
-  disposed with `forceContextLoss` when the page closes; without WebGL the head icon) and
-  nine look buttons (`aria-label` "Look: Fern", "Look: Automatic (Fern)"). A new look is
-  sent at once. `markuscraft.player.v1` holds `{ key, name, look }`; a record without a
-  valid look loads as 0, and `saveIdentity` leaves a stored record that says the same
-  untouched.
-- **Measure and harden (Phase 6 part E).** The F3 overlay has five network rows, shown
-  only in a room (`netRows`, `Multiplayer.debugInfo`): role, status, code and players;
-  the round trip (a guest's own; on the host what each guest reports in `ping.rtt`); the
-  link of each connection from `getStats()` every 2 s (`linkKind`: "direct", "via STUN",
-  "relay"); the signaling state; messages and bytes per second in and out over the last
-  2 s, counted by a `TrafficMeter` around the room's network (`countedNetwork`).
-  `traffic.ts` and the stats code are in the lazy session chunk. Relayed poses are cut to
-  millimetres and 1e-4 rad (`compactPose`) and leave out flags that are false: with four
-  moving players the host sends about 13 kB/s (AC14.6, limit 20). The scenario `players`
-  (suite version 3) hosts a `SimRoom` in the run's world: three `ClientSession`s over a
-  memory network with no delay, joined during `settle` (`BenchHost.guestsReady`), stepped
-  with the simulation (`stepGuests`, the room's clock is simulation time, which the
-  figures are drawn by), closed when the scenario ends; its chunk is loaded when a run
-  starts. The guests walk arcs in front of the player (`BENCH_GUEST_RADII`) and place and
-  break a block every 30 steps in looks 2, 5 and 8.
-- **The network test (Phase 6 part A)** is a screen of its own (`nettest`), opened by
-  "Network test" on the settings page; "Back" returns there. Its test id is
-  `mc-<build>-t-<4 characters>`; it lists the others from PeerJS discovery every 3 s,
-  connects with "Connect", runs 20 pings and 1 MB in 16 kB messages (`NetTestRun`), reads
-  the candidate pair from `getStats()` and gives one verdict line.
+  (`SAVE_FORMAT_VERSION`, now 2). Decoding validates every field and never throws; a
+  change to the format needs a new format version and a migration. Details:
+  `src/save/CLAUDE.md`.
+- **Light.** Sky and block light per cell (0–15) are a pure function of the blocks, never
+  saved. **The invariant:** after any edits, loads and unloads the
+  stored light of every lit chunk equals what the slow reference (`lightCheck.ts`) works
+  out from the blocks. `World.verifyLight()` counts the cells that differ; tests of
+  anything that touches blocks or chunks end with it being 0. If fast code and reference
+  disagree, the reference decides. Stored light is written only by `World.light` and
+  `World.setBlock`. Details: `src/world/CLAUDE.md`.
 - **Determinism.** No `Math.random()` and no `Date.now()` in `world/`, `player/`, `util/`
   or texture generation. Randomness comes from the seeded RNG; time comes in as a parameter.
   The same seed must always produce the same world and the same textures.
@@ -607,236 +142,110 @@ lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX
 - **Hot paths** (meshing, generation, physics) avoid per-block allocations; use typed arrays.
 - **In-game text** is English. Code, comments and docs are English.
 
+## Where the rules are
+
+Before changing an area, read its file (it lists the area's files) and the "Decisions and
+deviations" of the reports whose status row names it:
+
+- `src/world/CLAUDE.md`: chunks, generation, light, meshing, block flags
+- `src/actions/CLAUDE.md`: actions, refusal reasons, game modes
+- `src/items/CLAUDE.md`: items, tools, gating, recipes
+- `src/save/CLAUDE.md`: the save format, stores
+- `src/net/CLAUDE.md`: rooms, protocol, breaking together, network test
+- `src/input/CLAUDE.md`: input modes, controller, focus, back guard
+- `src/bench/CLAUDE.md`: the performance test, `perf-run` results
+- `src/render/CLAUDE.md`: light on screen, textures, the figure
+- `src/player/CLAUDE.md`: looks, figure motion, physics
+- `src/ui/CLAUDE.md`: inventory, recipe list, "Your player"
+- `src/game/CLAUDE.md`: screens, multiplayer configuration, identity
+- `e2e/CLAUDE.md`: writing browser specs
+- `docs/architecture.md`: data flow, rules spanning areas, CI jobs, files of `src/util/`,
+  `src/testing/`, `scripts/`, `scripts/ci/`
+- `docs/testing.md`: test API, URL parameters, references, bench by hand
+
 ## Commands
 
-| Command                   | Purpose                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------ |
-| `npm run dev`             | Dev server                                                                                       |
-| `npm run build`           | Type check + production build into `dist/`                                                       |
-| `npm run preview`         | Serve the production build                                                                       |
-| `npm run signal`          | Local PeerJS server on `127.0.0.1:9000` (multiplayer tests)                                      |
-| `npm run typecheck`       | `tsc --noEmit`                                                                                   |
-| `npm run lint`            | ESLint + Prettier check                                                                          |
-| `npm run format`          | Apply Prettier                                                                                   |
-| `npm test`                | Vitest unit tests: ordinary, then solo, then slow files                                          |
-| `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI)                                       |
-| `npm run test:e2e`        | Build, then Playwright tests against the preview server                                          |
-| `npm run test:e2e:update` | Same, regenerating reference screenshots                                                         |
-| `npm run check`           | `typecheck` + `lint` + `test` (fast gate for every commit)                                       |
-| `npm run check:all`       | `check` + `build` + `test:e2e` (full local run, needed only for references and CI-only failures) |
+- `npm run dev` (dev server), `npm run build` (type check + production build into
+  `dist/`), `npm run preview` (serve the build), `npm run signal` (local PeerJS server on
+  `127.0.0.1:9000`, multiplayer tests)
+- `npm run typecheck` (`tsc --noEmit`), `npm run lint` (ESLint + Prettier check),
+  `npm run format` (apply Prettier)
+- `npm test` (unit tests: ordinary, then solo, then slow files), `npm run test:coverage`
+  (with coverage, 85 % line threshold, used by CI)
+- `npm run test:e2e` (build, then Playwright against the preview server),
+  `npm run test:e2e:update` (same, regenerating reference screenshots)
+- `npm run check`: `typecheck` + `lint` + `test` (fast gate for every commit);
+  `npm run check:all`: `check` + `build` + `test:e2e` (only for references and CI-only
+  failures)
 
 ## CI
 
-`.github/workflows/ci.yml` runs these jobs:
+`.github/workflows/ci.yml`: `changes` and `checks` run always; with `full` (a push to
+`main`, or a pull request that changes more than `.md` files) also `build`, `e2e-game` (4
+shards), `e2e-mp` (3 shards) and `report`. `CI result` is the one required check of `main`
+(set by the owner): green only if every job that had to run passed and the others were
+skipped. What each job does: `docs/architecture.md`, "CI jobs".
 
-| Job         | Runs when                | Does                                                                                                                                                              |
-| ----------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `changes`   | always                   | `full`: push to `main` yes; pull request yes unless only `.md` files; other pushes no                                                                             |
-| `checks`    | always                   | npm ci, actionlint (pinned, SHA-256 checked), lint, type check, unit tests with coverage, unit tests with time limits                                             |
-| `build`     | `full`                   | `npm run build`, uploads `dist/` (artifact `dist`)                                                                                                                |
-| `e2e-game`  | `full`, after `build`    | four shards, `--project=game` with the specs of `e2e/shards.json`, blob report each                                                                               |
-| `e2e-mp`    | `full`, after `build`    | three shards, `--project=multiplayer` with the specs of `e2e/shards.json`, each with its own signaling server                                                     |
-| `report`    | `full`, after the shards | merges the blobs into HTML and JSON, timing summary in the job summary, artifacts `e2e-timings` (90 days) and, when a shard failed, `playwright-report` (14 days) |
-| `CI result` | always                   | the one required check: green only if every job that had to run passed and the others were skipped                                                                |
-
-Triggers: every `push` (only `main` runs the full suite) and `pull_request` (`opened`,
-`synchronize`, `reopened`, `ready_for_review`). Runs on `main` are never cancelled; other
-runs are cancelled by a newer one of the same event and ref. Time limits per job: `changes`
-5, `checks` 15, `build` 10, each shard 30, `report` 10, `CI result` 5 minutes.
-
+- **Triggers:** every `push` (only `main` runs the full suite) and `pull_request`
+  (`opened`, `synchronize`, `reopened`, `ready_for_review`). Runs on `main` are never
+  cancelled; others are cancelled by a newer one of the same event and ref. Docs-only pull
+  requests skip the browser tests; `CI result` is still green.
 - **Time budget:** `checks` within 8 minutes, a pull request run within 25 minutes. A
   session that sees a green run above 25 minutes, or a shard above 15, rebalances
   (`node scripts/ci/timings.mjs --assign <shard>=<json>... > e2e/shards.json`, then
   `npm run format`) or adds a shard in its own part, and records it in its report.
-- **Spec lists per shard:** `e2e/shards.json` (made by `--assign` from the `e2e-timings`
-  JSON, longest spec first onto the shard with the least time) names the specs of every
-  shard; `timings.mjs --files <project> <n>` gives a shard job its list. A new spec file
-  needs nothing: a spec the file does not name runs in the last shard of its project, so it
-  is never lost; the next rebalancing places it.
-- Timing data: the `report` job's summary and its artifact `e2e-timings` (90 days; one
-  JSON per shard, `game-N.json` / `mp-N.json`, the merged `merged.json` and `summary.md`).
-- Docs-only pull requests (`.md` files only) skip the browser tests; `CI result` is still
-  green.
+- **Spec lists per shard:** `e2e/shards.json`; a spec it does not name runs in the last
+  shard of its project, so it is never lost. Timing data: the `report` job's summary and
+  its artifact `e2e-timings`.
 - **The local rule:** after each plan step run `npm run check` and `npm run build`, plus
   the browser specs the step touches or could affect (`npx playwright test <files>`, with
   `MC_CONTAINER_GPU_STALL=1` in a cloud session); name them in the commit message body or
-  the report. The full browser suite runs in CI. The local full run (`npm run check:all`)
-  is only needed to regenerate reference screenshots, or to chase a failure that shows only
-  in CI.
-- `CI result` must be the required status check of `main` (set by the owner in the
-  repository settings).
+  the report. The local full run (`npm run check:all`) is only needed to regenerate
+  reference screenshots, or to chase a failure that shows only in CI.
 
 ## Headless testing
 
-The game exposes a test API on `window.__mc` (`src/game/testApi.ts`) and accepts URL
-parameters so tests are deterministic. Details are specified in `docs/phase-1-plan.md`
-(section "Test strategy"). In short:
+Test API (`window.__mc`), URL parameters (`?test=1`, `?seed=`, …): `docs/testing.md`;
+writing specs: `e2e/CLAUDE.md`. Always:
 
-- `?seed=<int>` fixes the world, `?time=<0..1>` sets the time of day, `?freeze=1` stops
-  the clock, `?test=1` runs without menus and pointer lock and with fixed settings,
-  `?touch=1` forces touch mode (shows the touch controls without a touch on the play
-  button).
-- `?bench=1` (never with `test=1`, where it is ignored) opens the start page of the
-  performance test instead of the world menu, `bench=quick` the same with the quick suite
-  (render distances 2 and 3, a twentieth of the steps; what the browser tests run),
-  `bench=sample` the result screen with the built-in `SAMPLE_RESULT`. `getState().bench`
-  is null outside the test, otherwise `{ phase, suite, index, total, scenario, reason,
-figures }` (`figures`: most other players' figures drawn at once during the run);
-  `__mc.benchResult()` returns the record on the result screen or null. The run is driven
-  by its own buttons (`.bench-start-button`, `.bench-cancel-button`, …). Tests of a run
-  wait on `getState().bench`, give themselves four minutes and never assert on a
-  measured time or a light; the rules that throw a run away apply once the progress line
-  shows "scenario 1 of 13" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by
-  hand: `node scripts/benchRun.mjs [1|quick] [folder]` against the preview server (the
-  full suite takes about three minutes in a cloud session).
-- With `test=1` the world lives in memory (`MemoryStore`) and is never stored.
-  `save=1` (with `test=1`) uses IndexedDB and opens the world named by `world=<name>`
-  (default "Test"), creating it from `seed`. Each Playwright test has its own browser
-  context and therefore an empty IndexedDB; persistence tests reload inside one context.
-- Without `test=1` the page starts in the world menu and `?seed=` only pre-fills the "New
-  world" form. Such tests use `openMenu`, `createWorld`, `pauseWithMouse` and
-  `backToWorlds` from `e2e/game.ts`. `openMenu` stores a render distance of 2 first:
-  three parallel browsers with software WebGL render at only 1 to 7 frames per second, so
-  keep these tests light and never assert on wall-clock time without taking the best of
-  several rounds.
-- `mode=gathering` or `mode=creative` (with `test=1`; default Creative) sets the game mode
-  of the test world.
-- **Controller tests** call `installFakePads(page)` (`e2e/gamepad.ts`) before `goto`; it
-  replaces `navigator.getGamepads` with pads in `window.__fakePads`. `new Pad(page)` has
-  `connect()` (with a wake-up tap of Select, as a real browser reports a pad only after a
-  press; `connect({ holding })` connects with buttons down, `wake: false` without the tap),
-  `disconnect()`, `press`, `release`, `tap`, `trigger(button, value)` and
-  `stick('left' | 'right', x, y)` (y down). A test that measures how far a stick moved
-  something uses `stickFor(which, x, y, count)`, which holds it for exactly `count` polls
-  inside one page call: between two separate calls it stays out as long as the round trips
-  take. `e2e/gamepadInventory.spec.ts` walks the
-  inventory with `focusOn(page, pad, selector)`, which taps the D-pad towards an element
-  (rows first) without knowing the layout. Each call applies the change and reads the poll
-  count in one page call, then waits until `getState().pad.polls` grew by two; `tap` holds
-  the button for exactly one poll (held longer, a slow frame could make the D-pad repeat
-  after `PAD_NAV_DELAY_MS`, as it should). `BUTTON`
-  has the standard indices. Menu tests read `getState().ui.focus`; a focus move is one
-  `tap` of the D-pad.
-- Test API beyond Phase 2: `submit(action)` (returns the session's answer),
-  `save()`, `openWorld(name, seed, mode?)` (switch worlds in place), `terrainChecksum()`,
-  `give(item, count, player?)` (on a host with a guest's id: into that guest's
-  inventory, Phase 6 part C), `clearInventory()`; `getState()` has `mode`, `world`,
-  `save { dirty, lastError, lastSaveMs, lastLoadMs }`, `inventory`,
-  `breaking { x, y, z, progress } | null`, `ui { screen, tab }`,
-  `recipes [{ id, name, craftable, missing, stationMissing }]` in table order (ids 1–20),
-  and `smelting { recipe, progress } | null`. Phase 5: `getState().pad { connected,
-active, polls, unsupported }`, `ui.focus` (aria-label, text or id of the focused element;
-  the key is left out while there is no focus, so older `toEqual` checks of `ui` hold), `settings.padSensitivity` and `settings.padInvertY`;
-  `glyphSheet()` shows all controller glyphs (reference `pad-glyphs`). `setBlock`, `give` and `clearInventory` are
-  direct tools past the action layer.
-- Light (Phase 4): `getLight(x, y, z)` → `{ sky, block }` or null in a chunk that is not
-  lit; `verifyLight()` → number of wrong cells (0 is correct; slow); `lightChecksum()`;
-  `getState()` has `chunks.lit`, `chunks.relight`, `settings.brightness` and
-  `perf { chunkWorkAvgMs, chunkWorkMaxMs, longFrames, frames }` (last ten seconds).
-  Light scenes are built by `e2e/lightScenes.ts`. Brightness of pixels is compared as
-  gamma-encoded values (`meanLuminance`) or as linear light (`linearBrightness`); say
-  which. A test that changes blocks should end with `verifyLight()` being 0.
-- Recipe-list tests: rows are in table order, so a row further down (furnace rows, the
-  torch) must be scrolled to; `e2e/recipeRows.ts` walks the list through the states that
-  must not move a row. A held "Craft" crafts first after 30 steps, then every 15.
-  `swipe` takes a `rest` callback for a finger that rests before it moves. `Fingers` waits until the page has
-  seen each finger position and therefore hangs on a gesture the browser takes over for
-  scrolling; use `swipe` from `e2e/touch.ts` for those.
-- The "New world" form is reset when the list of stored worlds arrives: `WorldMenu` sets
-  `data-ready` then, and `openMenu` waits for it. `createWorld` chooses Creative unless
-  told otherwise.
-- Run the browser suite alone: a build or `npm run check` in parallel makes menu tests
-  time out. A vertical finger drag that starts on the inventory overlay is a scroll
-  gesture for the browser and cancels the touch; tests drag sideways there.
-- **Tests with several game pages** are files named `mp<Name>.spec.ts`. They run in the
-  Playwright project `multiplayer` with one worker, next to the `game` project: with more
-  software-rendered pages at once, WebRTC connections between them starve on a 4-core
-  machine and take more than 15 s. Room tests use `openTestPlayer` (test mode, seed 1337,
-  noon, frozen, the local server), `hostRoom`, `joinRoom` (waits until the guest's world is
-  ready), `joinError` and `untilNet`. Room codes in tests must use the code alphabet (no
-  I, O, 0, 1). Test API of Part B: `__mc.net.host({ code?, build? })`,
-  `net.join(code, { name?, checksum?, build? })` (`checksum` forces a terrain mismatch,
-  `build` another build), `net.rooms()`, `net.leave()`, `net.sendRaw(message)`,
-  `net.dropConnection()`, `suspendFrames(on)`; `getState().net` has `role`, `status`,
-  `roomCode`, `selfId`, `players` (with `renderX/Y/Z/Yaw`, where the figure is drawn),
-  `rttMs`, `lastResult` (the host's last answer, also to raw messages), `worldHash`,
-  `lastError`, `notices`, `figures`. `setBlock` on a host is sent to the guests; on a guest
-  it throws. Part D: `getState().player` also has `name`, `choice` (0–8) and `look`;
-  `net.players` has `look`, `fly`, `busy`, `anim { bodyYaw, headYaw, headPitch, leftArm,
-rightArm, leftLeg, rightLeg }` (the angles drawn in the last frame, null if not drawn)
-  and `tagDraws`; `ui.preview { frames } | null`; `__mc.figureSheet()` (reference
-  `figure-sheet`). URL parameters `look=<0–8>` and `previewgl=0` (the preview gets no
-  WebGL). Tests whose pictures show a figure or a head icon fix the look with `look=`: one
-  from the random player key would change the reference. A guest in Gathering whose breaks are timed steps with `stepPaced(page, n)`
-  (`e2e/multiplayer.ts`, no faster than real time): the host measures breaks on its own
-  clock. URL parameters `join=<code>` (in test mode: join at once; otherwise the world
-  menu's "Join world CODE") and `name=<text>`. A crash without goodbye:
-  `Page.crash` through a CDP session.
-- **Multiplayer tests** use `test` from `e2e/multiplayer.ts`: `players.open()` makes a
-  player in its own browser context with the console checks. Playwright starts the local
-  PeerJS server (`npm run signal`, `127.0.0.1:9000`, discovery on) next to the preview
-  server; pages pass `netQuery()` (`signal=http://127.0.0.1:9000/&stun=none`). Every
-  build's ids carry its build id, so tests running alongside see each other's devices: a
-  test that needs a list of only its own devices (the `net-test` reference) starts a
-  PeerJS server of its own on another port (`ownServer` in `e2e/netTest.spec.ts`) and
-  closes its pages before stopping it. `__mc.netNetwork()` gives a test the page's PeerJS
-  network to drive directly; `getState().net` is `{ role, available, build, test }`, with
-  `test` the network test's state while its screen is open. A test whose page reaches a
-  closed port or a server without discovery allows exactly the message Chromium itself
-  logs for it (`allowConsole`).
-- **This cloud container's Chromium** logs "GPU stall due to ReadPixels" in every test
-  (CI's browser does not). Run the browser tests here with `MC_CONTAINER_GPU_STALL=1`,
-  which allows exactly that message (`ALLOWED_CONSOLE` in `e2e/fixtures.ts`); CI runs
-  without it.
-- Text-only reference screenshots use `maxDiffPixelRatio` 0.05, which is loose enough to
-  miss a whole button: after changing a menu, regenerate with `--update-snapshots=all`
-  and look at the result.
-- In test mode the simulation only advances through `__mc.step(n)`; rendering and chunk
-  loading keep running. Tests without `test=1` cover the start screen and the real loop.
-- Tests wait on game state (`__mc.isReady()`, `__mc.whenIdle()`), never on fixed sleeps.
-- `e2e/game.ts` opens the game and wraps the test API; `e2e/helpers.ts` measures pixels;
-  `e2e/fixtures.ts` fails any test whose page logs a console error or warning.
-- **Touch tests** run in contexts with `hasTouch` and `isMobile` (`test.use(TOUCH_DEVICE)`
-  from `e2e/touch.ts`). `Fingers` sends several fingers through the DevTools protocol
-  (`touchDown`, `touchMove`, `touchUp` with a finger id) and returns only once the page has
-  seen the event; Chromium delivers touch moves with its next frame. Behaviour tests use
-  `openTouchGame` (`test=1&touch=1`, fixed 960 × 540 view); layout tests run without
-  `test=1` at 640 × 360 and 1280 × 800. A look drag is applied by the next rendered frame:
-  wait with `whenIdle` before reading the angles.
-- Every visual feature gets both a rule-based assertion (measurable pixel or state facts)
-  and, where useful, a reference screenshot comparison (`e2e/screenshots/`).
-- **Regenerating references of the world** (anything that changes light, the mesher or the
-  shader): first copy `e2e/screenshots/` out of the repository, regenerate with
-  `npx playwright test --update-snapshots=all`, then
-  `node scripts/compareShots.mjs <old copy> <sheet folder>` writes one sheet per reference
-  with the old picture left and the new one right, and prints how many pixels changed.
-  Open every sheet with the Read tool and judge it against the checklist of
-  `docs/phase-4-plan.md`, section 6.5; the report gets one line per reference. A change
-  the checklist does not explain is a defect, not a new reference.
-- After changing anything visual, the implementing session must also open the produced
-  screenshots with the Read tool and judge them by eye. For a quick look at any pose:
-  `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
-- The full e2e run takes about an hour in a cloud session and runs in CI (section "CI");
-  locally run the affected specs. Run long commands in the background. The
-  unit tests take about half a minute: the four `lightEdits*.slow.test.ts` files check
-  the light against the slow reference after each of 2 000 random edits.
+- Wait on game state (`__mc.isReady()`, `__mc.whenIdle()`), never on fixed sleeps.
+- `e2e/fixtures.ts` fails a test whose page logs a console error or warning; in this
+  cloud container run browser tests with `MC_CONTAINER_GPU_STALL=1`.
+- Run the browser suite alone (a parallel build or `npm run check` makes menu tests time
+  out); locally only the affected specs, the full run (an hour here) is CI's.
+- After changing anything visual, open the produced screenshots with the Read tool and
+  judge them by eye.
 
 ## Tests on real devices
 
-`docs/device-tests.md` is the one list of everything only a person with a real device can
-judge (frame rate, feel, readability, whether a player understands something). The owner
-fills it out; it is used for all phases.
+`docs/device-tests.md` lists the open tests only a person with a real device can judge
+(frame rate, feel, readability, understanding); `docs/device-tests-done.md` holds the
+passed and the obsolete ones. The owner fills them out, for all phases.
 
-- A phase part adds its new tests there, in the section they belong to, with an id
-  (`LIGHT-9`, `TOUCH-12`, …) and its origin (`4B`). The part's report names the ids it
-  added instead of carrying a list of its own.
-- A test that a change makes pointless moves to the section "Obsolete" with one line of
-  reason. Ids are never reused.
+- A phase part adds its tests to `docs/device-tests.md`, in their section, with an id
+  (`LIGHT-9`, `TOUCH-12`, …) and its origin (`4B`); its report names the ids it added.
+- The next session that touches the file moves a ticked test unchanged to "Passed" in
+  `docs/device-tests-done.md`, and one a change made pointless to "Obsolete" there with
+  one line of reason. Ids are never reused.
 - Never change or remove what the owner wrote after "Result:" or into a table. If the
   subject of a test changed, add a new test and move the old one, with its result, to
   "Obsolete".
-- Read the results at the start of a session: they are the owner's feedback on earlier
-  parts. Update the line "Last updated" when you change the file.
+- Read the open list at the start of a session (the owner's feedback), the done file when
+  a test's history matters. Update "Last updated" when you change the open list.
+
+## Docs hygiene
+
+- `CLAUDE.md` and the nested `CLAUDE.md` files describe the current state only. History
+  stays only where a later session needs it to read older docs correctly or a decision
+  might be revisited; the reports and git keep the rest.
+- A finished part adds one row to the status table and its detail to the nested file of
+  its area, `docs/architecture.md` or `docs/testing.md`, never a paragraph in the root.
+- A new rule goes into its directory's nested file, else `docs/architecture.md`, with a
+  line in "Where the rules are" if it is new ground.
+- Paths are written in backticks (the link check sees them), as plain paths, never
+  `@`-imports (those would load the file into every session again).
+- `node scripts/ci/docsBudget.mjs` must pass: root at most 25 000 bytes, each nested file
+  at most 8 000, no missing path.
 
 ## Definition of Done (per phase or phase part)
 
@@ -854,9 +263,12 @@ hold:
 8. `docs/phase-N-report.md` (for a part: `docs/phase-Na-report.md`, `-Nb-`, …) exists: what was built, decisions and deviations from the
    plan, known issues, measured performance numbers, and suggestions for the next phase.
    Its tests for real devices are in `docs/device-tests.md`, and tests that became
-   pointless were moved to "Obsolete" there.
+   pointless were moved to "Obsolete" in `docs/device-tests-done.md`.
 9. Hard rule 1 has been checked: no third-party assets or protected names anywhere.
 10. One pull request into `main` is open, describing the result and linking the report.
+11. Docs hygiene holds: `CLAUDE.md` describes the current state, the finished part is one
+    row in the status table, its details are in the nested file or docs of its area, and
+    the docs budget check passes.
 
 ## Owner decisions
 
@@ -878,126 +290,40 @@ hold:
   tests, commit messages, pull requests). What the Pi side has to do goes into the part's
   report under the heading "For the Pi side", without addresses (owner, 2026-11-17).
 
-## Current status
+## Status
 
-- Phase 1: implemented (report: `docs/phase-1-report.md`). Read its "Decisions and
-  deviations" before changing world, meshing, physics or the test API.
-- Phase 2 part A (touch controls): implemented (report: `docs/phase-2a-report.md`). Read
-  its "Decisions and deviations" before changing input, the menu or the touch tests.
-- Phase 2 is complete with part A. Its former part B (multiplayer) was postponed by the
-  owner and is now Phase 6; `docs/phase-2-plan.md`, Part B, is not to be implemented. It
-  was re-planned on top of Phases 3–5 as `docs/phase-6-plan.md`.
-- Phase 3 (Gathering & Crafting): implemented (parts A–C); plan: `docs/phase-3-plan.md`.
-  - Phase 3 part A (foundation: terrain version 1, action layer, saving, world menu):
-    implemented (report: `docs/phase-3a-report.md`). Read its "Decisions and deviations"
-    before changing generation, actions, the save format, the menus or the start flow.
-  - Phase 3 part B (gathering: items, inventory, game modes, timed breaking, inventory
-    screen): implemented (report: `docs/phase-3b-report.md`). Read its "Decisions and
-    deviations" before changing items, the inventory, the break rules or the inventory
-    screen.
-  - Phase 3 part C (crafting: tools, gating, recipes, workbench, furnace, recipe list):
-    implemented (report: `docs/phase-3c-report.md`). Read its "Decisions and deviations"
-    before changing recipes, tools, the break rules or the recipe list.
-  - Phase 3 is complete with parts A–C. Its part D (Web Workers) was never started; the
-    topic is now Phase 4 part C. Do not implement Phase 3 part D as written.
-- Phase 4 (Light & Torches): plan `docs/phase-4-plan.md`.
-  - Phase 4 part A (light: engine, chunk pipeline, rendering, Brightness setting,
-    measurement): implemented (report: `docs/phase-4a-report.md`). Read its "Decisions and
-    deviations" before changing light, the chunk manager, the mesher, the chunk shader or
-    the reference screenshots.
-  - Phase 4 part P (performance test run: fixed scenarios played by the real game loop,
-    started by hand on a device, results as pre-filled GitHub issues with the label
-    `perf-run`): implemented (plan: `docs/phase-4p-plan.md`, report:
-    `docs/phase-4p-report.md`). Read its "Decisions and deviations" before changing the
-    performance test, `Input`, or how `Game` switches screens; "How a later session reads
-    the results" and "For Part B: adding a scenario" are in the report too. The label
-    `perf-run` exists in the repository.
-  - Phase 4 part E (edits without hitches: only the edited block's chunk is remeshed in
-    the frame of an edit, its neighbours follow through the urgent queue): implemented
-    (plan: `docs/phase-4e-plan.md`, report: `docs/phase-4e-report.md`). Read its
-    "Decisions and deviations" before changing how edits are remeshed or the chunk budget.
-  - Phase 4 part B (torch: block flags, the support rule, shape, aiming box, recipe 20;
-    the darker night; the scenario `torches`, suite version 2): implemented (report:
-    `docs/phase-4b-report.md`). Read its "Decisions and deviations" before changing the
-    torch, the block flags, the night or the Brightness floor.
-  - Part C (Web Workers) is optional and is built only when the owner's starting prompt
-    asks for it; the performance test on the owner's phone is what decides
-    (`docs/phase-4p-plan.md`, section 5.6). If it is never started, Phase 4 is complete.
-  - **Performance on real devices** is measured by the owner with the performance test on
-    computer, phone and tablet (PERF-4 and PERF-5 in `docs/device-tests.md`); at the start
-    of a session look for issues with the label `perf-run`. The baseline before light can no longer be taken. Numbers from software
-    WebGL (cloud sessions, CI) are never evidence of performance.
-  - **First runs (issues #13–#16, build aef8349):** everything green except `edit` on
-    phone and tablet, which alone makes the Web Workers line say "recommended". The cause
-    is remeshing up to four whole chunk columns in the frame of an edit, not light, and
-    Part C as planned would not fix it: `docs/phase-4-edit-cost.md` (analysis and
-    options). The owner chose option 1: Part E. After Part E (issue #18, tablet, build
-    20dd67c) every scenario is green and the line says "not needed".
-- **The phase order changed with Phase 4.** Multiplayer was Phase 4 and is now Phase 6;
-  personalization was Phase 5 and is now Phase 7. The Phase 3 plan and reports still say
-  "Phase 4 (multiplayer)" in their notes: read that as Phase 6.
-- Phase 5 (gamepad controls): plan `docs/phase-5-plan.md`.
-  - Phase 5 part A (the pad in play, the focus system, all screens but the inventory, the
-    back guard): implemented (report: `docs/phase-5a-report.md`). Read its "Decisions and
-    deviations" before changing `Input`, the controller, the focus system, the menus or
-    the back guard.
-  - Phase 5 part B (inventory, Creative palette, Crafting tab with the pad): implemented
-    (report: `docs/phase-5b-report.md`). Read its "Decisions and deviations" before
-    changing the inventory screen, the recipe list or the focus system.
-  - Phase 5 is complete with parts A and B.
-- Polishing session 1 (inventory and recipe list, between Phase 5 parts A and B):
-  implemented (plan: `docs/polish-1-plan.md`, report: `docs/polish-1-report.md`). The
-  recipe list keeps table order with craftable rows highlighted and a count on the
-  "Crafting" tab, the quarter-second rule after a craft is gone, rows have a fixed
-  height, the scroll position is kept, a held "Craft" first repeats after 500 ms, and the
-  label column of the settings rows is wider (136 px) so the controller labels fit on one
-  line. Esc stays as it is. Read its "Decisions and deviations" before changing the
-  recipe list or the hold. Its tests name their criterion as "Polish 1 AC1.1"; device
-  tests it added have the origin "P1" (CRAFT-12, CRAFT-13).
-- Phase 6 part A (connection test: transport, local signaling server, network test):
-  implemented (report: `docs/phase-6a-report.md`). Read its "Decisions and deviations"
-  before changing the network layer, the network test or the multiplayer tests.
-- Phase 6 part B (together in Creative: protocol, host and guest sessions, figures and
-  name tags, "Join a world", "Playing together", leaving and reconnecting): implemented
-  (report: `docs/phase-6b-report.md`). Read its "Decisions and deviations" before
-  changing the sessions, the protocol, the menus of rooms or the multiplayer tests.
-- Phase 6 part C (Gathering together: guests in the host's save, format version 2, the
-  host clock, the grace rule, the rate limit, Gathering worlds opened to others):
-  implemented (report: `docs/phase-6c-report.md`). Read its "Decisions and deviations"
-  before changing the save format, timed breaking in rooms or the sessions.
-- Phase 6 part D (player figure: looks, figure texture, motion, the animated figure with
-  two draw calls, `profile`, `busy` and `fly`, "Your player" with preview and look picker,
-  head icons in the player list): implemented (report: `docs/phase-6d-report.md`). Read its
-  "Decisions and deviations" before changing the figure, the looks, the identity record or
-  "Your player".
-- Phase 6 part E (measure and harden: the F3 network rows, round trips on the host, the
-  traffic meter, compact poses, the hidden-host, soak and large-world tests, the
-  performance test scenario `players` with simulated guests, suite version 3):
-  implemented (report: `docs/phase-6e-report.md`). Read its "Decisions and deviations"
-  before changing the overlay, the relayed poses or the scenario `players`.
-- Phase 6 (multiplayer): complete with parts A–E (`docs/phase-6-plan.md`). Five
-  parts, each in its own session with its own pull request, in order: **A** connection
-  test (steps 1–2), **B** together in Creative (steps 3–7; starts only when the owner's
-  NET tests of A in `docs/device-tests.md` show a working connection), **C** Gathering
-  together (steps 8–10), **D** player figure (steps 11–13, plan sections 5.14 and 5.15;
-  implemented), **E** measure and harden (steps 14–16; implemented). Part D was inserted by the
-  owner on 2026-11-21 (plan section 3, change 14); the former Part D is Part E, unchanged
-  in content, its device tests NET-17 to NET-19 keep their ids, and "Part D" or "AC11.x"
-  in the reports of Parts B and C mean Part E and AC14.x. The servers on the Pi are built
-  separately in the owner's `pi-infra` repository (plan section 5.12).
-- Phase 7 (personalization): not yet planned.
-- CI 1 (parallel browser tests, triggers, timing; a round of work on the pipeline, not a
-  game phase): implemented (plan: `docs/ci-1-plan.md`, report: `docs/ci-1-report.md`).
-  Read its "Decisions and deviations" before changing `ci.yml` or `scripts/ci/`. The first
-  session after the merge checks that the run on `main` ran the full suite and was not
-  cancelled by a later merge, and notes it in its report.
-- Fix of flaky controller tests (focus one frame late, back pairing in wall-clock time,
-  two tests that depended on round-trip timing):
-  report `docs/fix-pad-flaky-report.md`.
-- Fix of flaky browser tests after CI 1 (the back guard's pairing window counted per
-  frame; the network test's waits name their last state; the soak and the network test
-  documented as known issues): report `docs/fix-ci-flaky-report.md`. It also records the
-  first run on `main` after CI 1 (run #188: full suite, not cancelled, green, 15.8 min).
-- Docs 1 (a small `CLAUDE.md` with nested `CLAUDE.md` files per area, a docs budget check,
-  device tests split into open and done; a round of work on the docs, not a game phase):
-  planned (plan: `docs/docs-1-plan.md`), not yet implemented.
+| Part     | Plan                    | Report                         | Before changing                           |
+| -------- | ----------------------- | ------------------------------ | ----------------------------------------- |
+| 1        | `docs/phase-1-plan.md`  | `docs/phase-1-report.md`       | world, meshing, physics, the test API     |
+| 2A       | `docs/phase-2-plan.md`  | `docs/phase-2a-report.md`      | input, the menu, the touch tests          |
+| 3A       | `docs/phase-3-plan.md`  | `docs/phase-3a-report.md`      | generation, actions, saves, menus, start  |
+| 3B       | `docs/phase-3-plan.md`  | `docs/phase-3b-report.md`      | items, inventory, break rules             |
+| 3C       | `docs/phase-3-plan.md`  | `docs/phase-3c-report.md`      | recipes, tools, break rules, recipe list  |
+| 4A       | `docs/phase-4-plan.md`  | `docs/phase-4a-report.md`      | light, chunks, mesher, shader, references |
+| 4P       | `docs/phase-4p-plan.md` | `docs/phase-4p-report.md`      | performance test, `Input`, screens        |
+| 4E       | `docs/phase-4e-plan.md` | `docs/phase-4e-report.md`      | remeshing after edits, chunk budget       |
+| 4B       | `docs/phase-4-plan.md`  | `docs/phase-4b-report.md`      | torch, block flags, night, Brightness     |
+| 5A       | `docs/phase-5-plan.md`  | `docs/phase-5a-report.md`      | `Input`, controller, focus, menus, back   |
+| Polish 1 | `docs/polish-1-plan.md` | `docs/polish-1-report.md`      | the recipe list, the hold                 |
+| 5B       | `docs/phase-5-plan.md`  | `docs/phase-5b-report.md`      | inventory screen, recipe list, focus      |
+| 6A       | `docs/phase-6-plan.md`  | `docs/phase-6a-report.md`      | network layer, network test, mp specs     |
+| 6B       | `docs/phase-6-plan.md`  | `docs/phase-6b-report.md`      | sessions, protocol, room menus, mp specs  |
+| 6C       | `docs/phase-6-plan.md`  | `docs/phase-6c-report.md`      | save format, timed breaking in rooms      |
+| 6D       | `docs/phase-6-plan.md`  | `docs/phase-6d-report.md`      | figure, looks, identity, "Your player"    |
+| 6E       | `docs/phase-6-plan.md`  | `docs/phase-6e-report.md`      | overlay, relayed poses, `players`         |
+| CI 1     | `docs/ci-1-plan.md`     | `docs/ci-1-report.md`          | `ci.yml`, `scripts/ci/`                   |
+| Fix pad  | –                       | `docs/fix-pad-flaky-report.md` | pad test timing, back pairing             |
+| Fix CI   | –                       | `docs/fix-ci-flaky-report.md`  | back guard window, net test waits         |
+| Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget           |
+
+- **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
+  prompt asks for it; otherwise Phase 4 is complete. Phase 7 (personalization: custom
+  blocks, textures, characters beyond the eight looks, names, effects) is not planned. At
+  the start of a session look for issues with the label `perf-run`; the latest are all
+  green (issue #18), the Web Workers line says "not needed". Numbers from software WebGL (cloud sessions, CI) are never evidence.
+- **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
+  2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
+  (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;
+  "Part D" and "AC11.x" in the reports of 6B and 6C mean Part E and AC14.x (Part D, the
+  figure, was inserted later); Polish 1 names its criteria "Polish 1 AC1.1" and its device
+  tests' origin "P1".
