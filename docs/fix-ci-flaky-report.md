@@ -153,6 +153,10 @@ Full runs of the pull request (start → `CI result`). Runs cancelled by a newer
 | ---- | ------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------: | ----------- |
 | #194 | 1f22070 | full suite plus the throwaway rounds (af1a917): the back guard's 4 tests × 10, AC2.1 × 5 | back guard 40 of 40 passed, AC2.1 5 of 5 (shard game 4, 6.8 min) |  14.8 min | green       |
 | #196 | 2bf61f1 | full suite, final code (throwaway reverted in 7d22e21)                                   | passed (each test once)                                          |  16.4 min | green       |
+| #198 | 5c89efd | full suite, final code                                                                   | passed (each test once)                                          |  13.2 min | green       |
+
+Three green full runs, no failure of the fixed tests in any of them. A run on the commit
+that adds this line runs the full suite again; its result is on the pull request.
 
 ## 5. What CI 1 left for the first session after its merge
 
