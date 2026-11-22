@@ -158,7 +158,8 @@ done file passed all ticked: True 26
 obsolete unchanged: True
 ```
 
-84 open tests, 26 passed (PERF-8, NET-1 to NET-25), 9 obsolete entries.
+84 open tests, 26 passed (PERF-8, NET-1 to NET-25), 9 obsolete entries. After the triage of
+step 9: 39 open, 26 passed, 54 obsolete (section 8).
 
 ### Changed files (AC5.1)
 
@@ -279,6 +280,21 @@ itself; if not, read the nested file named in the index before changing the area
 ## 8. Device tests
 
 No device test was added or changed in content. The ticked tests and "Obsolete" moved to
-`docs/device-tests-done.md` (section 3). The owner's triage of the 45 open tests with an
-origin before Phase 4 is asked for in the pull request (plan section 3, change 7);
-step 9 records its result here.
+`docs/device-tests-done.md` (section 3).
+
+**Triage (step 9).** The pull request listed the 45 open tests with an origin before
+Phase 4 (origins 1, 2A, 3A–3C, including the mixed origins "1, 3A", "2A, 3A", "2A, 4A",
+"3B, 3C"). The owner answered on 2026-11-22: "Please drop all old device tests". All 45
+moved to "Obsolete" in `docs/device-tests-done.md`, each entry byte for byte as it stood
+(with its empty "Result:"), followed by one line "Reason: Dropped by the owner,
+2026-11-22." (checked by script: every moved entry appears verbatim in the done file, none
+remains in the open list). Ids: PERF-3, MOVE-1, LOOK-1, LOOK-2, MOUSE-1, MOUSE-2, TOUCH-1
+to TOUCH-11, SAVE-1 to SAVE-10, GATH-1 to GATH-10, CRAFT-2, CRAFT-4 to CRAFT-7, CRAFT-9 to
+CRAFT-11.
+
+- `docs/device-tests.md`: 39 open tests (was 84), 12 931 bytes (was 20 705).
+- `docs/device-tests-done.md`: 26 passed, 54 obsolete entries, 22 599 bytes.
+- Sections 4 (mouse and keyboard), 5 (touch controls), 6 (worlds and saving) and 7
+  (gathering) of the open list had no test left; their headings were removed (they had no
+  intro). The other sections keep their numbers, so references such as "section 1" in
+  older text still hold.

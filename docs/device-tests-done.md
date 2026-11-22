@@ -179,3 +179,150 @@ Tests that no longer need doing, with the reason.
 - **CRAFT-8** (3C) "Holding "Craft", by mouse and by finger: four per second. Too fast for
   the player?" Never filled in. Reason: polishing session 1 delays the first repeat to
   half a second; CRAFT-13 asks about the new timing.
+- [ ] **PERF-3** (1) PC only: 60 FPS at render distance 8 on a mid-range laptop? Try 16 as
+      well (render distance 16 is not part of the performance test; use the debug overlay,
+      F3). Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **MOVE-1** (1) Feel of movement: walking and sprint speed, jump height, air control,
+      swimming and climbing out of water, fly speed. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **LOOK-1** (1) Look of the textures, and of the sky at sunrise and sunset. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **LOOK-2** (3A) Rocky hills: is the change from grass to rock natural? Are the black
+      nuggets of coal ore easy to spot from some blocks away? Is the blue-grey clay in a
+      lake recognisable? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **MOUSE-1** (1, 3A) "Click to play" captures the mouse, Esc opens the pause menu,
+      "Click to continue" resumes. The mouse sensitivity slider works. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **MOUSE-2** (2A) `?touch=1` on the computer shows the touch controls; they react to
+      real touches only, not to the mouse. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-1** (2A) Start: tapping the play button shows the controls. No button is cut
+      off or hidden behind the system bars or a camera notch. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-2** (2A) Feel of the stick: does the thumb find it, is the dead zone right,
+      is the travel right, does sprinting at full push happen when intended? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-3** (2A) Look sensitivity: is a comfortable drag enough to turn around? Which
+      "Touch sensitivity" feels right (it can become the default)? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-4** (2A) Reachability: break, place, up and down with the right thumb while
+      the left thumb is on the stick; fly and menu at the top. Too small, too close, wrong
+      place? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-5** (2A) Three fingers: walk with the stick, turn with one finger and break
+      with another. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-6** (2A) Holding break or place repeats four times a second (Creative).
+      Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-7** (2A) Block bar: tapping a slot selects it; no block is broken by the
+      tap. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-8** (2A, 3A) Fullscreen: a tap on a play button hides the address bar. After
+      "Exit fullscreen" in the menu, "Tap to continue" does not enter fullscreen again; the
+      "Fullscreen" button still does. Does the rotate overlay flash when fullscreen starts
+      (it should not)? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-9** (2A) Rotate overlay: turning the device upright shows "Please rotate
+      your device to landscape."; turning back shows the menu. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-10** (2A) Gestures that must do nothing during play: pinch (no zoom), pull
+      down from the top edge (no reload), swipes from the edges, a long press on the view
+      or a button (no menu, no text selection). Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **TOUCH-11** (2A, 4A) The menu by touch: sliders can be dragged (Brightness too),
+      the debug switch toggles, "Copy link to this world" works. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-1** (3A) Worlds survive: build something, pause, wait for "Saved", close the
+      browser completely, reopen: the world is in the list and the building is there.
+      Repeat after a restart of the device. _PC, Phone, Tablet._ Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-2** (3A) Closing without pausing: build, close the tab right away, reopen: at
+      most the last few seconds are missing. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-3** (3A) The "New world" form with the on-screen keyboard: the name field
+      stays visible, typing works, "Create and play" can be reached. Does the rotate
+      overlay appear while the keyboard is open? _Phone, Tablet._ Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-4** (3A) The world list: the world played last is on top and selected. On the
+      phone the list scrolls with a finger; a tap selects a row. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-5** (3A) "Delete" asks "Delete this world for ever?"; "Keep" keeps it. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-6** (3A) Two tabs: the world that is open in the first tab cannot be played
+      in the second ("This world is open in another tab."). Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-7** (3A) "Copy link to this world": the link opens the form with the seed;
+      the new world has the same terrain, without the buildings. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-8** (3A) A private window: the game either saves until the window is closed
+      or says "Worlds cannot be saved in this browser window." Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-9** (3B, 3C) A Gathering world keeps its inventory, tools, workbench and
+      furnace after "back to worlds" and a restart of the browser. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **SAVE-10** (3B, 3C) Worlds from earlier versions open with what was built and
+      gathered. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-1** (3B) The mode choice in the "New world" form: is it clear what Gathering
+      and Creative mean? The list names the mode of each world. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-2** (3B, 3C) Break times with the mouse: leaves 0.25 s, sand and dirt 0.6 s,
+      a log 2 s, stone 3 s by hand; 1.5 s, 0.75 s and under 0.4 s with a wooden, stone and
+      iron pickaxe. Fun or tedious? Does the first pickaxe feel like a reward? Is a log by
+      hand too long? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-3** (3B) Break times by finger: is it comfortable to hold the break button
+      for three seconds while the other thumb looks around? A short tap breaks nothing.
+      _Phone, Tablet._ Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-4** (3B) Cracks and progress bar: are the cracks visible on dark blocks and
+      in the evening? Is the small bar under the crosshair noticed? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-5** (3B) Pickup notice ("+1 Dirt"): readable on the phone, gone soon enough?
+      Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-6** (3B) "Inventory full": is it understood why the block no longer breaks?
+      Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-7** (3B) The inventory with the mouse: `E` opens it; click a stack, then
+      another slot: move, merge, swap; the bin throws away. Closing returns to the game
+      with the mouse captured. `Esc` closes too but usually shows the pause menu: is that
+      acceptable? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-8** (3B) The inventory on the phone: are the slots large enough for a finger,
+      is everything on screen, are the counts readable? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-9** (3B) The bag button: is the symbol recognised, is its place good? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **GATH-10** (3B) Creative as before: flying, instant breaking, unlimited blocks; the
+      inventory key shows all blocks and they can be put into the bar. Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-2** (3C) Is the recipe list understood without reading: icons, "2 / 3" in
+      red, the greyed rows, "Needs a workbench nearby", that the list scrolls? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-4** (3C) "Needs a pickaxe": is the hint noticed before the three seconds are
+      spent? Should stone without a pickaxe not break at all instead? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-5** (3C) Is coal findable (dark specks in bare rock on hills)? If not: is it
+      discovered that the furnace turns two logs into coal? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-6** (3C) Is iron findable? It lies deep and needs a stone pickaxe: is
+      digging the shaft fun or tedious, and does one get out again? (With light the shaft
+      is dark at the sides; torches come with Phase 4 part B.) Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-7** (3C) The furnace's two seconds: does the bar feel like "it is cooking"?
+      Is it understood that closing the bag cancels it and that holding goes on? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-9** (3C) The recipe list on the phone: are tabs, rows and buttons easy to
+      hit, does scrolling work without crafting something, is the text readable? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-10** (3C) The icons: are pickaxe, axe and shovel told apart in the bar on
+      the phone, and wood, stone and iron by colour? Do workbench and furnace look like
+      what they are once placed? Result:
+      Reason: Dropped by the owner, 2026-11-22.
+- [ ] **CRAFT-11** (3C) Building blocks: are stone bricks, glass, bricks and the iron
+      block worth their recipes? Result:
+      Reason: Dropped by the owner, 2026-11-22.
