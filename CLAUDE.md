@@ -238,7 +238,8 @@ scripts/             dev tools: signalServer.mjs (local PeerJS server, `npm run 
                      (blob reports' JSON → timing summary; `--assign`: spec lists per shard;
                      `--files`: the specs of one shard job);
                      unit tests `*.test.ts` next to them
-docs/                phase plans and phase reports, ci-1-plan.md and ci-1-report.md (CI round 1); device-tests.md
+docs/                phase plans and phase reports, ci-1-plan.md and ci-1-report.md (CI round 1),
+                     docs-1-plan.md (Docs round 1); device-tests.md
                      (the one checklist of tests on real devices, filled out by the owner)
 .github/workflows/   ci.yml, deploy.yml
 ```
@@ -997,3 +998,6 @@ hold:
   frame; the network test's waits name their last state; the soak and the network test
   documented as known issues): report `docs/fix-ci-flaky-report.md`. It also records the
   first run on `main` after CI 1 (run #188: full suite, not cancelled, green, 15.8 min).
+- Docs 1 (a small `CLAUDE.md` with nested `CLAUDE.md` files per area, a docs budget check,
+  device tests split into open and done; a round of work on the docs, not a game phase):
+  planned (plan: `docs/docs-1-plan.md`), not yet implemented.
