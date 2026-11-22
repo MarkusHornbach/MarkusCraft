@@ -21,11 +21,14 @@ const SLOWEST = 20;
  */
 
 /**
- * One entry per test and project, with the time of all its attempts.
+ * One entry per test and project, with the time of all its attempts. `shard` names the shard
+ * of a report merged from one shard's blob alone; otherwise the shard comes from the JSON,
+ * where it carries one (Playwright 1.63's merged JSON does not).
  * @param {JsonReport} report
+ * @param {number | null} [shard]
  * @returns {TestTime[]}
  */
-export function collectTests(report) {
+export function collectTests(report, shard = null) {
   /** @type {TestTime[]} */
   const tests = [];
   /**
@@ -45,7 +48,7 @@ export function collectTests(report) {
           title: [...inner, spec.title ?? ''].join(' › '),
           durationMs: results.reduce((sum, result) => sum + (result.duration ?? 0), 0),
           status: test.status ?? 'unknown',
-          shard: typeof last?.shardIndex === 'number' ? last.shardIndex : null,
+          shard: shard ?? (typeof last?.shardIndex === 'number' ? last.shardIndex : null),
         });
       }
     }
@@ -177,15 +180,30 @@ export function assignShards(tests, project, count) {
   return files.map((list) => list.sort());
 }
 
+/**
+ * The command line's reports: `<n>=<path>` is the report of shard n alone, a plain path a
+ * report whose shards are unknown (or carried in the JSON).
+ * @param {readonly string[]} args
+ * @returns {{ shard: number | null, path: string }[]}
+ */
+export function parseReportArgs(args) {
+  return args.map((arg) => {
+    const match = /^(\d+)=(.+)$/.exec(arg);
+    return match ? { shard: Number(match[1]), path: match[2] } : { shard: null, path: arg };
+  });
+}
+
 function main() {
   const args = process.argv.slice(2);
   const assign = args[0] === '--assign';
-  const path = assign ? args[1] : args[0];
-  if (!path) {
-    console.error('usage: node scripts/ci/timings.mjs [--assign] <merged-report.json>');
+  const reports = parseReportArgs(assign ? args.slice(1) : args);
+  if (reports.length === 0) {
+    console.error('usage: node scripts/ci/timings.mjs [--assign] [<shard>=]<report.json>...');
     process.exit(2);
   }
-  const tests = collectTests(JSON.parse(readFileSync(path, 'utf8')));
+  const tests = reports.flatMap(({ shard, path }) =>
+    collectTests(JSON.parse(readFileSync(path, 'utf8')), shard),
+  );
   if (assign) {
     /** @type {Record<string, string[][]>} */
     const shards = {};

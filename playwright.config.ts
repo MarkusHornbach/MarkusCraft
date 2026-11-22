@@ -10,7 +10,8 @@ export default defineConfig({
   fullyParallel: true,
   workers: process.env.CI ? 2 : 3,
   retries: 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
+  // In CI every shard writes a blob report; the `report` job merges them into HTML and JSON.
+  reporter: process.env.CI ? [['list'], ['blob']] : [['list']],
   snapshotPathTemplate: '{testDir}/screenshots/{arg}{ext}',
   expect: {
     // Software WebGL is slow; stable screenshots need more than the default 5 s.

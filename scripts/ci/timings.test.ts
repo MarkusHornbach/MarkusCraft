@@ -1,6 +1,6 @@
 // Unit tests of the timing summary and the shard assignment of the `report` job.
 import { describe, expect, it } from 'vitest';
-import { assignShards, collectTests, summarize } from './timings.mjs';
+import { assignShards, collectTests, parseReportArgs, summarize } from './timings.mjs';
 
 type Report = Parameters<typeof collectTests>[0];
 
@@ -170,6 +170,11 @@ describe('collectTests', () => {
     ]);
   });
 
+  it('takes the shard given for a report merged from one shard alone', () => {
+    const shards = collectTests(REPORT, 3).map((test) => test.shard);
+    expect(shards).toEqual([3, 3, 3, 3, 3]);
+  });
+
   it('copes with an empty report', () => {
     expect(collectTests({})).toEqual([]);
   });
@@ -250,5 +255,14 @@ describe('assignShards', () => {
   it('looks only at the given project and leaves shards empty when specs run out', () => {
     const tests = collectTests(REPORT);
     expect(assignShards(tests, 'multiplayer', 3)).toEqual([['mpRooms.spec.ts'], [], []]);
+  });
+});
+
+describe('parseReportArgs', () => {
+  it('reads <n>=<path> as the report of shard n and a plain path as one without', () => {
+    expect(parseReportArgs(['2=shards/game-2.json', 'merged.json'])).toEqual([
+      { shard: 2, path: 'shards/game-2.json' },
+      { shard: null, path: 'merged.json' },
+    ]);
   });
 });
