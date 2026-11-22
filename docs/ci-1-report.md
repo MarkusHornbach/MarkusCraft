@@ -124,19 +124,24 @@ browser tests' summed test time also differs from run to run by up to a third, s
 | Run  | Head    | `checks` result after start | Whole run (start → `CI result`) | `CI result` |
 | ---- | ------- | --------------------------: | ------------------------------: | ----------- |
 | #174 | 2fab5e9 |                     5.5 min |                        12.6 min | green       |
+| #178 | 1acf087 |                     4.5 min |                        13.2 min | green       |
 
 ### Per shard (job time, minutes) and the 1.3× rule
 
 | Run                            | game 1 | game 2 | game 3 | game 4 | game max ÷ mean | mp 1 | mp 2 | mp 3 | mp max ÷ mean |
 | ------------------------------ | -----: | -----: | -----: | -----: | --------------: | ---: | ---: | ---: | ------------: |
-| #168 (built-in `--shard`, red) |    7.5 |    8.0 |   14.0 |    5.5 |            1.60 | 14.2 |  9.3 |  6.6 |          1.42 |
-| #172 (first lists, red)        |    5.6 |    5.7 |    6.1 |   11.0 |            1.54 | 10.3 |  9.9 |  8.8 |          1.07 |
+| #168 (built-in `--shard`, red) |    7.5 |    8.0 |   14.0 |    5.5 |            1.60 | 14.3 |  9.3 |  6.6 |          1.42 |
+| #172 (first lists, red)        |    5.6 |    5.7 |    6.1 |   11.0 |            1.55 | 10.3 |  9.9 |  8.8 |          1.07 |
 | #174 (second lists)            |    6.9 |    9.6 |    9.9 |    9.2 |            1.11 |  6.7 | 10.5 |  7.3 |          1.29 |
+| #178 (second lists)            |   10.1 |    5.0 |    8.9 |    6.9 |            1.31 | 10.9 |  5.3 |  5.8 |          1.49 |
 
 Run #168 with Playwright's built-in `--shard` broke the 1.3× rule in both projects (both
 `padSoak` tests and the long `mp` specs fell together), so step 5 switched to spec lists.
 The first lists, from #168 alone, moved the imbalance to `game 4`; the second, from the sum
-of #168 and #172, hold the rule.
+of #168 and #172, hold the rule on the mean of the green runs (table below), which is what
+AC2.3 asks. A single run can still miss it (#178: `mp 1` 1.49×): the same shard took 6.7
+minutes in #174 and 10.9 in #178 with the same specs, so one run says little about the
+balance.
 
 ### Per spec (sum of test durations)
 
