@@ -1,16 +1,17 @@
 // Back guard: while anything but the world list is shown, the page holds one history entry,
 // so the browser's Back (or a phone's back gesture, or a controller whose B the browser
 // sends as Back) acts in the game instead of leaving the page. Knows nothing of screens.
-import { BACK_PAIR_MS } from './config';
+import { BACK_PAIR_FRAME_MS, BACK_PAIR_MS } from './config';
 
 export class BackGuard {
   /** Whether our entry is on the history stack. */
   private pushed = false;
-  /** When the controller's B was pressed last. */
-  private padBackAt = -Infinity;
-  /** Frames ended so far (`update` calls), and the count when B was pressed last. */
-  private frames = 0;
-  private padBackFrame = -Infinity;
+  /** Whether a B press may still be paired with a Back. */
+  private padBackPending = false;
+  /** Time counted since the last B press (each frame at most `BACK_PAIR_FRAME_MS`). */
+  private padBackElapsed = 0;
+  /** When the B press or the last frame since it was counted. */
+  private padBackMark = 0;
 
   /**
    * `armed` says whether Back should act in the game right now; it is asked at the moment
@@ -30,24 +31,37 @@ export class BackGuard {
    * with a reload or a link.
    */
   update(): void {
-    this.frames++;
+    if (this.padBackPending) {
+      this.padBackElapsed += this.sinceMark();
+      this.padBackMark = this.now();
+      if (this.padBackElapsed >= BACK_PAIR_MS) this.padBackPending = false;
+    }
     if (this.armed() && !this.pushed) this.push();
   }
 
   /** The controller's B was pressed: a "Back" right after it is the same press. */
   notePadBack(): void {
-    this.padBackAt = this.now();
-    this.padBackFrame = this.frames;
+    this.padBackPending = true;
+    this.padBackElapsed = 0;
+    this.padBackMark = this.now();
+  }
+
+  /** Time since the last mark, as much of it as one frame may count. */
+  private sinceMark(): number {
+    return Math.min(this.now() - this.padBackMark, BACK_PAIR_FRAME_MS);
   }
 
   /**
-   * Whether a "Back" now is the one that came with the last B press. The `popstate` of
-   * that Back is a task that waits for the frame in which the poll saw B (and maybe the
-   * next one) to end; a slow frame can stretch that past `BACK_PAIR_MS`, so a Back before
-   * the end of the frame after the B frame is paired however long those frames took.
+   * Whether a "Back" now is the one that came with the last B press. The browser starts
+   * that Back with the press, but its `popstate` needs several tasks on the page's main
+   * thread, which wait behind a slow frame, and frames may run between them. So the window
+   * is not wall-clock time: each frame since B (and the wait since the last one) counts at
+   * most `BACK_PAIR_FRAME_MS`. At 60 fps that is wall-clock time, as before; with slow
+   * frames a Back is paired within `BACK_PAIR_MS / BACK_PAIR_FRAME_MS` (6) frames, however
+   * long they took.
    */
   private pairedWithPadBack(): boolean {
-    return this.frames - this.padBackFrame <= 1 || this.now() - this.padBackAt < BACK_PAIR_MS;
+    return this.padBackPending && this.padBackElapsed + this.sinceMark() < BACK_PAIR_MS;
   }
 
   private push(): void {

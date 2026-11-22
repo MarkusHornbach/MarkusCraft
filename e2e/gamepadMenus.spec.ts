@@ -481,6 +481,43 @@ test.describe('the back guard', () => {
     await polls(page, 5);
     expect((await getState(page)).paused).toBe(false);
   });
+
+  test('Phase 5 AC3.7: B, a slow frame, and a Back that an ordinary frame delays act once', async ({
+    page,
+  }) => {
+    // The order CI runs #168, #180 and #185 saw by chance: the popstate needs tasks after
+    // the slow frame, and an ordinary frame ran first. Here that frame is waited for.
+    await installFakePads(page);
+    await openMenu(page);
+    await createWorld(page);
+    const pad = new Pad(page);
+    await pad.connect();
+    await pad.tap(BUTTON.START);
+    expect((await getState(page)).paused).toBe(true);
+    await page.evaluate(async () => {
+      const polled = (count: number): Promise<void> =>
+        new Promise<void>((done) => {
+          const check = (): void => {
+            if (window.__mc.getState().pad.polls >= count) done();
+            else requestAnimationFrame(check);
+          };
+          requestAnimationFrame(check);
+        });
+      const before = window.__mc.getState().pad.polls;
+      window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
+      await polled(before + 1);
+      const end = performance.now() + 600;
+      while (performance.now() < end) {
+        // The slow frame.
+      }
+      await polled(window.__mc.getState().pad.polls + 1);
+      history.back();
+    });
+    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await pad.release(BUTTON.B);
+    await polls(page, 5);
+    expect((await getState(page)).paused).toBe(false);
+  });
 });
 
 test.describe('references', () => {
