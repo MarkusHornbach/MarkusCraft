@@ -121,10 +121,11 @@ browser tests' summed test time also differs from run to run by up to a third, s
 
 ### Green full runs of the pull request
 
-| Run  | Head    | `checks` result after start | Whole run (start → `CI result`) | `CI result` |
-| ---- | ------- | --------------------------: | ------------------------------: | ----------- |
-| #174 | 2fab5e9 |                     5.5 min |                        12.6 min | green       |
-| #178 | 1acf087 |                     4.5 min |                        13.2 min | green       |
+| Run  | Head    | `checks` result after start | Whole run (start → `CI result`) | `CI result`                           |
+| ---- | ------- | --------------------------: | ------------------------------: | ------------------------------------- |
+| #174 | 2fab5e9 |                     5.5 min |                        12.6 min | green                                 |
+| #178 | 1acf087 |                     4.5 min |                        13.2 min | green                                 |
+| #180 | 520dcfa |                     4.4 min |                        13.6 min | red: `gamepadMenus` AC3.7 (section 5) |
 
 ### Per shard (job time, minutes) and the 1.3× rule
 
@@ -134,6 +135,7 @@ browser tests' summed test time also differs from run to run by up to a third, s
 | #172 (first lists, red)        |    5.6 |    5.7 |    6.1 |   11.0 |            1.55 | 10.3 |  9.9 |  8.8 |          1.07 |
 | #174 (second lists)            |    6.9 |    9.6 |    9.9 |    9.2 |            1.11 |  6.7 | 10.5 |  7.3 |          1.29 |
 | #178 (second lists)            |   10.1 |    5.0 |    8.9 |    6.9 |            1.31 | 10.9 |  5.3 |  5.8 |          1.49 |
+| #180 (second lists, red)       |    6.5 |    5.2 |    9.7 |    9.5 |            1.24 | 10.4 | 10.2 | 11.3 |          1.07 |
 
 Run #168 with Playwright's built-in `--shard` broke the 1.3× rule in both projects (both
 `padSoak` tests and the long `mp` specs fell together), so step 5 switched to spec lists.
@@ -194,15 +196,19 @@ shard is the one in `e2e/shards.json`.
 
 ## 5. Known issues
 
-- **Three timing-dependent browser tests failed once each** in the runs of this pull
-  request, on code this round did not touch; each passed in the other runs:
+- **Three timing-dependent browser tests failed** in the runs of this pull request, on code
+  this round did not touch; each passed in the other runs. The first fails often enough to
+  matter: **2 of the 6 full runs** (#168, #180) were red because of it alone, so on the
+  sharded layout `CI result` will be red now and then until it is fixed (section 6):
   - `gamepadMenus.spec.ts` "Phase 5 AC3.7: B and a browser Back held up by a slow frame act
-    once" (run #168): still paused after B and Back. The test calls `history.back()` only
+    once" (runs #168 and #180, both in the shard with `gamepadMenus.spec.ts`): still paused
+    after B and Back. The test calls `history.back()` only
     after its 600 ms busy wait; if the `popstate` then arrives more than one frame after the
     frame in which the poll saw B, the guard counts it as a second Back
     (`BackGuard.pairedWithPadBack`). Locally it passed 4 of 4 times, and a probe measured the
     `popstate` 16–49 ms after `history.back()` with no poll in between, so the race needs a
-    runner whose frames come faster than the traversal.
+    runner whose frames come faster than the traversal. A shard runner carries less load than
+    the single job before, so its frames are faster: the race is likelier now than it was.
   - `netTest.spec.ts` "Phase 6 AC2.1, AC2.5, AC2.7" (run #168): the network test between two
     pages was not done within 30 s.
   - `mpHarden.spec.ts` "Phase 6 AC14.3: soak" (run #172): guest 3 was "reconnecting" during
@@ -232,8 +238,9 @@ shard is the one in `e2e/shards.json`.
   `node scripts/ci/timings.mjs --assign <shard>=<json>... > e2e/shards.json` with the
   per-shard JSON of two or more runs from the artifact `e2e-timings` (one run alone misleads,
   section 4), then `npm run format`.
-- A fix session for the three timing-dependent tests of section 5 (each in its own spec or,
-  for the back guard, in `backGuard.ts`), so that red runs mean a defect.
+- **First:** a fix session for the back-guard test of section 5 (in the spec, if a real
+  browser queues the Back during the slow frame, or in `backGuard.ts`, if a device can see
+  the same), then the other two timing-dependent tests, so that red runs mean a defect.
 - Second-round candidates (plan section 8): soak tests (`padSoak`, `mpHarden` AC14.3,
   `torchSoak`) not on every pull request; caching the Chromium download (about 15–25 s per
   shard) and `node_modules`; a fifth `game` shard if the suite grows.
