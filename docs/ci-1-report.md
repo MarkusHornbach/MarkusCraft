@@ -73,10 +73,10 @@ screenshots and `deploy.yml` are unchanged.
   GitHub; see "For the next session".
 - **S3 and S4 ran as one throwaway commit**, to spend one run instead of two: the probe spec
   and the broken unit test at once. Each scenario's expectation can be read from that one
-  run (section 5). That commit is the one commit of the branch that does not pass
+  run (section 3). That commit is the one commit of the branch that does not pass
   `npm run check`, on purpose; it was reverted in the next commit.
 - **S5 came by itself**: pushing f8566e8 two minutes after 449a74a cancelled both runs of
-  449a74a (section 5).
+  449a74a (section 3).
 - **`report` uses `always()`** as the plan says, so it also runs, and fails, in a cancelled
   run (no blob reports to merge). Such a run is red anyway; see "Known issues".
 
@@ -85,12 +85,12 @@ screenshots and `deploy.yml` are unchanged.
 | Id  | Run(s)                                  | Result                                                                                                                                                                                                                                                                       |
 | --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | S0  | push runs of 1684512, b78aef0, 5dc51ed  | Only `changes`, `checks` and `CI result` ran; the browser jobs were skipped. On 5dc51ed `CI result` was green (on b78aef0 `checks` failed on purpose: the first run printed the actionlint checksum).                                                                        |
-| S1  | #168 (5dc51ed, the workflow on the PR)  | All jobs ran; the shards ran 241 + 47 = 288 tests, as `npx playwright test --list`; `report` wrote the summary. Two tests failed (section 5), so `CI result` was red and named `e2e-game (2/4)` and `e2e-game (3/4)`. Green full runs followed (#174 and later).             |
+| S1  | #168 (5dc51ed, the workflow on the PR)  | All jobs ran; the shards ran 241 + 47 = 288 tests, as `npx playwright test --list`; `report` wrote the summary. Two tests failed (section 6), so `CI result` was red and named `e2e-game (2/4)` and `e2e-game (3/4)`. Green full runs followed (#174 and later).             |
 | S2  | not shown on this PR                    | See "Decisions and deviations": the pull request as a whole is not docs-only. Covered by unit tests; the first docs-only pull request after the merge checks it.                                                                                                             |
 | S3  | probe commit 6abdbf5                    | `e2e-game (4/4)` red (the probe, a spec not in `e2e/shards.json`, ran there, as the last-shard rule says), every other shard finished green; `CI result` red, naming `e2e-game (4/4)`; the artifact `playwright-report` holds the test with expected, actual and diff image. |
 | S4  | probe commit 6abdbf5                    | `checks` red (the failing unit test), the browser jobs still ran and `report` reported; `CI result` red, naming `checks`.                                                                                                                                                    |
 | S5  | 449a74a, then f8566e8 two minutes later | Both runs of 449a74a were cancelled (`checks` "cancelled"); their `CI result` was red ("checks: cancelled"); the runs of f8566e8 decided.                                                                                                                                    |
-| S6  | revert of the probe (with this report)  | The tree equals 2fab5e9 again (`git diff` empty). Its run: section 4.                                                                                                                                                                                                        |
+| S6  | #178 (revert of the probe, 1acf087)     | The tree equals 2fab5e9 again (`git diff` empty); the run was green.                                                                                                                                                                                                         |
 
 Unit tests (`scripts/ci/*.test.ts`, 38 tests) cover the decisions of AC1.3 and AC1.4: a
 docs-only, a mixed, an empty and an unreadable file list; a cancelled shard, a skipped shard
@@ -101,9 +101,9 @@ no empty shard).
 
 ## 4. Measured performance
 
-All times are from the job timestamps of the GitHub API. Queue time was below 5 s for every
-job (each job started within 5 s of its creation), so queue and run time are not shown
-apart.
+All times are from the job timestamps of the GitHub API. Queue time was a few seconds per
+job, except in #183, where `changes` and `checks` waited 25 s for runners (the cancelled run
+before it still held them); it is included in the times below.
 
 ### Before and after, per step (`checks`)
 
@@ -119,23 +119,26 @@ apart.
 (The unit tests take longer than in #163 on these runners; they did not change. The
 browser tests' summed test time also differs from run to run by up to a third, see below.)
 
-### Green full runs of the pull request
+### Full runs of the pull request after balancing
 
-| Run  | Head    | `checks` result after start | Whole run (start → `CI result`) | `CI result`                           |
-| ---- | ------- | --------------------------: | ------------------------------: | ------------------------------------- |
-| #174 | 2fab5e9 |                     5.5 min |                        12.6 min | green                                 |
-| #178 | 1acf087 |                     4.5 min |                        13.2 min | green                                 |
-| #180 | 520dcfa |                     4.4 min |                        13.6 min | red: `gamepadMenus` AC3.7 (section 5) |
+| Run  | Head    |       `checks` result after start | Whole run (start → `CI result`) | `CI result`                           |
+| ---- | ------- | --------------------------------: | ------------------------------: | ------------------------------------- |
+| #174 | 2fab5e9 |                           5.5 min |                        12.6 min | green                                 |
+| #178 | 1acf087 |                           4.5 min |                        13.2 min | green                                 |
+| #180 | 520dcfa |                           4.4 min |                        13.6 min | red: `gamepadMenus` AC3.7 (section 6) |
+| #183 | 70b1713 | 6.0 min (25 s of it in the queue) |                        16.9 min | green                                 |
 
 ### Per shard (job time, minutes) and the 1.3× rule
 
-| Run                            | game 1 | game 2 | game 3 | game 4 | game max ÷ mean | mp 1 | mp 2 | mp 3 | mp max ÷ mean |
-| ------------------------------ | -----: | -----: | -----: | -----: | --------------: | ---: | ---: | ---: | ------------: |
-| #168 (built-in `--shard`, red) |    7.5 |    8.0 |   14.0 |    5.5 |            1.60 | 14.3 |  9.3 |  6.6 |          1.42 |
-| #172 (first lists, red)        |    5.6 |    5.7 |    6.1 |   11.0 |            1.55 | 10.3 |  9.9 |  8.8 |          1.07 |
-| #174 (second lists)            |    6.9 |    9.6 |    9.9 |    9.2 |            1.11 |  6.7 | 10.5 |  7.3 |          1.29 |
-| #178 (second lists)            |   10.1 |    5.0 |    8.9 |    6.9 |            1.31 | 10.9 |  5.3 |  5.8 |          1.49 |
-| #180 (second lists, red)       |    6.5 |    5.2 |    9.7 |    9.5 |            1.24 | 10.4 | 10.2 | 11.3 |          1.07 |
+| Run                                         |  game 1 |  game 2 |  game 3 |  game 4 | game max ÷ mean |     mp 1 |    mp 2 |    mp 3 | mp max ÷ mean |
+| ------------------------------------------- | ------: | ------: | ------: | ------: | --------------: | -------: | ------: | ------: | ------------: |
+| #168 (built-in `--shard`, red)              |     7.5 |     8.0 |    14.0 |     5.5 |            1.60 |     14.3 |     9.3 |     6.6 |          1.42 |
+| #172 (first lists, red)                     |     5.6 |     5.7 |     6.1 |    11.0 |            1.55 |     10.3 |     9.9 |     8.8 |          1.07 |
+| #174 (second lists)                         |     6.9 |     9.6 |     9.9 |     9.2 |            1.11 |      6.7 |    10.5 |     7.3 |          1.29 |
+| #178 (second lists)                         |    10.1 |     5.0 |     8.9 |     6.9 |            1.31 |     10.9 |     5.3 |     5.8 |          1.49 |
+| #180 (second lists, red)                    |     6.5 |     5.2 |     9.7 |     9.5 |            1.24 |     10.4 |    10.2 |    11.3 |          1.07 |
+| #183 (second lists)                         |     8.4 |     9.9 |    10.2 |     8.2 |            1.13 |     14.2 |    10.4 |     4.9 |          1.44 |
+| **Mean of the green runs #174, #178, #183** | **8.5** | **8.2** | **9.7** | **8.1** |        **1.12** | **10.6** | **8.7** | **6.0** |      **1.26** |
 
 Run #168 with Playwright's built-in `--shard` broke the 1.3× rule in both projects (both
 `padSoak` tests and the long `mp` specs fell together), so step 5 switched to spec lists.
@@ -194,12 +197,31 @@ shard is the one in `e2e/shards.json`.
 | a spec slows down when a heavy spec runs on the shard's other worker. Sums of test time are |
 | therefore a coarse measure; the job times above are what counts for the budget.             |
 
-## 5. Known issues
+## 5. Acceptance criteria
+
+| AC    | Met          | Evidence                                                                                                                                                                        |
+| ----- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1.1 | yes          | S0: push runs ran only `changes`, `checks`, `CI result`                                                                                                                         |
+| AC1.2 | yes          | every full run's merged JSON: 288 tests (241 + 47), each once, as `npx playwright test --list`; `--files` lists 288 locally                                                     |
+| AC1.3 | yes, in part | the docs-only path by unit tests only (S2, section 2); every run of this PR ran everything                                                                                      |
+| AC1.4 | yes          | S3, S4, S5, the red runs #168, #172, #180, and the unit tests                                                                                                                   |
+| AC1.5 | yes          | S3: one `playwright-report` with the test, expected, actual and diff image; the other shards finished                                                                           |
+| AC2.1 | yes          | `checks` result after 5.5, 4.5, 6.0 min in #174, #178, #183 (limit 8)                                                                                                           |
+| AC2.2 | yes          | whole run 12.6, 13.2, 16.9 min (limit 25)                                                                                                                                       |
+| AC2.3 | yes          | mean job time per shard over the three runs: at most 1.12× (game) and 1.26× (multiplayer) the project's mean, after balancing                                                   |
+| AC3.1 | yes          | every full run's `report` job wrote the summary and uploaded `e2e-timings`                                                                                                      |
+| AC3.2 | yes          | section 4                                                                                                                                                                       |
+| AC4.1 | yes          | actionlint passes in `checks` with zero findings                                                                                                                                |
+| AC4.2 | yes          | `git diff origin/main --name-only` has no spec, no screenshot, nothing in `src/`, no `deploy.yml`; `playwright.config.ts` changes only the CI reporter; `e2e/shards.json` added |
+| AC5.1 | yes          | `CLAUDE.md`, section "CI" and the other places of plan section 6                                                                                                                |
+| AC5.2 | yes          | step 1, done in the planning session                                                                                                                                            |
+
+## 6. Known issues
 
 - **Three timing-dependent browser tests failed** in the runs of this pull request, on code
   this round did not touch; each passed in the other runs. The first fails often enough to
   matter: **2 of the 6 full runs** (#168, #180) were red because of it alone, so on the
-  sharded layout `CI result` will be red now and then until it is fixed (section 6):
+  sharded layout `CI result` will be red now and then until it is fixed (section 7):
   - `gamepadMenus.spec.ts` "Phase 5 AC3.7: B and a browser Back held up by a slow frame act
     once" (runs #168 and #180, both in the shard with `gamepadMenus.spec.ts`): still paused
     after B and Back. The test calls `history.back()` only
@@ -217,7 +239,7 @@ shard is the one in `e2e/shards.json`.
   `main` had red runs of the same kind before this round (#114, #136). Plan section 10 allows
   a fix in this round only if it keeps the test's content, and AC4.2 allows no change to a
   spec or to `src/` at all, so none was fixed here. They are candidates for a fix session of
-  their own (section 6).
+  their own (section 7).
 
 - **`report` fails in a cancelled run** (`if: always()` per the plan, but there are no blob
   reports to merge). The run is red anyway; `!cancelled()` would skip the job instead.
@@ -229,7 +251,7 @@ shard is the one in `e2e/shards.json`.
 - **The required check** is still the owner's step: "CI result" must be made required for
   `main`, and the old "check" removed if it is required (see the pull request).
 
-## 6. For the next session (and a second round)
+## 7. For the next session (and a second round)
 
 - After the merge: check that the run on `main` ran the full suite and was not cancelled;
   the first docs-only pull request shows S2 on GitHub (browser jobs skipped, `CI result`
@@ -238,7 +260,10 @@ shard is the one in `e2e/shards.json`.
   `node scripts/ci/timings.mjs --assign <shard>=<json>... > e2e/shards.json` with the
   per-shard JSON of two or more runs from the artifact `e2e-timings` (one run alone misleads,
   section 4), then `npm run format`.
-- **First:** a fix session for the back-guard test of section 5 (in the spec, if a real
+- `mp 1` (`mpMenus`, `mpPlayers`) is the longest shard on average and took 14.2 minutes in
+  #183, close to the 15-minute line of the time budget. If it passes 15, rebalance the
+  multiplayer lists with the timings of more runs, or add a fourth `mp` shard.
+- **First:** a fix session for the back-guard test of section 6 (in the spec, if a real
   browser queues the Back during the slow frame, or in `backGuard.ts`, if a device can see
   the same), then the other two timing-dependent tests, so that red runs mean a defect.
 - Second-round candidates (plan section 8): soak tests (`padSoak`, `mpHarden` AC14.3,
