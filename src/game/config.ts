@@ -289,8 +289,13 @@ export const PAD_MAX_ELAPSED_MS = 250;
 export const PAD_SENSITIVITY_DEFAULT = 1;
 export const PAD_SENSITIVITY_MIN = 0.2;
 export const PAD_SENSITIVITY_MAX = 3;
-/** A browser "Back" this soon after the controller's B press is the same press. */
+/**
+ * A browser "Back" this soon after the controller's B press is the same press. The time is
+ * counted per frame, each frame (and the wait since the last one) at most
+ * `BACK_PAIR_FRAME_MS`: a slow frame does not use up the window (fix-ci-flaky).
+ */
 export const BACK_PAIR_MS = 150;
+export const BACK_PAIR_FRAME_MS = 25;
 
 // --- Multiplayer (Phase 6) ---
 

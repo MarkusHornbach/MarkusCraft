@@ -26,8 +26,7 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: CI 1 planning (NET-17 to NET-19 and PERF-8 ticked as passed by the owner);
-2026-11-22.
+Last updated: fix of flaky CI tests (PAD-16 added); 2026-11-22.
 
 ---
 
@@ -306,6 +305,11 @@ after a press. The buttons are listed in the pause menu while the controller is 
 - [ ] **PAD-15** (5B) Creative palette with the controller: A on a block puts it into the
       selected bar slot; A on a bar slot first and then on a block puts it into that slot.
       Is the frame easy to follow over the many blocks? Result:
+- [ ] **PAD-16** (FIX) Phone, Chrome, controller by Bluetooth: pause, then press B ten
+      times in a row on the pause menu (play, pause with Start, B again), also right after
+      breaking a block in a crowded spot. Each B continues the game once and never pauses it
+      again by itself. Then, in play, B followed about a second later by the phone's back
+      gesture: the gesture pauses. _Phone._ Result:
 
 ---
 
