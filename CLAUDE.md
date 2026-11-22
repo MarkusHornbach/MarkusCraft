@@ -68,6 +68,8 @@ game in a procedurally generated world"; everything in it is original work.
    phase report (`docs/phase-N-report.md` or the part's report, section "Decisions and deviations").
 4. **Commit frequently.** Commit after every completed plan step at the latest, and more
    often for larger steps. Every commit must pass `npm run check`. Push after each step.
+   After each plan step also run `npm run build` and the browser specs the step touches or
+   could affect (section "CI", the local rule).
    Write messages as `<area>: <what changed>` (e.g. `world: add tree generation`).
 5. **One branch + one PR per phase or phase part.** A phase plan may divide the phase into
    parts (A, B, …) that are implemented in separate sessions; otherwise the whole phase is
@@ -86,18 +88,18 @@ game in a procedurally generated world"; everything in it is original work.
 
 ## Tech stack
 
-| Concern            | Choice                                                              |
-| ------------------ | ------------------------------------------------------------------- |
-| Language           | TypeScript, `strict` mode                                           |
-| Build / dev server | Vite, `base: './'` so the build works under any path                |
-| Rendering          | Three.js (WebGL2)                                                   |
-| Unit tests         | Vitest (Node environment)                                           |
-| Browser tests      | Playwright (`@playwright/test`), Chromium, software WebGL           |
-| Lint / format      | ESLint (typescript-eslint) + Prettier                               |
-| Multiplayer        | `peerjs` client (dynamic import), `peer` 1.0.2 as local test server |
-| Package manager    | npm, lockfile committed                                             |
-| Runtime            | Node 22 (`.nvmrc`)                                                  |
-| CI / deploy        | GitHub Actions: checks on every push, deploy `main` to GitHub Pages |
+| Concern            | Choice                                                                                                                                                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language           | TypeScript, `strict` mode                                                                                                                                                                                             |
+| Build / dev server | Vite, `base: './'` so the build works under any path                                                                                                                                                                  |
+| Rendering          | Three.js (WebGL2)                                                                                                                                                                                                     |
+| Unit tests         | Vitest (Node environment)                                                                                                                                                                                             |
+| Browser tests      | Playwright (`@playwright/test`), Chromium, software WebGL                                                                                                                                                             |
+| Lint / format      | ESLint (typescript-eslint) + Prettier                                                                                                                                                                                 |
+| Multiplayer        | `peerjs` client (dynamic import), `peer` 1.0.2 as local test server                                                                                                                                                   |
+| Package manager    | npm, lockfile committed                                                                                                                                                                                               |
+| Runtime            | Node 22 (`.nvmrc`)                                                                                                                                                                                                    |
+| CI / deploy        | GitHub Actions: `checks` on every push; the full suite (build, four `game` and three `multiplayer` shards, merged report) on pull requests and `main`; one required check, `CI result`; deploy `main` to GitHub Pages |
 
 Keep runtime dependencies minimal: `three` and `peerjs` (Phase 6, the WebRTC client,
 loaded with a dynamic import only when multiplayer is used), unless a phase plan says
@@ -231,12 +233,17 @@ scripts/             dev tools: signalServer.mjs (local PeerJS server, `npm run 
                      next to new), benchRun.mjs (plays the performance test headlessly),
                      perfRuns.ts (comparison table from saved `perf-run` issues), editCost.ts
                      (where an edit's time goes on the `edit` route; run it bundled)
-docs/                phase plans and phase reports; device-tests.md (the one checklist of tests
-                     on real devices, filled out by the owner)
+  ci/                the CI jobs' logic, no dependencies: changes.mjs (does the run need
+                     the full suite), ciResult.mjs (the verdict of `CI result`), timings.mjs
+                     (blob reports' JSON → timing summary; `--assign`: spec lists per shard;
+                     `--files`: the specs of one shard job);
+                     unit tests `*.test.ts` next to them
+docs/                phase plans and phase reports, ci-1-plan.md and ci-1-report.md (CI round 1); device-tests.md
+                     (the one checklist of tests on real devices, filled out by the owner)
 .github/workflows/   ci.yml, deploy.yml
 ```
 
-Unit tests live next to the code as `*.test.ts`. Wall-clock limits in tests go through
+Unit tests live next to the code as `*.test.ts` (in `src/` and `scripts/ci/`). Wall-clock limits in tests go through
 `expectFasterThan` (`src/testing/timing.ts`): they are enforced by `npm test` and skipped
 under coverage, which distorts timings. CI runs both.
 
@@ -600,21 +607,62 @@ lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX
 
 ## Commands
 
-| Command                   | Purpose                                                     |
-| ------------------------- | ----------------------------------------------------------- |
-| `npm run dev`             | Dev server                                                  |
-| `npm run build`           | Type check + production build into `dist/`                  |
-| `npm run preview`         | Serve the production build                                  |
-| `npm run signal`          | Local PeerJS server on `127.0.0.1:9000` (multiplayer tests) |
-| `npm run typecheck`       | `tsc --noEmit`                                              |
-| `npm run lint`            | ESLint + Prettier check                                     |
-| `npm run format`          | Apply Prettier                                              |
-| `npm test`                | Vitest unit tests: ordinary, then solo, then slow files     |
-| `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI)  |
-| `npm run test:e2e`        | Build, then Playwright tests against the preview server     |
-| `npm run test:e2e:update` | Same, regenerating reference screenshots                    |
-| `npm run check`           | `typecheck` + `lint` + `test` (fast gate for every commit)  |
-| `npm run check:all`       | `check` + `build` + `test:e2e` (gate for every plan step)   |
+| Command                   | Purpose                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `npm run dev`             | Dev server                                                                                       |
+| `npm run build`           | Type check + production build into `dist/`                                                       |
+| `npm run preview`         | Serve the production build                                                                       |
+| `npm run signal`          | Local PeerJS server on `127.0.0.1:9000` (multiplayer tests)                                      |
+| `npm run typecheck`       | `tsc --noEmit`                                                                                   |
+| `npm run lint`            | ESLint + Prettier check                                                                          |
+| `npm run format`          | Apply Prettier                                                                                   |
+| `npm test`                | Vitest unit tests: ordinary, then solo, then slow files                                          |
+| `npm run test:coverage`   | Unit tests with coverage (85 % line threshold, used by CI)                                       |
+| `npm run test:e2e`        | Build, then Playwright tests against the preview server                                          |
+| `npm run test:e2e:update` | Same, regenerating reference screenshots                                                         |
+| `npm run check`           | `typecheck` + `lint` + `test` (fast gate for every commit)                                       |
+| `npm run check:all`       | `check` + `build` + `test:e2e` (full local run, needed only for references and CI-only failures) |
+
+## CI
+
+`.github/workflows/ci.yml` runs these jobs:
+
+| Job         | Runs when                | Does                                                                                                                                                              |
+| ----------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `changes`   | always                   | `full`: push to `main` yes; pull request yes unless only `.md` files; other pushes no                                                                             |
+| `checks`    | always                   | npm ci, actionlint (pinned, SHA-256 checked), lint, type check, unit tests with coverage, unit tests with time limits                                             |
+| `build`     | `full`                   | `npm run build`, uploads `dist/` (artifact `dist`)                                                                                                                |
+| `e2e-game`  | `full`, after `build`    | four shards, `--project=game` with the specs of `e2e/shards.json`, blob report each                                                                               |
+| `e2e-mp`    | `full`, after `build`    | three shards, `--project=multiplayer` with the specs of `e2e/shards.json`, each with its own signaling server                                                     |
+| `report`    | `full`, after the shards | merges the blobs into HTML and JSON, timing summary in the job summary, artifacts `e2e-timings` (90 days) and, when a shard failed, `playwright-report` (14 days) |
+| `CI result` | always                   | the one required check: green only if every job that had to run passed and the others were skipped                                                                |
+
+Triggers: every `push` (only `main` runs the full suite) and `pull_request` (`opened`,
+`synchronize`, `reopened`, `ready_for_review`). Runs on `main` are never cancelled; other
+runs are cancelled by a newer one of the same event and ref. Time limits per job: `changes`
+5, `checks` 15, `build` 10, each shard 30, `report` 10, `CI result` 5 minutes.
+
+- **Time budget:** `checks` within 8 minutes, a pull request run within 25 minutes. A
+  session that sees a green run above 25 minutes, or a shard above 15, rebalances
+  (`node scripts/ci/timings.mjs --assign <shard>=<json>... > e2e/shards.json`, then
+  `npm run format`) or adds a shard in its own part, and records it in its report.
+- **Spec lists per shard:** `e2e/shards.json` (made by `--assign` from the `e2e-timings`
+  JSON, longest spec first onto the shard with the least time) names the specs of every
+  shard; `timings.mjs --files <project> <n>` gives a shard job its list. A new spec file
+  needs nothing: a spec the file does not name runs in the last shard of its project, so it
+  is never lost; the next rebalancing places it.
+- Timing data: the `report` job's summary and its artifact `e2e-timings` (90 days; one
+  JSON per shard, `game-N.json` / `mp-N.json`, the merged `merged.json` and `summary.md`).
+- Docs-only pull requests (`.md` files only) skip the browser tests; `CI result` is still
+  green.
+- **The local rule:** after each plan step run `npm run check` and `npm run build`, plus
+  the browser specs the step touches or could affect (`npx playwright test <files>`, with
+  `MC_CONTAINER_GPU_STALL=1` in a cloud session); name them in the commit message body or
+  the report. The full browser suite runs in CI. The local full run (`npm run check:all`)
+  is only needed to regenerate reference screenshots, or to chase a failure that shows only
+  in CI.
+- `CI result` must be the required status check of `main` (set by the owner in the
+  repository settings).
 
 ## Headless testing
 
@@ -766,7 +814,8 @@ rightArm, leftLeg, rightLeg }` (the angles drawn in the last frame, null if not 
 - After changing anything visual, the implementing session must also open the produced
   screenshots with the Read tool and judge them by eye. For a quick look at any pose:
   `npm run build`, `npm run preview`, then `node scripts/shot.mjs "?test=1&seed=1337" out.png`.
-- The full e2e run takes about twelve minutes; run long commands in the background. The
+- The full e2e run takes about an hour in a cloud session and runs in CI (section "CI");
+  locally run the affected specs. Run long commands in the background. The
   unit tests take about half a minute: the four `lightEdits*.slow.test.ts` files check
   the light against the slow reference after each of 2 000 random edits.
 
@@ -793,8 +842,9 @@ A phase, or a part of a phase that its plan defines, is done when all of the fol
 hold:
 
 1. Every step of the phase plan (of that part) is implemented and each acceptance criterion is met.
-2. `npm run check:all` passes locally with zero warnings from TypeScript and ESLint.
-3. CI is green on the phase branch.
+2. `npm run check` and `npm run build` pass locally with zero warnings, and the affected
+   specs pass locally.
+3. `CI result` is green on the part's pull request.
 4. New logic has unit tests; every user-visible feature has at least one Playwright test.
 5. Reference screenshots are up to date, committed, and were looked at by the session.
 6. The browser console shows no errors or warnings during the e2e run.
@@ -934,6 +984,11 @@ hold:
   in the reports of Parts B and C mean Part E and AC14.x. The servers on the Pi are built
   separately in the owner's `pi-infra` repository (plan section 5.12).
 - Phase 7 (personalization): not yet planned.
+- CI 1 (parallel browser tests, triggers, timing; a round of work on the pipeline, not a
+  game phase): implemented (plan: `docs/ci-1-plan.md`, report: `docs/ci-1-report.md`).
+  Read its "Decisions and deviations" before changing `ci.yml` or `scripts/ci/`. The first
+  session after the merge checks that the run on `main` ran the full suite and was not
+  cancelled by a later merge, and notes it in its report.
 - Fix of flaky controller tests (focus one frame late, back pairing in wall-clock time,
   two tests that depended on round-trip timing):
   report `docs/fix-pad-flaky-report.md`.

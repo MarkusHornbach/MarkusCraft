@@ -26,7 +26,7 @@ export default defineConfig({
     // The terrain property tests generate hundreds of chunks; allow for slow CI machines.
     // Coverage makes the slow tests several times slower still.
     testTimeout: withCoverage ? 240_000 : 60_000,
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/ci/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       include: [

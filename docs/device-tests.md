@@ -26,8 +26,8 @@ their lists as a record of what was asked at the time; this file is the one to f
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 6 part E (measure and harden: NET-17 to NET-19 in section 10, PERF-8
-in section 1; NET-5 to NET-25 ticked as passed by the owner); 2026-11-21.
+Last updated: CI 1 planning (NET-17 to NET-19 and PERF-8 ticked as passed by the owner);
+2026-11-22.
 
 ---
 
@@ -74,12 +74,12 @@ Once, before the first run:
       midnight and then flies past them. Is it green, and does placing the torches look
       smooth while you watch? _Phone, Tablet._
       Result: (issue numbers)
-- [ ] **PERF-8** (6E) After Phase 6 part E is deployed: run the performance test on PC,
+- [x] **PERF-8** (6E) After Phase 6 part E is deployed: run the performance test on PC,
       phone and tablet and submit the issues. The suite now has thirteen scenarios: the
       new one, "four players", has three simulated players (Ember, Moss and Plum) walk in
       front of you and place and break blocks, played inside the page without any network.
       Is it green on the phone, and do the three figures walk and swing their arms smoothly
-      while you watch? _PC, Phone, Tablet._ Result: (issue numbers)
+      while you watch? _PC, Phone, Tablet._ Result: passed (owner, 2026-11-21)
 - [ ] **PERF-3** (1) PC only: 60 FPS at render distance 8 on a mid-range laptop? Try 16 as
       well (render distance 16 is not part of the performance test; use the debug overlay,
       F3). Result:
@@ -422,19 +422,19 @@ and about **Settings → Your player** (name and look). NET-17 to NET-19 belong 
 
 The tests of Part E use the Pi's preview of Part E's pull request, like the tests before.
 
-- [ ] **NET-17** (6E) The network lines of the debug overlay (F3 on the PC, the "Debug
+- [x] **NET-17** (6E) The network lines of the debug overlay (F3 on the PC, the "Debug
       overlay" switch in the pause menu on touch devices) on host and guest while two or
       three players build: do "Room", "Round trip", "Link", "Signaling" and "Traffic" show
       sensible values (a round trip of a few milliseconds, "direct (host → host)" or "via
       STUN", traffic that rises while players move)? Note the round trip and the traffic
-      with three players. _PC, Phone._ Result:
-- [ ] **NET-18** (6E) The performance test with the new scenario "four players" on PC,
+      with three players. _PC, Phone._ Result: passed (owner, 2026-11-21)
+- [x] **NET-18** (6E) The performance test with the new scenario "four players" on PC,
       phone and tablet: see **PERF-8** in section 1 (the issues are the result here too).
-      Result:
-- [ ] **NET-19** (6E, optional) A second browser as guest: Firefox on the PC (or on the
+      Result: passed (owner, 2026-11-21)
+- [x] **NET-19** (6E, optional) A second browser as guest: Firefox on the PC (or on the
       phone) joins a world hosted in Chrome. Does it join, build and see the figures like
       Chrome? A failure to join with "This browser generates the world differently…" is a
-      finding worth noting. Result:
+      finding worth noting. Result: passed (owner, 2026-11-21)
 
 ---
 

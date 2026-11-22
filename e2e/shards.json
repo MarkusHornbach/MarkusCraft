@@ -1,0 +1,47 @@
+{
+  "game": [
+    [
+      "gamepad.spec.ts",
+      "gamepadInventory.spec.ts",
+      "padSoak.spec.ts",
+      "player.spec.ts",
+      "smoke.spec.ts",
+      "soak.spec.ts",
+      "worldMenu.spec.ts"
+    ],
+    [
+      "breaking.spec.ts",
+      "fullscreen.spec.ts",
+      "inventoryScreen.spec.ts",
+      "light.spec.ts",
+      "night.spec.ts",
+      "touch.spec.ts",
+      "touchLayout.spec.ts"
+    ],
+    [
+      "actions.spec.ts",
+      "crafting.spec.ts",
+      "gathering.spec.ts",
+      "inventory.spec.ts",
+      "sky.spec.ts",
+      "terrain.spec.ts",
+      "torch.spec.ts",
+      "ui.spec.ts"
+    ],
+    [
+      "bench.spec.ts",
+      "gamepadMenus.spec.ts",
+      "interaction.spec.ts",
+      "netTest.spec.ts",
+      "playerSection.spec.ts",
+      "save.spec.ts",
+      "torchSoak.spec.ts",
+      "world.spec.ts"
+    ]
+  ],
+  "multiplayer": [
+    ["mpMenus.spec.ts", "mpPlayers.spec.ts"],
+    ["mpFigure.spec.ts", "mpGathering.spec.ts"],
+    ["mpHarden.spec.ts", "mpRooms.spec.ts"]
+  ]
+}
