@@ -103,15 +103,22 @@ export async function untilNetTest(
   timeout = 20_000,
 ): Promise<NetTest> {
   let last: NetTest | null = null;
-  await expect
-    .poll(
-      async () => {
-        last = await netState(page);
-        return last !== null && check(last);
-      },
-      { timeout, intervals: [100] },
-    )
-    .toBe(true);
+  try {
+    await expect
+      .poll(
+        async () => {
+          last = await netState(page);
+          return last !== null && check(last);
+        },
+        { timeout, intervals: [100] },
+      )
+      .toBe(true);
+  } catch (error) {
+    // The state the wait ended on says where a run stopped (CI run #168 gave no clue).
+    if (error instanceof Error)
+      error.message += `\nLast network test state: ${JSON.stringify(last)}`;
+    throw error;
+  }
   if (!last) throw new Error('the network test is not open');
   return last;
 }
