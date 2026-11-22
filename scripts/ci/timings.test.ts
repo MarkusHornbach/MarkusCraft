@@ -1,6 +1,13 @@
 // Unit tests of the timing summary and the shard assignment of the `report` job.
 import { describe, expect, it } from 'vitest';
-import { assignShards, collectTests, parseReportArgs, summarize } from './timings.mjs';
+import {
+  assignShards,
+  collectTests,
+  parseReportArgs,
+  projectSpecs,
+  shardFiles,
+  summarize,
+} from './timings.mjs';
 
 type Report = Parameters<typeof collectTests>[0];
 
@@ -264,5 +271,50 @@ describe('parseReportArgs', () => {
       { shard: 2, path: 'shards/game-2.json' },
       { shard: null, path: 'merged.json' },
     ]);
+  });
+});
+
+describe('shardFiles', () => {
+  const shards = {
+    game: [
+      ['b.spec.ts', 'a.spec.ts'],
+      ['c.spec.ts', 'gone.spec.ts'],
+    ],
+  };
+  const all = ['a.spec.ts', 'b.spec.ts', 'c.spec.ts', 'new.spec.ts'];
+
+  it('gives a shard its list, sorted', () => {
+    expect(shardFiles(shards, 'game', 1, all)).toEqual(['a.spec.ts', 'b.spec.ts']);
+  });
+
+  it('runs a spec the file does not name in the last shard and drops a spec that is gone', () => {
+    expect(shardFiles(shards, 'game', 2, all)).toEqual(['c.spec.ts', 'new.spec.ts']);
+  });
+
+  it('runs every spec of the project exactly once over all shards', () => {
+    const files = [1, 2].flatMap((shard) => shardFiles(shards, 'game', shard, all));
+    expect(files.sort()).toEqual(all);
+  });
+
+  it('refuses a shard the file does not have and a shard with nothing to run', () => {
+    expect(() => shardFiles(shards, 'game', 3, all)).toThrow('no shard 3');
+    expect(() => shardFiles(shards, 'multiplayer', 1, all)).toThrow('no shard 1');
+    expect(() => shardFiles({ game: [['gone.spec.ts'], []] }, 'game', 1, all)).toThrow(
+      'has no specs',
+    );
+  });
+});
+
+describe('projectSpecs', () => {
+  it('splits the e2e folder into the two projects like the Playwright config', () => {
+    const names = [
+      'mpRooms.spec.ts',
+      'light.spec.ts',
+      'multiplayer.ts',
+      'mpx.spec.ts',
+      'shards.json',
+    ];
+    expect(projectSpecs(names, 'multiplayer')).toEqual(['mpRooms.spec.ts']);
+    expect(projectSpecs(names, 'game')).toEqual(['light.spec.ts', 'mpx.spec.ts']);
   });
 });

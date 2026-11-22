@@ -107,8 +107,14 @@ jobs:
         with:
           name: dist
           path: dist
+      # The specs of this shard from e2e/shards.json (balanced by measured time).
       - name: Browser tests
-        run: npx playwright test --project=game --shard=${{ matrix.shard }}/4
+        run: |
+          # A command substitution fails the step if the script fails; an empty list would
+          # make Playwright run the whole project.
+          list=$(node scripts/ci/timings.mjs --files game ${{ matrix.shard }})
+          mapfile -t specs <<< "$list"
+          npx playwright test --project=game "${specs[@]}"
       - name: Upload blob report
         if: always()
         uses: actions/upload-artifact@v7
@@ -141,7 +147,12 @@ jobs:
           path: dist
       # Playwright's webServer starts the local signaling server on each runner.
       - name: Browser tests
-        run: npx playwright test --project=multiplayer --shard=${{ matrix.shard }}/3
+        run: |
+          # A command substitution fails the step if the script fails; an empty list would
+          # make Playwright run the whole project.
+          list=$(node scripts/ci/timings.mjs --files multiplayer ${{ matrix.shard }})
+          mapfile -t specs <<< "$list"
+          npx playwright test --project=multiplayer "${specs[@]}"
       - name: Upload blob report
         if: always()
         uses: actions/upload-artifact@v7

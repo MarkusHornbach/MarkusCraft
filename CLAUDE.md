@@ -235,7 +235,8 @@ scripts/             dev tools: signalServer.mjs (local PeerJS server, `npm run 
                      (where an edit's time goes on the `edit` route; run it bundled)
   ci/                the CI jobs' logic, no dependencies: changes.mjs (does the run need
                      the full suite), ciResult.mjs (the verdict of `CI result`), timings.mjs
-                     (blob reports' JSON → timing summary; `--assign`: spec lists per shard);
+                     (blob reports' JSON → timing summary; `--assign`: spec lists per shard;
+                     `--files`: the specs of one shard job);
                      unit tests `*.test.ts` next to them
 docs/                phase plans and phase reports, ci-1-plan.md and ci-1-report.md (CI round 1); device-tests.md
                      (the one checklist of tests on real devices, filled out by the owner)
@@ -631,8 +632,8 @@ lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX
 | `changes`   | always                   | `full`: push to `main` yes; pull request yes unless only `.md` files; other pushes no                                                                             |
 | `checks`    | always                   | npm ci, actionlint (pinned, SHA-256 checked), lint, type check, unit tests with coverage, unit tests with time limits                                             |
 | `build`     | `full`                   | `npm run build`, uploads `dist/` (artifact `dist`)                                                                                                                |
-| `e2e-game`  | `full`, after `build`    | four shards, `--project=game --shard=N/4`, blob report each                                                                                                       |
-| `e2e-mp`    | `full`, after `build`    | three shards, `--project=multiplayer --shard=N/3`, each with its own signaling server                                                                             |
+| `e2e-game`  | `full`, after `build`    | four shards, `--project=game` with the specs of `e2e/shards.json`, blob report each                                                                               |
+| `e2e-mp`    | `full`, after `build`    | three shards, `--project=multiplayer` with the specs of `e2e/shards.json`, each with its own signaling server                                                     |
 | `report`    | `full`, after the shards | merges the blobs into HTML and JSON, timing summary in the job summary, artifacts `e2e-timings` (90 days) and, when a shard failed, `playwright-report` (14 days) |
 | `CI result` | always                   | the one required check: green only if every job that had to run passed and the others were skipped                                                                |
 
@@ -645,9 +646,11 @@ runs are cancelled by a newer one of the same event and ref. Time limits per job
   session that sees a green run above 25 minutes, or a shard above 15, rebalances
   (`node scripts/ci/timings.mjs --assign <shard>=<json>... > e2e/shards.json`, then
   `npm run format`) or adds a shard in its own part, and records it in its report.
-- A new spec file needs nothing: built-in sharding picks it up (or, once
-  `e2e/shards.json` exists, the assignment script places it, and a spec missing from the
-  file runs in the last shard so it is never lost).
+- **Spec lists per shard:** `e2e/shards.json` (made by `--assign` from the `e2e-timings`
+  JSON, longest spec first onto the shard with the least time) names the specs of every
+  shard; `timings.mjs --files <project> <n>` gives a shard job its list. A new spec file
+  needs nothing: a spec the file does not name runs in the last shard of its project, so it
+  is never lost; the next rebalancing places it.
 - Timing data: the `report` job's summary and its artifact `e2e-timings` (90 days; one
   JSON per shard, `game-N.json` / `mp-N.json`, the merged `merged.json` and `summary.md`).
 - Docs-only pull requests (`.md` files only) skip the browser tests; `CI result` is still

@@ -1,11 +1,15 @@
-// CI job `report`: turns the merged Playwright JSON into a timing summary (and, with
-// --assign, into spec lists per shard, longest spec first onto the least loaded shard).
+// CI timing tools: the `report` job's summary from the shards' Playwright JSON; with
+// --assign, spec lists per shard (longest spec first onto the least loaded shard) for
+// e2e/shards.json; with --files, the specs one shard job runs.
 // @ts-check
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 /** Shards per project in `ci.yml`. */
 export const SHARD_COUNTS = { game: 4, multiplayer: 3 };
+
+/** Spec files of the `multiplayer` project (the same pattern as playwright.config.ts). */
+const MULTIPLAYER = /^mp[A-Z]\w*\.spec\.ts$/;
 
 /** How many of the slowest tests the summary lists. */
 const SLOWEST = 20;
@@ -193,12 +197,61 @@ export function parseReportArgs(args) {
   });
 }
 
+/**
+ * The specs of one shard: its list in `shards.json`, without files that no longer exist,
+ * and in the last shard also every spec of the project that the file does not name, so a
+ * new spec is never lost. Throws if the shard would run nothing (Playwright would then run
+ * the whole project).
+ * @param {Record<string, string[][]>} shards
+ * @param {string} project
+ * @param {number} shard counted from 1
+ * @param {readonly string[]} allSpecs every spec file of the project, relative to e2e/
+ * @returns {string[]}
+ */
+export function shardFiles(shards, project, shard, allSpecs) {
+  const lists = shards[project];
+  if (!Array.isArray(lists) || shard < 1 || shard > lists.length) {
+    throw new Error(`shards.json has no shard ${shard} of ${project}`);
+  }
+  const existing = new Set(allSpecs);
+  const files = lists[shard - 1].filter((file) => existing.has(file));
+  if (shard === lists.length) {
+    const named = new Set(lists.flat());
+    files.push(...allSpecs.filter((file) => !named.has(file)));
+  }
+  if (files.length === 0) throw new Error(`shard ${shard} of ${project} has no specs`);
+  return [...new Set(files)].sort();
+}
+
+/**
+ * The spec files of a project among the names of the e2e folder.
+ * @param {readonly string[]} names
+ * @param {string} project
+ */
+export function projectSpecs(names, project) {
+  const specs = names.filter((name) => name.endsWith('.spec.ts'));
+  return specs.filter((name) => MULTIPLAYER.test(name) === (project === 'multiplayer')).sort();
+}
+
 function main() {
   const args = process.argv.slice(2);
+  if (args[0] === '--files') {
+    // --files <project> <shard>: one path per line, `e2e/<spec>` (the folder anchors the
+    // name, since Playwright reads each argument as a pattern on the path).
+    const [, project, shard] = args;
+    const shards = JSON.parse(readFileSync('e2e/shards.json', 'utf8'));
+    const specs = projectSpecs(readdirSync('e2e'), project);
+    for (const file of shardFiles(shards, project, Number(shard), specs)) {
+      process.stdout.write(`e2e/${file}\n`);
+    }
+    return;
+  }
   const assign = args[0] === '--assign';
   const reports = parseReportArgs(assign ? args.slice(1) : args);
   if (reports.length === 0) {
-    console.error('usage: node scripts/ci/timings.mjs [--assign] [<shard>=]<report.json>...');
+    console.error(
+      'usage: node scripts/ci/timings.mjs [--assign] [<shard>=]<report.json>... | --files <project> <shard>',
+    );
     process.exit(2);
   }
   const tests = reports.flatMap(({ shard, path }) =>
