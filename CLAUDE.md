@@ -485,9 +485,10 @@ lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX
   "Craft <item>" (e.g. "Craft Stick").
 - **Back guard.** Outside test mode, while anything but the world list is shown, the page
   holds one history entry (`backGuard.ts`); a `popstate` re-arms it and acts like the pad's
-  B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press, or
-  before the end of the frame after the one whose poll saw B (a slow frame holds the
-  `popstate` back), only re-arms. Back on the world list leaves the entry in place (no navigation of its own,
+  B (`Game.onBrowserBack`). A `popstate` within `BACK_PAIR_MS` of a pad B press only
+  re-arms; the window counts each frame since B (and the wait since the last one) at most
+  `BACK_PAIR_FRAME_MS` (25), so slow frames, and ordinary frames between the tasks a
+  `popstate` needs after a slow one, do not use it up (six frames at least). Back on the world list leaves the entry in place (no navigation of its own,
   which could collide with a reload); a Back that pops it there goes back once more.
   Whether it is armed is asked at each `popstate` (`Game.wantsBackGuard`); `update()` per
   frame only pushes the entry.
@@ -992,3 +993,7 @@ hold:
 - Fix of flaky controller tests (focus one frame late, back pairing in wall-clock time,
   two tests that depended on round-trip timing):
   report `docs/fix-pad-flaky-report.md`.
+- Fix of flaky browser tests after CI 1 (the back guard's pairing window counted per
+  frame; the network test's waits name their last state; the soak and the network test
+  documented as known issues): report `docs/fix-ci-flaky-report.md`. It also records the
+  first run on `main` after CI 1 (run #188: full suite, not cancelled, green, 15.8 min).
