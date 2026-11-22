@@ -390,141 +390,135 @@ test('Phase 5 AC3.6: from the result screen B goes back', async ({ page }) => {
   expect((await getState(page)).ui.screen).toBe('worlds');
 });
 
-// THROWAWAY (reverted): the back guard's tests ten times in their shard.
-for (let round = 1; round <= 10; round++)
-  test.describe(`the back guard, round ${round}`, () => {
-    test('Phase 5 AC3.7: Back pauses the game, returns from the form, leaves from the list', async ({
-      page,
-    }) => {
-      // A page before the game, so that leaving it has somewhere to go.
-      await page.goto('data:text/html,<title>before</title>');
-      await openMenu(page);
-      const url = page.url();
-      await createWorld(page);
-      await page.goBack();
-      await page.waitForFunction(() => window.__mc.getState().paused);
-      expect((await getState(page)).ui.screen).toBe('pause');
-      expect(page.url()).toBe(url);
-      // Once more: the guard holds its entry again.
-      await page.locator('.pause-screen .play-button').click();
-      await untilPlaying(page);
-      await page.goBack();
-      await page.waitForFunction(() => window.__mc.getState().paused);
-      await backToWorlds(page);
+test.describe('the back guard', () => {
+  test('Phase 5 AC3.7: Back pauses the game, returns from the form, leaves from the list', async ({
+    page,
+  }) => {
+    // A page before the game, so that leaving it has somewhere to go.
+    await page.goto('data:text/html,<title>before</title>');
+    await openMenu(page);
+    const url = page.url();
+    await createWorld(page);
+    await page.goBack();
+    await page.waitForFunction(() => window.__mc.getState().paused);
+    expect((await getState(page)).ui.screen).toBe('pause');
+    expect(page.url()).toBe(url);
+    // Once more: the guard holds its entry again.
+    await page.locator('.pause-screen .play-button').click();
+    await untilPlaying(page);
+    await page.goBack();
+    await page.waitForFunction(() => window.__mc.getState().paused);
+    await backToWorlds(page);
 
-      await page.locator('.world-new-button').click();
-      await expect(page.locator('.world-form')).toBeVisible();
-      // The guard holds its entry.
-      await page.waitForFunction(() => window.history.state !== null);
-      await page.goBack();
-      await expect(page.locator('.world-list-view')).toBeVisible();
-      expect(page.url()).toBe(url);
-      // On the list Back leaves the page (past the guard's entry, which it no longer needs).
-      await page.goBack();
-      await page.waitForURL((u) => u.protocol === 'data:');
+    await page.locator('.world-new-button').click();
+    await expect(page.locator('.world-form')).toBeVisible();
+    // The guard holds its entry.
+    await page.waitForFunction(() => window.history.state !== null);
+    await page.goBack();
+    await expect(page.locator('.world-list-view')).toBeVisible();
+    expect(page.url()).toBe(url);
+    // On the list Back leaves the page (past the guard's entry, which it no longer needs).
+    await page.goBack();
+    await page.waitForURL((u) => u.protocol === 'data:');
+  });
+
+  test('Phase 5 AC3.7: B followed within 150 ms by a browser Back acts once', async ({ page }) => {
+    await installFakePads(page);
+    await openMenu(page);
+    await createWorld(page);
+    const pad = new Pad(page);
+    await pad.connect();
+    await pad.tap(BUTTON.START);
+    expect((await getState(page)).paused).toBe(true);
+    // B, and the browser's Back right after the poll that saw it.
+    await page.evaluate(async () => {
+      const before = window.__mc.getState().pad.polls;
+      window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
+      await new Promise<void>((done) => {
+        const check = (): void => {
+          if (window.__mc.getState().pad.polls > before) done();
+          else requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+      });
+      history.back();
     });
+    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await pad.release(BUTTON.B);
+    await polls(page, 5);
+    // B continued the game; the Back that came with it did not pause it again.
+    expect((await getState(page)).paused).toBe(false);
+  });
 
-    test('Phase 5 AC3.7: B followed within 150 ms by a browser Back acts once', async ({
-      page,
-    }) => {
-      await installFakePads(page);
-      await openMenu(page);
-      await createWorld(page);
-      const pad = new Pad(page);
-      await pad.connect();
-      await pad.tap(BUTTON.START);
-      expect((await getState(page)).paused).toBe(true);
-      // B, and the browser's Back right after the poll that saw it.
-      await page.evaluate(async () => {
-        const before = window.__mc.getState().pad.polls;
-        window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
-        await new Promise<void>((done) => {
+  test('Phase 5 AC3.7: B and a browser Back held up by a slow frame act once', async ({ page }) => {
+    await installFakePads(page);
+    await openMenu(page);
+    await createWorld(page);
+    const pad = new Pad(page);
+    await pad.connect();
+    await pad.tap(BUTTON.START);
+    expect((await getState(page)).paused).toBe(true);
+    // B, then a frame that takes far longer than BACK_PAIR_MS before the Back comes.
+    await page.evaluate(async () => {
+      const before = window.__mc.getState().pad.polls;
+      window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
+      await new Promise<void>((done) => {
+        const check = (): void => {
+          if (window.__mc.getState().pad.polls > before) {
+            const end = performance.now() + 600;
+            while (performance.now() < end) {
+              // The slow frame.
+            }
+            done();
+          } else requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+      });
+      history.back();
+    });
+    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await pad.release(BUTTON.B);
+    await polls(page, 5);
+    expect((await getState(page)).paused).toBe(false);
+  });
+
+  test('Phase 5 AC3.7: B, a slow frame, and a Back that an ordinary frame delays act once', async ({
+    page,
+  }) => {
+    // The order CI runs #168, #180 and #185 saw by chance: the popstate needs tasks after
+    // the slow frame, and an ordinary frame ran first. Here that frame is waited for.
+    await installFakePads(page);
+    await openMenu(page);
+    await createWorld(page);
+    const pad = new Pad(page);
+    await pad.connect();
+    await pad.tap(BUTTON.START);
+    expect((await getState(page)).paused).toBe(true);
+    await page.evaluate(async () => {
+      const polled = (count: number): Promise<void> =>
+        new Promise<void>((done) => {
           const check = (): void => {
-            if (window.__mc.getState().pad.polls > before) done();
+            if (window.__mc.getState().pad.polls >= count) done();
             else requestAnimationFrame(check);
           };
           requestAnimationFrame(check);
         });
-        history.back();
-      });
-      await page.waitForFunction(() => !window.__mc.getState().paused);
-      await pad.release(BUTTON.B);
-      await polls(page, 5);
-      // B continued the game; the Back that came with it did not pause it again.
-      expect((await getState(page)).paused).toBe(false);
+      const before = window.__mc.getState().pad.polls;
+      window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
+      await polled(before + 1);
+      const end = performance.now() + 600;
+      while (performance.now() < end) {
+        // The slow frame.
+      }
+      await polled(window.__mc.getState().pad.polls + 1);
+      history.back();
     });
-
-    test('Phase 5 AC3.7: B and a browser Back held up by a slow frame act once', async ({
-      page,
-    }) => {
-      await installFakePads(page);
-      await openMenu(page);
-      await createWorld(page);
-      const pad = new Pad(page);
-      await pad.connect();
-      await pad.tap(BUTTON.START);
-      expect((await getState(page)).paused).toBe(true);
-      // B, then a frame that takes far longer than BACK_PAIR_MS before the Back comes.
-      await page.evaluate(async () => {
-        const before = window.__mc.getState().pad.polls;
-        window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
-        await new Promise<void>((done) => {
-          const check = (): void => {
-            if (window.__mc.getState().pad.polls > before) {
-              const end = performance.now() + 600;
-              while (performance.now() < end) {
-                // The slow frame.
-              }
-              done();
-            } else requestAnimationFrame(check);
-          };
-          requestAnimationFrame(check);
-        });
-        history.back();
-      });
-      await page.waitForFunction(() => !window.__mc.getState().paused);
-      await pad.release(BUTTON.B);
-      await polls(page, 5);
-      expect((await getState(page)).paused).toBe(false);
-    });
-
-    test('Phase 5 AC3.7: B, a slow frame, and a Back that an ordinary frame delays act once', async ({
-      page,
-    }) => {
-      // The order CI runs #168, #180 and #185 saw by chance: the popstate needs tasks after
-      // the slow frame, and an ordinary frame ran first. Here that frame is waited for.
-      await installFakePads(page);
-      await openMenu(page);
-      await createWorld(page);
-      const pad = new Pad(page);
-      await pad.connect();
-      await pad.tap(BUTTON.START);
-      expect((await getState(page)).paused).toBe(true);
-      await page.evaluate(async () => {
-        const polled = (count: number): Promise<void> =>
-          new Promise<void>((done) => {
-            const check = (): void => {
-              if (window.__mc.getState().pad.polls >= count) done();
-              else requestAnimationFrame(check);
-            };
-            requestAnimationFrame(check);
-          });
-        const before = window.__mc.getState().pad.polls;
-        window.__fakePadOp?.({ kind: 'button', index: 0, button: 1, value: 1 });
-        await polled(before + 1);
-        const end = performance.now() + 600;
-        while (performance.now() < end) {
-          // The slow frame.
-        }
-        await polled(window.__mc.getState().pad.polls + 1);
-        history.back();
-      });
-      await page.waitForFunction(() => !window.__mc.getState().paused);
-      await pad.release(BUTTON.B);
-      await polls(page, 5);
-      expect((await getState(page)).paused).toBe(false);
-    });
+    await page.waitForFunction(() => !window.__mc.getState().paused);
+    await pad.release(BUTTON.B);
+    await polls(page, 5);
+    expect((await getState(page)).paused).toBe(false);
   });
+});
 
 test.describe('references', () => {
   test('Phase 5 AC3.8: pad-glyphs', async ({ page }) => {

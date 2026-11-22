@@ -104,21 +104,17 @@ async function listEachOther(a: Player, b: Player, query = netQuery()): Promise<
   return [codeA, codeB];
 }
 
-// THROWAWAY (reverted): five rounds in its shard, one after the other (port 9003).
-test.describe.serial('rounds', () => {
-  for (let round = 1; round <= 5; round++)
-    test(`Phase 6 AC2.1, AC2.5, AC2.7: the test connects directly; result text; reference, round ${round}`, async ({
-      players,
-    }) => {
-      test.setTimeout(120_000);
-      // A server of its own: devices of tests running alongside must not show in the reference.
-      const stop = await ownServer(9003, true);
-      try {
-        await connectAndCheck(players);
-      } finally {
-        await stop();
-      }
-    });
+test('Phase 6 AC2.1, AC2.5, AC2.7: the test connects directly; result text; reference', async ({
+  players,
+}) => {
+  test.setTimeout(120_000);
+  // A server of its own: devices of tests running alongside must not show in the reference.
+  const stop = await ownServer(9003, true);
+  try {
+    await connectAndCheck(players);
+  } finally {
+    await stop();
+  }
 });
 
 async function connectAndCheck(players: Players): Promise<void> {
