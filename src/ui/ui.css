@@ -709,9 +709,15 @@ canvas {
     font-size: 12px;
   }
 
+  /* Rows sit 1 px apart and switch rows are 24 px since "Collide with leaves" (Phase 7
+     part A) joined them: the pause menu still fits 360 px. */
   .touch-mode .setting-row {
     min-height: 26px;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
+  }
+
+  .touch-mode .switch-row {
+    min-height: 24px;
   }
 
   /* The link field needs a keyboard to be of use; the copy button does the job. */

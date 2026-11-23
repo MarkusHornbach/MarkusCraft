@@ -37,10 +37,12 @@ export interface Settings {
   padSensitivity: number;
   /** The controller's right stick pushed up looks down. */
   padInvertY: boolean;
+  /** Leaves stop the player (Phase 7 part A); off: the player walks and falls through them. */
+  collideLeaves: boolean;
 }
 
 /** The settings that are numbers (each has a slider). */
-export type NumberSetting = Exclude<keyof Settings, 'padInvertY'>;
+export type NumberSetting = Exclude<keyof Settings, 'padInvertY' | 'collideLeaves'>;
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   renderDistance: RENDER_DISTANCE_DEFAULT,
@@ -50,6 +52,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   brightness: BRIGHTNESS_DEFAULT,
   padSensitivity: PAD_SENSITIVITY_DEFAULT,
   padInvertY: false,
+  collideLeaves: false,
 };
 
 /** The part of the Storage interface that is used; lets tests pass a fake. */
@@ -97,6 +100,10 @@ export function validateSettings(raw: unknown): Settings {
     ),
     padInvertY:
       typeof source.padInvertY === 'boolean' ? source.padInvertY : DEFAULT_SETTINGS.padInvertY,
+    collideLeaves:
+      typeof source.collideLeaves === 'boolean'
+        ? source.collideLeaves
+        : DEFAULT_SETTINGS.collideLeaves,
   };
 }
 
@@ -125,7 +132,7 @@ export function hasStoredSettings(storage: SettingsStorage | null): boolean {
 export function saveSettings(storage: SettingsStorage | null, settings: Settings): void {
   if (!storage) return;
   try {
-    const { touchSensitivity, brightness, padSensitivity, padInvertY, ...rest } =
+    const { touchSensitivity, brightness, padSensitivity, padInvertY, collideLeaves, ...rest } =
       validateSettings(settings);
     // The settings added after Phase 1 are only written once they were changed, so the
     // stored text of players who never touched them stays as it was before they existed.
@@ -136,6 +143,7 @@ export function saveSettings(storage: SettingsStorage | null, settings: Settings
     if (brightness !== DEFAULT_SETTINGS.brightness) stored.brightness = brightness;
     if (padSensitivity !== DEFAULT_SETTINGS.padSensitivity) stored.padSensitivity = padSensitivity;
     if (padInvertY !== DEFAULT_SETTINGS.padInvertY) stored.padInvertY = padInvertY;
+    if (collideLeaves !== DEFAULT_SETTINGS.collideLeaves) stored.collideLeaves = collideLeaves;
     storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(stored));
   } catch {
     // Storage can be full or blocked (private mode); the game works without it.

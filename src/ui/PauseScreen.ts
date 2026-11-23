@@ -111,6 +111,8 @@ export class PauseScreen {
   private readonly sliders: Record<NumberSetting, SliderHandle>;
   /** "Invert controller look", a switch row like the debug overlay. */
   private readonly invertRow: HTMLElement;
+  private readonly leavesRow: HTMLElement;
+  private readonly leavesSwitch: HTMLInputElement;
   private readonly invertSwitch: HTMLInputElement;
   /** A controller was used during this visit: its two settings rows are shown. */
   private padSeen = false;
@@ -281,6 +283,17 @@ export class PauseScreen {
       this.settings.padInvertY = this.invertSwitch.checked;
       change();
     });
+
+    // Phase 7 part A: movement only; leaves stay visible, targetable and breakable.
+    const leaves = this.switchRow('setting-collide-leaves', 'Collide with leaves');
+    this.leavesRow = leaves.row;
+    this.leavesSwitch = leaves.input;
+    this.leavesSwitch.checked = this.settings.collideLeaves;
+    this.leavesSwitch.addEventListener('change', () => {
+      this.settings.collideLeaves = this.leavesSwitch.checked;
+      change();
+    });
+    settings.appendChild(this.leavesRow);
 
     // Touch devices have no F3 key; this switch replaces it.
     const debug = this.switchRow('setting-debug', 'Debug overlay');
@@ -480,6 +493,8 @@ export class PauseScreen {
       // The controller's rows show once a controller was used during this visit.
       place(this.sliders.padSensitivity.row, settings, this.sliders.fov.row, this.padSeen);
       place(this.invertRow, settings, null, this.padSeen);
+      // Below "Invert controller look", in every input mode.
+      place(this.leavesRow, settings, null, true);
       for (const node of this.touchOnly) place(node, settings, null, touch);
     }
     this.placeFullscreenButton();
@@ -499,6 +514,7 @@ export class PauseScreen {
       this.sliders[key].set(settings[key]);
     }
     this.invertSwitch.checked = settings.padInvertY;
+    this.leavesSwitch.checked = settings.collideLeaves;
   }
 
   setDebugChecked(checked: boolean): void {

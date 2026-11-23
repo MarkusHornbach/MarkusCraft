@@ -16,7 +16,7 @@ import { addItems } from '../items/inventory';
 import { isItem, itemLabel } from '../items/items';
 import { type RecipeStatus, getRecipe, listRecipes, stationsNear } from '../items/recipes';
 import { TouchControls } from '../input/TouchControls';
-import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
+import { MovementWorld, type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
 import {
@@ -197,6 +197,8 @@ export class Game {
   // World, chunk manager, player and session belong to the open world; `loadWorld`
   // replaces them. Until a world is open they are empty placeholders.
   private world: World;
+  /** The world as movement sees it (leaves passable unless "Collide with leaves"). */
+  private movement: MovementWorld;
   private readonly renderer: Renderer;
   private chunkManager: ChunkManager;
   private player: PlayerState;
@@ -340,6 +342,7 @@ export class Game {
     if (params.look !== null) this.mp.setLook(params.look);
     this.time = params.time;
     this.world = new World(0);
+    this.movement = new MovementWorld(this.world);
 
     this.root = document.createElement('div');
     this.root.className = 'game-root';
@@ -621,6 +624,7 @@ export class Game {
     this.renderer.clearChunkMeshes();
     const gen = metaGen(meta);
     this.world = new World(meta.seed, gen, edits);
+    this.movement = this.movementOf(this.world);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
     this.spawn = findSpawn(getTerrain(meta.seed, gen));
     this.player = createPlayer(meta.pose.x, meta.pose.y, meta.pose.z);
@@ -905,6 +909,7 @@ export class Game {
     this.meta = null;
     this.renderer.clearChunkMeshes();
     this.world = new World(0);
+    this.movement = this.movementOf(this.world);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
     this.autosave = this.createAutosave();
     this.target = null;
@@ -1889,7 +1894,15 @@ export class Game {
     this.renderer.setRenderDistance(settings.renderDistance);
     this.chunkManager.setRadius(settings.renderDistance);
     this.gamepad.setLook(settings.padSensitivity, settings.padInvertY);
+    // Takes effect at once; physics only tests the cells the player newly enters.
+    this.movement.collideLeaves = settings.collideLeaves;
     if (!this.chunksIdle()) this.framesSinceIdle = 0;
+  }
+
+  private movementOf(world: World): MovementWorld {
+    const movement = new MovementWorld(world);
+    movement.collideLeaves = this.settings.collideLeaves;
+    return movement;
   }
 
   private setDebugVisible(visible: boolean): void {
@@ -2012,7 +2025,7 @@ export class Game {
     // A performance test sets the input of this step and submits its action.
     this.bench?.runner.step();
     this.rememberPosition();
-    stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
+    stepPlayer(this.player, this.readMoveInput(), this.movement, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
     // The step is over: actions of this step carry its end time.
     this.simSteps++;
@@ -2695,6 +2708,7 @@ export class Game {
         brightness: this.settings.brightness,
         padSensitivity: this.settings.padSensitivity,
         padInvertY: this.settings.padInvertY,
+        collideLeaves: this.settings.collideLeaves,
       },
       pad: this.gamepad.state(this.padActive),
       render: {
@@ -2795,6 +2809,7 @@ export class Game {
       },
       save: () => this.saveNow(),
       give: (item, count, player) => this.testGive(item, count, player),
+      setCollideLeaves: (on) => this.useSettings({ ...this.settings, collideLeaves: on }),
       clearInventory: () => this.testClearInventory(),
       benchResult: () => (this.benchPhase === 'result' ? this.benchResult : null),
       netNetwork: () =>

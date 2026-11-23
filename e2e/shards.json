@@ -13,6 +13,7 @@
       "breaking.spec.ts",
       "fullscreen.spec.ts",
       "inventoryScreen.spec.ts",
+      "leaves.spec.ts",
       "light.spec.ts",
       "night.spec.ts",
       "touch.spec.ts",

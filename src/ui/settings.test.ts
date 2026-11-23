@@ -31,6 +31,7 @@ describe('settings', () => {
       brightness: 0.5,
       padSensitivity: 1,
       padInvertY: false,
+      collideLeaves: false,
     });
     expect(SETTINGS_STORAGE_KEY).toBe('markuscraft.settings.v1');
   });
@@ -44,6 +45,7 @@ describe('settings', () => {
       brightness: 0.5,
       padSensitivity: 1,
       padInvertY: false,
+      collideLeaves: false,
     });
     expect(validateSettings({ renderDistance: 99, mouseSensitivity: 0, fov: 10 })).toEqual({
       renderDistance: 16,
@@ -53,6 +55,7 @@ describe('settings', () => {
       brightness: 0.5,
       padSensitivity: 1,
       padInvertY: false,
+      collideLeaves: false,
     });
     expect(validateSettings({ touchSensitivity: 2 }).touchSensitivity).toBe(2);
     expect(validateSettings({ touchSensitivity: 9 }).touchSensitivity).toBe(3);
@@ -82,6 +85,7 @@ describe('settings', () => {
       brightness: 0.5,
       padSensitivity: 1,
       padInvertY: false,
+      collideLeaves: false,
     };
     saveSettings(storage, chosen);
     expect(hasStoredSettings(storage)).toBe(true);
@@ -125,6 +129,7 @@ describe('settings', () => {
       brightness: 0.5,
       padSensitivity: 1,
       padInvertY: false,
+      collideLeaves: false,
     });
     // Writing them back without a change of Brightness gives the same text.
     saveSettings(storage, loadSettings(storage));
@@ -184,5 +189,20 @@ describe('settings', () => {
     expect(hasStoredSettings(null)).toBe(false);
     expect(() => saveSettings(throwing, DEFAULT_SETTINGS)).not.toThrow();
     expect(() => saveSettings(null, DEFAULT_SETTINGS)).not.toThrow();
+  });
+
+  it('Phase 7 AC7.3: Collide with leaves defaults to off, is validated and stored only when on', () => {
+    expect(DEFAULT_SETTINGS.collideLeaves).toBe(false);
+    for (const bad of [1, 'true', null, {}]) {
+      expect(validateSettings({ collideLeaves: bad }).collideLeaves).toBe(false);
+    }
+    expect(validateSettings({ collideLeaves: true }).collideLeaves).toBe(true);
+    const storage = fakeStorage();
+    saveSettings(storage, { ...DEFAULT_SETTINGS });
+    expect(JSON.parse(storage.data.get(SETTINGS_STORAGE_KEY) ?? '')).not.toHaveProperty(
+      'collideLeaves',
+    );
+    saveSettings(storage, { ...DEFAULT_SETTINGS, collideLeaves: true });
+    expect(loadSettings(storage).collideLeaves).toBe(true);
   });
 });

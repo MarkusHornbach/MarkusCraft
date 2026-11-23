@@ -108,11 +108,16 @@ export class World {
    * through terrain that has not been generated yet.
    */
   isSolidAt(x: number, y: number, z: number): boolean {
+    return this.isSolidIn(BLOCK_SOLID, x, y, z);
+  }
+
+  /** `isSolidAt` with another solid table (`BLOCK_SOLID_PASSABLE_LEAVES` for movement). */
+  isSolidIn(table: Uint8Array, x: number, y: number, z: number): boolean {
     if (y >= WORLD_HEIGHT) return false;
     if (y < 0) return true;
     const chunk = this.getChunk(toChunkCoord(x), toChunkCoord(z));
     if (!chunk) return true;
-    return BLOCK_SOLID[chunk.blocks[blockIndex(toLocalCoord(x), y, toLocalCoord(z))]] === 1;
+    return table[chunk.blocks[blockIndex(toLocalCoord(x), y, toLocalCoord(z))]] === 1;
   }
 
   isWaterAt(x: number, y: number, z: number): boolean {

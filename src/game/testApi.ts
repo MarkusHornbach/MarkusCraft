@@ -190,6 +190,8 @@ export interface GameState {
     brightness: number;
     padSensitivity: number;
     padInvertY: boolean;
+    /** "Collide with leaves" (Phase 7 part A). */
+    collideLeaves: boolean;
   };
   /**
    * The controller: pads the browser reports, whether one is the active source, how often
@@ -270,6 +272,8 @@ export interface TestApi {
    * `player`, into that guest's inventory (Phase 6 part C).
    */
   give(item: number, count: number, player?: number): void;
+  /** Switches "Collide with leaves" (Phase 7 part A) without storing it (test tool). */
+  setCollideLeaves(on: boolean): void;
   /** Empties the inventory directly (test tool). */
   clearInventory(): void;
   /** The result record on the performance test's result screen, or null. */

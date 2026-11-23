@@ -297,6 +297,13 @@ for (const def of BLOCKS) {
   }
 }
 
+/**
+ * `BLOCK_SOLID` with leaves passable: the player's movement while "Collide with leaves" is
+ * off (Phase 7 part A). Leaves stay solid everywhere else (support, placing, raycast).
+ */
+export const BLOCK_SOLID_PASSABLE_LEAVES = BLOCK_SOLID.slice();
+BLOCK_SOLID_PASSABLE_LEAVES[Block.LEAVES] = 0;
+
 /** Block ids of the hotbar, index 0 = slot 1. */
 export const HOTBAR_BLOCKS: readonly number[] = Array.from({ length: HOTBAR_SLOTS }, (_, i) => {
   const def = BLOCKS.find((b) => b.slot === i + 1);
