@@ -91,11 +91,13 @@ per shard, `game-N.json` / `mp-N.json`, the merged `merged.json` and `summary.md
   `sampleWorld.ts`, `lightChecksum.ts`, `lightScenes.ts` (tables with emitters, artificial
   volumes), `lightEdits.ts` (a lit test world, random edits), `netRig.ts` (a host and
   guests over the memory transport with a fake clock), `terrainMeasure.ts` (plains, water,
-  trees, open land, ores per terrain; Phase 7 part A).
+  trees, open land, ores per terrain; Phase 7 part A), `startingTables.ts` (the progress
+  tables with the plan's starting values, so engine tests do not follow the tuning).
 - `scripts/` (dev tools): `signalServer.mjs` (local PeerJS server, `npm run signal`),
   `figurePreview.ts` (sheet of all looks, front and back), `shot.mjs`, `atlasPreview.ts`,
   `iconPreview.ts` (sheet of all item icons), `terrainStats.ts` (terrain statistics per
-  generator preset and generation time), `perf.ts` (generation, light, meshing, edits), `compareShots.mjs` (old
+  generator preset and generation time), `progressRun.ts` (the goal bot over 12 worlds:
+  `src/bot/CLAUDE.md`), `perf.ts` (generation, light, meshing, edits), `compareShots.mjs` (old
   reference next to new), `benchRun.mjs` (plays the performance test headlessly),
   `perfRuns.ts` (comparison table from saved `perf-run` issues), `editCost.ts` (where an
   edit's time goes on the `edit` route; run it bundled), `docsCoverage.mjs` (names of an

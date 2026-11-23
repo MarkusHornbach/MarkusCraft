@@ -32,8 +32,7 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 7 part A (section "World options", GEN-1 to GEN-4, LEAF-1 and LEAF-2;
-seed 1337 now with the form's defaults); 2026-11-23.
+Last updated: Phase 8 part A1 (section "Progression", PROG-1 to PROG-5); 2026-11-23.
 
 ---
 
@@ -229,3 +228,26 @@ after a press. The buttons are listed in the pause menu while the controller is 
       breaking a block in a crowded spot. Each B continues the game once and never pauses it
       again by itself. Then, in play, B followed about a second later by the phone's back
       gesture: the gesture pauses. _Phone._ Result:
+
+## 10. Progression (Phase 8 part A)
+
+An Adventure world (the mode that was called Gathering) has a task book: the third tab
+"Tasks" of the inventory, levels that unlock recipes, and a notice at the top for every
+finished task, chapter and level.
+
+- [ ] **PROG-1** (8A1) Play a fresh Adventure world (seed 1337, the form's defaults)
+      through the whole book on the PC, as you would play it. Note the minutes per chapter
+      (the F3 row "Progress" says which chapter is open) and the total. The goal bot
+      estimates 32 minutes in total (chapters about 4, 5, 8, 7 and 8); your times calibrate
+      its "human factor". Were any tasks boring, too long or unclear? _PC._ Result:
+- [ ] **PROG-2** (8A1) The Tasks tab on the phone: level, XP bar, "Next level", the open
+      chapter's tasks with their counts. Readable at arm's length? Does it scroll with a
+      finger where needed? _Phone._ Result:
+- [ ] **PROG-3** (8A1) The controller reaches the Tasks tab with RB (from Crafting) and
+      scrolls it with the right stick; B closes the inventory. Is it clear that nothing in
+      the tab can be selected? _PC or Phone, controller._ Result:
+- [ ] **PROG-4** (8A1) The notices ("Task done: …", "Chapter done: …", "Level 3 · Unlocked:
+      …", "First find: Coal ore …"): noticed, but not annoying? Do they ever hide something
+      you need to see? _PC, Phone._ Result:
+- [ ] **PROG-5** (8A1) A locked recipe row ("Level 3" or "Task: Mine 32 coal" instead of
+      "Craft"): is it clear why it cannot be made and what to do about it? _PC._ Result:

@@ -29,6 +29,11 @@ light against the slow reference after each of 2 000 random edits. The three pas
   part A) make the test world generator 2 with these options; a missing one takes its
   default (Balanced, Few), an invalid value is ignored. Without both the test world is
   generator 1, so `?test=1&seed=1337` keeps the terrain of every older spec and reference.
+- `progress=all|fresh` (with `test=1`, Phase 8 part A): the task book of an Adventure test
+  world (`mode=gathering`). Default `all`: every task done and the player at the maximum
+  level, so older specs that craft keep working; `fresh` starts the book. Worlds made by
+  the form are always fresh, in tests too (a spec that crafts beyond level 1 there calls
+  `setProgress` first).
 - `?bench=1`, `bench=quick`, `bench=sample`: see "Performance test" below.
 - `look=<0–8>` and `previewgl=0` (the preview gets no WebGL), Phase 6 part D.
 - `join=<code>` (in test mode: join at once; otherwise the world menu's "Join world CODE")
@@ -66,6 +71,15 @@ light against the slow reference after each of 2 000 random edits. The three pas
   `setCollideLeaves(on)` switches "Collide with leaves" without storing it (test mode has no
   settings page). References `gen2-balanced-few`, `gen2-flat-many`, `gen2-hilly-normal`
   (`e2e/terrain.spec.ts`).
+- Phase 8 part A: `openWorld(name, seed, mode?, progress?)` (a new Adventure world's book,
+  default `all`); `setProgress({ xp?, done? }, player?)` sets the XP (on a host with a
+  guest's id: that guest's) through the single `replaceRecord` of the test tools, and
+  `done` replaces the world's done list and clears the counts; `getState().progress`
+  `{ level, xp, nextLevelXp, chapter, done, tasks [{ id, count, goal, done }] (the open
+chapter), notice }` or `null` in Creative; `recipes[]` has `locked` and `unlock`
+  (`{ level } | { task }`); `ui.tab` may be `tasks`. References `tasks-tab`,
+  `tasks-tab-touch`, `recipe-list-locked`, `progress-notice` (`e2e/progress.spec.ts`,
+  `e2e/progressTouch.spec.ts`).
 
 ## Controller
 
