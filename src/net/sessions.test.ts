@@ -7,6 +7,7 @@ import { BLOCK_SOLID, Block } from '../world/blocks';
 import { roomPeerId } from './roomCode';
 import { encodeMessage } from './protocol';
 import { startPoseNear } from './HostSession';
+import { terrainChecksum } from '../world/generation/terrain';
 import type { Connection } from './transport';
 
 /** A raw connection to the room, for messages no client would send. */
@@ -206,6 +207,38 @@ describe('admission (Phase 6 AC4.5)', () => {
     expect(g.world).toBeNull();
     await rig.run(200);
     expect(rig.host.playerCount).toBe(1);
+  });
+
+  it('Phase 7 AC5.3: a guest of a generator 2 world gets its options, checksum and blocks', async () => {
+    const gen = { version: 2, options: { terrain: 'hilly', trees: 'none' } } as const;
+    const rig = new Rig({ gen });
+    await rig.open();
+    const g = rig.guest();
+    expect(await rig.join(g)).toBeNull();
+    expect(g.welcome?.generatorVersion).toBe(2);
+    expect(g.welcome?.options).toEqual({ terrain: 'hilly', trees: 'none' });
+    expect(g.welcome?.checksum).toBe(terrainChecksum(1337, gen));
+    expect(g.world?.gen).toEqual(gen);
+    // The same blocks as the host's world, chunk by chunk.
+    for (let cz = -2; cz <= 2; cz++) {
+      for (let cx = -2; cx <= 2; cx++) {
+        const mine = g.world?.getChunk(cx, cz)?.blocks;
+        const host = rig.world.getChunk(cx, cz)?.blocks;
+        expect(mine && host && Buffer.from(mine).equals(Buffer.from(host))).toBe(true);
+      }
+    }
+  });
+
+  it('Phase 7 AC5.3: a welcome whose options do not give its checksum fails with terrain', async () => {
+    // The welcome says hilly/none, the checksum belongs to flat/many: a forged welcome.
+    const rig = new Rig({
+      gen: { version: 2, options: { terrain: 'hilly', trees: 'none' } },
+      checksumGen: { version: 2, options: { terrain: 'flat', trees: 'many' } },
+    });
+    await rig.open();
+    const g = rig.guest();
+    expect(await rig.join(g)).toBe('terrain');
+    expect(g.world).toBeNull();
   });
 
   it('an unreachable server and a missing room', async () => {

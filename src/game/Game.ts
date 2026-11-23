@@ -1122,7 +1122,7 @@ export class Game {
         seed: welcome.seed,
         mode: welcome.mode,
         generatorVersion: welcome.generatorVersion,
-        options: null,
+        options: welcome.options,
         formatVersion: SAVE_FORMAT_VERSION,
         createdMs: now,
         playedMs: now,

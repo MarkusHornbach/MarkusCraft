@@ -7,7 +7,7 @@ import { createPlayerRecord } from '../actions/playerRecord';
 import { findSpawn } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
 import { World } from '../world/World';
-import { CLASSIC_GEN } from '../world/generation/worldOptions';
+import { CLASSIC_GEN, type WorldGen, worldGenOf } from '../world/generation/worldOptions';
 import { ClientSession, type ClientStatus, type EndReason } from '../net/ClientSession';
 import { HostSession, type PeerEvent } from '../net/HostSession';
 import { MemoryNetwork, type MemorySignaling } from '../net/memoryTransport';
@@ -54,6 +54,10 @@ export interface RigOptions {
   time?: number;
   /** Guests the world remembers (its saved record). */
   guests?: GuestEntry[];
+  /** The host world's generator (version 1 if left out). */
+  gen?: WorldGen;
+  /** The generator of the checksum the host sends, if it is to differ (a forged welcome). */
+  checksumGen?: WorldGen;
 }
 
 /** The fake wall clock of a rig: milliseconds since 1970 at its start, plus the fake time. */
@@ -82,8 +86,9 @@ export class Rig {
       minDelayMs: options.minDelayMs ?? 5,
       maxDelayMs: options.maxDelayMs ?? 20,
     });
-    this.world = new World(seed);
-    const spawn = findSpawn(getTerrain(seed));
+    const gen = options.gen ?? CLASSIC_GEN;
+    this.world = new World(seed, gen);
+    const spawn = findSpawn(getTerrain(seed, gen));
     for (let cz = -2; cz <= 2; cz++) {
       for (let cx = -2; cx <= 2; cx++) this.world.generate(cx, cz);
     }
@@ -94,7 +99,7 @@ export class Rig {
       world: this.world,
       mode,
       worldName: 'Shared',
-      checksum: terrainChecksum(seed, CLASSIC_GEN),
+      checksum: terrainChecksum(seed, options.checksumGen ?? gen),
       hostName: 'Hosta',
       hostKey: playerKeyFromBytes([0xff]),
       hostRecord: this.hostRecord,
@@ -172,7 +177,9 @@ export class Rig {
       listener: {
         onWorld: (welcome, edits) => {
           guest.welcome = welcome;
-          guest.world = new World(welcome.seed, CLASSIC_GEN, edits);
+          const gen = worldGenOf(welcome.generatorVersion, welcome.options);
+          if (!gen) throw new Error('The welcome has no known generator');
+          guest.world = new World(welcome.seed, gen, edits);
           // The chunks around the start, as the guest's chunk manager would load them.
           for (let cz = -2; cz <= 2; cz++) {
             for (let cx = -2; cx <= 2; cx++) guest.world.generate(cx, cz);

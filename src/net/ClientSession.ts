@@ -464,7 +464,7 @@ export class ClientSession implements Session {
         this.failAttempt(new JoinError(m.reason));
         return;
       case 'welcome': {
-        const gen = worldGenOf(m.generatorVersion, null);
+        const gen = worldGenOf(m.generatorVersion, m.options);
         // A generator this build does not know cannot give the host's terrain.
         if (!gen || this.o.checksum(m.seed, gen) !== m.checksum) {
           this.send({ t: 'bye' });
