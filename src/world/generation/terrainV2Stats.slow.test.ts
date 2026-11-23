@@ -12,7 +12,12 @@ import {
 } from '../../testing/terrainMeasure';
 import { Terrain } from './terrain';
 import { TerrainV2 } from './terrainV2';
-import { TERRAIN_SHAPES, type TerrainShape } from './worldOptions';
+import {
+  TERRAIN_SHAPES,
+  TREE_DENSITIES,
+  type TerrainShape,
+  type TreeDensity,
+} from './worldOptions';
 
 function measureShape(shape: TerrainShape | 'v1'): { total: TerrainCounts; perSeed: number[] } {
   const total = emptyCounts();
@@ -84,4 +89,34 @@ describe('generator 2 shapes over the measured seeds', () => {
       expect(share.clay, s).toBeLessThanOrEqual(12);
     }
   });
+});
+
+describe('generator 2 trees over the measured seeds', () => {
+  const measure = (shape: TerrainShape, trees: TreeDensity) => {
+    const total = emptyCounts();
+    for (const seed of MEASURED_SEEDS) {
+      addCounts(total, measureTerrain(new TerrainV2(seed, { terrain: shape, trees })));
+    }
+    return sharesOf(total);
+  };
+  const LIMITS: Record<TreeDensity, [number, number]> = {
+    none: [0, 0],
+    few: [4, 10],
+    normal: [12, 22],
+    many: [28, 45],
+  };
+  const OPEN: Partial<Record<TreeDensity, number>> = { few: 50, normal: 20 };
+
+  for (const shape of TERRAIN_SHAPES) {
+    it(`Phase 7 AC3.1, AC3.2: trees per 1000 grass columns and open land (${shape})`, () => {
+      for (const trees of TREE_DENSITIES) {
+        const s = measure(shape, trees);
+        const [lo, hi] = LIMITS[trees];
+        expect(s.treesPer1000, `${shape}/${trees}`).toBeGreaterThanOrEqual(lo);
+        expect(s.treesPer1000, `${shape}/${trees}`).toBeLessThanOrEqual(hi);
+        const open = OPEN[trees];
+        if (open !== undefined) expect(s.open, `${shape}/${trees}`).toBeGreaterThanOrEqual(open);
+      }
+    });
+  }
 });

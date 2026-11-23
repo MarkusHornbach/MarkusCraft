@@ -12,7 +12,7 @@ import {
 } from '../../game/config';
 import { smoothstep } from '../../util/math';
 import { createNoise2D, fbm2D, type Noise2D } from '../../util/noise';
-import { deriveSeed, hash2Float } from '../../util/rng';
+import { deriveSeed, hash2, hash2Float } from '../../util/rng';
 import { Block } from '../blocks';
 import { chunkKey } from '../chunk';
 import { CLAY_COLUMN, markClayColumns, placeOres } from './ores';
@@ -28,8 +28,8 @@ import {
   ROCK_SCALE,
   SALT_ROCK,
 } from './terrainRules';
-import { TREE_CANOPY_RADIUS, hasLeaf, isTreeOrigin, trunkHeight } from './trees';
-import type { TerrainShape, WorldOptions } from './worldOptions';
+import { TREE_CANOPY_RADIUS, TREE_MIN_SPACING, hasLeaf, trunkHeight } from './trees';
+import type { TerrainShape, TreeDensity, WorldOptions } from './worldOptions';
 
 /**
  * The height curve of a shape: `base = SEA_LEVEL + 3 + c · slope` (slope `landSlope`
@@ -54,6 +54,34 @@ export const SHAPE_CURVES: Record<TerrainShape, ShapeCurve> = {
   flat: { landSlope: 10, ampBase: 2, ampHill: 4, ampFrom: 0.3, ampTo: 1 },
 };
 
+/**
+ * A tree level: the candidate chance of a column is `meadow + (forest - meadow) · w`, with
+ * the forest weight `w = smoothstep(lo, hi, f)` of the low-frequency forest noise `f`. The
+ * spacing rule of version 1 then thins the candidates out.
+ */
+export interface TreeLevel {
+  meadow: number;
+  forest: number;
+  lo: number;
+  hi: number;
+}
+
+export const TREE_LEVELS: Record<Exclude<TreeDensity, 'none'>, TreeLevel> = {
+  few: { meadow: 0.0006, forest: 0.08, lo: 0.24, hi: 0.44 },
+  normal: { meadow: 0.002, forest: 0.1, lo: 0, hi: 0.22 },
+  many: { meadow: 0.06, forest: 0.14, lo: -0.4, hi: -0.1 },
+};
+
+/** The forest noise: about 1/160, two octaves (forests and meadows, not single trees). */
+const FOREST_SCALE = 1 / 160;
+const FOREST_OCTAVES = 2;
+/** `deriveSeed` index of the forest noise; 1 to 3 are version 1's tables. */
+const FOREST_NOISE = 4;
+const SALT_PLACE = 0x2b7d;
+/** Origins that can matter to a chunk: its canopy reach plus the spacing rule's reach. */
+const TREE_REACH = TREE_CANOPY_RADIUS + TREE_MIN_SPACING - 1;
+const CHANCE_SIDE = CHUNK_SIZE + 2 * TREE_REACH;
+
 const LAYER = CHUNK_SIZE * CHUNK_SIZE;
 /** Heights of a chunk's columns plus a rim of one column, for the slope rule. */
 const GRID = CHUNK_SIZE + 2;
@@ -70,6 +98,18 @@ export class TerrainV2 {
   private readonly continent: Noise2D;
   private readonly detail: Noise2D;
   private readonly rock: Noise2D;
+  private readonly forestNoise: Noise2D;
+  private readonly level: TreeLevel | null;
+  /** The level's highest chance: a column whose hash is above it is never a candidate. */
+  private readonly maxChance: number;
+  /**
+   * Candidate chance per column of the chunk being generated and its rim (-1: not computed
+   * yet), so the forest noise is evaluated once per column and never per neighbour check.
+   */
+  private readonly chances = new Float32Array(CHANCE_SIDE * CHANCE_SIDE);
+  private chanceX0 = 0;
+  private chanceZ0 = 0;
+  private chancesActive = false;
   // Scratch buffers of `generateChunk`, reused between calls.
   private readonly heights = new Uint8Array(GRID * GRID);
   /** Per column: `ROCK_COLUMN`, 1 where clay is possible, `CLAY_COLUMN` or 0. */
@@ -86,6 +126,42 @@ export class TerrainV2 {
     this.continent = createNoise2D(deriveSeed(this.seed, 1));
     this.detail = createNoise2D(deriveSeed(this.seed, 2));
     this.rock = createNoise2D(deriveSeed(this.seed, 3));
+    this.forestNoise = createNoise2D(deriveSeed(this.seed, FOREST_NOISE));
+    this.level = options.trees === 'none' ? null : TREE_LEVELS[options.trees];
+    this.maxChance = this.level ? Math.max(this.level.meadow, this.level.forest) : 0;
+  }
+
+  /** Forest weight of a column, 0 (meadow) to 1 (forest); 0 without trees. */
+  forestWeight(x: number, z: number): number {
+    const level = this.level;
+    if (!level) return 0;
+    const f = fbm2D(this.forestNoise, x * FOREST_SCALE, z * FOREST_SCALE, FOREST_OCTAVES);
+    return smoothstep(level.lo, level.hi, f);
+  }
+
+  private chanceAt(x: number, z: number): number {
+    const level = this.level;
+    if (!level) return 0;
+    if (this.chancesActive) {
+      const lx = x - this.chanceX0;
+      const lz = z - this.chanceZ0;
+      if (lx >= 0 && lx < CHANCE_SIDE && lz >= 0 && lz < CHANCE_SIDE) {
+        const i = lx + lz * CHANCE_SIDE;
+        let chance = this.chances[i];
+        if (chance < 0) {
+          chance = level.meadow + (level.forest - level.meadow) * this.forestWeight(x, z);
+          this.chances[i] = chance;
+        }
+        return chance;
+      }
+    }
+    return level.meadow + (level.forest - level.meadow) * this.forestWeight(x, z);
+  }
+
+  private isCandidate(x: number, z: number): boolean {
+    const h = hash2Float(this.seed ^ SALT_PLACE, x, z);
+    // Most columns are decided without the noise.
+    return h < this.maxChance && h < this.chanceAt(x, z);
   }
 
   /** Y of the topmost ground block (not counting water or trees) in column (x, z). */
@@ -118,8 +194,21 @@ export class TerrainV2 {
 
   /** Whether column (x, z) wants a tree, by hashes only (the terrain is checked apart). */
   private isOrigin(x: number, z: number): boolean {
-    if (this.options.trees === 'none') return false;
-    return isTreeOrigin(this.seed, x, z);
+    if (!this.level) return false;
+    if (!this.isCandidate(x, z)) return false;
+    // Version 1's spacing rule: among candidates closer than the minimum spacing the one
+    // with the highest hash wins, so the rule does not depend on generation order.
+    const own = hash2(this.seed ^ SALT_PLACE, x, z);
+    const reach = TREE_MIN_SPACING - 1;
+    for (let dz = -reach; dz <= reach; dz++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        if (dx === 0 && dz === 0) continue;
+        if (!this.isCandidate(x + dx, z + dz)) continue;
+        const other = hash2(this.seed ^ SALT_PLACE, x + dx, z + dz);
+        if (other > own || (other === own && (dx > 0 || (dx === 0 && dz > 0)))) return false;
+      }
+    }
+    return true;
   }
 
   private aboveRockLine(h: number, x: number, z: number): boolean {
@@ -259,7 +348,17 @@ export class TerrainV2 {
       }
     }
     placeOres(this.seed, blocks, x0, z0, maxHeight);
-    if (this.options.trees !== 'none') this.placeTrees(blocks, x0, z0);
+    if (this.level) {
+      this.chances.fill(-1);
+      this.chanceX0 = x0 - TREE_REACH;
+      this.chanceZ0 = z0 - TREE_REACH;
+      this.chancesActive = true;
+      try {
+        this.placeTrees(blocks, x0, z0);
+      } finally {
+        this.chancesActive = false;
+      }
+    }
     return blocks;
   }
 

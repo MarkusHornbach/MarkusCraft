@@ -21,6 +21,11 @@ export const UNDERWATER_FOG_FAR = 24;
 
 /** Version of the terrain generator that new worlds are created with (stored per world). */
 export const GENERATOR_VERSION = 1;
+/** Generator 2 spawn: at least this many trunks within `SPAWN_WOOD_RADIUS` (Chebyshev). */
+export const SPAWN_MIN_TREES = 8;
+export const SPAWN_WOOD_RADIUS = 40;
+/** Generator 2 spawn: rings searched for a spot with wood before the plain rule applies. */
+export const SPAWN_WOOD_RINGS = 256;
 /** Land at or above this height (shifted by noise) is bare rock without soil. */
 export const ROCK_HEIGHT = 80;
 /** Largest shift of the rock line by its low-frequency noise, in blocks. */
