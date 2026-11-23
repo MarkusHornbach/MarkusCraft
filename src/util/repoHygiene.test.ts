@@ -44,7 +44,8 @@ describe('repository hygiene (AC12.4)', () => {
     // `pad-inventory` and `pad-recipe-list`. Phase 6 part A added `net-test`; part B
     // `remote-player`, `remote-player-night`, `join-section` and `room-panel`; part D
     // `figure-sheet` and `player-section`. Phase 7 part A added `gen2-balanced-few`,
-    // `gen2-flat-many` and `gen2-hilly-normal`.
-    expect(assets.length).toBe(42);
+    // `gen2-flat-many` and `gen2-hilly-normal`. Phase 8 part A1 added `tasks-tab`,
+    // `tasks-tab-touch`, `recipe-list-locked` and `progress-notice`.
+    expect(assets.length).toBe(46);
   });
 });

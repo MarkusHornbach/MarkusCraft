@@ -154,6 +154,8 @@ export const HOTBAR_SLOTS = 9;
 export const BREAK_TOLERANCE_MS = 100;
 /** A pickup notice ("+1 Stone") and the "Inventory full" hint stay this long. */
 export const NOTICE_MS = 1500;
+/** How long one progress notice ("Task done: …") shows, in simulation time (Phase 8). */
+export const PROGRESS_NOTICE_MS = 3000;
 
 export const DAY_LENGTH_SECONDS = 20 * 60;
 export const START_TIME_OF_DAY = 0.1;

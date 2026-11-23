@@ -25,7 +25,7 @@ test.describe.configure({ timeout: 180_000 });
 const AIR = 0;
 const BRICKS = 8;
 const NOTE = 'Worlds are saved in this browser, on this device only.';
-const NO_TREES_HINT = 'No trees only in Creative: Gathering needs wood.';
+const NO_TREES_HINT = 'No trees only in Creative: Adventure needs wood.';
 
 function rows(page: Page) {
   return page.locator('.world-row');

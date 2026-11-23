@@ -33,7 +33,7 @@ test('Phase 3 AC6.5: the form offers Gathering (preselected) and Creative; the m
   await openMenu(page);
   const gathering = page.locator('.world-mode-button[data-mode="gathering"]');
   const creative = page.locator('.world-mode-button[data-mode="creative"]');
-  await expect(gathering).toHaveText('Gathering');
+  await expect(gathering).toHaveText('Adventure');
   await expect(creative).toHaveText('Creative');
   await expect(gathering).toHaveAttribute('aria-checked', 'true');
   await expect(creative).toHaveAttribute('aria-checked', 'false');
@@ -72,13 +72,13 @@ test('Phase 3 AC6.5: the form offers Gathering (preselected) and Creative; the m
     return Object.fromEntries(rows) as Record<string, string>;
   };
   expect(await modes()).toEqual({
-    Gatherer: 'Gathering · Balanced · Few trees',
+    Gatherer: 'Adventure · Balanced · Few trees',
     Builder: 'Creative · Balanced · Few trees',
   });
   await page.reload();
   await page.locator('.world-list-view').waitFor();
   expect(await modes()).toEqual({
-    Gatherer: 'Gathering · Balanced · Few trees',
+    Gatherer: 'Adventure · Balanced · Few trees',
     Builder: 'Creative · Balanced · Few trees',
   });
   // The form opens with Gathering again, whatever was chosen last.

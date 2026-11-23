@@ -35,6 +35,11 @@ export interface GameParams {
    */
   testGen: WorldGen;
   /**
+   * With `test`: the task book of an Adventure world the page creates (Phase 8). `all`
+   * (default): every task done and the maximum level; `fresh`: the book at its start.
+   */
+  progress: 'all' | 'fresh';
+  /**
    * The performance test (never with `test`): `full` and `quick` open its start page
    * with that suite, `sample` shows the result screen with a built-in result.
    */
@@ -84,6 +89,7 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
     world: normalizeName(query.get('world') ?? '', 'Test'),
     mode: query.get('mode') === 'gathering' ? 'gathering' : 'creative',
     testGen: testGenParam(query.get('terrain'), query.get('trees')),
+    progress: query.get('progress') === 'fresh' ? 'fresh' : 'all',
     bench: test ? 'off' : bench,
     join: normalizeRoomCode(query.get('join') ?? ''),
     name: query.get('name'),

@@ -265,14 +265,16 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
     string,
     unknown
   >;
-  // Saved again, the record is migrated to the current format (3; Phase 6 part C added
-  // the empty list of guests; a generator 1 world has no options).
-  expect(Object.keys(meta).sort()).toEqual([...Object.keys(PART_C_META), 'guests'].sort());
-  expect(meta.formatVersion).toBe(3);
+  // Saved again, the record is migrated to the current format (4; Phase 6 part C added
+  // the empty list of guests, Phase 8 the task book; a generator 1 world has no options).
+  expect(Object.keys(meta).sort()).toEqual(
+    [...Object.keys(PART_C_META), 'guests', 'progress'].sort(),
+  );
+  expect(meta.formatVersion).toBe(4);
   expect(meta.guests).toEqual([]);
   expect(meta.generatorVersion).toBe(1);
   expect(meta.time).toBeCloseTo(0.3, 9);
-  expect(meta.player).toEqual(PART_C_META.player);
+  expect(meta.player).toEqual({ ...PART_C_META.player, xp: 0, found: [], crafted: [] });
   const chunks = stored.chunks.filter(
     (c) => (c as { worldId: string }).worldId === 'wpartc-fixture1',
   );

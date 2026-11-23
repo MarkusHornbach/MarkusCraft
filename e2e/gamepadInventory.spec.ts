@@ -196,8 +196,13 @@ test('Phase 5 AC5.3: the opening Y does not act inside; B cancels a pick first; 
   // LB/RB: the tabs, no wrap-around; the focus starts on the Crafting tab there.
   await pad.tap(BUTTON.RB);
   expect((await getState(page)).ui).toMatchObject({ tab: 'crafting', focus: 'Crafting' });
+  // Phase 8: the third tab, Tasks, follows; its focus starts on its tab as well.
   await pad.tap(BUTTON.RB);
-  expect((await getState(page)).ui.tab).toBe('crafting');
+  expect((await getState(page)).ui).toMatchObject({ tab: 'tasks', focus: 'Tasks' });
+  await pad.tap(BUTTON.RB);
+  expect((await getState(page)).ui.tab).toBe('tasks');
+  await pad.tap(BUTTON.LB);
+  expect((await getState(page)).ui).toMatchObject({ tab: 'crafting', focus: 'Crafting' });
   await pad.tap(BUTTON.LB);
   expect((await getState(page)).ui).toMatchObject({ tab: 'items', focus: 'Slot 1: Dirt' });
   await pad.tap(BUTTON.LB);
@@ -407,4 +412,69 @@ test('Phase 5 AC6.4: matches the pad-inventory and pad-recipe-list references', 
   await expectFrameOnFocus(page);
   // Mostly text: the looser limit of the text references.
   await expect(page).toHaveScreenshot('pad-recipe-list.png', { maxDiffPixelRatio: 0.05 });
+});
+
+test('Phase 8 AC5.3: LB/RB reach the Tasks tab; nothing in it takes the focus; the right stick scrolls it; B closes', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 640, height: 360 });
+  await installFakePads(page);
+  await openGame(page, { mode: 'gathering', progress: 'fresh' });
+  await page.evaluate(() => window.__mc.setProgress({ xp: 100, done: [1, 2, 3, 4, 5, 6, 7, 8] }));
+  const pad = new Pad(page);
+  await pad.connect();
+  await pad.tap(BUTTON.Y);
+  await pad.tap(BUTTON.RB);
+  await pad.tap(BUTTON.RB);
+  expect((await getState(page)).ui).toMatchObject({ tab: 'tasks', focus: 'Tasks' });
+  // The D-pad walks the header only: the tab has no focusable element.
+  for (const button of [BUTTON.DOWN, BUTTON.DOWN, BUTTON.LEFT, BUTTON.RIGHT, BUTTON.DOWN]) {
+    await pad.tap(button);
+    const focused = await page.evaluate(() =>
+      Boolean(document.querySelector('.pad-focused')?.closest('.tasks-tab')),
+    );
+    expect(focused).toBe(false);
+  }
+  const tab = page.locator('.tasks-tab');
+  // The book of five chapters fits the tab; a later, longer chapter would not. The test
+  // makes the tab short so that it has something to scroll.
+  await tab.evaluate((n) => (n.style.height = '120px'));
+  expect(await tab.evaluate((n) => n.scrollHeight > n.clientHeight)).toBe(true);
+  const top = await tab.evaluate((n) => n.scrollTop);
+  await pad.stickFor('right', 0, 1, 10);
+  await polls(page, 2);
+  expect(await tab.evaluate((n) => n.scrollTop)).toBeGreaterThan(top + 10);
+  expect((await getState(page)).ui.tab).toBe('tasks');
+  await pad.tap(BUTTON.B);
+  expect((await getState(page)).ui.screen).toBe('play');
+});
+
+test('Phase 8 AC3.3: A cannot reach a locked row: the D-pad never focuses one', async ({
+  page,
+}) => {
+  await installFakePads(page);
+  await openGame(page, { mode: 'gathering', progress: 'fresh' });
+  const { px, pz } = await standOnPlatform(page);
+  await setBlock(page, px + 1, PLATFORM_Y + 1, pz - 1, 15);
+  await give(page, PLANKS, 20);
+  await give(page, STICK, 10);
+  await give(page, STONE, 20);
+  const pad = new Pad(page);
+  await pad.connect();
+  await pad.tap(BUTTON.Y);
+  await pad.tap(BUTTON.RB);
+  const seen = new Set<string>();
+  for (let i = 0; i < 24; i++) {
+    await pad.tap(BUTTON.DOWN);
+    const focus = await focusOf(page);
+    if (focus) seen.add(focus);
+    // A on whatever has the focus: never a locked recipe.
+    await pad.tap(BUTTON.A);
+  }
+  expect([...seen]).toContain('Craft Wooden pickaxe');
+  for (const locked of ['Craft Wooden axe', 'Craft Wooden shovel', 'Craft Stone pickaxe']) {
+    expect([...seen]).not.toContain(locked);
+  }
+  expect(await have(page, 260)).toBe(0);
+  expect(await have(page, 262)).toBe(0);
 });

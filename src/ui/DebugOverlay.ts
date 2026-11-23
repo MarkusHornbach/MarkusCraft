@@ -26,6 +26,8 @@ export interface DebugInfo {
   seed: number;
   /** The world's generator: "Generator 2 · balanced · few" or "Generator 1". */
   generator: string;
+  /** Adventure: "Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP"; null in Creative. */
+  progress: string | null;
   time: number;
   mode: string;
   onGround: boolean;
@@ -48,6 +50,7 @@ const ROWS = [
   'render',
   'seed',
   'generator',
+  'progress',
   'time',
   'mode',
   'target',
@@ -74,6 +77,7 @@ const LABELS: Record<Row, string> = {
   render: 'Render',
   seed: 'Seed',
   generator: 'World',
+  progress: 'Progress',
   time: 'Time',
   mode: 'Mode',
   target: 'Target',
@@ -158,7 +162,7 @@ export class DebugOverlay {
       this.element.appendChild(line);
       this.values.set(row, value);
       this.lines.set(row, line);
-      if (NET_ROWS.includes(row)) line.hidden = true;
+      if (NET_ROWS.includes(row) || row === 'progress') line.hidden = true;
     }
     parent.appendChild(this.element);
   }
@@ -200,6 +204,12 @@ export class DebugOverlay {
     this.set('render', `${info.drawCalls} draw calls, ${info.triangles} triangles`);
     this.set('seed', String(info.seed));
     this.set('generator', info.generator);
+    // The progress row only in Adventure worlds.
+    const progressLine = this.lines.get('progress');
+    if (progressLine && progressLine.hidden !== (info.progress === null)) {
+      progressLine.hidden = info.progress === null;
+    }
+    this.set('progress', info.progress ?? '');
     this.set('time', `${info.time.toFixed(3)} (${timeName(info.time)})`);
     const detail = info.inWater ? ', in water' : info.onGround ? ', on ground' : '';
     this.set('mode', `${info.mode}${detail}`);

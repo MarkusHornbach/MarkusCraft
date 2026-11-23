@@ -325,7 +325,7 @@ test('Phase 3 AC12.1: the Crafting tab lists every recipe in table order; one lo
   await page.keyboard.press('KeyE');
   // The screen opens on the items page; the list is the second tab.
   expect((await getState(page)).ui).toEqual({ screen: 'inventory', tab: 'items' });
-  await expect(page.locator('.inventory-tab')).toHaveText(['Items', /^Crafting/]);
+  await expect(page.locator('.inventory-tab')).toHaveText(['Items', /^Crafting/, 'Tasks']);
   await expect(page.locator('.recipe-list')).toBeHidden();
   await page.locator('.inventory-tab[data-tab="crafting"]').click();
   await expect(page.locator('.recipe-list')).toBeVisible();
@@ -560,12 +560,14 @@ test('Phase 3 AC12.4 and Polish 1 AC3.1: holding "Craft" on sticks crafts after 
   expect(await have(page, PLANKS)).toBe(1);
 });
 
-test('Phase 3 AC12.5: Creative has no Crafting tab and refuses to craft', async ({ page }) => {
+test('Phase 3 AC12.5: Creative has no Crafting tab (nor Tasks) and refuses to craft', async ({
+  page,
+}) => {
   await openGame(page);
   await page.keyboard.press('KeyE');
   await expect(page.locator('.inventory-screen')).toBeVisible();
   await expect(page.locator('.inventory-tabs')).toBeHidden();
-  await expect(page.locator('.inventory-tab')).toHaveCount(2);
+  await expect(page.locator('.inventory-tab')).toHaveCount(3);
   await expect(page.locator('.inventory-tab:visible')).toHaveCount(0);
   await expect(page.locator('.recipe-list')).toBeHidden();
   await expect(page.locator('.inventory-palette')).toBeVisible();

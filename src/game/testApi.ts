@@ -55,7 +55,7 @@ export interface GameState {
   ui: {
     screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'bench' | 'nettest';
     /** The open page of the inventory screen, or null while it is closed. */
-    tab: 'items' | 'crafting' | null;
+    tab: 'items' | 'crafting' | 'tasks' | null;
     /**
      * The element the controller's focus is on (its `aria-label`, its text or its id).
      * Left out while there is none (the controller is not the active source, or no screen
@@ -79,7 +79,25 @@ export interface GameState {
     craftable: boolean;
     missing: ItemStack[];
     stationMissing: boolean;
+    /** Adventure: the player has not unlocked it yet (Phase 8). */
+    locked: boolean;
+    /** What unlocks it. */
+    unlock: { level: number } | { task: number };
   }[];
+  /**
+   * The task book and the player's level (Adventure, Phase 8); null in Creative. `tasks`
+   * are those of the open chapter (`chapter` null: the book is complete); `notice` the
+   * progress notice shown now.
+   */
+  progress: {
+    level: number;
+    xp: number;
+    nextLevelXp: number | null;
+    chapter: number | null;
+    done: number[];
+    tasks: { id: number; count: number; goal: number; done: boolean }[];
+    notice: string | null;
+  } | null;
   /** The furnace recipe whose progress bar runs (0..1), or null. */
   smelting: { recipe: number; progress: number } | null;
   /**
@@ -264,9 +282,14 @@ export interface TestApi {
   /**
    * Saves the open world, then opens the world with this name from the store in place,
    * creating it from the seed (and the mode, default: the `mode` parameter) if it does
-   * not exist.
+   * not exist; a new Adventure world with the book as `progress` says (default `all`).
    */
-  openWorld(name: string, seed: number, mode?: GameMode): Promise<void>;
+  openWorld(name: string, seed: number, mode?: GameMode, progress?: 'all' | 'fresh'): Promise<void>;
+  /**
+   * Sets the XP of the player (on a host with `player`, of that guest) and replaces the
+   * world's done list, clearing the counts (test tool, Phase 8).
+   */
+  setProgress(patch: { xp?: number; done?: number[] }, player?: number): void;
   /**
    * Puts items into the inventory directly, as far as they fit (test tool); on a host with
    * `player`, into that guest's inventory (Phase 6 part C).

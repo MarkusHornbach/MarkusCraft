@@ -16,6 +16,7 @@
       "leaves.spec.ts",
       "light.spec.ts",
       "night.spec.ts",
+      "progressTouch.spec.ts",
       "touch.spec.ts",
       "touchLayout.spec.ts"
     ],
@@ -35,6 +36,7 @@
       "interaction.spec.ts",
       "netTest.spec.ts",
       "playerSection.spec.ts",
+      "progress.spec.ts",
       "save.spec.ts",
       "torchSoak.spec.ts",
       "world.spec.ts"

@@ -19,6 +19,8 @@ export interface OpenOptions {
   /** World options of the test world (Phase 7 part A); either one makes it generator 2. */
   terrain?: 'flat' | 'balanced' | 'hilly';
   trees?: 'none' | 'few' | 'normal' | 'many';
+  /** The book of an Adventure test world (Phase 8, `progress=`; the game's default `all`). */
+  progress?: 'all' | 'fresh';
 }
 
 export function gameUrl(options: OpenOptions = {}): string {
@@ -33,6 +35,7 @@ export function gameUrl(options: OpenOptions = {}): string {
   if (options.mode !== undefined) query.set('mode', options.mode);
   if (options.terrain !== undefined) query.set('terrain', options.terrain);
   if (options.trees !== undefined) query.set('trees', options.trees);
+  if (options.progress !== undefined) query.set('progress', options.progress);
   return `/?${query.toString()}`;
 }
 

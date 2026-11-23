@@ -128,19 +128,24 @@ export class RecipeList {
    * Shows what the player has of every ingredient and which recipes can be made. The rows
    * never move: they stay in table order whatever the statuses say.
    */
-  update(statuses: readonly RecipeStatus[]): void {
+  update(statuses: readonly RecipeStatus[], locks: ReadonlyMap<number, string>): void {
     for (const status of statuses) {
       const row = this.rows.get(status.id);
       if (!row) continue;
-      const shown = JSON.stringify(status);
+      const lock = locks.get(status.id) ?? null;
+      const shown = JSON.stringify(status) + (lock ?? '');
       if (row.shown !== shown) {
         row.shown = shown;
-        this.showStatus(row, status);
+        this.showStatus(row, status, lock);
       }
     }
   }
 
-  private showStatus(row: Row, status: RecipeStatus): void {
+  private showStatus(row: Row, status: RecipeStatus, lock: string | null): void {
+    // A locked row (Adventure, Phase 8) is dimmed and says what unlocks it instead of
+    // offering "Craft"; the ingredients show as on any other row.
+    row.root.classList.toggle('locked', lock !== null);
+    row.root.dataset.locked = String(lock !== null);
     row.root.classList.toggle('craftable', status.craftable);
     row.root.dataset.craftable = String(status.craftable);
     status.ingredients.forEach((ingredient, index) => {
@@ -150,10 +155,17 @@ export class RecipeList {
     });
     const station = row.recipe.station;
     const note =
-      status.stationMissing && station ? STATION_TEXT[station] : status.full ? FULL_TEXT : '';
+      lock !== null
+        ? lock
+        : status.stationMissing && station
+          ? STATION_TEXT[station]
+          : status.full
+            ? FULL_TEXT
+            : '';
     row.note.textContent = note;
     row.note.hidden = note === '';
-    row.craft.dataset.ready = String(status.craftable);
+    row.note.classList.toggle('recipe-lock', lock !== null);
+    row.craft.dataset.ready = String(status.craftable && lock === null);
     this.showAction(row);
   }
 

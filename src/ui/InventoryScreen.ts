@@ -7,13 +7,16 @@ import { BLOCK_ITEMS, getItemDef, itemLabel } from '../items/items';
 import type { RecipeStatus } from '../items/recipes';
 import { type InputMode, button, element, onActivate } from './activate';
 import { createItemIcon } from './itemIcon';
+import type { BookView } from '../progress/view';
 import { RecipeList } from './RecipeList';
+import { TasksTab } from './TasksTab';
 
 /** The pages of the screen in a Gathering world. Creative has the first one only. */
-export type InventoryTab = 'items' | 'crafting';
+export type InventoryTab = 'items' | 'crafting' | 'tasks';
 const TABS: readonly { tab: InventoryTab; label: string }[] = [
   { tab: 'items', label: 'Items' },
   { tab: 'crafting', label: 'Crafting' },
+  { tab: 'tasks', label: 'Tasks' },
 ];
 
 export interface InventoryScreenOptions {
@@ -89,6 +92,7 @@ export class InventoryScreen {
   /** Everything of the items page: slots or palette, bar, bin and hint. */
   private readonly itemsPage: HTMLElement;
   private readonly recipes: RecipeList;
+  private readonly tasks: TasksTab;
   private tab: InventoryTab = 'items';
   private gameMode: GameMode = 'creative';
   /** The slot chosen first; the next activation says where its items go. */
@@ -226,6 +230,7 @@ export class InventoryScreen {
       onCraftUp: options.onCraftUp,
       onCraftClick: options.onCraftClick,
     });
+    this.tasks = new TasksTab(panel);
     parent.appendChild(this.element);
     this.setGameMode(this.gameMode);
   }
@@ -245,6 +250,7 @@ export class InventoryScreen {
     this.setTab('items');
     // A world was loaded: its list starts at the top.
     this.recipes.scrollToTop();
+    this.tasks.scrollToTop();
   }
 
   /** Shows the items page or the recipe list. Creative always shows its blocks. */
@@ -258,8 +264,11 @@ export class InventoryScreen {
     // On the recipe list the controller's focus starts on its tab: a "Craft" button comes and
     // goes, and a default that changes would count as a new view and move the focus.
     this.tabButtons.get('crafting')?.toggleAttribute('data-pad-default', this.tab === 'crafting');
+    // The Tasks tab has nothing to focus: the focus starts on its tab, as on Crafting.
+    this.tabButtons.get('tasks')?.toggleAttribute('data-pad-default', this.tab === 'tasks');
     this.itemsPage.hidden = this.tab !== 'items';
     this.recipes.element.hidden = this.tab !== 'crafting';
+    this.tasks.element.hidden = this.tab !== 'tasks';
     // The list keeps its scroll position while a world is open.
     if (this.tab === 'crafting' && this.visible) this.recipes.restoreScroll();
     this.setPicked(null);
@@ -290,13 +299,22 @@ export class InventoryScreen {
     return this.tab;
   }
 
-  /** The recipes in table order, with what the player has for each; the count on the tab. */
-  setRecipes(statuses: readonly RecipeStatus[]): void {
-    this.recipes.update(statuses);
+  /**
+   * The recipes in table order, with what the player has for each; the count on the tab.
+   * `locks` names what unlocks each locked recipe ("Level 3"); locked rows are never
+   * craftable.
+   */
+  setRecipes(statuses: readonly RecipeStatus[], locks: ReadonlyMap<number, string>): void {
+    this.recipes.update(statuses, locks);
     const count = statuses.filter((status) => status.craftable).length;
     const text = count > 0 ? String(count) : '';
     if (this.craftCount.textContent !== text) this.craftCount.textContent = text;
     this.craftCount.hidden = count === 0;
+  }
+
+  /** The task book on the Tasks tab (Adventure). */
+  setBook(view: BookView): void {
+    this.tasks.update(view);
   }
 
   /** The furnace's progress bar in the row of a recipe; null hides it. */

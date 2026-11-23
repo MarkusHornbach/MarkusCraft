@@ -28,7 +28,7 @@ export const TEXT_LIST_UNREACHABLE =
   'Could not reach the connection service. Is this device on the home network?';
 export const TEXT_UNAVAILABLE = 'Multiplayer is not available in this build.';
 
-const MODE_TEXT: Record<GameMode, string> = { creative: 'Creative', gathering: 'Gathering' };
+const MODE_TEXT: Record<GameMode, string> = { creative: 'Creative', gathering: 'Adventure' };
 
 export interface JoinSectionOptions {
   name: string;

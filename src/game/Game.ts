@@ -3,7 +3,7 @@ import type { Action } from '../actions/actions';
 import { type ActionResult, type BlockChange, heldItem } from '../actions/apply';
 import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
 import { type PlayerRecord } from '../actions/playerRecord';
-import { LocalSession, type Session } from '../actions/Session';
+import { LOCAL_PLAYER_ID, LocalSession, type Session } from '../actions/Session';
 import { type BenchResult, issueText, parseIssueBody } from '../bench/benchReport';
 import { type BenchHost, BenchRunner } from '../bench/BenchRunner';
 import { SAMPLE_RESULT } from '../bench/sampleResult';
@@ -14,7 +14,7 @@ import { PadButton, type PadFrame } from '../input/padMapping';
 import { breakTimeMs, missingTool } from '../items/hardness';
 import { addItems } from '../items/inventory';
 import { isItem, itemLabel } from '../items/items';
-import { type RecipeStatus, getRecipe, listRecipes, stationsNear } from '../items/recipes';
+import { RECIPES, type RecipeStatus, getRecipe, listRecipes, stationsNear } from '../items/recipes';
 import { TouchControls } from '../input/TouchControls';
 import { MovementWorld, type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
@@ -93,6 +93,7 @@ import {
   LOOK_RADIANS_PER_PIXEL,
   MAX_STEPS_PER_FRAME,
   NOTICE_MS,
+  PROGRESS_NOTICE_MS,
   PIXEL_RATIO_MAX,
   PLAYER_EYE_HEIGHT,
   REACH,
@@ -110,7 +111,23 @@ import {
   TOUCH_RENDER_DISTANCE_DEFAULT,
   WATER_SURFACE_DROP,
 } from './config';
-import { EMPTY_PROGRESS } from '../progress/progress';
+import {
+  EMPTY_PROGRESS,
+  type ProgressOutcome,
+  type WorldProgress,
+  completeProgress,
+  countOf,
+  levelOf,
+  maxLevelXp,
+  nextLevelXp,
+  openChapter,
+  recipeUnlocked,
+  tasksOf,
+  unlockText,
+} from '../progress/progress';
+import { unlockOf } from '../progress/tables';
+import { bookView, lockedText, noticeTexts, progressRow } from '../progress/view';
+import { ProgressNotice } from '../ui/ProgressNotice';
 import { IdbStore } from './idbStore';
 import { type NetConfig, readNetConfig } from './netConfig';
 import {
@@ -163,7 +180,12 @@ interface BenchRun {
 type SimRoomModule = typeof import('../bench/simGuests');
 
 /** A session as `Game` uses it; the test tools may replace a record where it can. */
-type GameSession = Session & { replaceRecord?: (record: PlayerRecord) => void };
+type GameSession = Session & {
+  replaceRecord?: (record: PlayerRecord) => void;
+  /** Single-player only: the task book (Phase 8). */
+  replaceProgress?: (progress: WorldProgress) => void;
+  notePose?: (y: number) => void;
+};
 
 /** A problem the world menu tells the player about. */
 class MenuProblem extends Error {}
@@ -173,6 +195,8 @@ const TEXT_NOT_OPENED = 'This world could not be opened.';
 const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.';
 const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 const TEXT_INVENTORY_FULL = 'Inventory full';
+/** Phase 8 part A1: rooms in Adventure worlds come with part A2 (the test API still opens them). */
+const TEXT_ADVENTURE_ROOMS = 'Rooms in Adventure worlds come with the next update.';
 const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
 const TEXT_NEEDS_SUPPORT = 'Needs a block underneath';
 const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
@@ -271,6 +295,13 @@ export class Game {
   private readonly backGuard: BackGuard | null = null;
   /** A controller notice in play ("Controller connected") and the action time it stays until. */
   private padNotice: { text: string; untilMs: number } | null = null;
+  /** Progress notices waiting their turn, and the one shown until its time (Phase 8). */
+  private progressQueue: string[] = [];
+  private progressShown: { text: string; untilMs: number } | null = null;
+  private readonly progressNotice: ProgressNotice;
+  /** The HUD's "Locked: Level 3" after a refused craft, until this action time. */
+  private lockedUntilMs = -1;
+  private lockedText = '';
   /** The controller notice last shown, which a menu clears once the controller is used. */
   private menuPadNotice: string | null = null;
   /** Smoothed frames per second for the debug overlay. */
@@ -300,6 +331,8 @@ export class Game {
   private roomListAt = -Infinity;
   private roomListPending = false;
   private gameMode: GameMode = 'creative';
+  /** The open world's task book (Adventure); empty in Creative. */
+  private progress: WorldProgress = EMPTY_PROGRESS;
   /** Simulation steps since the world was opened: the clock of the action layer. */
   private simSteps = 0;
   /** Answer to the action submitted last (the test API returns it). */
@@ -425,8 +458,13 @@ export class Game {
         this.suppressCraftClick = false;
         if (!suppressed) this.craft(recipe);
       },
-      onTab: () => this.refreshRecipes(),
+      onTab: () => {
+        this.refreshRecipes();
+        this.refreshBook();
+      },
     });
+    // Above the inventory screen (it comes later in the document), below the menus.
+    this.progressNotice = new ProgressNotice(this.root);
     // E opens and closes the inventory, Esc closes it. Not while a text field is typed in.
     window.addEventListener('keydown', (e) => {
       if (e.repeat || e.target instanceof HTMLInputElement) return;
@@ -537,7 +575,16 @@ export class Game {
     } else {
       // A new world in memory. It is never stored.
       this.loadWorld(
-        this.newWorldMeta(params.world, params.seed, params.time, params.mode, this.testWorldGen()),
+        this.withTestProgress(
+          this.newWorldMeta(
+            params.world,
+            params.seed,
+            params.time,
+            params.mode,
+            this.testWorldGen(),
+          ),
+          params.progress,
+        ),
         new Map(),
       );
     }
@@ -583,6 +630,16 @@ export class Game {
    */
   private testWorldGen(): WorldGen {
     return this.params.testGen;
+  }
+
+  /**
+   * Test tool: the automatic test world of an Adventure world starts with the book complete
+   * and the player at the maximum level (`progress=all`, the default), so specs that craft
+   * keep working; `fresh` starts the book. Worlds of the form are always fresh.
+   */
+  private withTestProgress(meta: WorldMeta, choice: 'all' | 'fresh'): WorldMeta {
+    if (meta.mode !== 'gathering' || choice === 'fresh') return meta;
+    return { ...meta, progress: completeProgress(), player: { ...meta.player, xp: maxLevelXp() } };
   }
 
   /** The record of a world that does not exist yet: at its start point, in the morning. */
@@ -643,9 +700,13 @@ export class Game {
     this.pickup = null;
     this.fullUntilMs = -1;
     this.supportUntilMs = -1;
+    this.lockedUntilMs = -1;
+    this.progressQueue = [];
+    this.progressShown = null;
     this.target = null;
     this.stopCrafting();
     this.meta = meta;
+    this.progress = meta.mode === 'gathering' ? meta.progress : EMPTY_PROGRESS;
     this.session = this.createSession(meta.player);
     this.autosave = this.createAutosave();
     this.hud.setSlots(meta.player.slots);
@@ -673,6 +734,7 @@ export class Game {
       player: { ...this.session.record, breaking: null },
       // While the world is open to others, its guests as they are now.
       guests: this.mp.host?.guestEntries() ?? meta.guests,
+      progress: this.progress,
     };
   }
 
@@ -712,14 +774,22 @@ export class Game {
    * Opens the world with this name from the store, creating it from the seed if there
    * is none. Saves the world that is open first.
    */
-  private async openNamedWorld(name: string, seed: number, mode: GameMode): Promise<void> {
+  private async openNamedWorld(
+    name: string,
+    seed: number,
+    mode: GameMode,
+    progress: 'all' | 'fresh' = this.params.progress,
+  ): Promise<void> {
     await this.saveNow();
     const start = performance.now();
     const wanted = normalizeName(name);
     const entries = await this.store.list();
     const entry = entries.find((e) => e.status === 'ok' && e.meta.name === wanted);
     if (!entry) {
-      const meta = this.newWorldMeta(wanted, seed, this.params.time, mode, this.testWorldGen());
+      const meta = this.withTestProgress(
+        this.newWorldMeta(wanted, seed, this.params.time, mode, this.testWorldGen()),
+        progress,
+      );
       await this.store.create(meta);
       this.loadWorld(meta, new Map());
     } else {
@@ -1090,6 +1160,7 @@ export class Game {
         this.markMetaDirty();
       },
       guestsChanged: () => this.markMetaDirty(),
+      progress: () => this.progress,
       time: () => this.time,
       frozen: () => this.params.freeze,
       listener: {
@@ -1156,12 +1227,15 @@ export class Game {
     if (!this.pauseScreen) {
       // Test mode has no menus: a fresh world in memory, as at the start.
       this.loadWorld(
-        this.newWorldMeta(
-          this.params.world,
-          this.params.seed,
-          this.params.time,
-          this.params.mode,
-          this.testWorldGen(),
+        this.withTestProgress(
+          this.newWorldMeta(
+            this.params.world,
+            this.params.seed,
+            this.params.time,
+            this.params.mode,
+            this.testWorldGen(),
+          ),
+          this.params.progress,
         ),
         new Map(),
       );
@@ -1198,7 +1272,12 @@ export class Game {
         host,
         self,
       })),
-      disabledReason: this.netConfig.signal === null ? TEXT_UNAVAILABLE : null,
+      disabledReason:
+        this.netConfig.signal === null
+          ? TEXT_UNAVAILABLE
+          : this.gameMode === 'gathering'
+            ? TEXT_ADVENTURE_ROOMS
+            : null,
       touch: this.mode === 'touch',
       message: this.roomMessage,
     });
@@ -1565,8 +1644,40 @@ export class Game {
         onBlocks: (changes) => this.onBlocksChanged(changes),
         onPlayer: (changed) => this.onPlayerChanged(changed),
         onResult: (action, result) => this.onActionResult(action, result),
+        onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
       },
+      this.progress,
     );
+  }
+
+  /** The task book changed or a step had outcomes: keep it, save it, show it. */
+  private onProgressChanged(progress: WorldProgress, outcomes: readonly ProgressOutcome[]): void {
+    this.progress = progress;
+    this.markMetaDirty();
+    this.showProgress(outcomes);
+  }
+
+  /** Shows what changed in the task book: notices, the Tasks tab, unlocked rows. */
+  private showProgress(outcomes: readonly ProgressOutcome[]): void {
+    this.progressQueue.push(...noticeTexts(outcomes, LOCAL_PLAYER_ID));
+    this.advanceProgressNotice();
+    this.refreshRecipes();
+    this.refreshBook();
+  }
+
+  /** The next notice of the queue once the one shown has had its time (simulation time). */
+  private advanceProgressNotice(): void {
+    const now = this.nowMs();
+    // The tolerance keeps 180 steps of 1/60 s from falling just short of 3 000 ms.
+    if (this.progressShown && now < this.progressShown.untilMs - 1e-6) return;
+    const text = this.progressQueue.shift();
+    this.progressShown = text === undefined ? null : { text, untilMs: now + PROGRESS_NOTICE_MS };
+  }
+
+  /** The Tasks tab, while the inventory of an Adventure world is open. */
+  private refreshBook(): void {
+    if (!this.inventoryOpen || this.gameMode !== 'gathering') return;
+    this.inventoryScreen.setBook(bookView(this.progress, this.session.record));
   }
 
   /** The clock of the action layer: simulation time since the world was opened. */
@@ -1596,13 +1707,27 @@ export class Game {
 
   /** The recipes as the list shows them now: what the player has, which stations are near. */
   private recipeStatuses(): RecipeStatus[] {
-    return listRecipes(this.session.record.slots, stationsNear(this.world, this.player));
+    const statuses = listRecipes(this.session.record.slots, stationsNear(this.world, this.player));
+    // A locked recipe cannot be made, whatever the player has (Phase 8).
+    return statuses.map((status) =>
+      status.craftable && this.recipeLocked(status.id) ? { ...status, craftable: false } : status,
+    );
+  }
+
+  /** What unlocks each locked recipe, as the list says it ("Level 3", "Task: Mine 3 coal"). */
+  private recipeLocks(): Map<number, string> {
+    const locks = new Map<number, string>();
+    if (this.gameMode !== 'gathering') return locks;
+    for (const recipe of RECIPES) {
+      if (this.recipeLocked(recipe.id)) locks.set(recipe.id, unlockText(recipe.id));
+    }
+    return locks;
   }
 
   /** Brings the recipe list up to date while it is on screen. */
   private refreshRecipes(): void {
     if (!this.inventoryOpen || this.gameMode !== 'gathering') return;
-    this.inventoryScreen.setRecipes(this.recipeStatuses());
+    this.inventoryScreen.setRecipes(this.recipeStatuses(), this.recipeLocks());
   }
 
   /**
@@ -1677,6 +1802,7 @@ export class Game {
     this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
     this.inventoryScreen.setVisible(true);
     this.refreshRecipes();
+    this.refreshBook();
     // The screen has its own bar; the controls of the game would only shine through.
     this.hud.setVisible(false);
     this.updateTouchCover();
@@ -1732,6 +1858,10 @@ export class Game {
     }
     if (action.kind === 'place' && !result.ok && result.reason === 'support') {
       this.supportUntilMs = this.nowMs() + NOTICE_MS;
+    }
+    if (action.kind === 'craft' && !result.ok && result.reason === 'locked') {
+      this.lockedUntilMs = this.nowMs() + NOTICE_MS;
+      this.lockedText = lockedText(action.recipe);
     }
     // A recipe that cannot be made any more ends the hold on its button.
     if (action.kind === 'craft' && !result.ok && this.craftHold) {
@@ -2031,10 +2161,13 @@ export class Game {
     this.rememberPosition();
     stepPlayer(this.player, this.readMoveInput(), this.movement, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
+    // The reach tasks of the book read the feet (single-player; returns at once otherwise).
+    (this.session as GameSession).notePose?.(this.player.y);
     // The step is over: actions of this step carry its end time.
     this.simSteps++;
     this.repeatHeldAction();
     this.continueCrafting();
+    if (this.progressShown || this.progressQueue.length > 0) this.advanceProgressNotice();
     // Pose and time of day are part of the world's record.
     this.markMetaDirty();
     // The clock of a performance test stands still.
@@ -2136,8 +2269,14 @@ export class Game {
         ? TEXT_INVENTORY_FULL
         : now <= this.supportUntilMs
           ? TEXT_NEEDS_SUPPORT
-          : this.toolHint(),
+          : now <= this.lockedUntilMs
+            ? this.lockedText
+            : this.toolHint(),
     );
+    // Over the HUD and the open inventory; not over the pause menu or the world menu.
+    const playing =
+      (this.inventoryOpen || !this.paused) && (!this.pauseScreen || this.screen === 'play');
+    this.progressNotice.show(playing ? (this.progressShown?.text ?? null) : null);
     const smelt = this.smeltView();
     this.inventoryScreen.setSmelting(smelt ? smelt.recipe : null, smelt ? smelt.progress : 0);
   }
@@ -2571,6 +2710,8 @@ export class Game {
       triangles: stats.triangles,
       seed: this.world.seed,
       generator: debugWorldGen(this.world.gen),
+      progress:
+        this.gameMode === 'gathering' ? progressRow(this.progress, this.session.record) : null,
       time: this.time,
       mode: p.mode,
       onGround: p.onGround,
@@ -2618,12 +2759,42 @@ export class Game {
    */
   private testGive(item: number, count: number, player?: number): void {
     if (!isItem(item) || !Number.isInteger(count) || count < 1) return;
+    this.testEditRecord(player, (record) => ({
+      ...record,
+      slots: addItems(record.slots, item, count).slots,
+    }));
+  }
+
+  /**
+   * Test tools `give` and `setProgress`: replaces the record past the action layer; on a
+   * host with `player`, that guest's record.
+   */
+  private testEditRecord(
+    player: number | undefined,
+    edit: (r: PlayerRecord) => PlayerRecord,
+  ): void {
     const session: { record: PlayerRecord; replaceRecord?: (r: PlayerRecord) => void } | null =
       player === undefined ? this.session : (this.mp.host?.guestRecordDoor(player) ?? null);
     if (!session) throw new Error(`No guest with id ${String(player)}`);
-    const record = session.record;
-    const { slots } = addItems(record.slots, item, count);
-    if (session.replaceRecord) session.replaceRecord({ ...record, slots });
+    if (session.replaceRecord) session.replaceRecord(edit(session.record));
+  }
+
+  /**
+   * Test tool: sets a player's XP and the world's done list (clearing the counts), past
+   * the action layer.
+   */
+  private testSetProgress(patch: { xp?: number; done?: number[] }, player?: number): void {
+    const { xp, done } = patch;
+    if (xp !== undefined) {
+      if (!Number.isInteger(xp) || xp < 0) throw new Error(`Bad XP ${String(xp)}`);
+      this.testEditRecord(player, (record) => ({ ...record, xp }));
+    }
+    if (done !== undefined) {
+      const progress: WorldProgress = { done: [...done], counts: [] };
+      const session = this.session as GameSession;
+      if (session.replaceProgress) session.replaceProgress(progress);
+      else this.onProgressChanged(progress, []);
+    }
   }
 
   /** Test tool: empties all slots. */
@@ -2640,6 +2811,40 @@ export class Game {
     this.session.submit(action as Action);
     this.updateTarget();
     return this.lastResult;
+  }
+
+  /** Whether the player has not unlocked a recipe yet (Adventure only). */
+  private recipeLocked(recipe: number): boolean {
+    if (this.gameMode !== 'gathering') return false;
+    return !recipeUnlocked(recipe, this.session.record, this.progress);
+  }
+
+  /** `getState().progress`: the book and the player's level; null in Creative. */
+  private progressState(): GameState['progress'] {
+    if (this.gameMode !== 'gathering') return null;
+    const xp = this.session.record.xp;
+    const chapter = openChapter(this.progress);
+    return {
+      level: levelOf(xp),
+      xp,
+      nextLevelXp: nextLevelXp(xp),
+      chapter: chapter?.id ?? null,
+      done: [...this.progress.done],
+      tasks: chapter
+        ? tasksOf(chapter.id).map((task) => ({
+            id: task.id,
+            count: countOf(this.progress, task),
+            goal: task.count,
+            done: this.progress.done.includes(task.id),
+          }))
+        : [],
+      notice: this.progressNoticeText(),
+    };
+  }
+
+  /** The progress notice shown now, or null. */
+  private progressNoticeText(): string | null {
+    return this.progressShown?.text ?? null;
   }
 
   private getState(): GameState {
@@ -2682,7 +2887,10 @@ export class Game {
         craftable: status.craftable,
         missing: status.missing,
         stationMissing: status.stationMissing,
+        locked: this.recipeLocked(status.id),
+        unlock: unlockOf(status.id),
       })),
+      progress: this.progressState(),
       smelting: this.smeltView(),
       bench: this.benchState(),
       net: this.netState(),
@@ -2842,7 +3050,9 @@ export class Game {
       suspendFrames: (on) => {
         this.framesSuspended = on;
       },
-      openWorld: (name, seed, mode) => this.openNamedWorld(name, seed, mode ?? this.params.mode),
+      openWorld: (name, seed, mode, progress) =>
+        this.openNamedWorld(name, seed, mode ?? this.params.mode, progress),
+      setProgress: (patch, player) => this.testSetProgress(patch, player),
       step: (n) => {
         for (let i = 0; i < n; i++) this.simulate();
         this.updateChunkCenter();

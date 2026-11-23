@@ -115,8 +115,9 @@ test('Phase 5 AC4.1 (Part B): 2 000 random controller frames over the inventory 
   await installFakePads(page);
   await openMenu(page);
   await createWorld(page, { mode: 'gathering' });
-  // Something to move, merge, throw away and craft.
+  // Something to move, merge, throw away and craft; every recipe unlocked (Phase 8).
   await page.evaluate(() => {
+    window.__mc.setProgress({ xp: 480 });
     window.__mc.give(5, 20);
     window.__mc.give(7, 30);
     window.__mc.give(2, 40);

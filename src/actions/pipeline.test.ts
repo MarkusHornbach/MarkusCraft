@@ -52,7 +52,7 @@ const REPLACE_RECORD_ALLOWED: Record<string, number> = {
 };
 
 /** Calls of the test tool that replaces the world's task book (`setProgress`). */
-const REPLACE_PROGRESS_ALLOWED: Record<string, number> = {};
+const REPLACE_PROGRESS_ALLOWED: Record<string, number> = { 'src/game/Game.ts': 1 };
 
 /** A value given to a record's progress field (`xp: …`), not a type (`xp: number`). */
 const RECORD_PROGRESS_FIELD =
@@ -60,6 +60,8 @@ const RECORD_PROGRESS_FIELD =
 const RECORD_PROGRESS_ALLOWED: Record<string, number> = {
   // The encoder writes and the decoder reads the fields of stored and received records.
   'src/save/saveFormat.ts': 7,
+  // The test world of `progress=all`: the maximum level (`withTestProgress`).
+  'src/game/Game.ts': 1,
 };
 
 function countCalls(pattern: RegExp, skip: (file: string) => boolean): Record<string, number> {
