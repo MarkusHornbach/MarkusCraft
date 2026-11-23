@@ -110,16 +110,10 @@ many rounds, the two sides in turn.
   `items.test.ts` and `recipes.test.ts` pin them. Every placeable block is an item with the block's id; items that are no blocks
   start at 256 (`Item.COAL`). An unknown stored item id still loads and shows as "Unknown
   item"; a newer build must never make a world "damaged".
-- **Generator version.** Every world stores the version of the terrain generator it was
-  created with (`GENERATOR_VERSION`, now 1). `generateChunk(seed, cx, cz, version)` must
-  keep producing the same blocks for an old version for ever: a change to generation adds
-  a new version and leaves the old code path working. The recorded checksum
-  (`src/testing/terrainChecksum.ts`) must never change; it is checked in Node and in the
-  browser.
-- **Saving.** A world is one `WorldMeta` record plus one record per edited chunk
-  (`SAVE_FORMAT_VERSION`, now 2). Decoding validates every field and never throws; a
-  change to the format needs a new format version and a migration. Details:
-  `src/save/CLAUDE.md`.
+- **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 2, with
+  world options); old versions and `TERRAIN_CHECKSUM_1337_V1` never change: `src/world/CLAUDE.md`.
+- **Saving.** One `WorldMeta` record plus one record per edited chunk (`SAVE_FORMAT_VERSION`,
+  now 3); decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`.
 - **Light.** Sky and block light per cell (0–15) are a pure function of the blocks, never
   saved. **The invariant:** after any edits, loads and unloads the
   stored light of every lit chunk equals what the slow reference (`lightCheck.ts`) works
@@ -311,14 +305,14 @@ hold:
 | Fix pad  | –                       | `docs/fix-pad-flaky-report.md` | pad test timing, back pairing             |
 | Fix CI   | –                       | `docs/fix-ci-flaky-report.md`  | back guard window, net test waits         |
 | Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget           |
+| 7A       | `docs/phase-7a-plan.md` | `docs/phase-7a-report.md`      | generator 2, save format 3, leaves        |
 
 - **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
-  prompt asks for it; otherwise Phase 4 is complete. Phase 7 is personalization; its part
-  A (world options: generator 2, leaf collision) is planned in `docs/phase-7a-plan.md`
-  (one session, one PR); the rest (custom blocks, textures, characters, names, effects) is
-  not planned. At the start of a session look for issues with the label `perf-run`; the
-  latest are all green (issue #18), the Web Workers line says "not needed". Numbers from
-  software WebGL (cloud sessions, CI) are never evidence.
+  prompt asks for it; otherwise Phase 4 is complete. The rest of Phase 7 (custom blocks,
+  textures, characters, names, effects) is not planned. At the start of a session look for
+  issues with the label `perf-run`; the latest are all green (issue #37), the Web Workers
+  line says "not needed". Numbers from software WebGL (cloud sessions, CI) are never
+  evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
   2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
   (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;

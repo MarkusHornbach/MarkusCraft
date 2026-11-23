@@ -25,6 +25,10 @@ light against the slow reference after each of 2 000 random edits. The three pas
   therefore an empty IndexedDB; persistence tests reload inside one context.
 - `mode=gathering` or `mode=creative` (with `test=1`; default Creative) sets the game mode
   of the test world.
+- `terrain=flat|balanced|hilly` and `trees=none|few|normal|many` (with `test=1`, Phase 7
+  part A) make the test world generator 2 with these options; a missing one takes its
+  default (Balanced, Few), an invalid value is ignored. Without both the test world is
+  generator 1, so `?test=1&seed=1337` keeps the terrain of every older spec and reference.
 - `?bench=1`, `bench=quick`, `bench=sample`: see "Performance test" below.
 - `look=<0–8>` and `previewgl=0` (the preview gets no WebGL), Phase 6 part D.
 - `join=<code>` (in test mode: join at once; otherwise the world menu's "Join world CODE")
@@ -57,6 +61,11 @@ light against the slow reference after each of 2 000 random edits. The three pas
   `pad-glyphs`).
 - Phase 6 part D: `getState().player` also has `name`, `choice` (0–8) and `look`;
   `ui.preview { frames } | null`; `__mc.figureSheet()` (reference `figure-sheet`).
+- Phase 7 part A: `getState().world.options` (`{ terrain, trees }`, `null` for generator 1);
+  `terrainChecksum()` uses the open world's generator; `getState().settings.collideLeaves`;
+  `setCollideLeaves(on)` switches "Collide with leaves" without storing it (test mode has no
+  settings page). References `gen2-balanced-few`, `gen2-flat-many`, `gen2-hilly-normal`
+  (`e2e/terrain.spec.ts`).
 
 ## Controller
 

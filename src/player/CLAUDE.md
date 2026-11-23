@@ -27,5 +27,16 @@ away from it) and is never more than 45° from the head; the right arm swings ev
 (`RemotePlayer.edits`). `busy` is `Game.holdingBreak()`: break held, a block targeted, not
 paused.
 
+## Leaves and movement (Phase 7 part A)
+
+The setting "Collide with leaves" (`Settings.collideLeaves`, default off) changes movement
+only. `Game` steps physics on a `MovementWorld` (made once per world) whose `isSolidAt`
+reads `BLOCK_SOLID_PASSABLE_LEAVES` (leaves 0) while the setting is off and `BLOCK_SOLID`
+while it is on, through `World.isSolidIn`; no allocation per step. `World.isSolidAt` keeps
+the block table's `solid`: leaves stay a support, the place rule, light, mesher, raycast and
+the save are unchanged. Physics tests only cells the player newly enters, so a player inside
+leaves who turns the setting on is not moved and can walk out. Each player's own setting
+applies to its own movement in rooms (the host checks only `validPose`).
+
 Before changing physics or the break/place rules read the "Decisions and deviations" of
 `docs/phase-1-report.md`; for the figure `docs/phase-6d-report.md`.

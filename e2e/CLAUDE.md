@@ -14,7 +14,8 @@ references and the performance test are in `docs/testing.md`.
   `openTestPlayer`, `hostRoom`, `joinRoom`, `untilNet`), `mp*.spec.ts` (tests with several
   game pages; project `multiplayer`; `mpHarden.spec.ts`: overlay, host without frames,
   soak, large world; `mpFigure.spec.ts`: the figure of others), `playerSection.spec.ts`
-  ("Your player"), `shards.json` (spec lists per CI shard)
+  ("Your player"), `leaves.spec.ts` ("Collide with leaves"), `shards.json` (spec lists per
+  CI shard)
 
 ## Rules
 
