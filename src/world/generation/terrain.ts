@@ -28,7 +28,8 @@ import {
   ROCK_SCALE,
   SALT_ROCK,
 } from './terrainRules';
-import { type WorldGen, isKnownGeneratorVersion } from './worldOptions';
+import { TerrainV2 } from './terrainV2';
+import { CLASSIC_GEN, type WorldGen, isKnownGeneratorVersion, worldGenKey } from './worldOptions';
 
 export { isKnownGeneratorVersion } from './worldOptions';
 import { TREE_CANOPY_RADIUS, hasLeaf, isTreeOrigin, trunkHeight as treeTrunkHeight } from './trees';
@@ -327,22 +328,41 @@ export class Terrain {
   }
 }
 
-const terrains = new Map<number, Terrain>();
+/** What every generator version offers the spawn search, the game and the tools. */
+export interface TerrainSource {
+  readonly seed: number;
+  /** Set (and true) when the spawn search should look for wood near the start point. */
+  readonly wantsWood?: boolean;
+  heightAt(x: number, z: number): number;
+  isUnderWater(x: number, z: number): boolean;
+  isGrass(x: number, z: number): boolean;
+  isRock(x: number, z: number): boolean;
+  treeAt(x: number, z: number): number;
+  generateChunk(cx: number, cz: number): Uint8Array;
+}
+
+const terrains = new Map<string, TerrainSource>();
 const TERRAIN_CACHE_SIZE = 4;
 
-/** Returns the (cached) terrain of a seed; the noise tables are built once per seed. */
-export function getTerrain(seed: number): Terrain {
-  const key = seed >>> 0;
+/**
+ * Returns the (cached) terrain of a seed and generator; the noise tables are built once
+ * per pair. Without `gen` it is generator version 1.
+ */
+export function getTerrain(seed: number, gen: WorldGen = CLASSIC_GEN): TerrainSource {
+  if (!isKnownGeneratorVersion(gen.version)) {
+    throw new Error(`Unknown generator version ${gen.version}`);
+  }
+  const key = `${seed >>> 0}/${worldGenKey(gen)}`;
   let terrain = terrains.get(key);
   if (!terrain) {
-    // A few seeds stay cached (switching between worlds); the oldest one is dropped.
+    // A few stay cached (switching between worlds); the oldest one is dropped.
     if (terrains.size >= TERRAIN_CACHE_SIZE) {
       for (const oldest of terrains.keys()) {
         terrains.delete(oldest);
         break;
       }
     }
-    terrain = new Terrain(key);
+    terrain = gen.version === 1 ? new Terrain(seed) : new TerrainV2(seed, gen.options);
     terrains.set(key, terrain);
   }
   return terrain;
@@ -353,10 +373,7 @@ export function getTerrain(seed: number): Terrain {
  * the world; a later version that changes the terrain must keep the older ones working.
  */
 export function generateChunk(seed: number, cx: number, cz: number, gen: WorldGen): Uint8Array {
-  if (!isKnownGeneratorVersion(gen.version)) {
-    throw new Error(`Unknown generator version ${gen.version}`);
-  }
-  return getTerrain(seed).generateChunk(cx, cz);
+  return getTerrain(seed, gen).generateChunk(cx, cz);
 }
 
 /**

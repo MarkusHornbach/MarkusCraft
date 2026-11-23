@@ -3,7 +3,7 @@ import { TREE_CANOPY_RADIUS } from './trees';
 
 /** No tree trunk this close to the spawn: leaves stay at least two blocks away. */
 export const SPAWN_TREE_CLEARANCE = TREE_CANOPY_RADIUS + 2;
-import type { Terrain } from './terrain';
+import type { TerrainSource } from './terrain';
 
 export interface SpawnPoint {
   /** Block column of the spawn. */
@@ -16,7 +16,7 @@ export interface SpawnPoint {
 /** Upper bound of the spiral, in rings. Far more than any basin of the terrain needs. */
 const MAX_RINGS = 2048;
 
-function isSuitable(terrain: Terrain, x: number, z: number): boolean {
+function isSuitable(terrain: TerrainSource, x: number, z: number): boolean {
   // Grass only: not in water, not on a beach and not on bare rock.
   if (!terrain.isGrass(x, z)) return false;
   // Keep the player's head out of leaves and the first view clear of foliage.
@@ -30,7 +30,7 @@ function isSuitable(terrain: Terrain, x: number, z: number): boolean {
 }
 
 /** Column (0, 0) if it is suitable, otherwise the first one on an outward square spiral. */
-export function findSpawn(terrain: Terrain): SpawnPoint {
+export function findSpawn(terrain: TerrainSource): SpawnPoint {
   for (let ring = 0; ring <= MAX_RINGS; ring++) {
     for (let dz = -ring; dz <= ring; dz++) {
       for (let dx = -ring; dx <= ring; dx++) {

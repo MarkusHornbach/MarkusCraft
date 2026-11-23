@@ -76,7 +76,7 @@ export function decodeWorldOptions(value: unknown): OptionsCheck {
 
 /** Generator versions this build can generate. */
 export function isKnownGeneratorVersion(version: number): boolean {
-  return version === 1;
+  return version === 1 || version === 2;
 }
 
 /**
@@ -85,6 +85,7 @@ export function isKnownGeneratorVersion(version: number): boolean {
  */
 export function worldGenOf(version: number, options: WorldOptions | null): WorldGen | null {
   if (version === 1) return options === null ? CLASSIC_GEN : null;
+  if (version === 2 && options !== null) return { version: 2, options };
   return null;
 }
 

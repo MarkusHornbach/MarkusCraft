@@ -21,11 +21,7 @@ import {
 } from '../game/config';
 import type { MoveMode } from '../player/player';
 import { chunkKey } from '../world/chunk';
-import {
-  type WorldGen,
-  isKnownGeneratorVersion,
-  worldGenOf,
-} from '../world/generation/worldOptions';
+import { type WorldGen, worldGenOf } from '../world/generation/worldOptions';
 
 export interface SavedPose {
   x: number;
@@ -257,7 +253,8 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
     if (!isInt(value.formatVersion, 1, 0xffff)) return damaged;
     if (value.formatVersion > SAVE_FORMAT_VERSION) return { ok: false, error: 'newer' };
     if (!isInt(value.generatorVersion, 1, 0xffff)) return damaged;
-    if (!isKnownGeneratorVersion(value.generatorVersion)) return { ok: false, error: 'newer' };
+    // Format 2 stores no options: only a generator that needs none can be read.
+    if (worldGenOf(value.generatorVersion, null) === null) return { ok: false, error: 'newer' };
     if (typeof value.name !== 'string') return damaged;
     // A stored name is already normal; anything else was not written by the game.
     if (value.name.length === 0 || normalizeName(value.name, '') !== value.name) return damaged;
