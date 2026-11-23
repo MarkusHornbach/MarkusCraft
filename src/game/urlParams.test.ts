@@ -15,6 +15,7 @@ describe('parseParams', () => {
       save: false,
       world: 'Test',
       mode: 'creative',
+      testGen: { version: 1 },
       bench: 'off',
       join: null,
       name: null,
@@ -39,12 +40,35 @@ describe('parseParams', () => {
       save: true,
       world: 'Second',
       mode: 'creative',
+      testGen: { version: 1 },
       bench: 'off',
       join: 'ABCDEF',
       name: 'Ann',
       look: 3,
       previewGl: false,
     });
+  });
+  it('Phase 7 5.8: terrain and trees choose generator 2 for the test world', () => {
+    expect(parseParams('?test=1', random).testGen).toEqual({ version: 1 });
+    expect(parseParams('?test=1&terrain=flat&trees=many', random).testGen).toEqual({
+      version: 2,
+      options: { terrain: 'flat', trees: 'many' },
+    });
+    // A missing one takes its default.
+    expect(parseParams('?terrain=hilly', random).testGen).toEqual({
+      version: 2,
+      options: { terrain: 'hilly', trees: 'few' },
+    });
+    expect(parseParams('?trees=none', random).testGen).toEqual({
+      version: 2,
+      options: { terrain: 'balanced', trees: 'none' },
+    });
+    // An invalid value is ignored.
+    expect(parseParams('?terrain=islands&trees=many', random).testGen).toEqual({
+      version: 2,
+      options: { terrain: 'balanced', trees: 'many' },
+    });
+    expect(parseParams('?terrain=Flat&trees=', random).testGen).toEqual({ version: 1 });
   });
   it('Phase 6 AC7.3: an invalid join code counts as none', () => {
     expect(parseParams('?join=ABC', random).join).toBeNull();

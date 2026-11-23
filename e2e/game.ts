@@ -16,6 +16,9 @@ export interface OpenOptions {
   world?: string;
   /** Game mode of a world the page creates (`mode=`, default Creative). */
   mode?: 'creative' | 'gathering';
+  /** World options of the test world (Phase 7 part A); either one makes it generator 2. */
+  terrain?: 'flat' | 'balanced' | 'hilly';
+  trees?: 'none' | 'few' | 'normal' | 'many';
 }
 
 export function gameUrl(options: OpenOptions = {}): string {
@@ -28,6 +31,8 @@ export function gameUrl(options: OpenOptions = {}): string {
   if (options.save) query.set('save', '1');
   if (options.world !== undefined) query.set('world', options.world);
   if (options.mode !== undefined) query.set('mode', options.mode);
+  if (options.terrain !== undefined) query.set('terrain', options.terrain);
+  if (options.trees !== undefined) query.set('trees', options.trees);
   return `/?${query.toString()}`;
 }
 
@@ -164,6 +169,9 @@ export interface NewWorld {
   seed?: string;
   /** Game mode; the helper chooses Creative unless told otherwise (the form: Gathering). */
   mode?: 'creative' | 'gathering';
+  /** World options; the form's defaults (Balanced, Few) unless told otherwise. */
+  terrain?: 'flat' | 'balanced' | 'hilly';
+  trees?: 'none' | 'few' | 'normal' | 'many';
   /** Activate the button with a finger instead of the mouse. */
   tap?: boolean;
   /** Also wait until all chunks around the player are loaded (slow under software WebGL). */
@@ -184,6 +192,14 @@ export async function createWorld(page: Page, world: NewWorld = {}): Promise<voi
   if (world.seed !== undefined) await page.locator('#world-seed').fill(world.seed);
   const mode = page.locator(`.world-mode-button[data-mode="${world.mode ?? 'creative'}"]`);
   await (world.tap ? mode.tap() : mode.click());
+  for (const [key, value] of [
+    ['terrain', world.terrain],
+    ['trees', world.trees],
+  ] as const) {
+    if (value === undefined) continue;
+    const choice = page.locator(`.world-mode-button[data-${key}="${value}"]`);
+    await (world.tap ? choice.tap() : choice.click());
+  }
   const create = page.locator('.world-create-button');
   await (world.tap ? create.tap() : create.click());
   await untilPlaying(page);

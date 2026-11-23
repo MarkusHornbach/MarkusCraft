@@ -226,7 +226,12 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
   );
   await openGame(page, { save: true, world: 'Part C world' });
   const state = await getState(page);
-  expect(state.world).toEqual({ id: 'wpartc-fixture1', name: 'Part C world', generatorVersion: 1 });
+  expect(state.world).toEqual({
+    id: 'wpartc-fixture1',
+    name: 'Part C world',
+    generatorVersion: 1,
+    options: null,
+  });
   expect(state.mode).toBe('gathering');
   expect(state.inventory.slots.slice(0, 3)).toEqual(PART_C_META.player.slots.slice(0, 3));
   // Its edits are there, and they cast their shade: under the bricks the sky light is less.

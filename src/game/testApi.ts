@@ -2,6 +2,7 @@
 import type { ActionResult } from '../actions/apply';
 import type { GameMode, ItemStack } from '../actions/playerRecord';
 import type { BenchResult } from '../bench/benchReport';
+import type { WorldOptions } from '../world/generation/worldOptions';
 import type { Network } from '../net/transport';
 import type { RoomList } from './multiplayer';
 import type { FigureAngles } from '../player/figureMotion';
@@ -30,7 +31,13 @@ export interface GameState {
   /** Game mode of the open world. */
   mode: GameMode;
   /** The open world, or null while none is open. */
-  world: { id: string; name: string; generatorVersion: number } | null;
+  world: {
+    id: string;
+    name: string;
+    generatorVersion: number;
+    /** The world options of generator 2; null for generator 1 (Phase 7 part A). */
+    options: WorldOptions | null;
+  } | null;
   save: {
     /** True while a change of the world is not written yet. */
     dirty: boolean;

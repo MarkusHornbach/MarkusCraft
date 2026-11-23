@@ -1,5 +1,8 @@
 // Generator version 1 in the browser (Phase 3 step 1): checksum, new blocks, rocky hills.
-import { TERRAIN_CHECKSUM_1337_V1 } from '../src/testing/terrainChecksum';
+import {
+  TERRAIN_CHECKSUM_1337_V1,
+  TERRAIN_CHECKSUMS_1337_V2,
+} from '../src/testing/terrainChecksum';
 import { test, expect } from './fixtures';
 import {
   DEG,
@@ -33,6 +36,54 @@ test('the browser generates the same terrain as Node (Phase 3 AC1.2)', async ({ 
   await openGame(page);
   expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(TERRAIN_CHECKSUM_1337_V1);
 });
+
+test('Phase 7 AC1.3: without terrain and trees the test world is generator 1', async ({ page }) => {
+  await openGame(page);
+  const { world } = await getState(page);
+  expect(world).toMatchObject({ generatorVersion: 1, options: null });
+});
+
+test('Phase 7 AC4.1: the browser generates the same generator 2 terrain as Node', async ({
+  page,
+}) => {
+  for (const [terrain, trees] of [
+    ['balanced', 'few'],
+    ['flat', 'many'],
+  ] as const) {
+    await openGame(page, { terrain, trees });
+    const { world } = await getState(page);
+    expect(world).toMatchObject({ generatorVersion: 2, options: { terrain, trees } });
+    expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(
+      TERRAIN_CHECKSUMS_1337_V2[`${terrain}/${trees}`],
+    );
+  }
+  // One option alone: the other one takes its default.
+  await openGame(page, { trees: 'many' });
+  expect((await getState(page)).world?.options).toEqual({ terrain: 'balanced', trees: 'many' });
+});
+
+/**
+ * References of generator 2 (Phase 7 part A): seed 1337 at noon from a fixed pose high above
+ * the origin, looking south-east and down over the land.
+ */
+for (const [terrain, trees] of [
+  ['balanced', 'few'],
+  ['flat', 'many'],
+  ['hilly', 'normal'],
+] as const) {
+  test(`Phase 7: matches the gen2-${terrain}-${trees} reference`, async ({ page }) => {
+    await openGame(page, { terrain, trees });
+    await setPlayer(page, {
+      x: 0.5,
+      y: 88,
+      z: 0.5,
+      yaw: -135 * DEG,
+      pitch: -40 * DEG,
+      mode: 'fly',
+    });
+    await expect(page).toHaveScreenshot(`gen2-${terrain}-${trees}.png`);
+  });
+}
 
 test('coal ore, iron ore and clay have their own tiles and can be broken (Phase 3 AC1.11)', async ({
   page,

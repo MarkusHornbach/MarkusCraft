@@ -24,6 +24,8 @@ export interface DebugInfo {
   drawCalls: number;
   triangles: number;
   seed: number;
+  /** The world's generator: "Generator 2 · balanced · few" or "Generator 1". */
+  generator: string;
   time: number;
   mode: string;
   onGround: boolean;
@@ -45,6 +47,7 @@ const ROWS = [
   'light',
   'render',
   'seed',
+  'generator',
   'time',
   'mode',
   'target',
@@ -70,6 +73,7 @@ const LABELS: Record<Row, string> = {
   light: 'Light',
   render: 'Render',
   seed: 'Seed',
+  generator: 'World',
   time: 'Time',
   mode: 'Mode',
   target: 'Target',
@@ -195,6 +199,7 @@ export class DebugOverlay {
     this.set('light', info.light ? `sky ${info.light.sky}, block ${info.light.block}` : 'none');
     this.set('render', `${info.drawCalls} draw calls, ${info.triangles} triangles`);
     this.set('seed', String(info.seed));
+    this.set('generator', info.generator);
     this.set('time', `${info.time.toFixed(3)} (${timeName(info.time)})`);
     const detail = info.inWater ? ', in water' : info.onGround ? ', on ground' : '';
     this.set('mode', `${info.mode}${detail}`);

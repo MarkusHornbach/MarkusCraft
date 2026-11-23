@@ -73,6 +73,40 @@ async function frameAndFocus(page: Page) {
   });
 }
 
+test('Phase 7 AC6.1: the controller reaches the Terrain and Trees rows; A selects', async ({
+  page,
+}) => {
+  const pad = await padMenu(page);
+  await pad.tap(BUTTON.LEFT);
+  await focusTo(page, pad, 'Create and play', [BUTTON.RIGHT]);
+  const trees = /^(None|Few|Normal|Many)$/;
+  await focusTo(page, pad, trees, [BUTTON.UP]);
+  await focusTo(page, pad, 'Many', [BUTTON.RIGHT, BUTTON.RIGHT, BUTTON.RIGHT]);
+  await pad.tap(BUTTON.A);
+  await expect(page.locator('.world-mode-button[data-trees="many"]')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await focusTo(page, pad, /^(Flat|Balanced|Hilly)$/, [BUTTON.UP]);
+  await focusTo(page, pad, 'Flat', [BUTTON.LEFT, BUTTON.LEFT, BUTTON.LEFT]);
+  await pad.tap(BUTTON.A);
+  await expect(page.locator('.world-mode-button[data-terrain="flat"]')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  // In Gathering "None" is disabled, so the focus never lands on it: walking left along
+  // the Trees row passes Normal and Few and then leaves the row.
+  await focusTo(page, pad, trees, [BUTTON.DOWN]);
+  const seen: (string | null)[] = [await focusOf(page)];
+  for (let i = 0; i < 4 && trees.test(seen[seen.length - 1] ?? ''); i++) {
+    await pad.tap(BUTTON.LEFT);
+    seen.push(await focusOf(page));
+  }
+  expect(seen).toContain('Few');
+  expect(seen).not.toContain('None');
+  expect(trees.test(seen[seen.length - 1] ?? '')).toBe(false);
+});
+
 test('Phase 5 AC3.1: the pad alone creates a world, plays, pauses, goes back and plays it again', async ({
   page,
 }) => {
@@ -82,7 +116,15 @@ test('Phase 5 AC3.1: the pad alone creates a world, plays, pauses, goes back and
   await pad.tap(BUTTON.LEFT);
   expect((await getState(page)).pad.active).toBe(true);
   await focusTo(page, pad, 'Create and play', [BUTTON.RIGHT]);
-  await focusTo(page, pad, 'Gathering', [BUTTON.UP, BUTTON.LEFT, BUTTON.LEFT]);
+  // Up past the Trees and Terrain rows (Phase 7 part A) to the Mode row.
+  await focusTo(page, pad, 'Gathering', [
+    BUTTON.UP,
+    BUTTON.UP,
+    BUTTON.UP,
+    BUTTON.LEFT,
+    BUTTON.LEFT,
+    BUTTON.LEFT,
+  ]);
   await pad.tap(BUTTON.A);
   await expect(page.locator('.world-mode-button[data-mode="gathering"]')).toHaveAttribute(
     'aria-checked',

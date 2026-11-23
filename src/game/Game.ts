@@ -66,9 +66,9 @@ import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
 import {
-  CLASSIC_GEN,
-  DEFAULT_WORLD_OPTIONS,
   type WorldGen,
+  type WorldOptions,
+  debugWorldGen,
   optionsOf,
 } from '../world/generation/worldOptions';
 import { lightChecksumOf } from '../world/light/lightChunk';
@@ -464,8 +464,8 @@ export class Game {
       this.worldMenu = new WorldMenu(this.root, {
         mode: this.mode,
         onPlay: (id, via) => void this.startWorld(() => this.loadStoredWorld(id), via),
-        onCreate: (name, seedText, mode, via) =>
-          void this.startWorld(() => this.createStoredWorld(name, seedText, mode), via),
+        onCreate: (name, seedText, mode, options, via) =>
+          void this.startWorld(() => this.createStoredWorld(name, seedText, mode, options), via),
         onDelete: (id) => void this.deleteWorld(id),
         onSettings: () => this.showScreen('settings'),
         onBench: () => this.openBench(),
@@ -573,9 +573,12 @@ export class Game {
     );
   }
 
-  /** The generator of the automatic test world: version 1, as all specs before 7A expect. */
+  /**
+   * The generator of the automatic test world: version 1, as the specs before Phase 7 part A
+   * expect, unless the URL names `terrain` or `trees`.
+   */
   private testWorldGen(): WorldGen {
-    return CLASSIC_GEN;
+    return this.params.testGen;
   }
 
   /** The record of a world that does not exist yet: at its start point, in the morning. */
@@ -794,12 +797,13 @@ export class Game {
     name: string,
     seedText: string,
     mode: GameMode,
+    options: WorldOptions,
   ): Promise<LoadedWorld> {
     const seed = seedFromText(seedText) ?? Math.floor(Math.random() * 0x100000000);
     const time = this.params.timeFromUrl ? this.params.time : START_TIME_OF_DAY;
     const meta = this.newWorldMeta(name, seed, time, mode, {
       version: GENERATOR_VERSION,
-      options: DEFAULT_WORLD_OPTIONS,
+      options,
     });
     try {
       await this.store.create(meta);
@@ -2549,6 +2553,7 @@ export class Game {
       drawCalls: stats.drawCalls,
       triangles: stats.triangles,
       seed: this.world.seed,
+      generator: debugWorldGen(this.world.gen),
       time: this.time,
       mode: p.mode,
       onGround: p.onGround,
@@ -2634,6 +2639,7 @@ export class Game {
             id: this.meta.id,
             name: this.meta.name,
             generatorVersion: this.meta.generatorVersion,
+            options: this.meta.options,
           }
         : null,
       save: {
