@@ -167,7 +167,8 @@ Bot time per run: 11.7–15.2 bot minutes (× 2.5 = estimated player minutes); a
   walks to "Adventure").
 - Tabs: `e2e/crafting.spec.ts` AC12.1 (three tab labels), AC12.5 (three tab elements, all
   hidden in Creative), `e2e/touchLayout.spec.ts` AC8.5 (four header buttons),
-  `e2e/gamepadInventory.spec.ts` AC5.3 (RB reaches Tasks).
+  `e2e/gamepadInventory.spec.ts` AC5.3 (RB reaches Tasks), `e2e/padSoak.spec.ts` Phase 5
+  AC4.1 Part B (the soak visits three tabs; found by CI).
 - Worlds of the form that craft beyond level 1 call `setProgress` first:
   `e2e/touchLayout.spec.ts` (Phase 4 AC8.5, Polish 1 AC1.3), `e2e/padSoak.spec.ts`.
 - `e2e/mpGathering.spec.ts` Phase 6 AC9.7 sets the guest's XP with `setProgress(…, guestId)`.
