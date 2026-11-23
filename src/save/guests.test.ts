@@ -35,14 +35,15 @@ describe('version 1 worlds (Phase 6 AC8.1)', () => {
     ['Phase 3 part A', PART_A_META],
     ['the last Phase 5 build', PHASE_5_META],
   ] as const) {
-    it(`a world of ${label} decodes into version 2 without guests, everything else unchanged`, () => {
+    it(`a world of ${label} decodes into the current version without guests, everything else unchanged`, () => {
       const stored = JSON.parse(text) as Record<string, unknown>;
       const decoded = decodeWorld(stored, []);
       expect(decoded.ok).toBe(true);
       if (!decoded.ok) return;
       const { meta } = decoded.value;
-      expect(SAVE_FORMAT_VERSION).toBe(2);
-      expect(meta.formatVersion).toBe(2);
+      expect(SAVE_FORMAT_VERSION).toBe(3);
+      expect(meta.formatVersion).toBe(3);
+      expect(meta.options).toBeNull();
       expect(meta.guests).toEqual([]);
       const { formatVersion: _a, guests: _b, ...rest } = encodeMeta(meta);
       const { formatVersion: _c, ...old } = stored;

@@ -10,6 +10,7 @@ export function sampleMeta(overrides: Partial<WorldMeta> = {}): WorldMeta {
     seed: 1337,
     mode: 'creative',
     generatorVersion: 1,
+    options: null,
     formatVersion: SAVE_FORMAT_VERSION,
     createdMs: 1_700_000_000_000,
     playedMs: 1_700_000_100_000,

@@ -65,6 +65,12 @@ import { chunkKey, toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
+import {
+  CLASSIC_GEN,
+  DEFAULT_WORLD_OPTIONS,
+  type WorldGen,
+  optionsOf,
+} from '../world/generation/worldOptions';
 import { lightChecksumOf } from '../world/light/lightChunk';
 import { blockOf, skyOf } from '../world/light/lightRules';
 import { type RayHit, raycast } from '../world/raycast';
@@ -527,7 +533,7 @@ export class Game {
     } else {
       // A new world in memory. It is never stored.
       this.loadWorld(
-        this.newWorldMeta(params.world, params.seed, params.time, params.mode),
+        this.newWorldMeta(params.world, params.seed, params.time, params.mode, this.testWorldGen()),
         new Map(),
       );
     }
@@ -567,9 +573,20 @@ export class Game {
     );
   }
 
+  /** The generator of the automatic test world: version 1, as all specs before 7A expect. */
+  private testWorldGen(): WorldGen {
+    return CLASSIC_GEN;
+  }
+
   /** The record of a world that does not exist yet: at its start point, in the morning. */
-  private newWorldMeta(name: string, seed: number, time: number, mode: GameMode): WorldMeta {
-    const spawn = findSpawn(getTerrain(seed));
+  private newWorldMeta(
+    name: string,
+    seed: number,
+    time: number,
+    mode: GameMode,
+    gen: WorldGen,
+  ): WorldMeta {
+    const spawn = findSpawn(getTerrain(seed, gen));
     const now = Date.now();
     const random = (): number => Math.floor(Math.random() * 0x100000000);
     return {
@@ -577,7 +594,8 @@ export class Game {
       name: normalizeName(name),
       seed: seed >>> 0,
       mode,
-      generatorVersion: GENERATOR_VERSION,
+      generatorVersion: gen.version,
+      options: optionsOf(gen),
       formatVersion: SAVE_FORMAT_VERSION,
       createdMs: now,
       playedMs: now,
@@ -598,9 +616,10 @@ export class Game {
     // A room belongs to its world: another world closes it.
     if (this.mp.role === 'host') this.mp.leave();
     this.renderer.clearChunkMeshes();
-    this.world = new World(meta.seed, metaGen(meta), edits);
+    const gen = metaGen(meta);
+    this.world = new World(meta.seed, gen, edits);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
-    this.spawn = findSpawn(getTerrain(meta.seed));
+    this.spawn = findSpawn(getTerrain(meta.seed, gen));
     this.player = createPlayer(meta.pose.x, meta.pose.y, meta.pose.z);
     applyLook(this.player, meta.pose.yaw, meta.pose.pitch);
     // Nobody flies in a Gathering world, whatever the record says.
@@ -691,7 +710,7 @@ export class Game {
     const entries = await this.store.list();
     const entry = entries.find((e) => e.status === 'ok' && e.meta.name === wanted);
     if (!entry) {
-      const meta = this.newWorldMeta(wanted, seed, this.params.time, mode);
+      const meta = this.newWorldMeta(wanted, seed, this.params.time, mode, this.testWorldGen());
       await this.store.create(meta);
       this.loadWorld(meta, new Map());
     } else {
@@ -778,7 +797,10 @@ export class Game {
   ): Promise<LoadedWorld> {
     const seed = seedFromText(seedText) ?? Math.floor(Math.random() * 0x100000000);
     const time = this.params.timeFromUrl ? this.params.time : START_TIME_OF_DAY;
-    const meta = this.newWorldMeta(name, seed, time, mode);
+    const meta = this.newWorldMeta(name, seed, time, mode, {
+      version: GENERATOR_VERSION,
+      options: DEFAULT_WORLD_OPTIONS,
+    });
     try {
       await this.store.create(meta);
     } catch {
@@ -1100,6 +1122,7 @@ export class Game {
         seed: welcome.seed,
         mode: welcome.mode,
         generatorVersion: welcome.generatorVersion,
+        options: null,
         formatVersion: SAVE_FORMAT_VERSION,
         createdMs: now,
         playedMs: now,
@@ -1120,7 +1143,13 @@ export class Game {
     if (!this.pauseScreen) {
       // Test mode has no menus: a fresh world in memory, as at the start.
       this.loadWorld(
-        this.newWorldMeta(this.params.world, this.params.seed, this.params.time, this.params.mode),
+        this.newWorldMeta(
+          this.params.world,
+          this.params.seed,
+          this.params.time,
+          this.params.mode,
+          this.testWorldGen(),
+        ),
         new Map(),
       );
       return;
@@ -1394,8 +1423,10 @@ export class Game {
     return {
       loadWorld: (renderDistance) => {
         this.useSettings({ ...DEFAULT_SETTINGS, renderDistance });
-        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative');
-        this.loadWorld({ ...meta, generatorVersion: BENCH_GENERATOR_VERSION }, new Map());
+        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative', {
+          version: BENCH_GENERATOR_VERSION,
+        });
+        this.loadWorld(meta, new Map());
         // The loop runs the simulation; no pointer lock is asked for.
         this.paused = false;
         this.showScreen('play');

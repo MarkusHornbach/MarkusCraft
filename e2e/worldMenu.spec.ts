@@ -73,7 +73,7 @@ test('a first visit creates a world; after a reload it is listed and continues (
 
   await createWorld(page);
   const created = await getState(page);
-  expect(created.world).toMatchObject({ name: 'My world', generatorVersion: 1 });
+  expect(created.world).toMatchObject({ name: 'My world', generatorVersion: 2 });
   expect(created.mode).toBe('creative');
   const cell = await mark(page);
 

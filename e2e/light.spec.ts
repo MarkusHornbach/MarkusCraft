@@ -260,10 +260,10 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
     string,
     unknown
   >;
-  // Saved again, the record is migrated to format version 2 (Phase 6 part C): the same
-  // fields plus an empty list of guests.
+  // Saved again, the record is migrated to the current format (3; Phase 6 part C added
+  // the empty list of guests; a generator 1 world has no options).
   expect(Object.keys(meta).sort()).toEqual([...Object.keys(PART_C_META), 'guests'].sort());
-  expect(meta.formatVersion).toBe(2);
+  expect(meta.formatVersion).toBe(3);
   expect(meta.guests).toEqual([]);
   expect(meta.generatorVersion).toBe(1);
   expect(meta.time).toBeCloseTo(0.3, 9);

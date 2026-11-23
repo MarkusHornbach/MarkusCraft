@@ -21,7 +21,13 @@ import {
 } from '../game/config';
 import type { MoveMode } from '../player/player';
 import { chunkKey } from '../world/chunk';
-import { type WorldGen, worldGenOf } from '../world/generation/worldOptions';
+import {
+  type WorldGen,
+  type WorldOptions,
+  decodeWorldOptions,
+  isKnownGeneratorVersion,
+  worldGenOf,
+} from '../world/generation/worldOptions';
 
 export interface SavedPose {
   x: number;
@@ -52,6 +58,8 @@ export interface WorldMeta {
   seed: number;
   mode: GameMode;
   generatorVersion: number;
+  /** The world options of generator 2; null for generator 1 (format 3). */
+  options: WorldOptions | null;
   formatVersion: number;
   /** Wall-clock times (milliseconds since 1970) of creation and of the last save. */
   createdMs: number;
@@ -67,7 +75,7 @@ export interface WorldMeta {
 
 /** The generator of a decoded world. Decoding guarantees that version and options fit. */
 export function metaGen(meta: WorldMeta): WorldGen {
-  const gen = worldGenOf(meta.generatorVersion, null);
+  const gen = worldGenOf(meta.generatorVersion, meta.options);
   if (!gen) throw new Error(`World ${meta.id} has an unknown generator`);
   return gen;
 }
@@ -201,6 +209,10 @@ export function encodeMeta(meta: WorldMeta): Record<string, unknown> {
     seed: meta.seed,
     mode: meta.mode,
     generatorVersion: meta.generatorVersion,
+    // Stored only for generator 2: a generator 1 record has no `options` field.
+    ...(meta.options
+      ? { options: { terrain: meta.options.terrain, trees: meta.options.trees } }
+      : {}),
     formatVersion: meta.formatVersion,
     createdMs: meta.createdMs,
     playedMs: meta.playedMs,
@@ -253,8 +265,20 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
     if (!isInt(value.formatVersion, 1, 0xffff)) return damaged;
     if (value.formatVersion > SAVE_FORMAT_VERSION) return { ok: false, error: 'newer' };
     if (!isInt(value.generatorVersion, 1, 0xffff)) return damaged;
-    // Format 2 stores no options: only a generator that needs none can be read.
-    if (worldGenOf(value.generatorVersion, null) === null) return { ok: false, error: 'newer' };
+    if (!isKnownGeneratorVersion(value.generatorVersion)) return { ok: false, error: 'newer' };
+    // Formats 1 and 2 knew generator 1 only and stored no options. From format 3 the
+    // options are there for generator 2 and absent for generator 1.
+    let options: WorldOptions | null = null;
+    if (value.formatVersion < 3) {
+      if (value.generatorVersion !== 1 || 'options' in value) return damaged;
+    } else if (value.generatorVersion === 1) {
+      if ('options' in value) return damaged;
+    } else {
+      const decoded = decodeWorldOptions(value.options);
+      if (!decoded.ok) return { ok: false, error: decoded.error };
+      options = decoded.options;
+    }
+    if (worldGenOf(value.generatorVersion, options) === null) return damaged;
     if (typeof value.name !== 'string') return damaged;
     // A stored name is already normal; anything else was not written by the game.
     if (value.name.length === 0 || normalizeName(value.name, '') !== value.name) return damaged;
@@ -288,6 +312,7 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
         seed: value.seed,
         mode,
         generatorVersion: value.generatorVersion,
+        options,
         // Read records are migrated: saving them again writes the current version.
         formatVersion: SAVE_FORMAT_VERSION,
         createdMs: value.createdMs,

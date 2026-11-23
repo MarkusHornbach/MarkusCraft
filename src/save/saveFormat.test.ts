@@ -14,6 +14,7 @@ import {
   isWorldId,
   listEntries,
   makeWorldId,
+  metaGen,
   nextWorldName,
   normalizeName,
   seedFromText,
@@ -160,7 +161,7 @@ describe('save format', () => {
       ok: false,
       error: 'newer',
     });
-    expect(decodeMeta({ ...good, generatorVersion: 2 })).toEqual({ ok: false, error: 'newer' });
+    expect(decodeMeta({ ...good, generatorVersion: 3 })).toEqual({ ok: false, error: 'newer' });
   });
 
   it('validates chunk records (Phase 3 AC3.2)', () => {
@@ -276,9 +277,13 @@ describe('save format', () => {
   });
 });
 
-/** A version 1 record as version 2 writes it: the same fields, no guests. */
+/** A version 1 record as the current version writes it: the same fields, no guests. */
 function migrated(text: string): string {
-  return JSON.stringify({ ...(JSON.parse(text) as object), formatVersion: 2, guests: [] });
+  return JSON.stringify({
+    ...(JSON.parse(text) as object),
+    formatVersion: SAVE_FORMAT_VERSION,
+    guests: [],
+  });
 }
 
 describe('worlds of earlier versions', () => {
@@ -308,7 +313,7 @@ describe('worlds of earlier versions', () => {
       [100, 8],
       [2000, 0],
     ]);
-    // Saving it again writes the same record, migrated to version 2 (Phase 6 part C).
+    // Saving it again writes the same record, migrated to the current version (Phase 6 part C, Phase 7 AC1.2).
     expect(JSON.stringify(encodeMeta(meta))).toBe(migrated(PART_A_META));
   });
 });
@@ -341,7 +346,7 @@ describe('a world saved by Part B (Phase 3 AC10.6)', () => {
       [31001, 7],
       [5, 12],
     ]);
-    // Saving it again writes the same record, migrated to version 2 (Phase 6 part C).
+    // Saving it again writes the same record, migrated to the current version (Phase 6 part C, Phase 7 AC1.2).
     expect(JSON.stringify(encodeMeta(meta))).toBe(migrated(PART_B_META));
   });
 });
@@ -469,5 +474,92 @@ describe('listEntries', () => {
     expect(entries[3]).toEqual({ status: 'damaged', id: 'd', name: 'Broken' });
     expect(entries[4]).toEqual({ status: 'newer', id: 'e', name: 'Future' });
     expect(entries[5]).toEqual({ status: 'damaged', id: 'f', name: null });
+  });
+});
+
+describe('format 3: the world options (Phase 7 part A)', () => {
+  const v2 = (options: unknown): Record<string, unknown> => ({
+    ...encodeMeta(sampleMeta()),
+    generatorVersion: 2,
+    options,
+  });
+
+  it('Phase 7 AC1.2: a format 2 record loads as generator 1 and is written back as format 3', () => {
+    const stored = { ...encodeMeta(sampleMeta()), formatVersion: 2 };
+    expect('options' in stored).toBe(false);
+    const decoded = decodeMeta(stored);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.options).toBeNull();
+    expect(decoded.value.generatorVersion).toBe(1);
+    expect(decoded.value.formatVersion).toBe(3);
+    const written = encodeMeta(decoded.value);
+    expect(written.formatVersion).toBe(3);
+    expect('options' in written).toBe(false);
+    expect({ ...written, formatVersion: 2 }).toEqual(stored);
+  });
+
+  it('keeps the options of a generator 2 world through encode and decode', () => {
+    const meta = sampleMeta({ generatorVersion: 2, options: { terrain: 'flat', trees: 'many' } });
+    const record = JSON.parse(JSON.stringify(encodeMeta(meta))) as Record<string, unknown>;
+    expect(record.options).toEqual({ terrain: 'flat', trees: 'many' });
+    expect(decodeMeta(record)).toEqual({ ok: true, value: meta });
+    expect(metaGen(meta)).toEqual({ version: 2, options: { terrain: 'flat', trees: 'many' } });
+    expect(metaGen(sampleMeta())).toEqual({ version: 1 });
+  });
+
+  it('Phase 7 AC5.2: missing options are damaged, unknown strings newer, options on generator 1 damaged', () => {
+    expect(decodeMeta(v2(undefined))).toEqual({ ok: false, error: 'damaged' });
+    const { options: _o, ...withoutOptions } = v2(null);
+    expect(decodeMeta(withoutOptions)).toEqual({ ok: false, error: 'damaged' });
+    expect(decodeMeta(v2(null))).toEqual({ ok: false, error: 'damaged' });
+    expect(decodeMeta(v2({ terrain: 'islands', trees: 'few' }))).toEqual({
+      ok: false,
+      error: 'newer',
+    });
+    expect(decodeMeta(v2({ terrain: 'flat', trees: 'jungle' }))).toEqual({
+      ok: false,
+      error: 'newer',
+    });
+    const v1 = { ...encodeMeta(sampleMeta()), options: { terrain: 'flat', trees: 'few' } };
+    expect(decodeMeta(v1)).toEqual({ ok: false, error: 'damaged' });
+    expect(decodeMeta({ ...v1, options: null })).toEqual({ ok: false, error: 'damaged' });
+    // An older format never had generator 2.
+    expect(decodeMeta({ ...v2({ terrain: 'flat', trees: 'few' }), formatVersion: 2 })).toEqual({
+      ok: false,
+      error: 'damaged',
+    });
+  });
+
+  it('Phase 7 AC5.2: fuzzed options never throw and never load as something else', () => {
+    const rng = mulberry32(77);
+    const values: unknown[] = [
+      null,
+      undefined,
+      0,
+      1.5,
+      '',
+      'flat',
+      'few',
+      'none',
+      'x'.repeat(40),
+      [],
+      {},
+      true,
+    ];
+    const pick = (): unknown => values[randInt(rng, values.length)];
+    for (let i = 0; i < 2000; i++) {
+      const options =
+        randInt(rng, 4) === 0
+          ? pick()
+          : { terrain: pick(), trees: pick(), ...(randInt(rng, 2) ? { extra: pick() } : {}) };
+      const result = decodeMeta(v2(options));
+      if (result.ok) {
+        const o = options as { terrain: unknown; trees: unknown };
+        expect(result.value.options).toEqual({ terrain: o.terrain, trees: o.trees });
+      } else {
+        expect(['damaged', 'newer']).toContain(result.error);
+      }
+    }
   });
 });
