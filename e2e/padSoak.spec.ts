@@ -131,7 +131,8 @@ test('Phase 5 AC4.1 (Part B): 2 000 random controller frames over the inventory 
     [0, 0, 0, 0, 0, 1, 3, 3, 3, 4, 5, 5, 12, 13, 13, 14, 15, 15, 12, 13, 9],
   );
   expect(report.screens).toContain('inventory');
-  expect(report.tabs).toEqual(['crafting', 'items']);
+  // Phase 8: the third tab, Tasks, is reached by RB as well.
+  expect(report.tabs).toEqual(['crafting', 'items', 'tasks']);
   expect(report.connects).toBeGreaterThan(1);
   expect(report.presses).toBeGreaterThan(500);
   await expectCleanEnd(page);
