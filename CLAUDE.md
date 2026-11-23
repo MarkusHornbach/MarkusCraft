@@ -313,10 +313,12 @@ hold:
 | Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget           |
 
 - **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
-  prompt asks for it; otherwise Phase 4 is complete. Phase 7 (personalization: custom
-  blocks, textures, characters beyond the eight looks, names, effects) is not planned. At
-  the start of a session look for issues with the label `perf-run`; the latest are all
-  green (issue #18), the Web Workers line says "not needed". Numbers from software WebGL (cloud sessions, CI) are never evidence.
+  prompt asks for it; otherwise Phase 4 is complete. Phase 7 is personalization; its part
+  A (world options: generator 2, leaf collision) is planned in `docs/phase-7a-plan.md`
+  (one session, one PR); the rest (custom blocks, textures, characters, names, effects) is
+  not planned. At the start of a session look for issues with the label `perf-run`; the
+  latest are all green (issue #18), the Web Workers line says "not needed". Numbers from
+  software WebGL (cloud sessions, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
   2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
   (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;
