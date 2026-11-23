@@ -284,12 +284,18 @@ describe('save format', () => {
   });
 });
 
-/** A version 1 record as the current version writes it: the same fields, no guests. */
+/**
+ * A version 1 record as the current version writes it: the same fields, no guests, a
+ * fresh task book and a player at 0 XP (format 4).
+ */
 function migrated(text: string): string {
+  const old = JSON.parse(text) as Record<string, unknown>;
   return JSON.stringify({
-    ...(JSON.parse(text) as object),
+    ...old,
     formatVersion: SAVE_FORMAT_VERSION,
+    player: { ...(old.player as object), xp: 0, found: [], crafted: [] },
     guests: [],
+    progress: { done: [], counts: [] },
   });
 }
 
@@ -491,17 +497,18 @@ describe('format 3: the world options (Phase 7 part A)', () => {
     options,
   });
 
-  it('Phase 7 AC1.2: a format 2 record loads as generator 1 and is written back as format 3', () => {
-    const stored = { ...encodeMeta(sampleMeta()), formatVersion: 2 };
+  it('Phase 7 AC1.2: a format 2 record loads as generator 1 and is written back as the current format', () => {
+    const { progress: _p, ...format3 } = encodeMeta(sampleMeta());
+    const stored = { ...format3, formatVersion: 2 };
     expect('options' in stored).toBe(false);
     const decoded = decodeMeta(stored);
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
     expect(decoded.value.options).toBeNull();
     expect(decoded.value.generatorVersion).toBe(1);
-    expect(decoded.value.formatVersion).toBe(3);
-    const written = encodeMeta(decoded.value);
-    expect(written.formatVersion).toBe(3);
+    expect(decoded.value.formatVersion).toBe(SAVE_FORMAT_VERSION);
+    const { progress: _q, ...written } = encodeMeta(decoded.value);
+    expect(written.formatVersion).toBe(SAVE_FORMAT_VERSION);
     expect('options' in written).toBe(false);
     expect({ ...written, formatVersion: 2 }).toEqual(stored);
   });

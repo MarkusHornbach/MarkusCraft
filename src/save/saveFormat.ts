@@ -20,6 +20,7 @@ import {
   WORLD_NAME_MAX,
 } from '../game/config';
 import type { MoveMode } from '../player/player';
+import { EMPTY_PROGRESS, type TaskCount, type WorldProgress } from '../progress/progress';
 import { chunkKey } from '../world/chunk';
 import {
   type WorldGen,
@@ -71,6 +72,8 @@ export interface WorldMeta {
   player: PlayerRecord;
   /** Guests of the world, at most `GUESTS_MAX` (empty for worlds never opened to others). */
   guests: GuestEntry[];
+  /** The task book (format 4); empty in Creative and for older formats. */
+  progress: WorldProgress;
 }
 
 /** The generator of a decoded world. Decoding guarantees that version and options fit. */
@@ -172,8 +175,58 @@ function isFiniteIn(value: unknown, min: number, max: number): value is number {
 
 const TIME_LIMIT = 8.64e15; // the range of JavaScript dates
 
-/** Reads a player record (save files and network messages); null if it does not check out. */
-export function decodePlayer(value: unknown): PlayerRecord | null {
+/** Limits of the progress fields (plan 5.6). */
+const XP_LIMIT = 1_000_000_000;
+const FOUND_MAX = 256;
+const CRAFTED_MAX = 1024;
+const TASKS_MAX = 1024;
+const TASK_COUNT_LIMIT = 1_000_000;
+
+/** A list of distinct ids 1–65535, at most `max` long; null if it does not check out. */
+function decodeIds(value: unknown, max: number): number[] | null {
+  if (!Array.isArray(value) || value.length > max) return null;
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const id of value as unknown[]) {
+    if (!isInt(id, 1, 0xffff) || seen.has(id)) return null;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * Reads a world's task book (format 4); null if it does not check out. Unknown task ids
+ * load (the engine ignores them).
+ */
+export function decodeProgress(value: unknown): WorldProgress | null {
+  if (!isObject(value)) return null;
+  const done = decodeIds(value.done, TASKS_MAX);
+  if (!done || !Array.isArray(value.counts) || value.counts.length > TASKS_MAX) return null;
+  const counts: TaskCount[] = [];
+  const seen = new Set<number>();
+  for (const entry of value.counts as unknown[]) {
+    if (!isObject(entry)) return null;
+    if (!isInt(entry.task, 1, 0xffff) || !isInt(entry.count, 1, TASK_COUNT_LIMIT)) return null;
+    if (seen.has(entry.task)) return null;
+    seen.add(entry.task);
+    counts.push({ task: entry.task, count: entry.count });
+  }
+  return { done, counts };
+}
+
+export function encodeProgress(progress: WorldProgress): Record<string, unknown> {
+  return {
+    done: [...progress.done],
+    counts: progress.counts.map((c) => ({ task: c.task, count: c.count })),
+  };
+}
+
+/**
+ * Reads a player record (save files and network messages); null if it does not check out.
+ * `legacy`: a record of save format 1–3, which had no progress fields; it starts at 0 XP.
+ */
+export function decodePlayer(value: unknown, legacy = false): PlayerRecord | null {
   if (!isObject(value)) return null;
   if (!Array.isArray(value.slots) || value.slots.length !== INVENTORY_SLOTS) return null;
   const slots: (ItemStack | null)[] = [];
@@ -196,7 +249,13 @@ export function decodePlayer(value: unknown): PlayerRecord | null {
     if (!isInt(b.y, 0, WORLD_HEIGHT - 1) || !isFiniteIn(b.startMs, 0, TIME_LIMIT)) return null;
     breaking = { x: b.x, y: b.y, z: b.z, startMs: b.startMs };
   }
-  return { slots, selectedSlot: value.selectedSlot, breaking, xp: 0, found: [], crafted: [] };
+  if (legacy)
+    return { slots, selectedSlot: value.selectedSlot, breaking, xp: 0, found: [], crafted: [] };
+  if (!isInt(value.xp, 0, XP_LIMIT)) return null;
+  const found = decodeIds(value.found, FOUND_MAX);
+  const crafted = decodeIds(value.crafted, CRAFTED_MAX);
+  if (!found || !crafted) return null;
+  return { slots, selectedSlot: value.selectedSlot, breaking, xp: value.xp, found, crafted };
 }
 
 // --- world record ------------------------------------------------------------------
@@ -221,6 +280,7 @@ export function encodeMeta(meta: WorldMeta): Record<string, unknown> {
     moveMode: meta.moveMode,
     player: encodePlayer(meta.player),
     guests: limitGuests(meta.guests).map(encodeGuest),
+    progress: encodeProgress(meta.progress),
   };
 }
 
@@ -251,6 +311,9 @@ export function encodePlayer(player: PlayerRecord): Record<string, unknown> {
     slots: player.slots.map((slot) => (slot ? { item: slot.item, count: slot.count } : null)),
     selectedSlot: player.selectedSlot,
     breaking: player.breaking ? { ...player.breaking } : null,
+    xp: player.xp,
+    found: [...player.found],
+    crafted: [...player.crafted],
   };
 }
 
@@ -291,8 +354,16 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
     const pose = decodePose(value.pose);
     if (!pose) return damaged;
     if (value.moveMode !== 'walk' && value.moveMode !== 'fly') return damaged;
-    const player = decodePlayer(value.player);
+    // Formats 1–3 knew no progress: an old Gathering world opens with a fresh book.
+    const legacy = value.formatVersion < 4;
+    const player = decodePlayer(value.player, legacy);
     if (!player) return damaged;
+    let progress: WorldProgress = EMPTY_PROGRESS;
+    if (!legacy) {
+      const decoded = decodeProgress(value.progress);
+      if (!decoded) return damaged;
+      progress = decoded;
+    }
     // Version 1 knew no guests. A guest entry that does not check out is dropped: it
     // never makes the world itself damaged.
     let guests: GuestEntry[] = [];
@@ -300,7 +371,7 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
       if (!Array.isArray(value.guests)) return damaged;
       guests = limitGuests(
         (value.guests as unknown[])
-          .map(decodeGuest)
+          .map((guest) => decodeGuest(guest, legacy))
           .filter((guest): guest is GuestEntry => guest !== null),
       );
     }
@@ -322,6 +393,7 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
         moveMode: value.moveMode,
         player,
         guests,
+        progress,
       },
     };
   } catch {
@@ -343,11 +415,11 @@ function decodePose(value: unknown): SavedPose | null {
 const PLAYER_KEY_PATTERN = /^[0-9a-f]{32}$/;
 const GUEST_NAME_MAX = 64;
 
-function decodeGuest(value: unknown): GuestEntry | null {
+function decodeGuest(value: unknown, legacy: boolean): GuestEntry | null {
   if (!isObject(value)) return null;
   if (typeof value.key !== 'string' || !PLAYER_KEY_PATTERN.test(value.key)) return null;
   if (typeof value.name !== 'string' || value.name.length > GUEST_NAME_MAX) return null;
-  const record = decodePlayer(value.record);
+  const record = decodePlayer(value.record, legacy);
   const pose = decodePose(value.pose);
   if (!record || !pose) return null;
   if (value.moveMode !== 'walk' && value.moveMode !== 'fly') return null;

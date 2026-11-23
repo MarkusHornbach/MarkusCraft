@@ -58,8 +58,8 @@ const REPLACE_PROGRESS_ALLOWED: Record<string, number> = {};
 const RECORD_PROGRESS_FIELD =
   /\b(?:xp|found|crafted)\s*:(?!\s*(?:number|readonly|string|boolean)\b)\s*[^\s]/g;
 const RECORD_PROGRESS_ALLOWED: Record<string, number> = {
-  // The decoder reads the fields of stored and received records.
-  'src/save/saveFormat.ts': 3,
+  // The encoder writes and the decoder reads the fields of stored and received records.
+  'src/save/saveFormat.ts': 7,
 };
 
 function countCalls(pattern: RegExp, skip: (file: string) => boolean): Record<string, number> {

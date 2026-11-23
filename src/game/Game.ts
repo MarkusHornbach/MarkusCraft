@@ -110,6 +110,7 @@ import {
   TOUCH_RENDER_DISTANCE_DEFAULT,
   WATER_SURFACE_DROP,
 } from './config';
+import { EMPTY_PROGRESS } from '../progress/progress';
 import { IdbStore } from './idbStore';
 import { type NetConfig, readNetConfig } from './netConfig';
 import {
@@ -610,6 +611,7 @@ export class Game {
       moveMode: 'walk',
       player: createPlayerRecord(mode),
       guests: [],
+      progress: EMPTY_PROGRESS,
     };
   }
 
@@ -1140,6 +1142,8 @@ export class Game {
         moveMode,
         player: welcome.record,
         guests: [],
+        // 8A2 brings the room's book; a guest's world is never saved.
+        progress: EMPTY_PROGRESS,
       },
       edits,
     );
