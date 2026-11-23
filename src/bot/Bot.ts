@@ -208,7 +208,7 @@ export class Bot {
     const distance = Math.hypot(x + 0.5 - this.pose.x, y - this.pose.y, z + 0.5 - this.pose.z);
     this.clockMs += climbing
       ? (1000 / BOT_TIME.pillarSpeed) * distance
-      : (1000 * distance) / BOT_TIME.walkSpeed;
+      : (1000 * distance * BOT_TIME.pathFactor) / BOT_TIME.walkSpeed;
     this.pose = { x: x + 0.5, y, z: z + 0.5 };
     this.session.notePose(y);
     if (!climbing) this.fall();
@@ -312,9 +312,32 @@ export class Bot {
     if (here) return here;
     // Somewhere awkward (in a tree, on a pillar): to open ground nearby first.
     const ground = this.standableNear((c) => this.neighbourFor(c) !== null);
-    if (!ground) return this.fail(`no place for ${itemLabel(block)}`);
-    this.goTo(ground);
-    return this.placeCellNear() ?? this.fail(`no place for ${itemLabel(block)}`);
+    if (ground) {
+      this.goTo(ground);
+      const there = this.placeCellNear();
+      if (there) return there;
+    }
+    // Underground, with every cell around used: a step into fresh rock, which can be dug.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const [x, y, z] = this.cell;
+      const dir = (
+        [
+          [1, 0],
+          [0, 1],
+          [-1, 0],
+          [0, -1],
+        ] as const
+      ).find(
+        ([dx, dz]) =>
+          this.solid([x + 2 * dx, y, z + 2 * dz]) && this.solid([x + 2 * dx, y - 1, z + 2 * dz]),
+      );
+      if (!dir) break;
+      // Two steps: past what was placed next to the player into rock.
+      this.goTo([x + 2 * dir[0], y, z + 2 * dir[1]]);
+      const fresh = this.placeCellNear();
+      if (fresh) return fresh;
+    }
+    return this.fail(`no place for ${itemLabel(block)}`);
   }
 
   /** A free cell next to `from` (feet level) with a solid cube below it, if any. */
@@ -340,7 +363,7 @@ export class Bot {
       for (let dx = -radius; dx <= radius; dx++) {
         const x = px + dx;
         const z = pz + dz;
-        for (let y = Math.min(WORLD_HEIGHT - 3, py + 6); y > Math.max(1, py - 8); y--) {
+        for (let y = Math.min(WORLD_HEIGHT - 3, py + 6); y > Math.max(1, py - 32); y--) {
           const below = this.block([x, y - 1, z]);
           if (!isSupport(below) || below === Block.LEAVES || below === Block.LOG) continue;
           if (this.solid([x, y, z]) || this.solid([x, y + 1, z])) continue;

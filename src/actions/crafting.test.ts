@@ -5,6 +5,7 @@ import { Item } from '../items/items';
 import { RECIPES, type Recipe } from '../items/recipes';
 import { Block } from '../world/blocks';
 import { EMPTY_PROGRESS, completeProgress, maxLevelXp } from '../progress/progress';
+import { LEVELS } from '../progress/tables';
 import { type ActionContext, type ActionResult, applyAction } from './apply';
 import { type ItemStack, type PlayerRecord, createPlayerRecord } from './playerRecord';
 import { LocalSession } from './Session';
@@ -238,8 +239,8 @@ describe('locked recipes (Phase 8 AC3.1)', () => {
   it('unlocked at the level XP, or once the task is done', () => {
     const level1 = fresh([Block.LOG, 1]);
     expect(reasonOf(craft(at(level1), 'planks'))).toBe('ok');
-    expect(reasonOf(craft(at({ ...fresh(), xp: 29 }), 'stone_pickaxe'))).toBe('locked');
-    expect(reasonOf(craft(at({ ...fresh(), xp: 30 }), 'stone_pickaxe'))).toBe('station');
+    expect(reasonOf(craft(at({ ...fresh(), xp: LEVELS[1] - 1 }), 'stone_pickaxe'))).toBe('locked');
+    expect(reasonOf(craft(at({ ...fresh(), xp: LEVELS[1] }), 'stone_pickaxe'))).toBe('station');
     const torch = fresh([Item.STICK, 1], [Item.COAL, 1]);
     expect(reasonOf(craft(at(torch, { done: [12], counts: [] }), 'torch'))).toBe('ok');
   });
@@ -249,7 +250,7 @@ describe('locked recipes (Phase 8 AC3.1)', () => {
     const outcomes: unknown[] = [];
     const session = new LocalSession(
       { world, mode: 'gathering', pose: () => pose, nowMs: () => 0 },
-      { ...fresh([Block.LOG, 2]), xp: 26 },
+      { ...fresh([Block.LOG, 2]), xp: LEVELS[1] - 4 },
       {
         onBlocks: () => {},
         onPlayer: () => {},
@@ -258,7 +259,7 @@ describe('locked recipes (Phase 8 AC3.1)', () => {
       },
     );
     session.submit({ kind: 'craft', recipe: recipe('planks').id });
-    expect(session.record.xp).toBe(31);
+    expect(session.record.xp).toBe(LEVELS[1] + 1);
     expect(outcomes).toContainEqual({
       kind: 'levelUp',
       player: 'local',

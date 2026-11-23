@@ -110,12 +110,13 @@ describe('progress tables (Phase 8 AC1.1)', () => {
   });
 
   it('levels and lookups', () => {
-    expect(LEVELS).toEqual([0, 30, 80, 150, 240, 350, 480]);
+    // Tuned with the goal bot (Phase 8 part A1 report); the plan started at 30, 80, 150, …
+    expect(LEVELS).toEqual([0, 60, 125, 190, 270, 370, 460]);
     expect(levelIn(LEVELS, 0)).toBe(1);
-    expect(levelIn(LEVELS, 29)).toBe(1);
-    expect(levelIn(LEVELS, 30)).toBe(2);
+    expect(levelIn(LEVELS, 59)).toBe(1);
+    expect(levelIn(LEVELS, 60)).toBe(2);
     expect(levelIn(LEVELS, 10_000)).toBe(7);
-    expect(getTask(12)?.label).toBe('Mine 3 coal');
+    expect(getTask(12)?.label).toBe('Mine 32 coal');
     expect(getTask(99)).toBeUndefined();
     expect(unlockOf(999)).toEqual({ level: 1 });
   });
@@ -124,6 +125,6 @@ describe('progress tables (Phase 8 AC1.1)', () => {
     const result = checkTables(PROGRESS_TABLES);
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.chapters.map((c) => c.level)).toEqual([2, 3, 4, 6, 7]);
+    expect(result.chapters.map((c) => c.level)).toEqual([1, 3, 4, 6, 7]);
   });
 });

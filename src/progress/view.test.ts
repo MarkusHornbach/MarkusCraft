@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { createPlayerRecord } from '../actions/playerRecord';
 import { Block } from '../world/blocks';
 import { EMPTY_PROGRESS, completeProgress, stepProgress } from './progress';
+import { STARTING_TABLES as T } from '../testing/startingTables';
 import { bookView, lockedText, noticeTexts, progressRow } from './view';
 
 const record = (xp: number) => ({ ...createPlayerRecord('gathering'), xp });
 
 describe('bookView', () => {
   it('a fresh book', () => {
-    expect(bookView(EMPTY_PROGRESS, record(0))).toEqual({
+    expect(bookView(EMPTY_PROGRESS, record(0), T)).toEqual({
       level: 1,
       xpText: '0 / 30 XP',
       xpFraction: 0,
@@ -30,6 +31,7 @@ describe('bookView', () => {
     const view = bookView(
       { done: [1, 2, 3, 4, 5, 6, 7, 8, 9], counts: [{ task: 11, count: 1 }] },
       record(120),
+      T,
     );
     expect(view.finished).toEqual(['First wood', 'Tools']);
     expect(view.chapterTitle).toBe('Chapter 3 · Stone and fire');
@@ -38,7 +40,7 @@ describe('bookView', () => {
     expect(view.xpFraction).toBeCloseTo(40 / 70, 6);
     expect(view.nextText).toBe('Next level: Stone bricks, Bricks');
     expect(view.footer).toBe('2 more chapters');
-    const reach = bookView({ done: [1, 2, 3, 4], counts: [] }, record(50));
+    const reach = bookView({ done: [1, 2, 3, 4], counts: [] }, record(50), T);
     expect(reach.tasks[3]).toEqual({
       id: 8,
       label: 'Climb to height 64',
@@ -51,9 +53,10 @@ describe('bookView', () => {
     const last = bookView(
       { done: [...Array(16).keys()].map((i) => i + 1), counts: [] },
       record(400),
+      T,
     );
     expect(last.footer).toBeNull();
-    const end = bookView(completeProgress(), record(600));
+    const end = bookView(completeProgress(T), record(600), T);
     expect(end).toMatchObject({
       level: 7,
       xpText: 'Max level',
@@ -69,15 +72,15 @@ describe('bookView', () => {
 
 describe('texts', () => {
   it('the F3 row', () => {
-    expect(progressRow({ done: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], counts: [] }, record(160))).toBe(
+    expect(progressRow({ done: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], counts: [] }, record(160), T)).toBe(
       'Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP',
     );
-    expect(progressRow(completeProgress(), record(480))).toBe('Book complete · Level 7 · Max');
+    expect(progressRow(completeProgress(T), record(480), T)).toBe('Book complete · Level 7 · Max');
   });
 
   it('lock texts', () => {
-    expect(lockedText(8)).toBe('Locked: Level 3');
-    expect(lockedText(20)).toBe('Locked: Mine 3 coal');
+    expect(lockedText(8, T)).toBe('Locked: Level 3');
+    expect(lockedText(20, T)).toBe('Locked: Mine 3 coal');
   });
 
   it('notices of a step, in order, only the own level-ups and finds', () => {
@@ -92,14 +95,15 @@ describe('texts', () => {
       me,
       { kind: 'mine', block: Block.IRON_ORE, item: Block.IRON_ORE, count: 1 },
       [me, other],
+      T,
     );
-    expect(noticeTexts(step.outcomes, 'me')).toEqual([
+    expect(noticeTexts(step.outcomes, 'me', T)).toEqual([
       'Task done: Mine 3 iron ore · +25 XP',
       'Chapter done: Into the dark',
       'First find: Iron ore · +40 XP',
       'Level 4 · Unlocked: Stone bricks, Bricks',
     ]);
-    expect(noticeTexts(step.outcomes, 'other')).toEqual([
+    expect(noticeTexts(step.outcomes, 'other', T)).toEqual([
       'Task done: Mine 3 iron ore · +25 XP',
       'Chapter done: Into the dark',
     ]);
@@ -108,14 +112,16 @@ describe('texts', () => {
       me,
       { kind: 'mine', block: Block.COAL_ORE, item: 256, count: 1 },
       [me],
+      T,
     );
-    expect(noticeTexts(coal.outcomes, 'me')).toContain('Unlocked: Torch');
+    expect(noticeTexts(coal.outcomes, 'me', T)).toContain('Unlocked: Torch');
     const craft = stepProgress(
       EMPTY_PROGRESS,
       me,
       { kind: 'craft', recipe: 2, item: 257, count: 4 },
       [me],
+      T,
     );
-    expect(noticeTexts(craft.outcomes, 'me')).toEqual([]);
+    expect(noticeTexts(craft.outcomes, 'me', T)).toEqual([]);
   });
 });

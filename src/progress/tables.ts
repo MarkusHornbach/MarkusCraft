@@ -110,30 +110,30 @@ function task(
 
 /** The task book in book order. Counts and XP are tuned with the bot; ids and types stay. */
 export const TASKS: readonly Task[] = [
-  task(1, 1, 'Mine 4 logs', 'mine', Block.LOG, 4, 10),
-  task(2, 1, 'Make 8 planks', 'craft', Block.PLANKS, 8, 10),
+  task(1, 1, 'Mine 32 logs', 'mine', Block.LOG, 32, 10),
+  task(2, 1, 'Make 64 planks', 'craft', Block.PLANKS, 64, 10),
   task(3, 1, 'Make a workbench', 'craft', Block.WORKBENCH, 1, 10),
   task(4, 1, 'Place a workbench', 'place', Block.WORKBENCH, 1, 10),
   task(5, 2, 'Make a wooden pickaxe', 'craft', Item.WOODEN_PICKAXE, 1, 15),
-  task(6, 2, 'Mine 8 stone', 'mine', Block.STONE, 8, 15),
+  task(6, 2, 'Mine 64 stone', 'mine', Block.STONE, 64, 15),
   task(7, 2, 'Make a stone pickaxe', 'craft', Item.STONE_PICKAXE, 1, 15),
   task(8, 2, 'Climb to height 64', 'reachAbove', 64, 1, 15),
   task(9, 3, 'Make a furnace', 'craft', Block.FURNACE, 1, 20),
   task(10, 3, 'Place a furnace', 'place', Block.FURNACE, 1, 20),
-  task(11, 3, 'Make 2 coal', 'craft', Item.COAL, 2, 20),
-  task(12, 3, 'Mine 3 coal', 'mine', Item.COAL, 3, 20),
-  task(13, 4, 'Make 8 torches', 'craft', Block.TORCH, 8, 25),
+  task(11, 3, 'Make 16 coal', 'craft', Item.COAL, 16, 20),
+  task(12, 3, 'Mine 32 coal', 'mine', Item.COAL, 32, 20),
+  task(13, 4, 'Make 32 torches', 'craft', Block.TORCH, 32, 25),
   task(14, 4, 'Reach depth 30', 'reachBelow', 30, 1, 25),
-  task(15, 4, 'Place 4 torches', 'place', Block.TORCH, 4, 25),
-  task(16, 4, 'Mine 3 iron ore', 'mine', Block.IRON_ORE, 3, 25),
-  task(17, 5, 'Make 3 iron ingots', 'craft', Item.IRON_INGOT, 3, 30),
+  task(15, 4, 'Place 32 torches', 'place', Block.TORCH, 32, 25),
+  task(16, 4, 'Mine 20 iron ore', 'mine', Block.IRON_ORE, 20, 25),
+  task(17, 5, 'Make 20 iron ingots', 'craft', Item.IRON_INGOT, 20, 30),
   task(18, 5, 'Make an iron pickaxe', 'craft', Item.IRON_PICKAXE, 1, 30),
-  task(19, 5, 'Make 4 glass', 'craft', Block.GLASS, 4, 30),
-  task(20, 5, 'Place 8 stone bricks', 'place', Block.STONE_BRICKS, 8, 30),
+  task(19, 5, 'Make 24 glass', 'craft', Block.GLASS, 24, 30),
+  task(20, 5, 'Place 64 stone bricks', 'place', Block.STONE_BRICKS, 64, 30),
 ];
 
 /** Total XP at which each level starts: level 1 at 0; the last entry is the maximum level. */
-export const LEVELS: readonly number[] = [0, 30, 80, 150, 240, 350, 480];
+export const LEVELS: readonly number[] = [0, 60, 125, 190, 270, 370, 460];
 
 function byLevel(level: number, recipes: readonly number[]): RecipeUnlock[] {
   return recipes.map((recipe) => ({ recipe, unlock: { level } }));

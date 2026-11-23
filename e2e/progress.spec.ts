@@ -27,12 +27,12 @@ test('Phase 8 AC4.4: progress survives a reload: open chapter, counts, XP', asyn
     window.__mc.setProgress({ xp: 40, done: [1, 3, 4] });
     window.__mc.give(5, 1);
   });
-  // One craft of planks: 4 of "Make 8 planks" and the first craft's 5 XP.
+  // One craft of planks: 4 of "Make 64 planks" and the first craft's 5 XP.
   const result = await page.evaluate(() => window.__mc.submit({ kind: 'craft', recipe: 1 }));
   expect(result?.ok).toBe(true);
   const before = await progress(page);
-  expect(before).toMatchObject({ xp: 45, level: 2, chapter: 1, done: [1, 3, 4] });
-  expect(before?.tasks.find((t) => t.id === 2)).toEqual({ id: 2, count: 4, goal: 8, done: false });
+  expect(before).toMatchObject({ xp: 45, level: 1, chapter: 1, done: [1, 3, 4] });
+  expect(before?.tasks.find((t) => t.id === 2)).toEqual({ id: 2, count: 4, goal: 64, done: false });
   await page.evaluate(() => window.__mc.save());
 
   await openGame(page, { save: true, world: 'Book', mode: 'gathering', progress: 'fresh' });
@@ -46,12 +46,12 @@ test('Phase 8 plan 5.8: progress=all is the default of an Adventure test world; 
 }) => {
   await openGame(page, { mode: 'gathering' });
   const all = await progress(page);
-  expect(all).toMatchObject({ level: 7, xp: 480, nextLevelXp: null, chapter: null, tasks: [] });
+  expect(all).toMatchObject({ level: 7, xp: 460, nextLevelXp: null, chapter: null, tasks: [] });
   expect(all?.done).toHaveLength(20);
   expect((await getState(page)).recipes.every((r) => !r.locked)).toBe(true);
   await openGame(page, { mode: 'gathering', progress: 'fresh' });
   const fresh = await getState(page);
-  expect(fresh.progress).toMatchObject({ level: 1, xp: 0, nextLevelXp: 30, chapter: 1 });
+  expect(fresh.progress).toMatchObject({ level: 1, xp: 0, nextLevelXp: 60, chapter: 1 });
   expect(fresh.progress?.tasks.map((t) => t.id)).toEqual([1, 2, 3, 4]);
   expect(fresh.recipes.find((r) => r.name === 'stone_pickaxe')).toMatchObject({
     locked: true,
@@ -100,7 +100,7 @@ test('Phase 8 AC3.2: locked rows are dimmed, say what unlocks them, have no butt
   await expect(row('wooden_pickaxe')).not.toHaveClass(/locked/);
   await expect(row('wooden_pickaxe').locator('.recipe-craft')).toBeVisible();
   await row('torch').scrollIntoViewIfNeeded();
-  await expect(row('torch').locator('.recipe-note')).toHaveText('Task: Mine 3 coal');
+  await expect(row('torch').locator('.recipe-note')).toHaveText('Task: Mine 32 coal');
   const state = await getState(page);
   expect(state.recipes.filter((r) => r.locked).map((r) => r.name)).toContain('wooden_axe');
   expect(state.recipes.find((r) => r.name === 'wooden_axe')?.craftable).toBe(false);
@@ -121,13 +121,13 @@ test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters a
   await openTab(page, 'tasks');
   const tab = page.locator('.tasks-tab');
   await expect(tab.locator('.tasks-level')).toHaveText('Level 1');
-  await expect(tab.locator('.tasks-xp-text')).toHaveText('0 / 30 XP');
+  await expect(tab.locator('.tasks-xp-text')).toHaveText('0 / 60 XP');
   await expect(tab.locator('.tasks-next')).toHaveText(
     'Next level: Wooden axe, Wooden shovel, Stone pickaxe',
   );
   await expect(tab.locator('.tasks-chapter')).toHaveText('Chapter 1 · First wood');
   await expect(tab.locator('.task-row')).toHaveCount(4);
-  await expect(tab.locator('.task-row').nth(1)).toContainText('Make 8 planks0 / 8');
+  await expect(tab.locator('.task-row').nth(1)).toContainText('Make 64 planks0 / 64');
   await expect(tab.locator('.tasks-footer')).toHaveText('4 more chapters');
   // Nothing on the tab takes the focus: no buttons in it.
   await expect(tab.locator('button, input')).toHaveCount(0);
@@ -135,18 +135,21 @@ test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters a
   // A craft while the tab is open: the count and the XP move.
   await give(page, LOG, 1);
   expect(await submit(page, { kind: 'craft', recipe: 1 })).toBe(true);
-  await expect(tab.locator('.task-row').nth(1).locator('.task-status')).toHaveText('4 / 8');
-  await expect(tab.locator('.tasks-xp-text')).toHaveText('5 / 30 XP');
+  await expect(tab.locator('.task-row').nth(1).locator('.task-status')).toHaveText('4 / 64');
+  await expect(tab.locator('.tasks-xp-text')).toHaveText('5 / 60 XP');
 
   // Mid-book: folded chapters and a reach task.
-  await page.evaluate(() => window.__mc.setProgress({ xp: 120, done: [1, 2, 3, 4, 5, 6, 7] }));
+  await page.evaluate(() => window.__mc.setProgress({ xp: 100, done: [1, 2, 3, 4, 5, 6, 7] }));
   await expect(tab.locator('.tasks-finished-chapter')).toHaveText(['✓ First wood']);
   await expect(tab.locator('.tasks-chapter')).toHaveText('Chapter 2 · Tools');
   await expect(tab.locator('.task-row .task-status')).toHaveText(['✓', '✓', '✓', '–']);
-  await expect(tab.locator('.tasks-level')).toHaveText('Level 3');
-  await expect(tab.locator('.tasks-xp-text')).toHaveText('120 / 150 XP');
+  await expect(tab.locator('.tasks-level')).toHaveText('Level 2');
+  await expect(tab.locator('.tasks-xp-text')).toHaveText('100 / 125 XP');
+  await expect(tab.locator('.tasks-next')).toHaveText(
+    'Next level: Stone axe, Stone shovel, Furnace, Coal',
+  );
   const fill = await tab.locator('.tasks-xp-fill').evaluate((e) => e.style.width);
-  expect(fill).toBe('57%');
+  expect(fill).toBe('62%');
   // Climbing to 64 finishes the chapter while the tab is open.
   await setPlayer(page, { y: 70 });
   await step(page, 1);
@@ -171,22 +174,24 @@ test('Phase 8 AC5.5: a task notice shows for 3 000 ms of simulation time; queued
   page,
 }) => {
   await freshAtWorkbench(page);
-  await give(page, LOG, 3);
+  await page.evaluate(() => window.__mc.setProgress({ xp: 45 }));
   await give(page, PLANKS, 4);
   const notice = page.locator('.progress-notice');
   await expect(notice).toBeHidden();
-  // Two crafts of planks finish "Make 8 planks"; the workbench finishes "Make a workbench".
-  expect(await submit(page, { kind: 'craft', recipe: 1 })).toBe(true);
-  expect(await submit(page, { kind: 'craft', recipe: 1 })).toBe(true);
+  // The workbench finishes "Make a workbench" (+10, first craft +5: level 2); placing it
+  // finishes "Place a workbench".
   expect(await submit(page, { kind: 'craft', recipe: 3 })).toBe(true);
+  const { player } = await getState(page);
+  const cell = { x: Math.floor(player.x) - 1, y: PLATFORM_Y + 1, z: Math.floor(player.z) - 2 };
+  expect(await submit(page, { kind: 'place', ...cell, slot: 0 })).toBe(true);
   const text = async () => (await getState(page)).progress?.notice ?? null;
-  expect(await text()).toBe('Task done: Make 8 planks · +10 XP');
-  await whenIdle(page);
-  await expect(notice).toHaveText('Task done: Make 8 planks · +10 XP');
-  await step(page, 179);
-  expect(await text()).toBe('Task done: Make 8 planks · +10 XP');
-  await step(page, 1);
   expect(await text()).toBe('Task done: Make a workbench · +10 XP');
+  await whenIdle(page);
+  await expect(notice).toHaveText('Task done: Make a workbench · +10 XP');
+  await step(page, 179);
+  expect(await text()).toBe('Task done: Make a workbench · +10 XP');
+  await step(page, 1);
+  expect(await text()).toBe('Level 2 · Unlocked: Wooden axe, Wooden shovel, Stone pickaxe');
   // Over the open inventory, at the top centre, away from the panel's tabs.
   await page.keyboard.press('KeyE');
   await whenIdle(page);
@@ -201,9 +206,8 @@ test('Phase 8 AC5.5: a task notice shows for 3 000 ms of simulation time; queued
   });
   expect(onTop).toBe(true);
   await expect(page).toHaveScreenshot('progress-notice.png', { maxDiffPixelRatio: 0.05 });
-  // 30 XP by now: the level-up follows.
   await step(page, 180);
-  expect(await text()).toBe('Level 2 · Unlocked: Wooden axe, Wooden shovel, Stone pickaxe');
+  expect(await text()).toBe('Task done: Place a workbench · +10 XP');
   await step(page, 180);
   expect(await text()).toBeNull();
   await whenIdle(page);
@@ -218,7 +222,7 @@ test('Phase 8 AC5.6: the F3 overlay shows the Progress row in Adventure only', a
   await page.keyboard.press('F3');
   await whenIdle(page);
   await expect(page.locator('[data-debug="progress"]')).toHaveText(
-    'Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP',
+    'Chapter 3 · Task 2/4 done · Level 3 · 160/190 XP',
   );
   await openGame(page);
   await page.keyboard.press('F3');

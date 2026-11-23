@@ -125,8 +125,10 @@ test('Phase 8 AC5.5 (touch): the notice never covers a touch button or the bar, 
   page,
 }) => {
   await phoneWorld(page);
-  // Three notices in a row (9 s of simulation time): the real loop runs slowly here.
+  // Notices in a row (several seconds of simulation time): the real loop runs slowly here.
   await page.evaluate(() => {
+    // 45 XP: the workbench's task and first craft make level 2, a second notice.
+    window.__mc.setProgress({ xp: 45 });
     window.__mc.give(5, 2);
     window.__mc.give(7, 4);
     window.__mc.submit({ kind: 'craft', recipe: 1 });

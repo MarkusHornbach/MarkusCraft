@@ -14,7 +14,7 @@ import {
   recipesOfLevel,
   tasksOf,
 } from './progress';
-import { CHAPTERS, FIRST_FIND_XP, getChapter, getTask, unlockOf } from './tables';
+import { PROGRESS_TABLES, type ProgressTables } from './tables';
 
 /** One row of the open chapter on the Tasks tab. */
 export interface TaskRowView {
@@ -53,18 +53,23 @@ export function recipeNames(recipes: readonly number[]): string {
     .join(', ');
 }
 
-export function bookView(progress: WorldProgress, record: PlayerRecord): BookView {
+export function bookView(
+  progress: WorldProgress,
+  record: PlayerRecord,
+  tables: ProgressTables = PROGRESS_TABLES,
+): BookView {
+  const chapters = tables.chapters;
   const xp = record.xp;
-  const level = levelOf(xp);
-  const next = nextLevelXp(xp);
-  const start = levelStartXp(xp);
-  const chapter = openChapter(progress);
-  const finished = CHAPTERS.filter((c) =>
-    tasksOf(c.id).every((t) => progress.done.includes(t.id)),
-  ).map((c) => c.title);
-  const index = chapter ? CHAPTERS.findIndex((c) => c.id === chapter.id) : CHAPTERS.length;
-  const later = chapter ? CHAPTERS.length - index - 1 : 0;
-  const nextRecipes = next === null ? [] : recipesOfLevel(level + 1);
+  const level = levelOf(xp, tables);
+  const next = nextLevelXp(xp, tables);
+  const start = levelStartXp(xp, tables);
+  const chapter = openChapter(progress, tables);
+  const finished = chapters
+    .filter((c) => tasksOf(c.id, tables).every((t) => progress.done.includes(t.id)))
+    .map((c) => c.title);
+  const index = chapter ? chapters.findIndex((c) => c.id === chapter.id) : chapters.length;
+  const later = chapter ? chapters.length - index - 1 : 0;
+  const nextRecipes = next === null ? [] : recipesOfLevel(level + 1, tables);
   return {
     level,
     xpText: next === null ? 'Max level' : `${xp} / ${next} XP`,
@@ -76,7 +81,7 @@ export function bookView(progress: WorldProgress, record: PlayerRecord): BookVie
     finished,
     chapterTitle: chapter ? `Chapter ${index + 1} · ${chapter.title}` : null,
     tasks: chapter
-      ? tasksOf(chapter.id).map((task) => {
+      ? tasksOf(chapter.id, tables).map((task) => {
           const done = progress.done.includes(task.id);
           const reach = task.type === 'reachBelow' || task.type === 'reachAbove';
           const status = done ? '✓' : reach ? '–' : `${countOf(progress, task)} / ${task.count}`;
@@ -92,15 +97,19 @@ export function bookView(progress: WorldProgress, record: PlayerRecord): BookVie
 }
 
 /** The F3 row "Progress": "Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP". */
-export function progressRow(progress: WorldProgress, record: PlayerRecord): string {
+export function progressRow(
+  progress: WorldProgress,
+  record: PlayerRecord,
+  tables: ProgressTables = PROGRESS_TABLES,
+): string {
   const xp = record.xp;
-  const level = levelOf(xp);
-  const next = nextLevelXp(xp);
-  const chapter = openChapter(progress);
+  const level = levelOf(xp, tables);
+  const next = nextLevelXp(xp, tables);
+  const chapter = openChapter(progress, tables);
   const levelText = next === null ? `Level ${level} · Max` : `Level ${level} · ${xp}/${next} XP`;
   if (!chapter) return `Book complete · ${levelText}`;
-  const index = CHAPTERS.findIndex((c) => c.id === chapter.id) + 1;
-  const tasks = tasksOf(chapter.id);
+  const index = tables.chapters.findIndex((c) => c.id === chapter.id) + 1;
+  const tasks = tasksOf(chapter.id, tables);
   const done = tasks.filter((t) => progress.done.includes(t.id)).length;
   return `Chapter ${index} · Task ${done}/${tasks.length} done · ${levelText}`;
 }
@@ -109,7 +118,12 @@ export function progressRow(progress: WorldProgress, record: PlayerRecord): stri
  * The notice lines of a step's outcomes for the player `self`, in order (plan 5.7). XP of
  * first crafts is silent; level-ups and first finds of other players are not shown.
  */
-export function noticeTexts(outcomes: readonly ProgressOutcome[], self: string): string[] {
+export function noticeTexts(
+  outcomes: readonly ProgressOutcome[],
+  self: string,
+  tables: ProgressTables = PROGRESS_TABLES,
+): string[] {
+  const getTask = (id: number) => tables.tasks.find((t) => t.id === id);
   const texts: string[] = [];
   for (const outcome of outcomes) {
     switch (outcome.kind) {
@@ -119,7 +133,7 @@ export function noticeTexts(outcomes: readonly ProgressOutcome[], self: string):
         break;
       }
       case 'chapterDone': {
-        const chapter = getChapter(outcome.chapter);
+        const chapter = tables.chapters.find((c) => c.id === outcome.chapter);
         if (chapter) texts.push(`Chapter done: ${chapter.title}`);
         break;
       }
@@ -136,7 +150,7 @@ export function noticeTexts(outcomes: readonly ProgressOutcome[], self: string):
         break;
       case 'firstFind': {
         if (outcome.player !== self) break;
-        const xp = FIRST_FIND_XP.get(outcome.block) ?? 0;
+        const xp = tables.firstFindXp.get(outcome.block) ?? 0;
         texts.push(`First find: ${getBlockDef(outcome.block).label} · +${xp} XP`);
         break;
       }
@@ -148,8 +162,9 @@ export function noticeTexts(outcomes: readonly ProgressOutcome[], self: string):
 }
 
 /** The HUD text of a `locked` refusal: "Locked: Level 3", "Locked: Mine 3 coal". */
-export function lockedText(recipe: number): string {
-  const unlock = unlockOf(recipe);
+export function lockedText(recipe: number, tables: ProgressTables = PROGRESS_TABLES): string {
+  const unlock = tables.recipeUnlocks.find((u) => u.recipe === recipe)?.unlock ?? { level: 1 };
   if ('level' in unlock) return `Locked: Level ${unlock.level}`;
-  return `Locked: ${getTask(unlock.task)?.label ?? `task ${unlock.task}`}`;
+  const task = tables.tasks.find((t) => t.id === unlock.task);
+  return `Locked: ${task?.label ?? `task ${unlock.task}`}`;
 }
