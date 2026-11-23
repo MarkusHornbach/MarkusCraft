@@ -133,7 +133,7 @@ export const TASKS: readonly Task[] = [
 ];
 
 /** Total XP at which each level starts: level 1 at 0; the last entry is the maximum level. */
-export const LEVELS: readonly number[] = [0, 60, 125, 190, 270, 370, 460];
+export const LEVELS: readonly number[] = [0, 50, 125, 190, 270, 370, 460];
 
 function byLevel(level: number, recipes: readonly number[]): RecipeUnlock[] {
   return recipes.map((recipe) => ({ recipe, unlock: { level } }));

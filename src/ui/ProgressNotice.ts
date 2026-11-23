@@ -11,8 +11,12 @@ export class ProgressNotice {
     parent.appendChild(this.element);
   }
 
-  /** The line to show; null hides the notice. */
-  show(text: string | null): void {
+  /**
+   * The line to show; null hides the notice. Over the open inventory a short screen has no
+   * room above the panel: the notice moves to the bottom edge there (CSS), off the tabs.
+   */
+  show(text: string | null, overInventory = false): void {
+    this.element.classList.toggle('over-inventory', overInventory);
     if (text === null) {
       if (!this.element.hidden) this.element.hidden = true;
       return;

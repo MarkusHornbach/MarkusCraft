@@ -2276,7 +2276,10 @@ export class Game {
     // Over the HUD and the open inventory; not over the pause menu or the world menu.
     const playing =
       (this.inventoryOpen || !this.paused) && (!this.pauseScreen || this.screen === 'play');
-    this.progressNotice.show(playing ? (this.progressShown?.text ?? null) : null);
+    this.progressNotice.show(
+      playing ? (this.progressShown?.text ?? null) : null,
+      this.inventoryOpen,
+    );
     const smelt = this.smeltView();
     this.inventoryScreen.setSmelting(smelt ? smelt.recipe : null, smelt ? smelt.progress : 0);
   }

@@ -1575,6 +1575,13 @@ canvas {
     font-size: 13px;
     padding: 4px 10px;
   }
+
+  /* The inventory panel fills a phone's height: the notice goes to the bottom edge, over
+     the panel's last line rather than its tabs. */
+  .progress-notice.over-inventory {
+    top: auto;
+    bottom: 4px;
+  }
 }
 
 /* ---- Performance test (Phase 4 part P) ---- */

@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import {
   PLATFORM_Y,
+  getBlock,
   getState,
   give,
   openGame,
@@ -51,7 +52,7 @@ test('Phase 8 plan 5.8: progress=all is the default of an Adventure test world; 
   expect((await getState(page)).recipes.every((r) => !r.locked)).toBe(true);
   await openGame(page, { mode: 'gathering', progress: 'fresh' });
   const fresh = await getState(page);
-  expect(fresh.progress).toMatchObject({ level: 1, xp: 0, nextLevelXp: 60, chapter: 1 });
+  expect(fresh.progress).toMatchObject({ level: 1, xp: 0, nextLevelXp: 50, chapter: 1 });
   expect(fresh.progress?.tasks.map((t) => t.id)).toEqual([1, 2, 3, 4]);
   expect(fresh.recipes.find((r) => r.name === 'stone_pickaxe')).toMatchObject({
     locked: true,
@@ -121,7 +122,7 @@ test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters a
   await openTab(page, 'tasks');
   const tab = page.locator('.tasks-tab');
   await expect(tab.locator('.tasks-level')).toHaveText('Level 1');
-  await expect(tab.locator('.tasks-xp-text')).toHaveText('0 / 60 XP');
+  await expect(tab.locator('.tasks-xp-text')).toHaveText('0 / 50 XP');
   await expect(tab.locator('.tasks-next')).toHaveText(
     'Next level: Wooden axe, Wooden shovel, Stone pickaxe',
   );
@@ -136,7 +137,7 @@ test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters a
   await give(page, LOG, 1);
   expect(await submit(page, { kind: 'craft', recipe: 1 })).toBe(true);
   await expect(tab.locator('.task-row').nth(1).locator('.task-status')).toHaveText('4 / 64');
-  await expect(tab.locator('.tasks-xp-text')).toHaveText('5 / 60 XP');
+  await expect(tab.locator('.tasks-xp-text')).toHaveText('5 / 50 XP');
 
   // Mid-book: folded chapters and a reach task.
   await page.evaluate(() => window.__mc.setProgress({ xp: 100, done: [1, 2, 3, 4, 5, 6, 7] }));
@@ -149,7 +150,7 @@ test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters a
     'Next level: Stone axe, Stone shovel, Furnace, Coal',
   );
   const fill = await tab.locator('.tasks-xp-fill').evaluate((e) => e.style.width);
-  expect(fill).toBe('62%');
+  expect(fill).toBe('67%');
   // Climbing to 64 finishes the chapter while the tab is open.
   await setPlayer(page, { y: 70 });
   await step(page, 1);
@@ -228,4 +229,159 @@ test('Phase 8 AC5.6: the F3 overlay shows the Progress row in Adventure only', a
   await page.keyboard.press('F3');
   await whenIdle(page);
   await expect(page.locator('[data-debug="progress"]')).toBeHidden();
+});
+
+/** Logs within reach of a free cell on the ground beside their trunk, nearest first. */
+function reachableLogs(page: Page) {
+  return page.evaluate(() => {
+    const mc = window.__mc;
+    const start = mc.getState().player;
+    const sx = Math.floor(start.x);
+    const sz = Math.floor(start.z);
+    const found: { log: [number, number, number]; stand: [number, number, number]; d: number }[] =
+      [];
+    for (let dz = -60; dz <= 60; dz++) {
+      for (let dx = -60; dx <= 60; dx++) {
+        const x = sx + dx;
+        const z = sz + dz;
+        const top = mc.surfaceY(x, z);
+        if (top < 0) continue;
+        // `surfaceY` of a trunk is its top log: the trunk reaches down below it.
+        for (let y = top - 8; y <= top; y++) {
+          if (mc.getBlock(x, y, z) !== 5) continue;
+          for (const [ox, oz] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
+            const gx = x + ox;
+            const gz = z + oz;
+            const ground = mc.surfaceY(gx, gz);
+            const g = mc.getBlock(gx, ground, gz);
+            // Dry ground, two free cells above it, the log within easy reach of the eye.
+            if (g === 0 || g === 5 || g === 6 || g === 10) continue;
+            if (mc.getBlock(gx, ground + 1, gz) !== 0 || mc.getBlock(gx, ground + 2, gz) !== 0)
+              continue;
+            const eye = ground + 1 + 1.62;
+            if (Math.abs(y + 0.5 - eye) > 3) continue;
+            found.push({ log: [x, y, z], stand: [gx, ground + 1, gz], d: Math.hypot(dx, dz) });
+            break;
+          }
+        }
+      }
+    }
+    return found.sort((a, b) => a.d - b.d);
+  });
+}
+
+test('Phase 8 AC6.1: a fresh world, real input, nothing given: chapter 1 completes, the notices appear, level 2 unlocks the stone pickaxe', async ({
+  page,
+}) => {
+  test.setTimeout(600_000);
+  await openGame(page, {
+    mode: 'gathering',
+    progress: 'fresh',
+    terrain: 'balanced',
+    trees: 'few',
+  });
+  const start = (await getState(page)).player;
+  expect((await getState(page)).inventory.slots.every((s) => s === null)).toBe(true);
+  const tasks = (await progress(page))?.tasks ?? [];
+  const goal = (id: number) => tasks.find((t) => t.id === id)?.goal ?? 0;
+  const logsNeeded = goal(1);
+  const planksNeeded = goal(2);
+  const notices: string[] = [];
+  const noteNotice = async () => {
+    const text = (await progress(page))?.notice ?? null;
+    if (text && notices[notices.length - 1] !== text) notices.push(text);
+  };
+
+  // 1. Logs by hand, the player beside each trunk (a teleport stands for the walk, as in
+  // the play-throughs of Phase 3), the mouse held on the log.
+  let mined = 0;
+  for (const { log, stand } of await reachableLogs(page)) {
+    if (mined >= logsNeeded) break;
+    if ((await getBlock(page, ...log)) !== LOG) continue;
+    const ex = stand[0] + 0.5;
+    const ey = stand[1] + 1.62;
+    const ez = stand[2] + 0.5;
+    const dx = log[0] + 0.5 - ex;
+    const dy = log[1] + 0.5 - ey;
+    const dz = log[2] + 0.5 - ez;
+    await setPlayer(page, {
+      x: ex,
+      y: stand[1],
+      z: ez,
+      yaw: Math.atan2(-dx, -dz),
+      pitch: Math.atan2(dy, Math.hypot(dx, dz)),
+    });
+    const target = (await getState(page)).target;
+    if (!target || target.x !== log[0] || target.y !== log[1] || target.z !== log[2]) continue;
+    await page.mouse.move(480, 270);
+    await page.mouse.down();
+    await step(page, 121);
+    await page.mouse.up();
+    await step(page, 1);
+    if ((await getBlock(page, ...log)) !== LOG) mined++;
+    await noteNotice();
+  }
+  expect(mined).toBe(logsNeeded);
+  expect((await progress(page))?.done).toEqual([1]);
+  expect(notices).toContain(`Task done: Mine ${logsNeeded} logs · +10 XP`);
+
+  // 2. Planks by the "Craft" button, then the workbench.
+  await openTab(page, 'crafting');
+  const planks = page.locator('.recipe-row[data-recipe="planks"] .recipe-craft');
+  for (let i = 0; i < planksNeeded / 4; i++) {
+    await planks.click();
+    await step(page, 20);
+    await noteNotice();
+  }
+  await page.locator('.recipe-row[data-recipe="workbench"] .recipe-craft').click();
+  await step(page, 1);
+  await noteNotice();
+  expect((await progress(page))?.done).toEqual([1, 2, 3]);
+  await page.keyboard.press('KeyE');
+
+  // 3. The workbench on the ground, by a right click.
+  const slots = (await getState(page)).inventory.slots;
+  const bench = slots.findIndex((s) => s?.item === WORKBENCH);
+  expect(bench).toBeGreaterThanOrEqual(0);
+  expect(bench).toBeLessThan(9);
+  await page.keyboard.press(`Digit${bench + 1}`);
+  // Back on the open grass of the start point, looking down in front of the feet.
+  await setPlayer(page, {
+    x: start.x,
+    y: start.y,
+    z: start.z,
+    yaw: 0,
+    pitch: (-70 * Math.PI) / 180,
+  });
+  await step(page, 30);
+  const ground = (await getState(page)).target;
+  expect(ground?.face).toEqual([0, 1, 0]);
+  await page.mouse.click(480, 270, { button: 'right' });
+  await step(page, 1);
+  const state = await progress(page);
+  expect(state?.chapter).toBe(2);
+  expect(state?.done).toEqual([1, 2, 3, 4]);
+  expect(state?.level).toBe(2);
+  // The notices of the rest of chapter 1 follow one after the other.
+  for (let i = 0; i < 12; i++) {
+    await noteNotice();
+    await step(page, 90);
+  }
+  expect(notices).toEqual(
+    expect.arrayContaining([
+      `Task done: Make ${planksNeeded} planks · +10 XP`,
+      'Task done: Make a workbench · +10 XP',
+      'Task done: Place a workbench · +10 XP',
+      'Chapter done: First wood',
+      'Level 2 · Unlocked: Wooden axe, Wooden shovel, Stone pickaxe',
+    ]),
+  );
+  const recipes = (await getState(page)).recipes;
+  expect(recipes.find((r) => r.name === 'stone_pickaxe')?.locked).toBe(false);
+  expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
 });
