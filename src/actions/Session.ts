@@ -1,6 +1,13 @@
 // Session: the one door through which the game changes the world and a player's items.
 import { type Action, decodeAction } from './actions';
 import { type ActionResult, type BlockChange, type PlayerPose, applyAction } from './apply';
+import { type ProgressEvent, eventsOf } from '../progress/events';
+import {
+  EMPTY_PROGRESS,
+  type ProgressOutcome,
+  type WorldProgress,
+  stepProgress,
+} from '../progress/progress';
 import type { GameMode, PlayerRecord } from './playerRecord';
 
 export interface SessionListener {
@@ -10,6 +17,11 @@ export interface SessionListener {
   onPlayer(record: PlayerRecord): void;
   /** The answer to a submitted action. */
   onResult(action: Action, result: ActionResult): void;
+  /**
+   * The world's task book changed, or a step had outcomes (Adventure, Phase 8). Records
+   * changed by XP were reported through `onPlayer` first.
+   */
+  onProgress?(progress: WorldProgress, outcomes: readonly ProgressOutcome[]): void;
 }
 
 /**
@@ -36,20 +48,60 @@ export interface LocalHost {
   nowMs(): number;
 }
 
+/** The id of the single player in the progress step. */
+export const LOCAL_PLAYER_ID = 'local';
+
 /** Single-player session: validates and applies at once, on this device. */
 export class LocalSession implements Session {
   private current: PlayerRecord;
+  private book: WorldProgress;
 
   constructor(
     private readonly host: LocalHost,
     record: PlayerRecord,
     private readonly listener: SessionListener,
+    progress: WorldProgress = EMPTY_PROGRESS,
   ) {
     this.current = record;
+    this.book = progress;
   }
 
   get record(): PlayerRecord {
     return this.current;
+  }
+
+  /** The world's task book as last changed. */
+  get progress(): WorldProgress {
+    return this.book;
+  }
+
+  /**
+   * Test tool: replaces the world's task book past the action layer (`setProgress`).
+   * Game and UI code must not call this; `pipeline.test.ts` guards it.
+   */
+  replaceProgress(progress: WorldProgress): void {
+    this.book = progress;
+    this.listener.onProgress?.(progress, []);
+  }
+
+  /** The player's feet Y, once per simulation step: the reach tasks (Adventure only). */
+  notePose(y: number): void {
+    if (this.host.mode !== 'gathering') return;
+    this.step({ kind: 'pose', y });
+  }
+
+  /** Runs one event through the progress step and reports what changed. */
+  private step(event: ProgressEvent): void {
+    const actor = { id: LOCAL_PLAYER_ID, record: this.current };
+    const result = stepProgress(this.book, actor, event, [actor]);
+    if (result.progress === this.book && result.records.length === 0) return;
+    for (const { id, record } of result.records) {
+      if (id !== LOCAL_PLAYER_ID) continue;
+      this.current = record;
+      this.listener.onPlayer(record);
+    }
+    this.book = result.progress;
+    this.listener.onProgress?.(result.progress, result.outcomes);
   }
 
   /**
@@ -69,11 +121,17 @@ export class LocalSession implements Session {
       return;
     }
     const pose = this.host.pose();
-    const result = applyAction(
-      { world: this.host.world, mode: this.host.mode, pose, record: this.current, players: [pose] },
-      decoded.action,
-      this.host.nowMs(),
-    );
+    const ctx = {
+      world: this.host.world,
+      mode: this.host.mode,
+      pose,
+      record: this.current,
+      players: [pose],
+      progress: this.book,
+    };
+    const result = applyAction(ctx, decoded.action, this.host.nowMs());
+    // Events read the world before the action's blocks are set.
+    const events = this.host.mode === 'gathering' ? eventsOf(decoded.action, result, ctx) : [];
     if (result.ok) {
       for (const change of result.blocks) {
         this.host.world.setBlock(change.x, change.y, change.z, change.id);
@@ -84,6 +142,7 @@ export class LocalSession implements Session {
         this.listener.onPlayer(result.player);
       }
     }
+    for (const event of events) this.step(event);
     this.listener.onResult(decoded.action, result);
   }
 }

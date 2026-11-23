@@ -4,6 +4,7 @@ import { expectFasterThan } from '../testing/timing';
 import { mulberry32, randInt } from '../util/rng';
 import { Block, HOTBAR_BLOCKS } from '../world/blocks';
 import type { Action } from './actions';
+import { EMPTY_PROGRESS } from '../progress/progress';
 import { type ActionContext, type ActionResult, applyAction } from './apply';
 import { type PlayerRecord, createPlayerRecord } from './playerRecord';
 import { LocalSession, type SessionListener } from './Session';
@@ -31,7 +32,14 @@ function scene(): { world: Cells; ctx: ActionContext } {
   const pose = { x: 0.5, y: 10, z: 0.5 };
   return {
     world,
-    ctx: { world, mode: 'creative', pose, record: createPlayerRecord('creative'), players: [pose] },
+    ctx: {
+      world,
+      mode: 'creative',
+      pose,
+      record: createPlayerRecord('creative'),
+      players: [pose],
+      progress: EMPTY_PROGRESS,
+    },
   };
 }
 

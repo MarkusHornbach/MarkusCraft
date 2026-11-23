@@ -12,6 +12,7 @@ import { playerIntersectsBlock } from '../player/physics';
 import { addItems, emptySlot, fits, moveStack, removeItems, setSlot } from '../items/inventory';
 import { getItemDef } from '../items/items';
 import { getRecipe, stationsNear, takeIngredients } from '../items/recipes';
+import { type WorldProgress, recipeUnlocked } from '../progress/progress';
 import { BLOCK_NEEDS_SUPPORT, BLOCK_REPLACEABLE, BLOCK_SOLID, isSupport } from '../world/blocks';
 import type { Action } from './actions';
 import type { GameMode, PlayerRecord } from './playerRecord';
@@ -21,7 +22,8 @@ import type { GameMode, PlayerRecord } from './playerRecord';
  * `missing` also stands for an empty slot and for ingredients a recipe is short of;
  * `station` for a recipe whose workbench or furnace is not within reach; `support` for a
  * block that needs a solid cube below it (the torch); `rate` for a guest that sent too
- * many actions within a second (the host's rule, Phase 6 part C; no text on screen).
+ * many actions within a second (the host's rule, Phase 6 part C; no text on screen);
+ * `locked` for a recipe the player has not unlocked yet (Phase 8).
  */
 export type RejectReason =
   | 'reach'
@@ -31,6 +33,7 @@ export type RejectReason =
   | 'early'
   | 'missing'
   | 'station'
+  | 'locked'
   | 'support'
   | 'mode'
   | 'rate'
@@ -59,6 +62,8 @@ export interface ActionContext {
   record: PlayerRecord;
   /** All players in the world (one today): a block cannot be placed into any of them. */
   players: readonly PlayerPose[];
+  /** The world's task book; with the record it decides which recipes are unlocked. */
+  progress: WorldProgress;
 }
 
 /** A pickup: `count` items of one kind went into the inventory. */
@@ -227,6 +232,7 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       if (ctx.mode !== 'gathering') return reject('mode');
       const recipe = getRecipe(action.recipe);
       if (!recipe) return reject('invalid');
+      if (!recipeUnlocked(recipe.id, ctx.record, ctx.progress)) return reject('locked');
       if (recipe.station && !stationsNear(ctx.world, ctx.pose)[recipe.station]) {
         return reject('station');
       }

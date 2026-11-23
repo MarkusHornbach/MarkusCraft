@@ -7,6 +7,7 @@ import { breakTimeMs } from '../items/hardness';
 import { Item } from '../items/items';
 import { Block } from '../world/blocks';
 import { eventsOf } from './events';
+import { completeProgress } from './progress';
 
 class Cells {
   readonly cells = new Map<string, number>();
@@ -35,8 +36,9 @@ function context(held: ItemStack | null = null): ActionContext {
     world,
     mode: 'gathering',
     pose,
-    record: { ...record, slots },
+    record: { ...record, slots, xp: 1000 },
     players: [pose],
+    progress: completeProgress(),
   };
 }
 

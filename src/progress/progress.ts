@@ -34,6 +34,16 @@ export const EMPTY_PROGRESS: WorldProgress = Object.freeze({
 /** The highest XP a record can hold (the save format's limit). */
 export const XP_MAX = 1_000_000_000;
 
+/** Every task of the tables done: the test worlds' `progress=all`. */
+export function completeProgress(tables: ProgressTables = PROGRESS_TABLES): WorldProgress {
+  return { done: tables.tasks.map((t) => t.id), counts: [] };
+}
+
+/** The XP the maximum level starts at. */
+export function maxLevelXp(tables: ProgressTables = PROGRESS_TABLES): number {
+  return tables.levels[tables.levels.length - 1];
+}
+
 /** A player the step may give XP to: an id (a name in rooms, "local" alone) and its record. */
 export interface ProgressPlayer {
   readonly id: string;

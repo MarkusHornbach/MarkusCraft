@@ -6,6 +6,7 @@ import { getRecipe } from '../items/recipes';
 import { mulberry32, randInt } from '../util/rng';
 import { BLOCKS, Block, isSupport } from '../world/blocks';
 import { type Action, decodeAction } from './actions';
+import { completeProgress, maxLevelXp } from '../progress/progress';
 import { type ActionContext, type ActionResult, applyAction } from './apply';
 import { type ItemStack, createPlayerRecord } from './playerRecord';
 
@@ -33,7 +34,14 @@ function context(
   for (const [index, stack] of Object.entries(slots)) filled[Number(index)] = stack;
   return {
     world,
-    ctx: { world, mode, pose, record: { ...record, slots: filled }, players: [pose] },
+    ctx: {
+      world,
+      mode,
+      pose,
+      record: { ...record, slots: filled, xp: maxLevelXp() },
+      players: [pose],
+      progress: completeProgress(),
+    },
   };
 }
 

@@ -51,6 +51,17 @@ const REPLACE_RECORD_ALLOWED: Record<string, number> = {
   'src/game/Game.ts': 2,
 };
 
+/** Calls of the test tool that replaces the world's task book (`setProgress`). */
+const REPLACE_PROGRESS_ALLOWED: Record<string, number> = {};
+
+/** A value given to a record's progress field (`xp: …`), not a type (`xp: number`). */
+const RECORD_PROGRESS_FIELD =
+  /\b(?:xp|found|crafted)\s*:(?!\s*(?:number|readonly|string|boolean)\b)\s*[^\s]/g;
+const RECORD_PROGRESS_ALLOWED: Record<string, number> = {
+  // The decoder reads the fields of stored and received records.
+  'src/save/saveFormat.ts': 3,
+};
+
 function countCalls(pattern: RegExp, skip: (file: string) => boolean): Record<string, number> {
   const found: Record<string, number> = {};
   for (const path of sourceFiles('src')) {
@@ -83,6 +94,33 @@ describe('single pipeline for items (Phase 3 plan 5.2)', () => {
   it('the pattern finds calls and ignores definitions of other names', () => {
     expect('x = addItems(slots, 1, 2); moveStack (a, b, c)'.match(INVENTORY_CALL)?.length).toBe(2);
     expect('function countItems(slots) {} fits(slots, 1, 1)'.match(INVENTORY_CALL)).toBeNull();
+  });
+});
+
+describe('single pipeline for progress (Phase 8 plan 5.5)', () => {
+  it('stepProgress is called only by the sessions', () => {
+    const found = countCalls(/\bstepProgress\s*\(/g, (file) => file.startsWith('src/progress/'));
+    for (const file of Object.keys(found)) {
+      expect(['src/actions/Session.ts', 'src/net/HostSession.ts']).toContain(file);
+    }
+    expect(found['src/actions/Session.ts']).toBe(1);
+  });
+
+  it('the task book is replaced past the session only by the test API', () => {
+    expect(countCalls(/\.replaceProgress\s*\(/g, () => false)).toEqual(REPLACE_PROGRESS_ALLOWED);
+  });
+
+  it("a record's xp, found and crafted are built only by progress, actions and the test tool", () => {
+    const found = countCalls(
+      RECORD_PROGRESS_FIELD,
+      (file) => file.startsWith('src/progress/') || file.startsWith('src/actions/'),
+    );
+    expect(found).toEqual(RECORD_PROGRESS_ALLOWED);
+  });
+
+  it('the field pattern finds values and ignores types', () => {
+    expect('{ ...r, xp: 5, found: [], crafted }'.match(RECORD_PROGRESS_FIELD)?.length).toBe(2);
+    expect('readonly xp: number; found: readonly number[]'.match(RECORD_PROGRESS_FIELD)).toBeNull();
   });
 });
 
