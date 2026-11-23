@@ -160,6 +160,9 @@ describe('timed breaking over the network (Phase 6 AC9.1)', () => {
       slots: [],
       selectedSlot: 0,
       breaking: { x: 1, y: 2, z: 3, startMs: 1000 },
+      xp: 0,
+      found: [],
+      crafted: [],
     } as PlayerRecord;
     const action = { kind: 'break', x: 1, y: 2, z: 3 } as const;
     // Due at 1000 + 600 - 100 (the tolerance of `applyAction`).

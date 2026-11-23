@@ -46,7 +46,14 @@ describe('save format', () => {
       time: 0.999,
       pose: { x: -12345.678, y: 80.25, z: 9876.5, yaw: -3.1, pitch: 1.5 },
       moveMode: 'fly',
-      player: { slots, selectedSlot: 8, breaking: { x: -3, y: 70, z: 12, startMs: 4321.5 } },
+      player: {
+        slots,
+        selectedSlot: 8,
+        breaking: { x: -3, y: 70, z: 12, startMs: 4321.5 },
+        xp: 0,
+        found: [],
+        crafted: [],
+      },
     });
     const decoded = decodeWorld(
       throughJson(encodeMeta(meta)),

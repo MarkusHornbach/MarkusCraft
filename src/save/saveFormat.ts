@@ -196,7 +196,7 @@ export function decodePlayer(value: unknown): PlayerRecord | null {
     if (!isInt(b.y, 0, WORLD_HEIGHT - 1) || !isFiniteIn(b.startMs, 0, TIME_LIMIT)) return null;
     breaking = { x: b.x, y: b.y, z: b.z, startMs: b.startMs };
   }
-  return { slots, selectedSlot: value.selectedSlot, breaking };
+  return { slots, selectedSlot: value.selectedSlot, breaking, xp: 0, found: [], crafted: [] };
 }
 
 // --- world record ------------------------------------------------------------------
