@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE, CHUNK_VOLUME, GENERATOR_VERSION, WORLD_HEIGHT } from '../../game/config';
+import { CHUNK_SIZE, CHUNK_VOLUME, WORLD_HEIGHT } from '../../game/config';
 import { LIGHT_CHECKSUM_1337_V1 } from '../../testing/lightChecksum';
 import { TEST_LIGHT, artificialGroup, caveGroup } from '../../testing/lightScenes';
 import { generateChunk } from '../generation/terrain';
 import { checkChunkLight, checkLight, joinChunks } from './lightCheck';
 import { lightChecksumOf, lightChunk } from './lightChunk';
 import { type ChunkLookup, blockOf, skyOf, stepLight } from './lightRules';
+import { CLASSIC_GEN } from '../generation/worldOptions';
 
 const SEED = 1337;
 const terrain = new Map<string, Uint8Array>();
@@ -13,7 +14,7 @@ function terrainChunk(cx: number, cz: number): Uint8Array {
   const key = `${cx},${cz}`;
   let blocks = terrain.get(key);
   if (!blocks) {
-    blocks = generateChunk(SEED, cx, cz, GENERATOR_VERSION);
+    blocks = generateChunk(SEED, cx, cz, CLASSIC_GEN);
     terrain.set(key, blocks);
   }
   return blocks;

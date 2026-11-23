@@ -20,6 +20,7 @@ import {
   VOID_Y,
   WALK_SPEED,
 } from '../game/config';
+import { BLOCK_SOLID, BLOCK_SOLID_PASSABLE_LEAVES } from '../world/blocks';
 import type { PlayerState } from './player';
 
 export interface MoveInput {
@@ -45,6 +46,31 @@ export const NO_INPUT: MoveInput = {
 export interface PhysicsWorld {
   isSolidAt(x: number, y: number, z: number): boolean;
   isWaterAt(x: number, y: number, z: number): boolean;
+}
+
+/** A world that answers solidity with a given table (`World` does). */
+export interface SolidSource {
+  isSolidIn(table: Uint8Array, x: number, y: number, z: number): boolean;
+  isWaterAt(x: number, y: number, z: number): boolean;
+}
+
+/**
+ * The world as the player's movement sees it: leaves are passable unless the setting
+ * "Collide with leaves" is on. Made once per world; choosing a table allocates nothing.
+ */
+export class MovementWorld implements PhysicsWorld {
+  collideLeaves = false;
+
+  constructor(private readonly world: SolidSource) {}
+
+  isSolidAt(x: number, y: number, z: number): boolean {
+    const table = this.collideLeaves ? BLOCK_SOLID : BLOCK_SOLID_PASSABLE_LEAVES;
+    return this.world.isSolidIn(table, x, y, z);
+  }
+
+  isWaterAt(x: number, y: number, z: number): boolean {
+    return this.world.isWaterAt(x, y, z);
+  }
 }
 
 const HALF = PLAYER_WIDTH / 2;

@@ -15,6 +15,7 @@ import {
 } from '../game/config';
 import type { WorldEdits } from '../save/saveFormat';
 import { wrapTime } from '../world/dayNight';
+import { type WorldGen, worldGenOf } from '../world/generation/worldOptions';
 import { BreakClock } from './breakTiming';
 import type { PeerEvent } from './HostSession';
 import { RemoteRoster } from './interpolation';
@@ -86,8 +87,8 @@ export interface ClientOptions {
    * `clock` if not given. Records carry its times instead of the host's (`BreakClock`).
    */
   actionClock?: () => number;
-  /** The terrain checksum this device computes for a seed and generator version. */
-  checksum: (seed: number, generatorVersion: number) => number;
+  /** The terrain checksum this device computes for a seed and generator. */
+  checksum: (seed: number, gen: WorldGen) => number;
   listener: ClientListener;
 }
 
@@ -462,14 +463,17 @@ export class ClientSession implements Session {
       case 'reject':
         this.failAttempt(new JoinError(m.reason));
         return;
-      case 'welcome':
-        if (this.o.checksum(m.seed, m.generatorVersion) !== m.checksum) {
+      case 'welcome': {
+        const gen = worldGenOf(m.generatorVersion, m.options);
+        // A generator this build does not know cannot give the host's terrain.
+        if (!gen || this.o.checksum(m.seed, gen) !== m.checksum) {
           this.send({ t: 'bye' });
           this.failAttempt(new JoinError('terrain'));
           return;
         }
         attempt.welcome = m;
         return;
+      }
       case 'snapshot':
         if (attempt.welcome) attempt.parts.push(m.chunks);
         return;

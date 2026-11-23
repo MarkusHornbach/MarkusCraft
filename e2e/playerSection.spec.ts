@@ -150,12 +150,14 @@ test('Phase 6 AC13.8: reference of "Your player"', async ({ page }) => {
   await openSettings(page);
   await page.getByRole('button', { name: 'Look: Moss' }).click();
   const section = page.locator('.player-section');
-  await section.scrollIntoViewIfNeeded();
+  // To the top of the view, so the whole clip is inside it (the "Collide with leaves" row of
+  // Phase 7 part A put the section lower); 276 px fit the view with room for other fonts.
+  await section.evaluate((node) => node.scrollIntoView({ block: 'start' }));
   const box = await section.boundingBox();
   if (!box) throw new Error('no section');
   // The Automatic button shows the look of a random key: masked like the moving preview.
   await expect(page).toHaveScreenshot('player-section.png', {
-    clip: { x: Math.round(box.x), y: Math.round(box.y), width: 345, height: 290 },
+    clip: { x: Math.round(box.x), y: Math.round(box.y), width: 345, height: 276 },
     mask: [page.locator('.player-preview'), page.locator('.look-button[data-look="0"] canvas')],
     maxDiffPixelRatio: 0.05,
   });

@@ -12,8 +12,11 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
 - Devices: **PC** = computer with keyboard and mouse, **Phone** and **Tablet** = Android
   with Chrome, landscape. Where a test names devices, do it on each of them.
 - Use a world with **seed 1337** for everything that is measured or compared, so runs on
-  different versions and devices see the same terrain. The start point is in a wood, with
-  a lake and shore close by and a rocky hill to the south.
+  different versions and devices see the same terrain. Since Phase 7 part A create it with
+  the form's defaults (Terrain "Balanced", Trees "Few"), or as the test says. Its start
+  point is on open grass by a lake (north and west), with a wood to the south-west and
+  south and hills rising to the south-east. Worlds created before Phase 7 are "Classic" and
+  keep their old terrain (there the start point is in a wood, a rocky hill to the south).
 - Debug overlay: F3 on the PC, the "Debug overlay" switch in the pause menu on touch
   devices.
 
@@ -29,8 +32,8 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Docs 1 (ticked tests and "Obsolete" moved to `docs/device-tests-done.md`; the
-owner dropped the 45 open tests from before Phase 4); 2026-11-22.
+Last updated: Phase 7 part A (section "World options", GEN-1 to GEN-4, LEAF-1 and LEAF-2;
+seed 1337 now with the form's defaults); 2026-11-23.
 
 ---
 
@@ -124,6 +127,38 @@ Once, before the first run:
       the chunk you stand in; walk until the number changes). Since Part E the chunk on the
       other side of the border gets its new mesh a frame or two later: do you see a
       flicker, a hole for a moment, or shading that jumps late? _Phone, PC._ Result:
+
+## 4. World options (Phase 7 part A)
+
+New worlds choose "Terrain" (Flat, Balanced, Hilly) and "Trees" (None, Few, Normal, Many)
+in the "New world" form; the defaults are Balanced and Few. "None" is for Creative only.
+"Collide with leaves" is a switch on the settings page (off by default).
+
+- [ ] **GEN-1** (7A) Create three worlds with seed 1337: Flat, Balanced and Hilly (Trees:
+      Few). Fly around each for a minute. Does each look like its name: Flat gentle lowland
+      with small hills, Balanced mostly plains with a few lower hills, Hilly like the old
+      worlds with mountains and bare rock? Is there still enough water (lakes, shores) in
+      all three? _PC, Phone._ Result:
+- [ ] **GEN-2** (7A) A Gathering world with the defaults (Balanced, Few): is wood within
+      easy reach of the start point (a few steps, not a long search)? Walking around: do
+      you see forests and groves with open meadows between them, rather than single trees
+      everywhere? Try Normal and Many too: is the difference clear? Result:
+- [ ] **GEN-3** (7A) The "New world" form on the phone in landscape: can you reach the
+      Terrain and Trees rows and "Create and play" by scrolling, and is nothing covered?
+      Then with the controller on the PC or the phone: does the frame move into both rows,
+      does A select, and is "None" skipped while Gathering is chosen? Is the hint "No trees
+      only in Creative: Gathering needs wood." understood? _Phone, PC._ Result:
+- [ ] **GEN-4** (7A) From a PR preview on the Pi: host a world created with Hilly and None
+      (Creative), and join it from a second device whose own worlds are Classic. Does the
+      guest see the same hills and no trees, and does the world list of the guest stay
+      unchanged afterwards? _PC, Phone._ Result:
+- [ ] **LEAF-1** (7A) With "Collide with leaves" off (the default): walk into a tree, jump
+      onto a canopy, stand above one. Does passing through the leaves feel right, or do you
+      miss standing on tree tops? Turn the setting on: are leaves solid again at once?
+      Result:
+- [ ] **LEAF-2** (7A) Inside a canopy the view is full of leaves. How does it look on the
+      PC and the phone: confusing, fine, or nice? Should a later phase add an effect for the
+      view inside leaves (darker, a tint), or a "slow down in leaves"? Result:
 
 ## 8. Crafting and tools
 

@@ -19,8 +19,16 @@ export const FOG_START_FACTOR = 0.6;
 export const UNDERWATER_FOG_NEAR = 1;
 export const UNDERWATER_FOG_FAR = 24;
 
-/** Version of the terrain generator that new worlds are created with (stored per world). */
-export const GENERATOR_VERSION = 1;
+/**
+ * Version of the terrain generator that worlds of the "New world" form get (stored per
+ * world). The automatic world of `?test=1` stays version 1 (Phase 7 part A).
+ */
+export const GENERATOR_VERSION = 2;
+/** Generator 2 spawn: at least this many trunks within `SPAWN_WOOD_RADIUS` (Chebyshev). */
+export const SPAWN_MIN_TREES = 8;
+export const SPAWN_WOOD_RADIUS = 40;
+/** Generator 2 spawn: rings searched for a spot with wood before the plain rule applies. */
+export const SPAWN_WOOD_RINGS = 256;
 /** Land at or above this height (shifted by noise) is bare rock without soil. */
 export const ROCK_HEIGHT = 80;
 /** Largest shift of the rock line by its low-frequency noise, in blocks. */
@@ -182,7 +190,7 @@ export const TOUCH_PIXEL_RATIO_MAX = 1.5;
  * Version of the save format; a world saved by a newer version is not opened. Version 2
  * (Phase 6 part C) adds the guests of the world; version 1 records load without any.
  */
-export const SAVE_FORMAT_VERSION = 2;
+export const SAVE_FORMAT_VERSION = 3;
 /** Guests a world keeps (items and place); beyond this the one seen longest ago goes. */
 export const GUESTS_MAX = 32;
 export const WORLD_NAME_MAX = 24;

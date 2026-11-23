@@ -18,6 +18,7 @@ import {
 import { LOOK_COUNT } from '../player/looks';
 import type { MoveMode } from '../player/player';
 import { decodePlayer, encodePlayer } from '../save/saveFormat';
+import { type WorldOptions, decodeWorldOptions } from '../world/generation/worldOptions';
 import { isPlayerKey } from './roomCode';
 
 /** Position of a player's feet centre and where it looks. */
@@ -65,6 +66,8 @@ export interface Welcome {
   worldName: string;
   seed: number;
   generatorVersion: number;
+  /** The world options of generator 2, null for generator 1 (Phase 7 part A). */
+  options: WorldOptions | null;
   mode: GameMode;
   checksum: number;
   time: number;
@@ -195,6 +198,14 @@ function str(m: Fields, key: string, maxLength: number, minLength = 0): string {
   const v = m[key];
   if (typeof v !== 'string' || v.length > maxLength || v.length < minLength) fail(key);
   return v;
+}
+
+/** World options as the save validates them; null for generator 1. */
+function worldOptions(value: unknown): WorldOptions | null {
+  if (value === null) return null;
+  const decoded = decodeWorldOptions(value);
+  if (!decoded.ok) fail('options');
+  return decoded.options;
 }
 
 function obj(value: unknown, what: string): Fields {
@@ -378,6 +389,7 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
           worldName: str(m, 'worldName', WORLD_NAME_MAX, 1),
           seed: int(m, 'seed', 0, 0xffffffff),
           generatorVersion: int(m, 'generatorVersion', 1, 0xffff),
+          options: worldOptions(m.options),
           mode: mode(m),
           checksum: int(m, 'checksum', 0, 0xffffffff),
           time: num(m, 'time', 0, 1),

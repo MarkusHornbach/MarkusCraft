@@ -25,6 +25,7 @@ import { lookForKey } from '../player/looks';
 import type { MoveMode } from '../player/player';
 import { type GuestEntry, limitGuests } from '../save/saveFormat';
 import type { World } from '../world/World';
+import { optionsOf } from '../world/generation/worldOptions';
 import { FarReader } from './authority';
 import { BreakClock, breakDueMs } from './breakTiming';
 import { RemoteRoster } from './interpolation';
@@ -65,7 +66,7 @@ export interface HostOptions {
   world: World;
   mode: GameMode;
   worldName: string;
-  /** Terrain checksum of the world's seed and generator version (computed by the caller). */
+  /** Terrain checksum of the world's seed and generator (computed by the caller). */
   checksum: number;
   hostName: string;
   hostKey: string;
@@ -597,6 +598,7 @@ export class HostSession {
       worldName: this.o.worldName,
       seed: this.o.world.seed,
       generatorVersion: this.o.world.generatorVersion,
+      options: optionsOf(this.o.world.gen),
       mode: this.o.mode,
       checksum: this.o.checksum,
       time: this.timeOfDay(now),

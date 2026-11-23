@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_FALL_SPEED, SIM_DT, SPRINT_SPEED, VOID_Y, WALK_SPEED } from '../game/config';
 import {
+  MovementWorld,
   type MoveInput,
   NO_INPUT,
   type PhysicsWorld,
@@ -10,7 +11,7 @@ import {
 } from './physics';
 import { type PlayerState, applyLook, createPlayer, eyeY, viewDirection } from './player';
 import { flatGroup, worldOf } from '../testing/lightEdits';
-import { Block } from '../world/blocks';
+import { BLOCK_SOLID, BLOCK_SOLID_PASSABLE_LEAVES, Block } from '../world/blocks';
 import type { World } from '../world/World';
 
 /** A tiny world: flat solid ground below `groundY`, plus individual solid and water cells. */
@@ -447,5 +448,95 @@ describe('the torch has no collision (Phase 4 AC6.2)', () => {
     expect(p.onGround).toBe(true);
     expect(p.y).toBeCloseTo(11, 6);
     expect(playerIntersectsBlock(p, 44, 11, 44)).toBe(true);
+  });
+});
+
+describe('leaves and "Collide with leaves" (Phase 7 part A)', () => {
+  /** Stone up to y = 10; a leaf wall across x = 38..42 at z = 37, and a canopy at y = 14. */
+  function leafWorld(): World {
+    const world = worldOf(flatGroup());
+    for (let x = 38; x <= 42; x++) {
+      for (let y = 11; y <= 12; y++) world.setBlock(x, y, 37, Block.LEAVES);
+    }
+    for (let x = 43; x <= 46; x++) {
+      for (let z = 43; z <= 46; z++) world.setBlock(x, 14, z, Block.LEAVES);
+    }
+    return world;
+  }
+
+  it('Phase 7 AC7.1: with the default setting a player walks through a canopy and falls through it', () => {
+    const world = leafWorld();
+    const movement = new MovementWorld(world);
+    expect(movement.collideLeaves).toBe(false);
+    // Leaves keep their meaning everywhere else.
+    expect(world.isSolidAt(40, 11, 37)).toBe(true);
+    expect(movement.isSolidAt(40, 11, 37)).toBe(false);
+    expect(movement.isSolidAt(40, 10, 37)).toBe(true);
+    const walker = standing(movement, 40.5, 40.5, 11);
+    run(walker, movement, 90, FORWARD);
+    expect(walker.z).toBeLessThan(36);
+    expect(walker.againstWall).toBe(false);
+    const faller = createPlayer(44.5, 15, 44.5);
+    run(faller, movement, 120);
+    expect(faller.onGround).toBe(true);
+    expect(faller.y).toBeCloseTo(11, 6);
+  });
+
+  it('Phase 7 AC7.1: with the setting on both are blocked as before', () => {
+    const world = leafWorld();
+    const movement = new MovementWorld(world);
+    movement.collideLeaves = true;
+    const walker = standing(movement, 40.5, 40.5, 11);
+    run(walker, movement, 90, FORWARD);
+    expect(walker.z).toBeGreaterThan(37.6);
+    expect(walker.againstWall).toBe(true);
+    const faller = createPlayer(44.5, 15, 44.5);
+    run(faller, movement, 120);
+    expect(faller.onGround).toBe(true);
+    expect(faller.y).toBeCloseTo(15, 6);
+    // The same as physics on the world itself.
+    const plain = createPlayer(44.5, 15, 44.5);
+    run(plain, world, 120);
+    expect(plain.y).toBe(faller.y);
+  });
+
+  it('Phase 7 AC7.4: turning it on inside leaves does not move the player, who can walk out', () => {
+    const world = leafWorld();
+    const movement = new MovementWorld(world);
+    const p = standing(movement, 40.5, 37.5, 11);
+    expect(playerIntersectsBlock(p, 40, 11, 37)).toBe(true);
+    const before = { x: p.x, y: p.y, z: p.z };
+    movement.collideLeaves = true;
+    run(p, movement, 30);
+    expect({ x: p.x, y: p.y, z: p.z }).toEqual(before);
+    // Forward (north, -z) leads out into the air.
+    run(p, movement, 60, FORWARD);
+    expect(p.z).toBeLessThan(36);
+    expect(playerIntersectsBlock(p, 40, 11, 37)).toBe(false);
+  });
+
+  it('Phase 7 AC7.5: chooses one of two fixed tables per call and allocates nothing', () => {
+    const world = leafWorld();
+    const tables = new Set<Uint8Array>();
+    const spy = {
+      isSolidIn: (table: Uint8Array, x: number, y: number, z: number) => {
+        tables.add(table);
+        return world.isSolidIn(table, x, y, z);
+      },
+      isWaterAt: (x: number, y: number, z: number) => world.isWaterAt(x, y, z),
+    };
+    const movement = new MovementWorld(spy);
+    for (const collide of [false, true]) {
+      movement.collideLeaves = collide;
+      const p = standing(movement, 40.5, 40.5, 11);
+      run(p, movement, 600, FORWARD);
+    }
+    // Every call used one of the two module tables: nothing is built per step.
+    expect([...tables]).toEqual([BLOCK_SOLID_PASSABLE_LEAVES, BLOCK_SOLID]);
+    expect(BLOCK_SOLID_PASSABLE_LEAVES[Block.LEAVES]).toBe(0);
+    expect(BLOCK_SOLID[Block.LEAVES]).toBe(1);
+    for (let id = 0; id < 256; id++) {
+      if (id !== Block.LEAVES) expect(BLOCK_SOLID_PASSABLE_LEAVES[id]).toBe(BLOCK_SOLID[id]);
+    }
   });
 });

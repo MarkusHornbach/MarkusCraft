@@ -240,6 +240,8 @@ test('F3 toggles the debug overlay with live values (AC11.3)', async ({ page }) 
   await expect(value('chunks')).toHaveText('81 loaded, 0 pending');
   await expect(value('render')).toHaveText(/^\d+ draw calls, \d+ triangles$/);
   await expect(value('seed')).toHaveText('1337');
+  // Phase 7 AC6.4: the generator row.
+  await expect(value('generator')).toHaveText('Generator 1');
   await expect(value('time')).toHaveText('0.250 (noon)');
   await expect(value('mode')).toHaveText('fly');
   await expect(value('target')).toHaveText('none');
@@ -258,6 +260,15 @@ test('F3 toggles the debug overlay with live values (AC11.3)', async ({ page }) 
 
   await page.keyboard.press('F3');
   await expect(overlay).toBeHidden();
+});
+
+test('Phase 7 AC6.4: the F3 overlay names the generator of a generator 2 world', async ({
+  page,
+}) => {
+  await openGame(page, { terrain: 'flat', trees: 'many' });
+  await page.keyboard.press('F3');
+  await expect(page.locator('[data-debug="generator"]')).toHaveText('Generator 2 · flat · many');
+  await expect(page.locator('.debug-overlay')).toContainText('World');
 });
 
 // Phase 1 AC11.4 (random seed per visit, seed from the URL, copy link) is now covered by

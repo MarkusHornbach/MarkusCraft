@@ -76,6 +76,13 @@ lazy session chunk. Relayed poses are cut to millimetres and 1e-4 rad (`compactP
 leave out flags that are false: with four moving players the host sends about 13 kB/s
 (AC14.6, limit 20). The scenario `players`: `src/bench/CLAUDE.md`.
 
+## World options (Phase 7 part A)
+
+`welcome` carries `options` next to `generatorVersion` (`null` for generator 1), validated
+like the save; the guest checks the checksum with that generator and opens its world with
+it, so a guest never sees another world than the host's. A mismatch is the join error
+`terrain`. Builds that differ never meet (`hello` checks `build`).
+
 ## The network test (Phase 6 part A)
 
 A screen of its own (`nettest`), opened by "Network test" on the settings page; "Back"

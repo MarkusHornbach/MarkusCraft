@@ -4,7 +4,6 @@ import {
   CHUNK_VOLUME,
   CLAY_DEPTH,
   CLAY_MIN_WATER_DEPTH,
-  GENERATOR_VERSION,
   ROCK_HEIGHT,
   ROCK_HEIGHT_SHIFT,
   ROCK_SLOPE,
@@ -17,21 +16,25 @@ import { deriveSeed, fnv1a, hash2Float } from '../../util/rng';
 import { Block } from '../blocks';
 import { chunkKey } from '../chunk';
 import { CLAY_COLUMN, markClayColumns, placeOres } from './ores';
+import {
+  BEACH_ABOVE,
+  BEACH_BELOW,
+  CONTINENT_SCALE,
+  DETAIL_SCALE,
+  DIRT_DEPTH,
+  MAX_SURFACE,
+  MIN_SURFACE,
+  ROCK_JITTER,
+  ROCK_SCALE,
+  SALT_ROCK,
+} from './terrainRules';
+import { TerrainV2 } from './terrainV2';
+import { CLASSIC_GEN, type WorldGen, isKnownGeneratorVersion, worldGenKey } from './worldOptions';
+
+export { isKnownGeneratorVersion } from './worldOptions';
 import { TREE_CANOPY_RADIUS, hasLeaf, isTreeOrigin, trunkHeight as treeTrunkHeight } from './trees';
 
-/** Columns whose surface is this close to sea level are sand (beaches, shallow beds). */
-export const BEACH_ABOVE = 2;
-export const BEACH_BELOW = 3;
-export const DIRT_DEPTH = 3;
-export const MIN_SURFACE = 22;
-export const MAX_SURFACE = 106;
-
-const CONTINENT_SCALE = 1 / 360;
-const DETAIL_SCALE = 1 / 110;
-const ROCK_SCALE = 1 / 64;
-/** Per-column jitter of the rock line, so grass and rock do not meet along a contour. */
-const ROCK_JITTER = 1;
-const SALT_ROCK = 0x70c4;
+export { BEACH_ABOVE, BEACH_BELOW, DIRT_DEPTH, MAX_SURFACE, MIN_SURFACE } from './terrainRules';
 const LAYER = CHUNK_SIZE * CHUNK_SIZE;
 /** Heights of a chunk's columns plus a rim of one column, for the slope rule. */
 const GRID = CHUNK_SIZE + 2;
@@ -325,48 +328,62 @@ export class Terrain {
   }
 }
 
-const terrains = new Map<number, Terrain>();
+/** What every generator version offers the spawn search, the game and the tools. */
+export interface TerrainSource {
+  readonly seed: number;
+  /** Set (and true) when the spawn search should look for wood near the start point. */
+  readonly wantsWood?: boolean;
+  heightAt(x: number, z: number): number;
+  isUnderWater(x: number, z: number): boolean;
+  isGrass(x: number, z: number): boolean;
+  isRock(x: number, z: number): boolean;
+  treeAt(x: number, z: number): number;
+  generateChunk(cx: number, cz: number): Uint8Array;
+}
+
+const terrains = new Map<string, TerrainSource>();
 const TERRAIN_CACHE_SIZE = 4;
 
-/** Returns the (cached) terrain of a seed; the noise tables are built once per seed. */
-export function getTerrain(seed: number): Terrain {
-  const key = seed >>> 0;
+/**
+ * Returns the (cached) terrain of a seed and generator; the noise tables are built once
+ * per pair. Without `gen` it is generator version 1.
+ */
+export function getTerrain(seed: number, gen: WorldGen = CLASSIC_GEN): TerrainSource {
+  if (!isKnownGeneratorVersion(gen.version)) {
+    throw new Error(`Unknown generator version ${gen.version}`);
+  }
+  const key = `${seed >>> 0}/${worldGenKey(gen)}`;
   let terrain = terrains.get(key);
   if (!terrain) {
-    // A few seeds stay cached (switching between worlds); the oldest one is dropped.
+    // A few stay cached (switching between worlds); the oldest one is dropped.
     if (terrains.size >= TERRAIN_CACHE_SIZE) {
       for (const oldest of terrains.keys()) {
         terrains.delete(oldest);
         break;
       }
     }
-    terrain = new Terrain(key);
+    terrain = gen.version === 1 ? new Terrain(seed) : new TerrainV2(seed, gen.options);
     terrains.set(key, terrain);
   }
   return terrain;
 }
 
-export function isKnownGeneratorVersion(version: number): boolean {
-  return version === GENERATOR_VERSION;
-}
-
 /**
- * Pure chunk generator: depends only on its arguments. `version` is the generator version
- * stored in the world; a later version that changes the terrain must keep this one working.
+ * Pure chunk generator: depends only on its arguments. `gen` is the generator stored with
+ * the world; a later version that changes the terrain must keep the older ones working.
  */
-export function generateChunk(seed: number, cx: number, cz: number, version: number): Uint8Array {
-  if (!isKnownGeneratorVersion(version)) throw new Error(`Unknown generator version ${version}`);
-  return getTerrain(seed).generateChunk(cx, cz);
+export function generateChunk(seed: number, cx: number, cz: number, gen: WorldGen): Uint8Array {
+  return getTerrain(seed, gen).generateChunk(cx, cz);
 }
 
 /**
  * 32-bit FNV-1a checksum over the block data of the 3 × 3 chunks around the origin. Two
  * devices that compute the same value generate the same terrain for the seed.
  */
-export function terrainChecksum(seed: number, version: number): number {
+export function terrainChecksum(seed: number, gen: WorldGen): number {
   let hash: number | undefined;
   for (let cz = -1; cz <= 1; cz++) {
-    for (let cx = -1; cx <= 1; cx++) hash = fnv1a(generateChunk(seed, cx, cz, version), hash);
+    for (let cx = -1; cx <= 1; cx++) hash = fnv1a(generateChunk(seed, cx, cz, gen), hash);
   }
   return hash ?? 0;
 }

@@ -16,7 +16,7 @@ import { addItems } from '../items/inventory';
 import { isItem, itemLabel } from '../items/items';
 import { type RecipeStatus, getRecipe, listRecipes, stationsNear } from '../items/recipes';
 import { TouchControls } from '../input/TouchControls';
-import { type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
+import { MovementWorld, type MoveInput, respawnIfFallen, stepPlayer } from '../player/physics';
 import { applyLook, createPlayer, eyeY, type PlayerState, viewDirection } from '../player/player';
 import { Renderer } from '../render/Renderer';
 import {
@@ -24,6 +24,7 @@ import {
   type WorldEdits,
   type WorldMeta,
   makeWorldId,
+  metaGen,
   normalizeName,
   seedFromText,
 } from '../save/saveFormat';
@@ -64,6 +65,12 @@ import { chunkKey, toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
+import {
+  type WorldGen,
+  type WorldOptions,
+  debugWorldGen,
+  optionsOf,
+} from '../world/generation/worldOptions';
 import { lightChecksumOf } from '../world/light/lightChunk';
 import { blockOf, skyOf } from '../world/light/lightRules';
 import { type RayHit, raycast } from '../world/raycast';
@@ -190,6 +197,8 @@ export class Game {
   // World, chunk manager, player and session belong to the open world; `loadWorld`
   // replaces them. Until a world is open they are empty placeholders.
   private world: World;
+  /** The world as movement sees it (leaves passable unless "Collide with leaves"). */
+  private movement: MovementWorld;
   private readonly renderer: Renderer;
   private chunkManager: ChunkManager;
   private player: PlayerState;
@@ -333,6 +342,7 @@ export class Game {
     if (params.look !== null) this.mp.setLook(params.look);
     this.time = params.time;
     this.world = new World(0);
+    this.movement = new MovementWorld(this.world);
 
     this.root = document.createElement('div');
     this.root.className = 'game-root';
@@ -457,8 +467,8 @@ export class Game {
       this.worldMenu = new WorldMenu(this.root, {
         mode: this.mode,
         onPlay: (id, via) => void this.startWorld(() => this.loadStoredWorld(id), via),
-        onCreate: (name, seedText, mode, via) =>
-          void this.startWorld(() => this.createStoredWorld(name, seedText, mode), via),
+        onCreate: (name, seedText, mode, options, via) =>
+          void this.startWorld(() => this.createStoredWorld(name, seedText, mode, options), via),
         onDelete: (id) => void this.deleteWorld(id),
         onSettings: () => this.showScreen('settings'),
         onBench: () => this.openBench(),
@@ -526,7 +536,7 @@ export class Game {
     } else {
       // A new world in memory. It is never stored.
       this.loadWorld(
-        this.newWorldMeta(params.world, params.seed, params.time, params.mode),
+        this.newWorldMeta(params.world, params.seed, params.time, params.mode, this.testWorldGen()),
         new Map(),
       );
     }
@@ -566,9 +576,23 @@ export class Game {
     );
   }
 
+  /**
+   * The generator of the automatic test world: version 1, as the specs before Phase 7 part A
+   * expect, unless the URL names `terrain` or `trees`.
+   */
+  private testWorldGen(): WorldGen {
+    return this.params.testGen;
+  }
+
   /** The record of a world that does not exist yet: at its start point, in the morning. */
-  private newWorldMeta(name: string, seed: number, time: number, mode: GameMode): WorldMeta {
-    const spawn = findSpawn(getTerrain(seed));
+  private newWorldMeta(
+    name: string,
+    seed: number,
+    time: number,
+    mode: GameMode,
+    gen: WorldGen,
+  ): WorldMeta {
+    const spawn = findSpawn(getTerrain(seed, gen));
     const now = Date.now();
     const random = (): number => Math.floor(Math.random() * 0x100000000);
     return {
@@ -576,7 +600,8 @@ export class Game {
       name: normalizeName(name),
       seed: seed >>> 0,
       mode,
-      generatorVersion: GENERATOR_VERSION,
+      generatorVersion: gen.version,
+      options: optionsOf(gen),
       formatVersion: SAVE_FORMAT_VERSION,
       createdMs: now,
       playedMs: now,
@@ -597,9 +622,11 @@ export class Game {
     // A room belongs to its world: another world closes it.
     if (this.mp.role === 'host') this.mp.leave();
     this.renderer.clearChunkMeshes();
-    this.world = new World(meta.seed, meta.generatorVersion, edits);
+    const gen = metaGen(meta);
+    this.world = new World(meta.seed, gen, edits);
+    this.movement = this.movementOf(this.world);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
-    this.spawn = findSpawn(getTerrain(meta.seed));
+    this.spawn = findSpawn(getTerrain(meta.seed, gen));
     this.player = createPlayer(meta.pose.x, meta.pose.y, meta.pose.z);
     applyLook(this.player, meta.pose.yaw, meta.pose.pitch);
     // Nobody flies in a Gathering world, whatever the record says.
@@ -690,7 +717,7 @@ export class Game {
     const entries = await this.store.list();
     const entry = entries.find((e) => e.status === 'ok' && e.meta.name === wanted);
     if (!entry) {
-      const meta = this.newWorldMeta(wanted, seed, this.params.time, mode);
+      const meta = this.newWorldMeta(wanted, seed, this.params.time, mode, this.testWorldGen());
       await this.store.create(meta);
       this.loadWorld(meta, new Map());
     } else {
@@ -774,10 +801,14 @@ export class Game {
     name: string,
     seedText: string,
     mode: GameMode,
+    options: WorldOptions,
   ): Promise<LoadedWorld> {
     const seed = seedFromText(seedText) ?? Math.floor(Math.random() * 0x100000000);
     const time = this.params.timeFromUrl ? this.params.time : START_TIME_OF_DAY;
-    const meta = this.newWorldMeta(name, seed, time, mode);
+    const meta = this.newWorldMeta(name, seed, time, mode, {
+      version: GENERATOR_VERSION,
+      options,
+    });
     try {
       await this.store.create(meta);
     } catch {
@@ -878,6 +909,7 @@ export class Game {
     this.meta = null;
     this.renderer.clearChunkMeshes();
     this.world = new World(0);
+    this.movement = this.movementOf(this.world);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
     this.autosave = this.createAutosave();
     this.target = null;
@@ -1099,6 +1131,7 @@ export class Game {
         seed: welcome.seed,
         mode: welcome.mode,
         generatorVersion: welcome.generatorVersion,
+        options: welcome.options,
         formatVersion: SAVE_FORMAT_VERSION,
         createdMs: now,
         playedMs: now,
@@ -1119,7 +1152,13 @@ export class Game {
     if (!this.pauseScreen) {
       // Test mode has no menus: a fresh world in memory, as at the start.
       this.loadWorld(
-        this.newWorldMeta(this.params.world, this.params.seed, this.params.time, this.params.mode),
+        this.newWorldMeta(
+          this.params.world,
+          this.params.seed,
+          this.params.time,
+          this.params.mode,
+          this.testWorldGen(),
+        ),
         new Map(),
       );
       return;
@@ -1393,8 +1432,10 @@ export class Game {
     return {
       loadWorld: (renderDistance) => {
         this.useSettings({ ...DEFAULT_SETTINGS, renderDistance });
-        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative');
-        this.loadWorld({ ...meta, generatorVersion: BENCH_GENERATOR_VERSION }, new Map());
+        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative', {
+          version: BENCH_GENERATOR_VERSION,
+        });
+        this.loadWorld(meta, new Map());
         // The loop runs the simulation; no pointer lock is asked for.
         this.paused = false;
         this.showScreen('play');
@@ -1853,7 +1894,15 @@ export class Game {
     this.renderer.setRenderDistance(settings.renderDistance);
     this.chunkManager.setRadius(settings.renderDistance);
     this.gamepad.setLook(settings.padSensitivity, settings.padInvertY);
+    // Takes effect at once; physics only tests the cells the player newly enters.
+    this.movement.collideLeaves = settings.collideLeaves;
     if (!this.chunksIdle()) this.framesSinceIdle = 0;
+  }
+
+  private movementOf(world: World): MovementWorld {
+    const movement = new MovementWorld(world);
+    movement.collideLeaves = this.settings.collideLeaves;
+    return movement;
   }
 
   private setDebugVisible(visible: boolean): void {
@@ -1976,7 +2025,7 @@ export class Game {
     // A performance test sets the input of this step and submits its action.
     this.bench?.runner.step();
     this.rememberPosition();
-    stepPlayer(this.player, this.readMoveInput(), this.world, SIM_DT);
+    stepPlayer(this.player, this.readMoveInput(), this.movement, SIM_DT);
     if (respawnIfFallen(this.player, this.spawnPosition())) this.rememberPosition();
     // The step is over: actions of this step carry its end time.
     this.simSteps++;
@@ -2517,6 +2566,7 @@ export class Game {
       drawCalls: stats.drawCalls,
       triangles: stats.triangles,
       seed: this.world.seed,
+      generator: debugWorldGen(this.world.gen),
       time: this.time,
       mode: p.mode,
       onGround: p.onGround,
@@ -2602,6 +2652,7 @@ export class Game {
             id: this.meta.id,
             name: this.meta.name,
             generatorVersion: this.meta.generatorVersion,
+            options: this.meta.options,
           }
         : null,
       save: {
@@ -2657,6 +2708,7 @@ export class Game {
         brightness: this.settings.brightness,
         padSensitivity: this.settings.padSensitivity,
         padInvertY: this.settings.padInvertY,
+        collideLeaves: this.settings.collideLeaves,
       },
       pad: this.gamepad.state(this.padActive),
       render: {
@@ -2746,7 +2798,7 @@ export class Game {
       setBlock: (x, y, z, id) => this.testSetBlock(x, y, z, id),
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
-      terrainChecksum: () => terrainChecksum(this.world.seed, this.world.generatorVersion),
+      terrainChecksum: () => terrainChecksum(this.world.seed, this.world.gen),
       getLight: (x, y, z) => this.lightAt(x, y, z),
       verifyLight: () => this.world.verifyLight(),
       lightChecksum: () => lightChecksumOf((cx, cz) => this.world.lightOf(cx, cz)),
@@ -2757,6 +2809,7 @@ export class Game {
       },
       save: () => this.saveNow(),
       give: (item, count, player) => this.testGive(item, count, player),
+      setCollideLeaves: (on) => this.useSettings({ ...this.settings, collideLeaves: on }),
       clearInventory: () => this.testClearInventory(),
       benchResult: () => (this.benchPhase === 'result' ? this.benchResult : null),
       netNetwork: () =>

@@ -12,8 +12,15 @@ write what), `worldLock.ts` (one tab per world).
 ## Saving
 
 A world is one `WorldMeta` record plus one record per edited chunk (`save/saveFormat.ts`,
-`SAVE_FORMAT_VERSION`, now 2). Decoding validates every field and never throws; a change
+`SAVE_FORMAT_VERSION`, now 3). Decoding validates every field and never throws; a change
 to the format needs a new format version and a migration.
+
+Version 3 (Phase 7 part A) adds `options` (`{ terrain, trees }`, validated by
+`decodeWorldOptions`): stored only for generator 2, `null` in `WorldMeta` for generator 1.
+Versions 1 and 2 load as generator 1 with `options: null` and are written back as 3. A
+generator 2 record without valid options is damaged, one with an unknown string is
+"newer"; a generator 1 record with `options`, or an older format with generator 2, is
+damaged. `metaGen(meta)` gives the world's `WorldGen`.
 
 Version 2 (Phase 6 part C) adds `guests`: `{ key, name, record, pose, moveMode,
 lastSeenMs }` per player who played in the world as a guest, at most `GUESTS_MAX` (32,

@@ -1,7 +1,8 @@
 // Test helpers for light: tables with emitters, artificial block volumes, a cave chunk.
-import { CHUNK_SIZE, CHUNK_VOLUME, GENERATOR_VERSION, WORLD_HEIGHT } from '../game/config';
+import { CHUNK_SIZE, CHUNK_VOLUME, WORLD_HEIGHT } from '../game/config';
 import { BLOCK_EMISSION, BLOCK_OPACITY, Block } from '../world/blocks';
 import { generateChunk } from '../world/generation/terrain';
+import { CLASSIC_GEN } from '../world/generation/worldOptions';
 import type { LightTables } from '../world/light/lightRules';
 import { hash32, mulberry32, randInt } from '../util/rng';
 
@@ -175,7 +176,7 @@ export function caveGroup(seed: number, cx: number, cz: number): ChunkGroup {
   let solid = 0;
   for (let iz = 0; iz < 3; iz++) {
     for (let ix = 0; ix < 3; ix++) {
-      const blocks = generateChunk(seed, cx + ix - 1, cz + iz - 1, GENERATOR_VERSION);
+      const blocks = generateChunk(seed, cx + ix - 1, cz + iz - 1, CLASSIC_GEN);
       for (let i = 0; i < CHUNK_VOLUME; i++) {
         const id = blocks[i];
         if (id === Block.AIR || id === Block.WATER || id === Block.BEDROCK) continue;

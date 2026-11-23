@@ -17,6 +17,7 @@ import {
   untilNet,
 } from './multiplayer';
 import { TOUCH_DEVICE, centerOf } from './touch';
+import { TERRAIN_CHECKSUMS_1337_V2 } from '../src/testing/terrainChecksum';
 
 test.setTimeout(180_000);
 
@@ -98,6 +99,37 @@ test('Phase 6 AC5.1: a host opens a room, a guest joins it by code', async ({ pl
   expect(g.mode).toBe(h.mode);
   expect(g.net.players.map((p) => p.host)).toEqual([true, false]);
   expect(g.net.players.find((p) => p.self)?.id).toBe(g.net.selfId);
+});
+
+test('Phase 7 AC5.3: a guest of a generator 2 world gets its options and the same blocks', async ({
+  players,
+}) => {
+  const host = await openTestPlayer(players, { query: { terrain: 'hilly', trees: 'none' } });
+  const guest = await openTestPlayer(players, { query: { seed: '42' } });
+  expect((await state(guest.page)).world?.options).toBeNull();
+  const code = await hostRoom(host.page);
+  await joinRoom(guest.page, code);
+  const [h, g] = [await state(host.page), await state(guest.page)];
+  const options = { terrain: 'hilly', trees: 'none' };
+  expect(h.world).toMatchObject({ generatorVersion: 2, options });
+  expect(g.world).toMatchObject({ generatorVersion: 2, options });
+  expect(g.seed).toBe(1337);
+  const checksum = (page: Page) => page.evaluate(() => window.__mc.terrainChecksum());
+  expect(await checksum(guest.page)).toBe(TERRAIN_CHECKSUMS_1337_V2['hilly/none']);
+  expect(await checksum(host.page)).toBe(TERRAIN_CHECKSUMS_1337_V2['hilly/none']);
+  // The same blocks in the columns around the start.
+  const columns = (page: Page) =>
+    page.evaluate(() => {
+      const out: number[] = [];
+      for (let z = -24; z <= 24; z += 6) {
+        for (let x = -24; x <= 24; x += 6) {
+          const y = window.__mc.surfaceY(x, z);
+          out.push(y, window.__mc.getBlock(x, y, z), window.__mc.getBlock(x, y + 1, z));
+        }
+      }
+      return out;
+    });
+  expect(await columns(guest.page)).toEqual(await columns(host.page));
 });
 
 test('Phase 6 AC5.2: edits made before the join exist on the guest, also 320 blocks away', async ({

@@ -1,5 +1,6 @@
 // Saving and loading worlds in the browser (Phase 3 step 3).
 import type { Page } from '@playwright/test';
+import { TERRAIN_CHECKSUM_1337_V1 } from '../src/testing/terrainChecksum';
 import { test, expect } from './fixtures';
 import { DEG, getBlock, getState, openGame, setBlock, setPlayer, step, surfaceY } from './game';
 
@@ -294,47 +295,66 @@ function storedRecords(page: Page): Promise<{ worlds: unknown[] }> {
   );
 }
 
-test('Phase 6 AC8.5: a world saved by the Phase 5 build still opens and is saved as version 2', async ({
-  page,
-}) => {
-  // Any stored world creates the database; then the old records are written into it.
-  await openGame(page, { save: true, world: 'Other' });
-  await page.evaluate(
-    ([meta, chunk]) =>
-      new Promise<void>((resolve, reject) => {
-        const open = indexedDB.open('markuscraft');
-        open.onerror = () => reject(new Error('open failed'));
-        open.onsuccess = () => {
-          const tx = open.result.transaction(['worlds', 'chunks'], 'readwrite');
-          tx.objectStore('worlds').put(meta);
-          tx.objectStore('chunks').put(chunk);
-          tx.oncomplete = () => {
-            open.result.close();
-            resolve();
+// The same world as the build before Phase 7 part A wrote it (format version 2).
+const PHASE_6_META = {
+  ...PHASE_5_META,
+  id: 'wp6-fixture001',
+  name: 'Phase 6 world',
+  formatVersion: 2,
+  guests: [],
+};
+const PHASE_6_CHUNK = { ...PHASE_5_CHUNK, key: 'wp6-fixture001|0,0', worldId: 'wp6-fixture001' };
+
+for (const [label, fixtureMeta, fixtureChunk] of [
+  ['Phase 6 AC8.5, Phase 7 AC1.2: a world saved by the Phase 5 build', PHASE_5_META, PHASE_5_CHUNK],
+  ['Phase 7 AC1.2: a world saved by the Phase 6 build (format 2)', PHASE_6_META, PHASE_6_CHUNK],
+] as const) {
+  test(`${label} still opens with its terrain and is saved as format 3`, async ({ page }) => {
+    // Any stored world creates the database; then the old records are written into it.
+    await openGame(page, { save: true, world: 'Other' });
+    await page.evaluate(
+      ([meta, chunk]) =>
+        new Promise<void>((resolve, reject) => {
+          const open = indexedDB.open('markuscraft');
+          open.onerror = () => reject(new Error('open failed'));
+          open.onsuccess = () => {
+            const tx = open.result.transaction(['worlds', 'chunks'], 'readwrite');
+            tx.objectStore('worlds').put(meta);
+            tx.objectStore('chunks').put(chunk);
+            tx.oncomplete = () => {
+              open.result.close();
+              resolve();
+            };
+            tx.onerror = () => reject(new Error('write failed'));
           };
-          tx.onerror = () => reject(new Error('write failed'));
-        };
-      }),
-    [PHASE_5_META, PHASE_5_CHUNK] as const,
-  );
-  await openGame(page, { save: true, world: 'Phase 5 world' });
-  const state = await getState(page);
-  expect(state.world?.id).toBe('wp5-fixture001');
-  expect(state.mode).toBe('gathering');
-  expect(state.selectedSlot).toBe(2);
-  expect(state.inventory.slots.slice(0, 3)).toEqual(PHASE_5_META.player.slots.slice(0, 3));
-  expect(state.player.x).toBeCloseTo(10.5, 5);
-  expect(await getBlock(page, 5, 100, 5)).toBe(8);
-  // Something changes (the time of day), the world is saved.
-  await page.evaluate(async () => {
-    window.__mc.setTime(0.3);
-    await window.__mc.save();
+        }),
+      [fixtureMeta, fixtureChunk] as const,
+    );
+    await openGame(page, { save: true, world: fixtureMeta.name });
+    const state = await getState(page);
+    expect(state.world?.id).toBe(fixtureMeta.id);
+    expect(state.world?.generatorVersion).toBe(1);
+    expect(state.mode).toBe('gathering');
+    expect(state.selectedSlot).toBe(2);
+    expect(state.inventory.slots.slice(0, 3)).toEqual(fixtureMeta.player.slots.slice(0, 3));
+    expect(state.player.x).toBeCloseTo(10.5, 5);
+    expect(await getBlock(page, 5, 100, 5)).toBe(8);
+    // The terrain of generator 1.
+    expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(TERRAIN_CHECKSUM_1337_V1);
+    // Something changes (the time of day), the world is saved.
+    await page.evaluate(async () => {
+      window.__mc.setTime(0.3);
+      await window.__mc.save();
+    });
+    const meta = (await storedRecords(page)).worlds.find(
+      (w) => (w as { id: string }).id === fixtureMeta.id,
+    ) as Record<string, unknown>;
+    expect(meta.formatVersion).toBe(3);
+    expect(meta.generatorVersion).toBe(1);
+    // Generator 1 records carry no options.
+    expect('options' in meta).toBe(false);
+    expect(meta.guests).toEqual([]);
+    expect(meta.player).toEqual(fixtureMeta.player);
+    expect(meta.createdMs).toBe(fixtureMeta.createdMs);
   });
-  const meta = (await storedRecords(page)).worlds.find(
-    (w) => (w as { id: string }).id === 'wp5-fixture001',
-  ) as Record<string, unknown>;
-  expect(meta.formatVersion).toBe(2);
-  expect(meta.guests).toEqual([]);
-  expect(meta.player).toEqual(PHASE_5_META.player);
-  expect(meta.createdMs).toBe(PHASE_5_META.createdMs);
-});
+}

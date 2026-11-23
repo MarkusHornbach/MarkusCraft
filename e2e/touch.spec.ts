@@ -141,10 +141,12 @@ test('"Tap to play" starts the game without pointer lock; the menu button pauses
   expect(await page.evaluate(() => document.pointerLockElement)).toBeNull();
   expect((await getState(page)).touch).toBe(true);
 
-  // The real-time loop runs: the clock advances and the stick moves the player.
+  // The real-time loop runs: the clock advances and the stick moves the player. Backwards
+  // (south): since Phase 7 part A the form's world of seed 1337 steps down to the north,
+  // and a pause in mid-air would keep the air speed a moment after continuing.
   const fingers = new Fingers(page);
   await fingers.touchDown(1, STICK.x, STICK.y);
-  await fingers.touchMove(1, STICK.x, STICK.y - 80, 4);
+  await fingers.touchMove(1, STICK.x, STICK.y + 80, 4);
   await page.waitForFunction(
     ([time, z]) => {
       const state = window.__mc.getState();

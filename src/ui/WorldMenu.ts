@@ -1,15 +1,32 @@
 // World menu: the start screen. Lists the saved worlds, creates and deletes them.
 import type { GameMode } from '../actions/playerRecord';
 import { WORLD_NAME_MAX } from '../game/config';
-import { type WorldListEntry, nextWorldName } from '../save/saveFormat';
+import { type WorldListEntry, metaGen, nextWorldName } from '../save/saveFormat';
+import {
+  DEFAULT_WORLD_OPTIONS,
+  TERRAIN_LABELS,
+  TERRAIN_SHAPES,
+  TREE_BUTTON_LABELS,
+  TREE_DENSITIES,
+  type TerrainShape,
+  type TreeDensity,
+  type WorldOptions,
+  describeWorldGen,
+} from '../world/generation/worldOptions';
 import { type InputMode, button, element, onActivate } from './activate';
 
 export interface WorldMenuOptions {
   mode: InputMode;
   /** Play the stored world with this id. */
   onPlay: (id: string, via: InputMode | null) => void;
-  /** Create a world from the form (raw texts, chosen mode) and play it. */
-  onCreate: (name: string, seedText: string, mode: GameMode, via: InputMode | null) => void;
+  /** Create a world from the form (raw texts, chosen mode and options) and play it. */
+  onCreate: (
+    name: string,
+    seedText: string,
+    mode: GameMode,
+    options: WorldOptions,
+    via: InputMode | null,
+  ) => void;
   onDelete: (id: string) => void;
   onSettings: () => void;
   /** Open the performance test. */
@@ -26,6 +43,8 @@ const MODE_HINTS: Record<GameMode, string> = {
   gathering: 'Gather blocks before you build. No flying.',
   creative: 'All blocks, instant breaking, flying.',
 };
+/** Shown under the Trees row while Gathering rules out "None" (Phase 7 part A). */
+export const NO_TREES_HINT = 'No trees only in Creative: Gathering needs wood.';
 export const STORAGE_NOTE = 'Worlds are saved in this browser, on this device only.';
 
 function playedDate(ms: number): string {
@@ -52,6 +71,12 @@ export class WorldMenu {
   private readonly modeHint: HTMLElement;
   /** Game mode chosen in the form. */
   private gameMode: GameMode = FORM_MODES[0];
+  private readonly terrainButtons = new Map<TerrainShape, HTMLButtonElement>();
+  private readonly treeButtons = new Map<TreeDensity, HTMLButtonElement>();
+  private readonly treesHint: HTMLElement;
+  /** World options chosen in the form. */
+  private terrain: TerrainShape = DEFAULT_WORLD_OPTIONS.terrain;
+  private trees: TreeDensity = DEFAULT_WORLD_OPTIONS.trees;
   private mode: InputMode;
   private padActive = false;
   private view: View = 'form';
@@ -97,30 +122,46 @@ export class WorldMenu {
     this.seedInput = this.field('world-seed', 'Seed', 40);
     this.seedInput.placeholder = 'Random';
     // The game mode: fixed once the world exists.
-    const modeRow = element('div', 'world-field world-mode-field');
-    modeRow.appendChild(element('span', 'world-field-label', 'Mode'));
-    const modeChoice = element('div', 'world-mode-choice');
-    modeChoice.setAttribute('role', 'radiogroup');
-    modeChoice.setAttribute('aria-label', 'Game mode');
-    for (const gameMode of FORM_MODES) {
-      const choice = button('menu-button world-mode-button', MODE_LABELS[gameMode]);
-      choice.dataset.mode = gameMode;
-      choice.setAttribute('role', 'radio');
-      choice.addEventListener('click', () => this.setGameMode(gameMode));
-      this.modeButtons.set(gameMode, choice);
-      modeChoice.appendChild(choice);
-    }
-    modeRow.appendChild(modeChoice);
-    this.formView.appendChild(modeRow);
+    this.choiceRow('world-mode-field', 'Mode', 'Game mode', FORM_MODES, MODE_LABELS, 'mode', (m) =>
+      this.setGameMode(m),
+    ).forEach((b, m) => this.modeButtons.set(m, b));
     this.modeHint = element('div', 'world-mode-hint');
     this.formView.appendChild(this.modeHint);
+    // The world options (Phase 7 part A): fixed once the world exists, like the mode.
+    this.choiceRow(
+      'world-terrain-field',
+      'Terrain',
+      'Terrain',
+      TERRAIN_SHAPES,
+      TERRAIN_LABELS,
+      'terrain',
+      (t) => this.setTerrain(t),
+    ).forEach((b, t) => this.terrainButtons.set(t, b));
+    this.choiceRow(
+      'world-trees-field',
+      'Trees',
+      'Trees',
+      TREE_DENSITIES,
+      TREE_BUTTON_LABELS,
+      'trees',
+      (t) => this.setTrees(t),
+    ).forEach((b, t) => this.treeButtons.set(t, b));
+    this.treesHint = element('div', 'world-mode-hint world-trees-hint');
+    this.formView.appendChild(this.treesHint);
     this.setGameMode(this.gameMode);
+    this.setTerrain(this.terrain);
     const formRow = element('div', 'world-buttons');
     const create = button('play-button world-create-button', 'Create and play');
     create.dataset.padDefault = '';
     onActivate(create, (via) => {
       if (this.busy) return;
-      options.onCreate(this.nameInput.value, this.seedInput.value, this.gameMode, via);
+      options.onCreate(
+        this.nameInput.value,
+        this.seedInput.value,
+        this.gameMode,
+        this.chosenOptions(),
+        via,
+      );
     });
     this.backButton = button('menu-button world-back-button', 'Back');
     this.backButton.dataset.padBack = '';
@@ -133,7 +174,13 @@ export class WorldMenu {
     this.formView.addEventListener('submit', (e) => {
       e.preventDefault();
       if (this.busy) return;
-      options.onCreate(this.nameInput.value, this.seedInput.value, this.gameMode, null);
+      options.onCreate(
+        this.nameInput.value,
+        this.seedInput.value,
+        this.gameMode,
+        this.chosenOptions(),
+        null,
+      );
     });
     panel.appendChild(this.formView);
 
@@ -191,13 +238,72 @@ export class WorldMenu {
     return input;
   }
 
+  /**
+   * A row of choice buttons like the Mode row: a radio group with one button per value
+   * (`data-<key>` names the value). Returns the buttons by value.
+   */
+  private choiceRow<T extends string>(
+    className: string,
+    label: string,
+    groupLabel: string,
+    values: readonly T[],
+    labels: Record<T, string>,
+    key: string,
+    choose: (value: T) => void,
+  ): Map<T, HTMLButtonElement> {
+    const row = element('div', `world-field ${className}`);
+    row.appendChild(element('span', 'world-field-label', label));
+    const group = element('div', 'world-mode-choice');
+    group.setAttribute('role', 'radiogroup');
+    group.setAttribute('aria-label', groupLabel);
+    const buttons = new Map<T, HTMLButtonElement>();
+    for (const value of values) {
+      const choice = button('menu-button world-mode-button', labels[value]);
+      choice.dataset[key] = value;
+      choice.setAttribute('role', 'radio');
+      choice.addEventListener('click', () => choose(value));
+      buttons.set(value, choice);
+      group.appendChild(choice);
+    }
+    row.appendChild(group);
+    this.formView.appendChild(row);
+    return buttons;
+  }
+
+  private static markChoice<T>(buttons: Map<T, HTMLButtonElement>, chosen: T): void {
+    for (const [value, choice] of buttons) {
+      choice.classList.toggle('selected', value === chosen);
+      choice.setAttribute('aria-checked', String(value === chosen));
+    }
+  }
+
   private setGameMode(gameMode: GameMode): void {
     this.gameMode = gameMode;
-    for (const [mode, choice] of this.modeButtons) {
-      choice.classList.toggle('selected', mode === gameMode);
-      choice.setAttribute('aria-checked', String(mode === gameMode));
-    }
+    WorldMenu.markChoice(this.modeButtons, gameMode);
     this.modeHint.textContent = MODE_HINTS[gameMode];
+    // Every tool of Gathering starts with a log: a world without trees is Creative only.
+    const gathering = gameMode === 'gathering';
+    const none = this.treeButtons.get('none');
+    if (none) none.disabled = gathering;
+    this.treesHint.textContent = gathering ? NO_TREES_HINT : '';
+    this.treesHint.hidden = !gathering;
+    this.setTrees(gathering && this.trees === 'none' ? 'few' : this.trees);
+  }
+
+  private setTerrain(terrain: TerrainShape): void {
+    this.terrain = terrain;
+    WorldMenu.markChoice(this.terrainButtons, terrain);
+  }
+
+  private setTrees(trees: TreeDensity): void {
+    if (trees === 'none' && this.gameMode === 'gathering') return;
+    this.trees = trees;
+    WorldMenu.markChoice(this.treeButtons, trees);
+  }
+
+  /** The world options chosen in the form. */
+  private chosenOptions(): WorldOptions {
+    return { terrain: this.terrain, trees: this.trees };
   }
 
   private selected(): WorldListEntry | undefined {
@@ -231,7 +337,9 @@ export class WorldMenu {
         element('span', 'world-row-name', ok ? entry.meta.name : (entry.name ?? 'Unnamed world')),
       );
       if (ok) {
-        row.appendChild(element('span', 'world-row-mode', MODE_LABELS[entry.meta.mode]));
+        // "Gathering · Balanced · Few trees", or "Creative · Classic" for generator 1.
+        const what = `${MODE_LABELS[entry.meta.mode]} · ${describeWorldGen(metaGen(entry.meta))}`;
+        row.appendChild(element('span', 'world-row-mode', what));
         row.appendChild(element('span', 'world-row-date', playedDate(entry.meta.playedMs)));
       } else {
         const text = entry.status === 'newer' ? 'Saved by a newer version' : 'Damaged';
@@ -267,6 +375,9 @@ export class WorldMenu {
     const names = this.entries.map((e) => (e.status === 'ok' ? e.meta.name : (e.name ?? '')));
     this.nameInput.value = nextWorldName(names);
     this.seedInput.value = seedText;
+    this.terrain = DEFAULT_WORLD_OPTIONS.terrain;
+    this.trees = DEFAULT_WORLD_OPTIONS.trees;
+    this.setTerrain(this.terrain);
     this.setGameMode(FORM_MODES[0]);
     this.setView('form');
   }
@@ -284,6 +395,9 @@ export class WorldMenu {
   }
 
   private setView(view: View): void {
+    // A view starts at the top: the form, taller since Phase 7 part A, scrolls on a phone,
+    // and the list must not inherit its scroll position.
+    if (view !== this.view) this.element.scrollTop = 0;
     this.view = view;
     this.listView.hidden = view !== 'list';
     this.formView.hidden = view !== 'form';
@@ -327,6 +441,10 @@ export class WorldMenu {
   }
 
   setVisible(visible: boolean): void {
+    const shown = visible && this.element.classList.contains('hidden');
     this.element.classList.toggle('hidden', !visible);
+    // A hidden menu keeps the scroll position of the form it left (taller since Phase 7
+    // part A); it comes back at the top. Set after showing: a hidden element cannot scroll.
+    if (shown) this.element.scrollTop = 0;
   }
 }

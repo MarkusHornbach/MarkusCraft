@@ -226,7 +226,12 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
   );
   await openGame(page, { save: true, world: 'Part C world' });
   const state = await getState(page);
-  expect(state.world).toEqual({ id: 'wpartc-fixture1', name: 'Part C world', generatorVersion: 1 });
+  expect(state.world).toEqual({
+    id: 'wpartc-fixture1',
+    name: 'Part C world',
+    generatorVersion: 1,
+    options: null,
+  });
   expect(state.mode).toBe('gathering');
   expect(state.inventory.slots.slice(0, 3)).toEqual(PART_C_META.player.slots.slice(0, 3));
   // Its edits are there, and they cast their shade: under the bricks the sky light is less.
@@ -260,10 +265,10 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
     string,
     unknown
   >;
-  // Saved again, the record is migrated to format version 2 (Phase 6 part C): the same
-  // fields plus an empty list of guests.
+  // Saved again, the record is migrated to the current format (3; Phase 6 part C added
+  // the empty list of guests; a generator 1 world has no options).
   expect(Object.keys(meta).sort()).toEqual([...Object.keys(PART_C_META), 'guests'].sort());
-  expect(meta.formatVersion).toBe(2);
+  expect(meta.formatVersion).toBe(3);
   expect(meta.guests).toEqual([]);
   expect(meta.generatorVersion).toBe(1);
   expect(meta.time).toBeCloseTo(0.3, 9);

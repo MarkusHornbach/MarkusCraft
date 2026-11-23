@@ -306,7 +306,7 @@ describe('the authority cache (Phase 6 AC9.3)', () => {
       return id;
     });
     // The reference: the same world with every chunk loaded.
-    const loaded = new World(seed, 1, host.edits);
+    const loaded = new World(seed, undefined, host.edits);
     for (const [cx, cz] of chunks) loaded.generate(cx, cz);
     const expected = positions.map(([x, y, z]) => loaded.getBlock(x, y, z));
     expect(positions.length).toBeGreaterThanOrEqual(10_000);

@@ -12,6 +12,12 @@ import {
   whenIdle,
 } from './game';
 import { TOUCH_DEVICE, withoutFullscreen } from './touch';
+import {
+  TERRAIN_CHECKSUM_1337_V1,
+  TERRAIN_CHECKSUMS_1337_V2,
+} from '../src/testing/terrainChecksum';
+import { findSpawn } from '../src/world/generation/spawn';
+import { getTerrain } from '../src/world/generation/terrain';
 
 // Several worlds are created per test, each under slow software rendering.
 test.describe.configure({ timeout: 180_000 });
@@ -19,6 +25,7 @@ test.describe.configure({ timeout: 180_000 });
 const AIR = 0;
 const BRICKS = 8;
 const NOTE = 'Worlds are saved in this browser, on this device only.';
+const NO_TREES_HINT = 'No trees only in Creative: Gathering needs wood.';
 
 function rows(page: Page) {
   return page.locator('.world-row');
@@ -73,7 +80,11 @@ test('a first visit creates a world; after a reload it is listed and continues (
 
   await createWorld(page);
   const created = await getState(page);
-  expect(created.world).toMatchObject({ name: 'My world', generatorVersion: 1 });
+  expect(created.world).toMatchObject({
+    name: 'My world',
+    generatorVersion: 2,
+    options: { terrain: 'balanced', trees: 'few' },
+  });
   expect(created.mode).toBe('creative');
   const cell = await mark(page);
 
@@ -86,7 +97,7 @@ test('a first visit creates a world; after a reload it is listed and continues (
   await expect(page.locator('.world-form')).toBeHidden();
   await expect(rows(page).first()).toHaveClass(/selected/);
   await expect(page.locator('.world-row-name')).toHaveText('My world');
-  await expect(page.locator('.world-row-mode')).toHaveText('Creative');
+  await expect(page.locator('.world-row-mode')).toHaveText('Creative · Balanced · Few trees');
   await expect(page.locator('.world-row-date')).toHaveText(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
   await expect(page.locator('.world-play-button')).toHaveText('Click to play');
 
@@ -566,7 +577,7 @@ test.describe('by touch', () => {
     ['phone', { width: 640, height: 360 }],
     ['tablet', { width: 1280, height: 800 }],
   ] as const) {
-    test(`the world menu works by taps on a ${view.width} × ${view.height} ${device} (Phase 3 AC4.9)`, async ({
+    test(`the world menu works by taps on a ${view.width} × ${view.height} ${device} (Phase 3 AC4.9, Phase 7 AC6.3)`, async ({
       page,
     }) => {
       await page.setViewportSize(view);
@@ -574,12 +585,35 @@ test.describe('by touch', () => {
       await openMenu(page);
       expect((await getState(page)).touch).toBe(true);
 
-      // The form: fields and buttons are finger-sized, on screen and apart.
-      // The world part fits without scrolling; "Join a world" (Phase 6) follows below it and
-      // is reached by scrolling (its own check: Phase 6 AC7.13).
-      check(await boxes(page, '.world-view button, .world-view input'), view);
-      const form = (await boxes(page, '.world-form'))[0];
-      expect(form.y + form.height).toBeLessThanOrEqual(view.height);
+      // The form: fields and buttons are finger-sized, on screen and apart. On the tablet
+      // the world part fits without scrolling; on the phone the form scrolls since the
+      // Terrain and Trees rows (Phase 7 AC6.3). "Join a world" (Phase 6) follows below it
+      // and is reached by scrolling (its own check: Phase 6 AC7.13).
+      const formParts = '.world-view button, .world-view input';
+      if (device === 'tablet') {
+        check(await boxes(page, formParts), view);
+        const form = (await boxes(page, '.world-form'))[0];
+        expect(form.y + form.height).toBeLessThanOrEqual(view.height);
+      } else {
+        check(await boxes(page, formParts), { width: view.width, height: Infinity });
+        // Phase 7 AC6.3: "Create and play" is reached by scrolling and nothing covers it.
+        const create = page.locator('.world-create-button');
+        await create.scrollIntoViewIfNeeded();
+        const [box] = await boxes(page, '.world-create-button');
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.y + box.height).toBeLessThanOrEqual(view.height);
+        const hit = await page.evaluate(
+          ([x, y]) => document.elementFromPoint(x, y)?.closest('button')?.className ?? '',
+          [box.x + box.width / 2, box.y + box.height / 2],
+        );
+        expect(hit).toContain('world-create-button');
+        // The trees row's four buttons fit the phone's width.
+        check(await boxes(page, '.world-trees-field button'), {
+          width: view.width,
+          height: Infinity,
+        });
+        await page.locator('#world-name').scrollIntoViewIfNeeded();
+      }
       await page.locator('#world-name').tap();
       await expect(page.locator('#world-name')).toBeFocused();
       await page.keyboard.press('Control+A');
@@ -649,4 +683,142 @@ test.describe('by touch', () => {
       await expect(page.locator('.touch-hud')).toBeVisible();
     });
   }
+});
+
+// --- World options (Phase 7 part A) ---
+
+function terrainChoice(page: Page, value: string) {
+  return page.locator(`.world-mode-button[data-terrain="${value}"]`);
+}
+
+function treesChoice(page: Page, value: string) {
+  return page.locator(`.world-mode-button[data-trees="${value}"]`);
+}
+
+test('Phase 7 AC6.1, AC6.2: the Terrain and Trees rows; None only in Creative', async ({
+  page,
+}) => {
+  await openMenu(page);
+  await expect(page.locator('[role="radiogroup"][aria-label="Terrain"]')).toBeVisible();
+  await expect(page.locator('[role="radiogroup"][aria-label="Trees"]')).toBeVisible();
+  await expect(page.locator('.world-terrain-field .world-mode-button')).toHaveText([
+    'Flat',
+    'Balanced',
+    'Hilly',
+  ]);
+  await expect(page.locator('.world-trees-field .world-mode-button')).toHaveText([
+    'None',
+    'Few',
+    'Normal',
+    'Many',
+  ]);
+  // The defaults: Balanced and Few. The form starts in Gathering, so None is disabled.
+  await expect(terrainChoice(page, 'balanced')).toHaveAttribute('aria-checked', 'true');
+  await expect(treesChoice(page, 'few')).toHaveAttribute('aria-checked', 'true');
+  await expect(treesChoice(page, 'none')).toBeDisabled();
+  await expect(page.locator('.world-trees-hint')).toHaveText(NO_TREES_HINT);
+
+  // The mouse selects; the selection shows on exactly one button per row.
+  await terrainChoice(page, 'hilly').click();
+  await treesChoice(page, 'many').click();
+  await expect(terrainChoice(page, 'hilly')).toHaveAttribute('aria-checked', 'true');
+  await expect(terrainChoice(page, 'balanced')).toHaveAttribute('aria-checked', 'false');
+  await expect(treesChoice(page, 'many')).toHaveClass(/selected/);
+  await expect(page.locator('.world-trees-field .selected')).toHaveCount(1);
+
+  // Creative allows None; switching back to Gathering turns it into Few, with the hint.
+  await page.locator('.world-mode-button[data-mode="creative"]').click();
+  await expect(treesChoice(page, 'none')).toBeEnabled();
+  await expect(page.locator('.world-trees-hint')).toBeHidden();
+  await treesChoice(page, 'none').click();
+  await expect(treesChoice(page, 'none')).toHaveAttribute('aria-checked', 'true');
+  await page.locator('.world-mode-button[data-mode="gathering"]').click();
+  await expect(treesChoice(page, 'few')).toHaveAttribute('aria-checked', 'true');
+  await expect(treesChoice(page, 'none')).toHaveAttribute('aria-checked', 'false');
+  await expect(treesChoice(page, 'none')).toBeDisabled();
+  await expect(page.locator('.world-trees-hint')).toBeVisible();
+  await expect(page.locator('.world-trees-hint')).toHaveText(NO_TREES_HINT);
+});
+
+test('Phase 7 AC5.1: a flat world with many trees reloads with its options, terrain and spawn', async ({
+  page,
+}) => {
+  await openMenu(page);
+  await createWorld(page, { name: 'Flatland', seed: '1337', terrain: 'flat', trees: 'many' });
+  const created = await getState(page);
+  const options = { terrain: 'flat', trees: 'many' } as const;
+  expect(created.world).toMatchObject({ name: 'Flatland', generatorVersion: 2, options });
+  const checksum = TERRAIN_CHECKSUMS_1337_V2['flat/many'];
+  expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(checksum);
+  // The world starts at the spawn of its own generator (the wood rule of generator 2).
+  const spawn = findSpawn(getTerrain(1337, { version: 2, options }));
+  expect(created.player.x).toBe(spawn.x + 0.5);
+  expect(created.player.z).toBe(spawn.z + 0.5);
+
+  await pauseWithMouse(page);
+  await expect(page.locator('.save-state')).toHaveText('Saved');
+  await page.reload();
+  await page.waitForFunction(() => window.__mc !== undefined);
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator('.world-row-mode')).toHaveText('Creative · Flat · Many trees');
+  await page.locator('.world-play-button').click();
+  await untilPlaying(page);
+  const again = await getState(page);
+  expect(again.world).toEqual(created.world);
+  expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(checksum);
+  expect(again.player.x).toBe(created.player.x);
+  expect(again.player.z).toBe(created.player.z);
+});
+
+test('Phase 7 AC1.2: a world of an earlier build is listed as Classic', async ({ page }) => {
+  await openMenu(page);
+  // The menu has opened the store; a format 2 record of a generator 1 world goes into it.
+  const record = {
+    id: 'wclassic-fixture1',
+    name: 'Old world',
+    seed: 1337,
+    mode: 'creative',
+    generatorVersion: 1,
+    formatVersion: 2,
+    createdMs: 1_810_000_000_000,
+    playedMs: 1_810_000_720_000,
+    time: 0.45,
+    pose: { x: 0.5, y: 70, z: 0.5, yaw: 0, pitch: 0 },
+    moveMode: 'walk',
+    player: {
+      slots: [
+        ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((item) => ({ item, count: 1 })),
+        ...Array.from({ length: 27 }, () => null),
+      ],
+      selectedSlot: 0,
+      breaking: null,
+    },
+    guests: [],
+  };
+  await page.evaluate(
+    (meta) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('markuscraft');
+        open.onerror = () => reject(new Error('open failed'));
+        open.onsuccess = () => {
+          const tx = open.result.transaction('worlds', 'readwrite');
+          tx.objectStore('worlds').put(meta);
+          tx.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+          tx.onerror = () => reject(new Error('write failed'));
+        };
+      }),
+    record,
+  );
+  await page.reload();
+  await page.waitForFunction(() => window.__mc !== undefined);
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator('.world-row-mode')).toHaveText('Creative · Classic');
+  await page.locator('.world-play-button').click();
+  await untilPlaying(page);
+  const state = await getState(page);
+  expect(state.world).toMatchObject({ id: record.id, generatorVersion: 1, options: null });
+  expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(TERRAIN_CHECKSUM_1337_V1);
 });

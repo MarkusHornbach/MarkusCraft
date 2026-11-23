@@ -273,7 +273,7 @@ export class Multiplayer {
       world,
       mode: this.game.mode(),
       worldName,
-      checksum: terrainChecksum(world.seed, world.generatorVersion),
+      checksum: terrainChecksum(world.seed, world.gen),
       hostName: this.identity.name,
       hostKey: this.identity.key,
       hostRecord: this.game.record(),
@@ -339,7 +339,7 @@ export class Multiplayer {
       randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
       clock: () => performance.now(),
       actionClock: () => this.game.actionClock(),
-      checksum: (seed, version) => options.checksum ?? terrainChecksum(seed, version),
+      checksum: (seed, gen) => options.checksum ?? terrainChecksum(seed, gen),
       listener: {
         ...this.wrap(this.game.listener),
         onWorld: (welcome, edits, rejoin) => {

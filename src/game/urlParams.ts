@@ -3,6 +3,13 @@ import { isLookChoice } from '../player/looks';
 import type { GameMode } from '../actions/playerRecord';
 import { normalizeRoomCode } from '../net/roomCode';
 import { normalizeName } from '../save/saveFormat';
+import {
+  CLASSIC_GEN,
+  DEFAULT_WORLD_OPTIONS,
+  type WorldGen,
+  isTerrainShape,
+  isTreeDensity,
+} from '../world/generation/worldOptions';
 import { START_TIME_OF_DAY } from './config';
 
 export interface GameParams {
@@ -22,6 +29,11 @@ export interface GameParams {
   world: string;
   /** With `test`: game mode of a world the page creates (default Creative). */
   mode: GameMode;
+  /**
+   * With `test`: the generator of a world the page creates. Version 1 unless `terrain` or
+   * `trees` names a valid value; then version 2, a missing option taking its default.
+   */
+  testGen: WorldGen;
   /**
    * The performance test (never with `test`): `full` and `quick` open its start page
    * with that suite, `sample` shows the result screen with a built-in result.
@@ -71,6 +83,7 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
     save: query.get('save') === '1',
     world: normalizeName(query.get('world') ?? '', 'Test'),
     mode: query.get('mode') === 'gathering' ? 'gathering' : 'creative',
+    testGen: testGenParam(query.get('terrain'), query.get('trees')),
     bench: test ? 'off' : bench,
     join: normalizeRoomCode(query.get('join') ?? ''),
     name: query.get('name'),
@@ -83,4 +96,18 @@ function lookParam(text: string | null): number | null {
   if (text === null || !/^\d$/.test(text.trim())) return null;
   const look = Number(text);
   return isLookChoice(look) ? look : null;
+}
+
+/** `terrain=` and `trees=` (Phase 7 part A); invalid values are ignored. */
+function testGenParam(terrainText: string | null, treesText: string | null): WorldGen {
+  const terrain = isTerrainShape(terrainText) ? terrainText : null;
+  const trees = isTreeDensity(treesText) ? treesText : null;
+  if (terrain === null && trees === null) return CLASSIC_GEN;
+  return {
+    version: 2,
+    options: {
+      terrain: terrain ?? DEFAULT_WORLD_OPTIONS.terrain,
+      trees: trees ?? DEFAULT_WORLD_OPTIONS.trees,
+    },
+  };
 }

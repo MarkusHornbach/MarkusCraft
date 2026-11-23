@@ -37,7 +37,8 @@ const HOST: HostMessage[] = [
     name: 'Anna (2)',
     worldName: 'My world',
     seed: 4000000000,
-    generatorVersion: 1,
+    generatorVersion: 2,
+    options: { terrain: 'flat', trees: 'many' },
     mode: 'gathering',
     checksum: 123456789,
     time: 0.25,
@@ -173,6 +174,23 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
     const welcomePlayer = { id: 1, name: 'Ben', slot: 0, host: true, pose: POSE };
     const welcome = HOST.find((m) => m.t === 'welcome');
     expect(bad(JSON.stringify({ ...welcome, players: [welcomePlayer] }), false)).toBe(true);
+  });
+
+  it('Phase 7 AC5.3: welcome carries the world options, validated like the save', () => {
+    const welcome = HOST.find((m) => m.t === 'welcome');
+    const decode = (options: unknown) => decodeHostMessage(JSON.stringify({ ...welcome, options }));
+    const classic = decode(null);
+    expect(classic.ok && classic.message.t === 'welcome' && classic.message.options).toBeNull();
+    for (const options of [
+      undefined,
+      {},
+      'flat',
+      { terrain: 'flat' },
+      { terrain: 'islands', trees: 'few' },
+      { terrain: 'flat', trees: 3 },
+    ]) {
+      expect(decode(options).ok, JSON.stringify(options)).toBe(false);
+    }
   });
 
   it('refuses oversized messages', () => {

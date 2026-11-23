@@ -50,7 +50,7 @@ export class FarReader {
       this.cache.set(key, blocks);
       return blocks;
     }
-    blocks = generateChunk(this.world.seed, cx, cz, this.world.generatorVersion);
+    blocks = generateChunk(this.world.seed, cx, cz, this.world.gen);
     const edits = this.world.edits.get(key);
     if (edits) for (const [index, id] of edits) blocks[index] = id;
     this.cache.set(key, blocks);

@@ -273,7 +273,7 @@ function generatedBlock(x: number, y: number, z: number): number {
   const key = chunkKey(cx, cz);
   let blocks = PLAYERS_CHUNKS.get(key);
   if (!blocks) {
-    blocks = generateChunk(BENCH_SEED, cx, cz, BENCH_GENERATOR_VERSION);
+    blocks = generateChunk(BENCH_SEED, cx, cz, { version: BENCH_GENERATOR_VERSION });
     PLAYERS_CHUNKS.set(key, blocks);
   }
   return blocks[blockIndex(toLocalCoord(x), y, toLocalCoord(z))];

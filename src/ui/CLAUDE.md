@@ -46,6 +46,19 @@ simulation time, then one every `CRAFT_REPEAT_MS` (250); a quick press crafts on
 release. The recipe table itself: `src/items/CLAUDE.md`. The label column of the settings
 rows is 136 px wide, so the controller labels fit on one line.
 
+## The "New world" form and the world list (Phase 7 part A)
+
+Under the Mode row and its hint: "Terrain" (Flat, Balanced, Hilly) and "Trees" (None, Few,
+Normal, Many), radio groups built like the Mode row (`choiceRow`, `data-terrain`,
+`data-trees`); `showForm` preselects Balanced and Few. **The `None` rule:** in Gathering
+`None` is disabled (not focusable) and the hint under Trees says "No trees only in Creative:
+Gathering needs wood."; switching to Gathering while `None` is chosen selects `Few`. The
+form scrolls on small screens; the menu comes back at the top when it is shown again. A list
+row shows "Gathering · Balanced · Few trees", or "Creative · Classic" for generator 1. The
+F3 overlay has a row "World" ("Generator 2 · balanced · few", "Generator 1"). The settings
+page has the switch "Collide with leaves" below "Invert controller look", in every input
+mode (`src/player/CLAUDE.md`).
+
 ## "Your player" (Phase 6 part D)
 
 A section of the pause screen after "Settings" (settings page and pause menu): the name

@@ -34,7 +34,7 @@ describe('repository hygiene (AC12.4)', () => {
 
   it('contains no image, audio or font files except the e2e reference screenshots (Phase 2 AC3.6)', () => {
     const assets = files.filter((file) => BINARY_ASSET.test(file));
-    const unexpected = assets.filter((file) => !/^e2e\/screenshots\/[a-z-]+\.png$/.test(file));
+    const unexpected = assets.filter((file) => !/^e2e\/screenshots\/[a-z0-9-]+\.png$/.test(file));
     expect(unexpected).toEqual([]);
     // Nineteen reference screenshots: nine from Phases 1 and 2, `rocky-hill` and `world-menu`
     // from Phase 3 part A, `gathering-hud`, `inventory`, `palette` and `inventory-touch`
@@ -43,7 +43,8 @@ describe('repository hygiene (AC12.4)', () => {
     // Phase 5 part A added `pad-glyphs`, `pad-world-menu` and `pad-pause`; part B
     // `pad-inventory` and `pad-recipe-list`. Phase 6 part A added `net-test`; part B
     // `remote-player`, `remote-player-night`, `join-section` and `room-panel`; part D
-    // `figure-sheet` and `player-section`.
-    expect(assets.length).toBe(39);
+    // `figure-sheet` and `player-section`. Phase 7 part A added `gen2-balanced-few`,
+    // `gen2-flat-many` and `gen2-hilly-normal`.
+    expect(assets.length).toBe(42);
   });
 });
