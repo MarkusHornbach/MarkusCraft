@@ -17,21 +17,21 @@ import { deriveSeed, fnv1a, hash2Float } from '../../util/rng';
 import { Block } from '../blocks';
 import { chunkKey } from '../chunk';
 import { CLAY_COLUMN, markClayColumns, placeOres } from './ores';
+import {
+  BEACH_ABOVE,
+  BEACH_BELOW,
+  CONTINENT_SCALE,
+  DETAIL_SCALE,
+  DIRT_DEPTH,
+  MAX_SURFACE,
+  MIN_SURFACE,
+  ROCK_JITTER,
+  ROCK_SCALE,
+  SALT_ROCK,
+} from './terrainRules';
 import { TREE_CANOPY_RADIUS, hasLeaf, isTreeOrigin, trunkHeight as treeTrunkHeight } from './trees';
 
-/** Columns whose surface is this close to sea level are sand (beaches, shallow beds). */
-export const BEACH_ABOVE = 2;
-export const BEACH_BELOW = 3;
-export const DIRT_DEPTH = 3;
-export const MIN_SURFACE = 22;
-export const MAX_SURFACE = 106;
-
-const CONTINENT_SCALE = 1 / 360;
-const DETAIL_SCALE = 1 / 110;
-const ROCK_SCALE = 1 / 64;
-/** Per-column jitter of the rock line, so grass and rock do not meet along a contour. */
-const ROCK_JITTER = 1;
-const SALT_ROCK = 0x70c4;
+export { BEACH_ABOVE, BEACH_BELOW, DIRT_DEPTH, MAX_SURFACE, MIN_SURFACE } from './terrainRules';
 const LAYER = CHUNK_SIZE * CHUNK_SIZE;
 /** Heights of a chunk's columns plus a rim of one column, for the slope rule. */
 const GRID = CHUNK_SIZE + 2;
