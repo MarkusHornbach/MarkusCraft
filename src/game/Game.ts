@@ -24,6 +24,7 @@ import {
   type WorldEdits,
   type WorldMeta,
   makeWorldId,
+  metaGen,
   normalizeName,
   seedFromText,
 } from '../save/saveFormat';
@@ -597,7 +598,7 @@ export class Game {
     // A room belongs to its world: another world closes it.
     if (this.mp.role === 'host') this.mp.leave();
     this.renderer.clearChunkMeshes();
-    this.world = new World(meta.seed, meta.generatorVersion, edits);
+    this.world = new World(meta.seed, metaGen(meta), edits);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
     this.spawn = findSpawn(getTerrain(meta.seed));
     this.player = createPlayer(meta.pose.x, meta.pose.y, meta.pose.z);
@@ -2746,7 +2747,7 @@ export class Game {
       setBlock: (x, y, z, id) => this.testSetBlock(x, y, z, id),
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
-      terrainChecksum: () => terrainChecksum(this.world.seed, this.world.generatorVersion),
+      terrainChecksum: () => terrainChecksum(this.world.seed, this.world.gen),
       getLight: (x, y, z) => this.lightAt(x, y, z),
       verifyLight: () => this.world.verifyLight(),
       lightChecksum: () => lightChecksumOf((cx, cz) => this.world.lightOf(cx, cz)),

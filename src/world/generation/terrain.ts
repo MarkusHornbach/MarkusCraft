@@ -4,7 +4,6 @@ import {
   CHUNK_VOLUME,
   CLAY_DEPTH,
   CLAY_MIN_WATER_DEPTH,
-  GENERATOR_VERSION,
   ROCK_HEIGHT,
   ROCK_HEIGHT_SHIFT,
   ROCK_SLOPE,
@@ -29,6 +28,9 @@ import {
   ROCK_SCALE,
   SALT_ROCK,
 } from './terrainRules';
+import { type WorldGen, isKnownGeneratorVersion } from './worldOptions';
+
+export { isKnownGeneratorVersion } from './worldOptions';
 import { TREE_CANOPY_RADIUS, hasLeaf, isTreeOrigin, trunkHeight as treeTrunkHeight } from './trees';
 
 export { BEACH_ABOVE, BEACH_BELOW, DIRT_DEPTH, MAX_SURFACE, MIN_SURFACE } from './terrainRules';
@@ -346,16 +348,14 @@ export function getTerrain(seed: number): Terrain {
   return terrain;
 }
 
-export function isKnownGeneratorVersion(version: number): boolean {
-  return version === GENERATOR_VERSION;
-}
-
 /**
- * Pure chunk generator: depends only on its arguments. `version` is the generator version
- * stored in the world; a later version that changes the terrain must keep this one working.
+ * Pure chunk generator: depends only on its arguments. `gen` is the generator stored with
+ * the world; a later version that changes the terrain must keep the older ones working.
  */
-export function generateChunk(seed: number, cx: number, cz: number, version: number): Uint8Array {
-  if (!isKnownGeneratorVersion(version)) throw new Error(`Unknown generator version ${version}`);
+export function generateChunk(seed: number, cx: number, cz: number, gen: WorldGen): Uint8Array {
+  if (!isKnownGeneratorVersion(gen.version)) {
+    throw new Error(`Unknown generator version ${gen.version}`);
+  }
   return getTerrain(seed).generateChunk(cx, cz);
 }
 
@@ -363,10 +363,10 @@ export function generateChunk(seed: number, cx: number, cz: number, version: num
  * 32-bit FNV-1a checksum over the block data of the 3 × 3 chunks around the origin. Two
  * devices that compute the same value generate the same terrain for the seed.
  */
-export function terrainChecksum(seed: number, version: number): number {
+export function terrainChecksum(seed: number, gen: WorldGen): number {
   let hash: number | undefined;
   for (let cz = -1; cz <= 1; cz++) {
-    for (let cx = -1; cx <= 1; cx++) hash = fnv1a(generateChunk(seed, cx, cz, version), hash);
+    for (let cx = -1; cx <= 1; cx++) hash = fnv1a(generateChunk(seed, cx, cz, gen), hash);
   }
   return hash ?? 0;
 }

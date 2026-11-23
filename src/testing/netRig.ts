@@ -7,6 +7,7 @@ import { createPlayerRecord } from '../actions/playerRecord';
 import { findSpawn } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
 import { World } from '../world/World';
+import { CLASSIC_GEN } from '../world/generation/worldOptions';
 import { ClientSession, type ClientStatus, type EndReason } from '../net/ClientSession';
 import { HostSession, type PeerEvent } from '../net/HostSession';
 import { MemoryNetwork, type MemorySignaling } from '../net/memoryTransport';
@@ -93,7 +94,7 @@ export class Rig {
       world: this.world,
       mode,
       worldName: 'Shared',
-      checksum: terrainChecksum(seed, 1),
+      checksum: terrainChecksum(seed, CLASSIC_GEN),
       hostName: 'Hosta',
       hostKey: playerKeyFromBytes([0xff]),
       hostRecord: this.hostRecord,
@@ -167,11 +168,11 @@ export class Rig {
           i === 0 ? ++this.idCounter : (key.charCodeAt(i) ?? 0),
         ),
       clock: () => this.net.nowMs,
-      checksum: (seed, version) => options.checksum ?? terrainChecksum(seed, version),
+      checksum: (seed, gen) => options.checksum ?? terrainChecksum(seed, gen),
       listener: {
         onWorld: (welcome, edits) => {
           guest.welcome = welcome;
-          guest.world = new World(welcome.seed, welcome.generatorVersion, edits);
+          guest.world = new World(welcome.seed, CLASSIC_GEN, edits);
           // The chunks around the start, as the guest's chunk manager would load them.
           for (let cz = -2; cz <= 2; cz++) {
             for (let cx = -2; cx <= 2; cx++) guest.world.generate(cx, cz);

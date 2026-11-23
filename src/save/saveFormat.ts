@@ -21,7 +21,11 @@ import {
 } from '../game/config';
 import type { MoveMode } from '../player/player';
 import { chunkKey } from '../world/chunk';
-import { isKnownGeneratorVersion } from '../world/generation/terrain';
+import {
+  type WorldGen,
+  isKnownGeneratorVersion,
+  worldGenOf,
+} from '../world/generation/worldOptions';
 
 export interface SavedPose {
   x: number;
@@ -63,6 +67,13 @@ export interface WorldMeta {
   player: PlayerRecord;
   /** Guests of the world, at most `GUESTS_MAX` (empty for worlds never opened to others). */
   guests: GuestEntry[];
+}
+
+/** The generator of a decoded world. Decoding guarantees that version and options fit. */
+export function metaGen(meta: WorldMeta): WorldGen {
+  const gen = worldGenOf(meta.generatorVersion, null);
+  if (!gen) throw new Error(`World ${meta.id} has an unknown generator`);
+  return gen;
 }
 
 /** Edits of all chunks of a world: chunk key → (block index → block id), as in `World`. */

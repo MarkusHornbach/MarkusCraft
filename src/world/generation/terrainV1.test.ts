@@ -4,7 +4,6 @@ import {
   CHUNK_SIZE,
   COAL_MAX_Y,
   COAL_MIN_Y,
-  GENERATOR_VERSION,
   IRON_MAX_Y,
   IRON_MIN_Y,
   SEA_LEVEL,
@@ -22,6 +21,7 @@ import {
   isKnownGeneratorVersion,
   terrainChecksum,
 } from './terrain';
+import { CLASSIC_GEN, type WorldGen } from './worldOptions';
 
 const SEEDS = [1337, 42, 987654321, 7, 2024];
 const AREA = 16; // chunks per side: 256 chunks per seed
@@ -68,18 +68,23 @@ const MAX = HALF * CHUNK_SIZE;
 
 describe('generator version', () => {
   it('has the recorded checksum for seed 1337 (Phase 3 AC1.1)', () => {
-    expect(terrainChecksum(1337, GENERATOR_VERSION)).toBe(TERRAIN_CHECKSUM_1337_V1);
-    expect(terrainChecksum(1338, GENERATOR_VERSION)).not.toBe(TERRAIN_CHECKSUM_1337_V1);
+    expect(terrainChecksum(1337, CLASSIC_GEN)).toBe(TERRAIN_CHECKSUM_1337_V1);
+    expect(terrainChecksum(1338, CLASSIC_GEN)).not.toBe(TERRAIN_CHECKSUM_1337_V1);
   });
 
   it('is taken by generateChunk, which rejects unknown versions (Phase 3 AC1.9)', () => {
-    expect(GENERATOR_VERSION).toBe(1);
     expect(isKnownGeneratorVersion(1)).toBe(true);
     expect(isKnownGeneratorVersion(0)).toBe(false);
     expect(isKnownGeneratorVersion(2)).toBe(false);
-    expect(generateChunk(1337, 0, 0, 1).length).toBe(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT);
-    expect(() => generateChunk(1337, 0, 0, 0)).toThrow(/generator version/);
-    expect(() => generateChunk(1337, 0, 0, 2)).toThrow(/generator version/);
+    expect(generateChunk(1337, 0, 0, CLASSIC_GEN).length).toBe(
+      CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT,
+    );
+    expect(() => generateChunk(1337, 0, 0, { version: 0 } as unknown as WorldGen)).toThrow(
+      /generator version/,
+    );
+    expect(() => generateChunk(1337, 0, 0, { version: 3 } as unknown as WorldGen)).toThrow(
+      /generator version/,
+    );
   });
 });
 

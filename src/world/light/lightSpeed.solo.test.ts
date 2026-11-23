@@ -3,13 +3,13 @@
 // many rounds taken with the two sides in turn. Moved here from `lightChunk.slow.test.ts`,
 // whose files run side by side with the heavy light soak tests (Phase 6 part B, CI).
 import { describe, expect, it } from 'vitest';
-import { GENERATOR_VERSION } from '../../game/config';
 import { caveGroup } from '../../testing/lightScenes';
 import { expectFasterThan } from '../../testing/timing';
 import { generateChunk } from '../generation/terrain';
 import { meshChunk } from '../meshing/mesher';
 import { lightChunk } from './lightChunk';
 import type { ChunkLookup } from './lightRules';
+import { CLASSIC_GEN } from '../generation/worldOptions';
 
 const SEED = 1337;
 const terrain = new Map<string, Uint8Array>();
@@ -17,7 +17,7 @@ function terrainChunk(cx: number, cz: number): Uint8Array {
   const key = `${cx},${cz}`;
   let blocks = terrain.get(key);
   if (!blocks) {
-    blocks = generateChunk(SEED, cx, cz, GENERATOR_VERSION);
+    blocks = generateChunk(SEED, cx, cz, CLASSIC_GEN);
     terrain.set(key, blocks);
   }
   return blocks;

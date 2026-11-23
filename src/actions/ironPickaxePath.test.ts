@@ -1,14 +1,7 @@
 // Phase 3 AC10.3: from an empty inventory to an iron pickaxe with valid actions only;
 // Phase 4 AC9.1: then coal, torches and a lit tunnel.
 import { describe, expect, it } from 'vitest';
-import {
-  GENERATOR_VERSION,
-  IRON_MAX_Y,
-  PLAYER_EYE_HEIGHT,
-  SEA_LEVEL,
-  WALK_SPEED,
-  WORLD_HEIGHT,
-} from '../game/config';
+import { IRON_MAX_Y, PLAYER_EYE_HEIGHT, SEA_LEVEL, WALK_SPEED, WORLD_HEIGHT } from '../game/config';
 import { breakTimeMs } from '../items/hardness';
 import { countItems } from '../items/inventory';
 import { Item, itemLabel } from '../items/items';
@@ -38,7 +31,7 @@ const RADIUS = 4;
  * (one of their six neighbours is not solid), as a player who has to see a block would.
  */
 class Script {
-  readonly world = new World(SEED, GENERATOR_VERSION);
+  readonly world = new World(SEED);
   readonly session: LocalSession;
   readonly log: string[] = [];
   pose: { x: number; y: number; z: number };

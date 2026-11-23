@@ -1,8 +1,9 @@
 // World: the set of loaded chunks, block access in world coordinates, and the edit log.
-import { CHUNK_SIZE, GENERATOR_VERSION, WORLD_HEIGHT } from '../game/config';
+import { CHUNK_SIZE, WORLD_HEIGHT } from '../game/config';
 import { BLOCK_SOLID, Block } from './blocks';
 import { type Chunk, blockIndex, chunkKey, createChunk, toChunkCoord, toLocalCoord } from './chunk';
 import { generateChunk } from './generation/terrain';
+import { CLASSIC_GEN, type WorldGen } from './generation/worldOptions';
 import { checkChunkLight } from './light/lightCheck';
 import { lightChunk } from './light/lightChunk';
 import { BLOCK_LIGHT, LIGHT_OPEN_SKY, type LightTables } from './light/lightRules';
@@ -17,8 +18,8 @@ export type LightListener = (cx: number, cz: number, lit: boolean) => void;
 
 export class World {
   readonly seed: number;
-  /** Version of the terrain generator this world was created with. */
-  readonly generatorVersion: number;
+  /** The terrain generator (version and options) this world was created with. */
+  readonly gen: WorldGen;
   private readonly chunks = new Map<string, Chunk>();
   /**
    * Player edits per chunk (block index → block id). Kept when a chunk unloads and
@@ -35,12 +36,17 @@ export class World {
   /** `edits` are the saved edits of a loaded world; the world takes the map over. */
   constructor(
     seed: number,
-    generatorVersion: number = GENERATOR_VERSION,
+    gen: WorldGen = CLASSIC_GEN,
     edits: Map<string, Map<number, number>> = new Map(),
   ) {
     this.seed = seed >>> 0;
-    this.generatorVersion = generatorVersion;
+    this.gen = gen;
     this.edits = edits;
+  }
+
+  /** Version of the terrain generator this world was created with. */
+  get generatorVersion(): number {
+    return this.gen.version;
   }
 
   get chunkCount(): number {
@@ -67,7 +73,7 @@ export class World {
   generate(cx: number, cz: number): Chunk {
     const existing = this.getChunk(cx, cz);
     if (existing) return existing;
-    const chunk = createChunk(cx, cz, generateChunk(this.seed, cx, cz, this.generatorVersion));
+    const chunk = createChunk(cx, cz, generateChunk(this.seed, cx, cz, this.gen));
     const edits = this.edits.get(chunkKey(cx, cz));
     if (edits) for (const [index, id] of edits) chunk.blocks[index] = id;
     this.chunks.set(chunkKey(cx, cz), chunk);
@@ -246,7 +252,7 @@ export class World {
     const key = chunkKey(cx, cz);
     let blocks = cache.get(key);
     if (!blocks) {
-      blocks = generateChunk(this.seed, cx, cz, this.generatorVersion);
+      blocks = generateChunk(this.seed, cx, cz, this.gen);
       const edits = this.edits.get(key);
       if (edits) for (const [index, id] of edits) blocks[index] = id;
       cache.set(key, blocks);

@@ -1,10 +1,11 @@
 // Dev tool: measures generation, light and meshing speed in Node.
 // Run: npx vite-node scripts/perf.ts
-import { CHUNK_SIZE, GENERATOR_VERSION } from '../src/game/config';
+import { CHUNK_SIZE } from '../src/game/config';
 import { Block } from '../src/world/blocks';
 import { ChunkManager } from '../src/world/ChunkManager';
 import { createChunk } from '../src/world/chunk';
 import { generateChunk } from '../src/world/generation/terrain';
+import { CLASSIC_GEN } from '../src/world/generation/worldOptions';
 import { lightChunk } from '../src/world/light/lightChunk';
 import { meshChunk } from '../src/world/meshing/mesher';
 import { mulberry32, randInt } from '../src/util/rng';
@@ -30,7 +31,7 @@ const generation = best(
   () => {
     for (let cz = -2; cz <= N + 1; cz++) {
       for (let cx = -2; cx <= N + 1; cx++) {
-        blocks.set(`${cx},${cz}`, generateChunk(SEED, cx, cz, GENERATOR_VERSION));
+        blocks.set(`${cx},${cz}`, generateChunk(SEED, cx, cz, CLASSIC_GEN));
       }
     }
   },

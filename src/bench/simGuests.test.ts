@@ -28,7 +28,7 @@ function scriptActions(steps: number): { step: number; guest: number; action: Ac
 async function play(steps: number) {
   const scenario = getScenario('players');
   if (!scenario?.guests) throw new Error('no players scenario');
-  const world = new World(BENCH_SEED, 1);
+  const world = new World(BENCH_SEED);
   for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) world.generate(cx, cz);
   for (let cz = -2; cz <= 2; cz++) for (let cx = -2; cx <= 2; cx++) world.light(cx, cz);
   const before = new Map<string, Uint8Array>();

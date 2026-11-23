@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE, GENERATOR_VERSION, SEA_LEVEL, WORLD_HEIGHT } from '../../game/config';
+import { CHUNK_SIZE, SEA_LEVEL, WORLD_HEIGHT } from '../../game/config';
 import { expectFasterThan } from '../../testing/timing';
 import { Block } from '../blocks';
 import { blockIndex } from '../chunk';
 import { findSpawn } from './spawn';
 import { Terrain, generateChunk } from './terrain';
 import { TREE_MIN_SPACING, hasLeaf, isTreeOrigin, trunkHeight } from './trees';
+import { CLASSIC_GEN } from './worldOptions';
 
 const SEEDS = [1337, 42, 987654321];
 const AREA = 16; // chunks per side
@@ -24,17 +25,15 @@ function columnTop(blocks: Uint8Array, lx: number, lz: number, skipTree: boolean
 
 describe('generateChunk', () => {
   it('is deterministic and depends on the seed (AC4.1)', () => {
-    const a = generateChunk(1337, 3, -2, GENERATOR_VERSION);
-    const b = generateChunk(1337, 3, -2, GENERATOR_VERSION);
+    const a = generateChunk(1337, 3, -2, CLASSIC_GEN);
+    const b = generateChunk(1337, 3, -2, CLASSIC_GEN);
     // Interleave another seed to prove the terrain cache does not leak state.
-    const c = generateChunk(7, 3, -2, GENERATOR_VERSION);
-    const d = generateChunk(1337, 3, -2, GENERATOR_VERSION);
+    const c = generateChunk(7, 3, -2, CLASSIC_GEN);
+    const d = generateChunk(1337, 3, -2, CLASSIC_GEN);
     expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
     expect(Buffer.from(a).equals(Buffer.from(d))).toBe(true);
     expect(Buffer.from(a).equals(Buffer.from(c))).toBe(false);
-    expect(Buffer.from(a).equals(Buffer.from(generateChunk(1337, 4, -2, GENERATOR_VERSION)))).toBe(
-      false,
-    );
+    expect(Buffer.from(a).equals(Buffer.from(generateChunk(1337, 4, -2, CLASSIC_GEN)))).toBe(false);
   });
 
   it('builds valid columns over a 16×16-chunk area for 3 seeds (AC4.2)', () => {
@@ -154,11 +153,11 @@ describe('generateChunk', () => {
   });
 
   it('generates a chunk in under 15 ms on average (AC4.6)', () => {
-    generateChunk(5, 0, 0, GENERATOR_VERSION); // warm-up
+    generateChunk(5, 0, 0, CLASSIC_GEN); // warm-up
     let average = Infinity;
     for (let round = 0; round < 3; round++) {
       const start = performance.now();
-      for (let i = 0; i < 50; i++) generateChunk(5, i - 25, (i * 7) % 13, GENERATOR_VERSION);
+      for (let i = 0; i < 50; i++) generateChunk(5, i - 25, (i * 7) % 13, CLASSIC_GEN);
       average = Math.min(average, (performance.now() - start) / 50);
     }
     expectFasterThan(average, 15);
@@ -203,8 +202,8 @@ describe('trees', () => {
         const cx = Math.floor(x / CHUNK_SIZE);
         const cz = Math.floor(z / CHUNK_SIZE);
         // Order 1: own chunk first; order 2 (fresh generator): neighbour first.
-        const own1 = generateChunk(seed, cx, cz, GENERATOR_VERSION);
-        const next1 = generateChunk(seed, cx + 1, cz, GENERATOR_VERSION);
+        const own1 = generateChunk(seed, cx, cz, CLASSIC_GEN);
+        const next1 = generateChunk(seed, cx + 1, cz, CLASSIC_GEN);
         const fresh = new Terrain(seed);
         const next2 = fresh.generateChunk(cx + 1, cz);
         const own2 = fresh.generateChunk(cx, cz);

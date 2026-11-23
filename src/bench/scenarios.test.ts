@@ -58,7 +58,7 @@ interface Route {
 
 /** Plays warm-up and window of a scenario with the real physics. */
 function play(scenario: Scenario): Route {
-  const world = new World(BENCH_SEED, 1);
+  const world = new World(BENCH_SEED);
   const p = playerAt(scenario);
   let from = { x: p.x, y: p.y, z: p.z };
   let borders = 0;
@@ -124,7 +124,7 @@ describe('scenario scripts', () => {
 
   it('Phase 4P AC1.4: all edits are accepted, change light across chunks and undo themselves', () => {
     const edit = scenarioOf('edit');
-    const world = new World(BENCH_SEED, 1);
+    const world = new World(BENCH_SEED);
     for (let cz = -3; cz <= 2; cz++) for (let cx = -3; cx <= 2; cx++) world.generate(cx, cz);
     for (let cz = -2; cz <= 1; cz++) for (let cx = -2; cx <= 1; cx++) world.light(cx, cz);
     const before = new Map<string, Uint8Array>();
@@ -189,7 +189,7 @@ describe('the torches scenario (Phase 4 AC9.8)', () => {
   /** Plays a window of `torches` with the real physics, world and action layer. */
   function playTorches(steps: number) {
     const torches = scenarioOf('torches');
-    const world = new World(BENCH_SEED, 1);
+    const world = new World(BENCH_SEED);
     for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) world.generate(cx, cz);
     for (let cz = -2; cz <= 2; cz++) for (let cx = -2; cx <= 2; cx++) world.light(cx, cz);
     const before = new Map<string, Uint8Array>();
@@ -227,7 +227,7 @@ describe('the torches scenario (Phase 4 AC9.8)', () => {
     const torches = scenarioOf('torches');
     expect(torches.time).toBe(0.75);
     expect(torches.start).toMatchObject({ ...TORCH_HOVER, mode: 'fly' });
-    const world = new World(BENCH_SEED, 1);
+    const world = new World(BENCH_SEED);
     for (let cz = -1; cz <= 1; cz++) for (let cx = -1; cx <= 1; cx++) world.generate(cx, cz);
     for (const cell of TORCH_CELLS) {
       expect(world.getBlock(cell.x, cell.y, cell.z), `${cell.x}`).toBe(Block.AIR);
