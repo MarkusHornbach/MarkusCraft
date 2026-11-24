@@ -49,8 +49,8 @@ inventory in the document, never over the pause or world menu, no pointer, no fo
 line at a time from a queue, each `PROGRESS_NOTICE_MS` (3 000) of simulation time; texts
 from `noticeTexts`. On screens up to 480 px high it moves to the bottom edge while the
 inventory is open (the panel fills the height). The F3 overlay has a row "Progress" in
-Adventure worlds. "Open to others" is disabled in Adventure worlds with the note "Rooms in
-Adventure worlds come with the next update." until Phase 8 part A2.
+Adventure worlds. In a room a finished task names its player ("Task done: Mine 32 logs
+(Anna) · +10 XP", for everyone); level-ups and first finds show only for their player.
 
 ## The recipe list keeps table order
 

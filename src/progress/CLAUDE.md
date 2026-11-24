@@ -33,7 +33,9 @@ objects unless a reach task is open. `stepProgress(world, actor, event, present)
 only for tasks of the open chapter, never carries a surplus, gives a finished task's XP to
 everyone in `present` and first finds and crafts to the actor, and reports outcomes
 (`taskDone`, `chapterDone`, `xp`, `firstFind`, `levelUp`, `unlocked`). It is called only by
-the sessions (`src/actions/CLAUDE.md`). **Extension points** for later parts: a new event
+the sessions (`src/actions/CLAUDE.md`). A guest of a room never steps: it rebuilds what to
+show from the host's messages, `outcomesOfBook` (finished tasks with the player's name,
+task unlocks, chapters) and `outcomesOfRecord` (its own finds, XP and level-ups). **Extension points** for later parts: a new event
 kind is one union member in `events.ts`; a new task type one member of `TaskType` and one
 `case` in `advance` (`progress.ts`), one in `check.ts` and one skill in the bot.
 

@@ -43,7 +43,7 @@
     ]
   ],
   "multiplayer": [
-    ["mpMenus.spec.ts", "mpPlayers.spec.ts"],
+    ["mpMenus.spec.ts", "mpPlayers.spec.ts", "mpProgress.spec.ts"],
     ["mpFigure.spec.ts", "mpGathering.spec.ts"],
     ["mpHarden.spec.ts", "mpRooms.spec.ts"]
   ]

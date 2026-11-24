@@ -83,6 +83,22 @@ like the save; the guest checks the checksum with that generator and opens its w
 it, so a guest never sees another world than the host's. A mismatch is the join error
 `terrain`. Builds that differ never meet (`hello` checks `build`).
 
+## Shared progress (Phase 8 part A2)
+
+In an Adventure room the task book belongs to the host: `HostSession` holds it (from
+`HostOptions.progress` when the room opens), runs `eventsOf` and `stepProgress` for every
+accepted action of every player and for every pose (a guest's from `pose`, its own from
+`HostLocalSession.notePose`), with everyone in the room `present`. Progress ids are
+`local` for the screen's own player and the member id for guests, so `noticeTexts` works
+unchanged; finished tasks carry `by`, the actor's name. XP, finds and crafts live in the
+records and so in the guest entries. `welcome` carries `progress`; the host message
+`progress { progress, done: [{ task, by }] }` goes to every guest when the book changes,
+before the changed records (at most one per action; a pose that completes nothing sends
+nothing). `ClientSession` reports it through `onProgress` (`outcomesOfBook`) and derives
+its own level-ups and first finds from its records (`outcomesOfRecord`). Each player's
+`craft` is locked by its own level. With four players placing twice a second, every place
+changing the book, the host sends about 16.5 kB/s (AC8.6, limit 20).
+
 ## The network test (Phase 6 part A)
 
 A screen of its own (`nettest`), opened by "Network test" on the settings page; "Back"
@@ -93,4 +109,5 @@ line.
 
 Before changing the network layer read the "Decisions and deviations" of
 `docs/phase-6a-report.md` to `docs/phase-6e-report.md` (sessions and protocol: 6B; timed
-breaking and the save: 6C; the figure: 6D; overlay and relayed poses: 6E).
+breaking and the save: 6C; the figure: 6D; overlay and relayed poses: 6E), for shared
+progress `docs/phase-8a2-report.md`.

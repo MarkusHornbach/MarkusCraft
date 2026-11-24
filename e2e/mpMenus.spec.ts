@@ -253,7 +253,7 @@ test('Phase 6 AC7.9: a guest whose connection dropped is back with the edits and
 });
 
 test.describe('five players', () => {
-  test('Phase 6 AC7.10: a fifth player sees "Room is full"; Adventure rooms wait for Phase 8 part A2', async ({
+  test('Phase 6 AC7.10: a fifth player sees "Room is full"; Phase 8 AC8.5: Adventure worlds open rooms', async ({
     players,
   }) => {
     const host = await openTestPlayer(players);
@@ -270,14 +270,14 @@ test.describe('five players', () => {
     await expect(fifth.page.locator('.join-status')).toHaveText('Room is full', {
       timeout: 15_000,
     });
-    // Phase 8 part A1: "Open to others" is disabled in an Adventure world, with its note,
-    // until part A2 brings shared progress (Phase 8 AC5.7).
+    // Phase 8 part A2: "Open to others" is enabled in an Adventure world again (AC8.5),
+    // without the note of part A1; the room opens.
     await createWorld(fifth.page, { mode: 'gathering' });
     await pause(fifth.page);
-    await expect(fifth.page.locator('.room-open-button')).toBeDisabled();
-    await expect(fifth.page.locator('.room-panel .room-note')).toHaveText(
-      'Rooms in Adventure worlds come with the next update.',
-    );
+    await expect(fifth.page.locator('.room-open-button')).toBeEnabled();
+    await expect(fifth.page.locator('.room-panel .room-note')).toHaveCount(0);
+    await fifth.page.locator('.room-open-button').click();
+    await untilNet(fifth.page, (n) => n.role === 'host' && n.roomCode !== null);
   });
 });
 

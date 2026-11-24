@@ -15,6 +15,7 @@ import { type WorldMeta, decodeMeta, encodeMeta } from '../save/saveFormat';
 import { CLASSIC_GEN } from '../world/generation/worldOptions';
 import { Rig, type RigGuest, type RigOptions } from '../testing/netRig';
 import { Block } from '../world/blocks';
+import { TrafficMeter, countedNetwork } from './traffic';
 
 interface Cell {
   x: number;
@@ -479,5 +480,82 @@ describe('progress traffic (Phase 8 plan 5.12)', () => {
     rig.host.local.notePose(66);
     await rig.run(200);
     expect(g.client.progressReceived).toBe(1);
+  });
+});
+
+function circlePose(base: { x: number; y: number; z: number }, i: number, t: number) {
+  const a = t / 1000 + (i * Math.PI) / 2;
+  return {
+    x: base.x + Math.cos(a) * (1.5 + i),
+    y: base.y,
+    z: base.z + Math.sin(a) * (1.5 + i),
+    yaw: a,
+    pitch: 0.1 * i,
+  };
+}
+
+describe('the traffic of an Adventure room (Phase 8 AC8.6)', () => {
+  it('four moving players whose every action changes the book: the host sends less than 20 kB per second', async () => {
+    const BRICKS_TASK = 20;
+    const done = Array.from({ length: BRICKS_TASK - 1 }, (_, i) => i + 1);
+    const rig = new Rig({ mode: 'gathering', progress: { done, counts: [] } });
+    const meter = new TrafficMeter(() => rig.net.nowMs);
+    const counted = countedNetwork(
+      { signaling: () => rig.net.signaling(), directory: rig.net.directory() },
+      meter,
+    );
+    const hostSignaling = counted.signaling();
+    hostSignaling.onConnection = (conn) => rig.host.accept(conn);
+    await rig.settle(hostSignaling.open('mc-test123-r-ABCDEF'));
+    for (let i = 0; i < 3; i++) expect(await rig.join(rig.guest())).toBeNull();
+    for (const g of rig.guests) {
+      await editGuest(rig, g, (r) => {
+        const slots = r.slots.map(() => null) as PlayerRecord['slots'][number][];
+        slots[0] = { item: Block.STONE_BRICKS, count: 64 };
+        return { ...r, slots, selectedSlot: 0 };
+      });
+    }
+    await rig.run(500);
+    const base = { ...rig.hostPose };
+    const sentBefore = meter.outBytes;
+    const msgsBefore = meter.outMsgs;
+    const start = rig.net.nowMs;
+    // Ten seconds of four players walking; every guest places a stone brick twice a second
+    // (60 in all, below the task's 64: every place changes the book), the host walks
+    // through the pose step.
+    for (let step = 0; step < 600; step++) {
+      const t = rig.net.nowMs;
+      rig.hostPose = circlePose(base, 0, t);
+      rig.host.local.notePose(rig.hostPose.y);
+      rig.guests.forEach((g, i) => {
+        const pose = circlePose(base, i + 1, t);
+        g.client.setPose(pose, t);
+        if (step % 30 === i * 10) {
+          const cell = {
+            x: Math.floor(pose.x),
+            y: Math.floor(pose.y) + 3 + Math.floor(step / 200),
+            z: Math.floor(pose.z),
+          };
+          g.client.submit({ kind: 'place', ...cell, slot: 0 });
+        }
+      });
+      await rig.run(10);
+      await rig.run(7, true);
+    }
+    await rig.run(200);
+    const seconds = (rig.net.nowMs - start) / 1000;
+    const bytesPerS = (meter.outBytes - sentBefore) / seconds;
+    const msgsPerS = (meter.outMsgs - msgsBefore) / seconds;
+    console.log(
+      `AC8.6: host sends ${(bytesPerS / 1024).toFixed(2)} kB/s in ${msgsPerS.toFixed(0)} messages/s`,
+    );
+    expect(bytesPerS).toBeLessThan(20 * 1024);
+    const placed = rig.guests.flatMap((g) =>
+      g.answers.filter((a) => a.action.kind === 'place' && a.result.ok),
+    ).length;
+    expect(placed).toBeGreaterThanOrEqual(50);
+    // Every accepted place counted, and every guest heard of each one once.
+    expect(rig.host.progress.counts).toEqual([{ task: BRICKS_TASK, count: placed }]);
+    for (const g of rig.guests) expect(g.client.progressReceived).toBe(placed);
   });
 });
