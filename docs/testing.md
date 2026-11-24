@@ -72,14 +72,16 @@ light against the slow reference after each of 2 000 random edits. The three pas
   settings page). References `gen2-balanced-few`, `gen2-flat-many`, `gen2-hilly-normal`
   (`e2e/terrain.spec.ts`).
 - Phase 8 part A: `openWorld(name, seed, mode?, progress?)` (a new Adventure world's book,
-  default `all`); `setProgress({ xp?, done? }, player?)` sets the XP (on a host with a
+  default `all`); `setProgress({ xp?, done?, counts? }, player?)` sets the XP (on a host with a
   guest's id: that guest's) through the single `replaceRecord` of the test tools, and
-  `done` replaces the world's done list and clears the counts; `getState().progress`
+  `done` replaces the world's done list and clears the counts (8A2: `counts` sets them; on
+  a host every guest learns the new book; a guest never gets `progress=all`); `getState().progress`
   `{ level, xp, nextLevelXp, chapter, done, tasks [{ id, count, goal, done }] (the open
 chapter), notice }` or `null` in Creative; `recipes[]` has `locked` and `unlock`
   (`{ level } | { task }`); `ui.tab` may be `tasks`. References `tasks-tab`,
   `tasks-tab-touch`, `recipe-list-locked`, `progress-notice` (`e2e/progress.spec.ts`,
-  `e2e/progressTouch.spec.ts`).
+  `e2e/progressTouch.spec.ts`). Part A2: shared progress in a room, `e2e/mpProgress.spec.ts`
+  (no references).
 
 ## Controller
 
