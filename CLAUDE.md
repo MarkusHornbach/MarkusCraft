@@ -113,7 +113,7 @@ many rounds, the two sides in turn.
 - **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 2, with
   world options); old versions and `TERRAIN_CHECKSUM_1337_V1` never change: `src/world/CLAUDE.md`.
 - **Saving.** One `WorldMeta` record plus one record per edited chunk (`SAVE_FORMAT_VERSION`,
-  now 4, with the task book); decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`.
+  now 5, with the task book and the tracked task); decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`.
 - **Light.** Sky and block light per cell (0–15) are a pure function of the blocks, never
   saved. **The invariant:** after any edits, loads and unloads the
   stored light of every lit chunk equals what the slow reference (`lightCheck.ts`) works
@@ -284,32 +284,33 @@ hold:
 
 ## Status
 
-| Part     | Plan                    | Report                         | Before changing                           |
-| -------- | ----------------------- | ------------------------------ | ----------------------------------------- |
-| 1        | `docs/phase-1-plan.md`  | `docs/phase-1-report.md`       | world, meshing, physics, the test API     |
-| 2A       | `docs/phase-2-plan.md`  | `docs/phase-2a-report.md`      | input, the menu, the touch tests          |
-| 3A       | `docs/phase-3-plan.md`  | `docs/phase-3a-report.md`      | generation, actions, saves, menus, start  |
-| 3B       | `docs/phase-3-plan.md`  | `docs/phase-3b-report.md`      | items, inventory, break rules             |
-| 3C       | `docs/phase-3-plan.md`  | `docs/phase-3c-report.md`      | recipes, tools, break rules, recipe list  |
-| 4A       | `docs/phase-4-plan.md`  | `docs/phase-4a-report.md`      | light, chunks, mesher, shader, references |
-| 4P       | `docs/phase-4p-plan.md` | `docs/phase-4p-report.md`      | performance test, `Input`, screens        |
-| 4E       | `docs/phase-4e-plan.md` | `docs/phase-4e-report.md`      | remeshing after edits, chunk budget       |
-| 4B       | `docs/phase-4-plan.md`  | `docs/phase-4b-report.md`      | torch, block flags, night, Brightness     |
-| 5A       | `docs/phase-5-plan.md`  | `docs/phase-5a-report.md`      | `Input`, controller, focus, menus, back   |
-| Polish 1 | `docs/polish-1-plan.md` | `docs/polish-1-report.md`      | the recipe list, the hold                 |
-| 5B       | `docs/phase-5-plan.md`  | `docs/phase-5b-report.md`      | inventory screen, recipe list, focus      |
-| 6A       | `docs/phase-6-plan.md`  | `docs/phase-6a-report.md`      | network layer, network test, mp specs     |
-| 6B       | `docs/phase-6-plan.md`  | `docs/phase-6b-report.md`      | sessions, protocol, room menus, mp specs  |
-| 6C       | `docs/phase-6-plan.md`  | `docs/phase-6c-report.md`      | save format, timed breaking in rooms      |
-| 6D       | `docs/phase-6-plan.md`  | `docs/phase-6d-report.md`      | figure, looks, identity, "Your player"    |
-| 6E       | `docs/phase-6-plan.md`  | `docs/phase-6e-report.md`      | overlay, relayed poses, `players`         |
-| CI 1     | `docs/ci-1-plan.md`     | `docs/ci-1-report.md`          | `ci.yml`, `scripts/ci/`                   |
-| Fix pad  | –                       | `docs/fix-pad-flaky-report.md` | pad test timing, back pairing             |
-| Fix CI   | –                       | `docs/fix-ci-flaky-report.md`  | back guard window, net test waits         |
-| Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget           |
-| 7A       | `docs/phase-7a-plan.md` | `docs/phase-7a-report.md`      | generator 2, save format 3, leaves        |
-| 8A1      | `docs/phase-8a-plan.md` | `docs/phase-8a1-report.md`     | progress, save format 4, Tasks tab, bot   |
-| 8A2      | `docs/phase-8a-plan.md` | `docs/phase-8a2-report.md`     | shared progress, protocol, mp specs       |
+| Part     | Plan                    | Report                         | Before changing                            |
+| -------- | ----------------------- | ------------------------------ | ------------------------------------------ |
+| 1        | `docs/phase-1-plan.md`  | `docs/phase-1-report.md`       | world, meshing, physics, the test API      |
+| 2A       | `docs/phase-2-plan.md`  | `docs/phase-2a-report.md`      | input, the menu, the touch tests           |
+| 3A       | `docs/phase-3-plan.md`  | `docs/phase-3a-report.md`      | generation, actions, saves, menus, start   |
+| 3B       | `docs/phase-3-plan.md`  | `docs/phase-3b-report.md`      | items, inventory, break rules              |
+| 3C       | `docs/phase-3-plan.md`  | `docs/phase-3c-report.md`      | recipes, tools, break rules, recipe list   |
+| 4A       | `docs/phase-4-plan.md`  | `docs/phase-4a-report.md`      | light, chunks, mesher, shader, references  |
+| 4P       | `docs/phase-4p-plan.md` | `docs/phase-4p-report.md`      | performance test, `Input`, screens         |
+| 4E       | `docs/phase-4e-plan.md` | `docs/phase-4e-report.md`      | remeshing after edits, chunk budget        |
+| 4B       | `docs/phase-4-plan.md`  | `docs/phase-4b-report.md`      | torch, block flags, night, Brightness      |
+| 5A       | `docs/phase-5-plan.md`  | `docs/phase-5a-report.md`      | `Input`, controller, focus, menus, back    |
+| Polish 1 | `docs/polish-1-plan.md` | `docs/polish-1-report.md`      | the recipe list, the hold                  |
+| 5B       | `docs/phase-5-plan.md`  | `docs/phase-5b-report.md`      | inventory screen, recipe list, focus       |
+| 6A       | `docs/phase-6-plan.md`  | `docs/phase-6a-report.md`      | network layer, network test, mp specs      |
+| 6B       | `docs/phase-6-plan.md`  | `docs/phase-6b-report.md`      | sessions, protocol, room menus, mp specs   |
+| 6C       | `docs/phase-6-plan.md`  | `docs/phase-6c-report.md`      | save format, timed breaking in rooms       |
+| 6D       | `docs/phase-6-plan.md`  | `docs/phase-6d-report.md`      | figure, looks, identity, "Your player"     |
+| 6E       | `docs/phase-6-plan.md`  | `docs/phase-6e-report.md`      | overlay, relayed poses, `players`          |
+| CI 1     | `docs/ci-1-plan.md`     | `docs/ci-1-report.md`          | `ci.yml`, `scripts/ci/`                    |
+| Fix pad  | –                       | `docs/fix-pad-flaky-report.md` | pad test timing, back pairing              |
+| Fix CI   | –                       | `docs/fix-ci-flaky-report.md`  | back guard window, net test waits          |
+| Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget            |
+| 7A       | `docs/phase-7a-plan.md` | `docs/phase-7a-report.md`      | generator 2, save format 3, leaves         |
+| 8A1      | `docs/phase-8a-plan.md` | `docs/phase-8a1-report.md`     | progress, save format 4, Tasks tab, bot    |
+| 8A2      | `docs/phase-8a-plan.md` | `docs/phase-8a2-report.md`     | shared progress, protocol, mp specs        |
+| Polish 2 | `docs/polish-2-plan.md` | `docs/polish-2-report.md`      | tracker, `track`, save format 5, Tasks tab |
 
 - **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
   prompt asks for it. The rest of Phase 7 (custom blocks, textures, characters, names,
@@ -321,5 +322,5 @@ hold:
   2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
   (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;
   "Part D" and "AC11.x" in the reports of 6B and 6C mean Part E and AC14.x (Part D, the
-  figure, was inserted later); Polish 1 names its criteria "Polish 1 AC1.1" and its device
-  tests' origin "P1".
+  figure, was inserted later); Polish 1 and 2 name their criteria "Polish 1 AC1.1",
+  "Polish 2 AC1.1" and their device tests' origins "P1", "P2".

@@ -12,10 +12,11 @@ import { playerIntersectsBlock } from '../player/physics';
 import { addItems, emptySlot, fits, moveStack, removeItems, setSlot } from '../items/inventory';
 import { getItemDef } from '../items/items';
 import { getRecipe, stationsNear, takeIngredients } from '../items/recipes';
-import { type WorldProgress, recipeUnlocked } from '../progress/progress';
+import { type WorldProgress, openChapter, recipeUnlocked } from '../progress/progress';
+import { getTask } from '../progress/tables';
 import { BLOCK_NEEDS_SUPPORT, BLOCK_REPLACEABLE, BLOCK_SOLID, isSupport } from '../world/blocks';
 import type { Action } from './actions';
-import type { GameMode, PlayerRecord } from './playerRecord';
+import { type GameMode, type PlayerRecord, TRACK_HIDDEN } from './playerRecord';
 
 /**
  * Why an action was refused. Short identifiers; the user interface maps them to texts.
@@ -243,5 +244,27 @@ export function applyAction(ctx: ActionContext, action: Action, nowMs: number): 
       if (added.left > 0) return reject('full');
       return changed(ctx.record, added.slots);
     }
+    case 'track': {
+      // Creative has no task book.
+      if (ctx.mode !== 'gathering') return reject('mode');
+      if (action.task !== TRACK_HIDDEN && !trackable(action.task, ctx.progress)) {
+        return reject('invalid');
+      }
+      // Only the choice changes; a break in progress goes on.
+      const player: PlayerRecord = { ...ctx.record, track: action.task };
+      return { ok: true, blocks: [], player, notices: [] };
+    }
   }
+}
+
+/** Whether a task can be chosen for the tracker: a task of the open chapter, not done. */
+function trackable(id: number, progress: WorldProgress): boolean {
+  const task = getTask(id);
+  const chapter = openChapter(progress);
+  return (
+    task !== undefined &&
+    chapter !== null &&
+    task.chapter === chapter.id &&
+    !progress.done.includes(id)
+  );
 }

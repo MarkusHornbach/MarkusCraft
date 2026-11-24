@@ -70,8 +70,9 @@ test('Phase 8 AC8.4: a guest mines the last log of "Mine 32 logs"; both see the 
   await openTasks(guest.page);
   for (const page of [host.page, guest.page]) {
     await expect(page.locator('.tasks-tab .tasks-xp-text')).toHaveText('0 / 50 XP');
+    // Polish 2: the row the tracker shows (the first open task) is marked "Tracked".
     await expect(page.locator('.tasks-tab .task-row').first()).toContainText(
-      `Mine 32 logs${LOG_GOAL - 1} / ${LOG_GOAL}`,
+      `Mine 32 logsTracked${LOG_GOAL - 1} / ${LOG_GOAL}`,
     );
   }
 
@@ -129,4 +130,52 @@ test('Phase 8 AC8.4: a guest mines the last log of "Mine 32 logs"; both see the 
   await untilNet(host.page, (n) => n.players.length === 2);
   expect(await host.page.evaluate(() => window.__mc.verifyLight())).toBe(0);
   expect(await guest.page.evaluate(() => window.__mc.verifyLight())).toBe(0);
+});
+
+test("Polish 2 AC3.6: in a room the guest's tracker follows the shared book and its own choice; the room notices sit below the tracker", async ({
+  players,
+}) => {
+  const host = await openTestPlayer(players, {
+    query: { mode: 'gathering', progress: 'fresh' },
+  });
+  const guest = await openTestPlayer(players, { query: { name: 'Anna' } });
+  const code = await hostRoom(host.page);
+  await joinRoom(guest.page, code);
+
+  // Each player's own choice: the guest tracks "Make 64 planks", the host stays automatic.
+  await guest.page.evaluate(() => window.__mc.submit({ kind: 'track', task: 2 }));
+  await expect
+    .poll(async () => (await state(guest.page)).progress?.tracked)
+    .toEqual({ id: 2, text: 'Make 64 planks  0 / 64' });
+  expect((await state(host.page)).progress?.tracked).toEqual({
+    id: 1,
+    text: 'Mine 32 logs  0 / 32',
+  });
+  // The host crafts planks: the guest's tracker follows the shared book.
+  await host.page.evaluate(() => {
+    window.__mc.give(5, 1);
+    window.__mc.submit({ kind: 'craft', recipe: 1 });
+  });
+  await expect
+    .poll(async () => (await state(guest.page)).progress?.tracked?.text)
+    .toBe('Make 64 planks  4 / 64');
+  await expect(guest.page.locator('.task-tracker')).toHaveText('Make 64 planks  4 / 64');
+  expect((await state(host.page)).progress?.tracked?.text).toBe('Mine 32 logs  0 / 32');
+  // The host keeps the guest's choice in its record of the guest.
+  expect((await state(guest.page)).progress?.track).toBe(2);
+
+  // The host's notice "Anna left" lies below its tracker, in one column. (Notices last 5 s
+  // of wall-clock time; the test-mode HUD shows them after the next step.)
+  await guest.page.evaluate(() => window.__mc.net.leave());
+  await untilNet(host.page, (n) => n.notices.some((t) => t.includes('left')));
+  await host.page.evaluate(() => window.__mc.step(1));
+  const notice = host.page.locator('.net-notice', { hasText: 'left' });
+  await expect(notice).toBeVisible();
+  const trackerBox = await host.page.locator('.task-tracker').boundingBox();
+  const noticeBox = await notice.boundingBox();
+  expect(trackerBox && noticeBox).toBeTruthy();
+  if (trackerBox && noticeBox) {
+    expect(noticeBox.y).toBeGreaterThanOrEqual(trackerBox.y + trackerBox.height);
+    expect(noticeBox.x).toBe(trackerBox.x);
+  }
 });

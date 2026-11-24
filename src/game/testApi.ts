@@ -87,7 +87,7 @@ export interface GameState {
   /**
    * The task book and the player's level (Adventure, Phase 8); null in Creative. `tasks`
    * are those of the open chapter (`chapter` null: the book is complete); `notice` the
-   * progress notice shown now.
+   * progress notice shown now; `tracked` and `track` the task tracker (Polish 2).
    */
   progress: {
     level: number;
@@ -97,6 +97,10 @@ export interface GameState {
     done: number[];
     tasks: { id: number; count: number; goal: number; done: boolean }[];
     notice: string | null;
+    /** What the HUD's task tracker shows (Polish 2), or null while it is hidden. */
+    tracked: { id: number; text: string } | null;
+    /** The record's choice: 0 automatic, -1 hidden, or a task id. */
+    track: number;
   } | null;
   /** The furnace recipe whose progress bar runs (0..1), or null. */
   smelting: { recipe: number; progress: number } | null;

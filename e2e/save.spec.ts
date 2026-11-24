@@ -309,7 +309,7 @@ for (const [label, fixtureMeta, fixtureChunk] of [
   ['Phase 6 AC8.5, Phase 7 AC1.2: a world saved by the Phase 5 build', PHASE_5_META, PHASE_5_CHUNK],
   ['Phase 7 AC1.2: a world saved by the Phase 6 build (format 2)', PHASE_6_META, PHASE_6_CHUNK],
 ] as const) {
-  test(`${label} still opens with its terrain and is saved as format 4`, async ({ page }) => {
+  test(`${label} still opens with its terrain and is saved as format 5`, async ({ page }) => {
     // Any stored world creates the database; then the old records are written into it.
     await openGame(page, { save: true, world: 'Other' });
     await page.evaluate(
@@ -349,13 +349,13 @@ for (const [label, fixtureMeta, fixtureChunk] of [
     const meta = (await storedRecords(page)).worlds.find(
       (w) => (w as { id: string }).id === fixtureMeta.id,
     ) as Record<string, unknown>;
-    expect(meta.formatVersion).toBe(4);
+    expect(meta.formatVersion).toBe(5);
     expect(meta.generatorVersion).toBe(1);
     // Generator 1 records carry no options.
     expect('options' in meta).toBe(false);
     expect(meta.guests).toEqual([]);
     // Phase 8 AC4.2: an old Gathering world is an Adventure world at the start of the book.
-    expect(meta.player).toEqual({ ...fixtureMeta.player, xp: 0, found: [], crafted: [] });
+    expect(meta.player).toEqual({ ...fixtureMeta.player, xp: 0, found: [], crafted: [], track: 0 });
     expect(meta.progress).toEqual({ done: [], counts: [] });
     expect(state.progress).toMatchObject({ level: 1, xp: 0, chapter: 1, done: [] });
     expect(meta.createdMs).toBe(fixtureMeta.createdMs);

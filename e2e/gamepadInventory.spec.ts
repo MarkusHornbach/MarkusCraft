@@ -414,32 +414,63 @@ test('Phase 5 AC6.4: matches the pad-inventory and pad-recipe-list references', 
   await expect(page).toHaveScreenshot('pad-recipe-list.png', { maxDiffPixelRatio: 0.05 });
 });
 
-test('Phase 8 AC5.3: LB/RB reach the Tasks tab; nothing in it takes the focus; the right stick scrolls it; B closes', async ({
+test('Phase 8 AC5.3, Polish 2 AC3.4: LB/RB reach the Tasks tab; D-pad down reaches the open rows, A chooses and hides; the right stick scrolls it; B closes', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 640, height: 360 });
   await installFakePads(page);
   await openGame(page, { mode: 'gathering', progress: 'fresh' });
-  await page.evaluate(() => window.__mc.setProgress({ xp: 100, done: [1, 2, 3, 4, 5, 6, 7, 8] }));
+  // Chapter 3 is open with "Make a furnace" done: its row is plain text.
+  await page.evaluate(() =>
+    window.__mc.setProgress({ xp: 100, done: [1, 2, 3, 4, 5, 6, 7, 8, 9] }),
+  );
   const pad = new Pad(page);
   await pad.connect();
   await pad.tap(BUTTON.Y);
   await pad.tap(BUTTON.RB);
   await pad.tap(BUTTON.RB);
+  // The default focus stays on the tab.
   expect((await getState(page)).ui).toMatchObject({ tab: 'tasks', focus: 'Tasks' });
-  // The D-pad walks the header only: the tab has no focusable element.
-  for (const button of [BUTTON.DOWN, BUTTON.DOWN, BUTTON.LEFT, BUTTON.RIGHT, BUTTON.DOWN]) {
+  // D-pad down enters the rows; the done row is skipped.
+  await pad.tap(BUTTON.DOWN);
+  expect(await focusOf(page)).toBe('Place a furnace');
+  await expect(page.locator('.pad-hints')).toContainText('Track');
+  await pad.tap(BUTTON.DOWN);
+  expect(await focusOf(page)).toBe('Make 16 coal');
+  const tracked = async () => (await getState(page)).progress?.tracked?.id ?? null;
+  // Automatic shows the first open task; A chooses the focused one.
+  expect(await tracked()).toBe(10);
+  await pad.tap(BUTTON.A);
+  expect(await tracked()).toBe(11);
+  await expect(page.locator('.task-row.tracked')).toHaveAttribute('data-task', '11');
+  // A on the shown task hides the tracker; A again shows it.
+  await pad.tap(BUTTON.A);
+  expect(await tracked()).toBeNull();
+  expect((await getState(page)).progress?.track).toBe(-1);
+  await expect(page.locator('.task-row.tracked')).toHaveCount(0);
+  await pad.tap(BUTTON.A);
+  expect(await tracked()).toBe(11);
+  // The focus stayed on its row through the changes.
+  expect(await focusOf(page)).toBe('Make 16 coal');
+  // Walking the rows never reaches the done one.
+  const seen = new Set<string>();
+  for (const button of [BUTTON.DOWN, BUTTON.DOWN, BUTTON.DOWN, BUTTON.UP, BUTTON.UP, BUTTON.UP]) {
     await pad.tap(button);
-    const focused = await page.evaluate(() =>
-      Boolean(document.querySelector('.pad-focused')?.closest('.tasks-tab')),
-    );
-    expect(focused).toBe(false);
+    seen.add((await focusOf(page)) ?? '');
   }
+  expect(seen.has('Make a furnace')).toBe(false);
+  expect(
+    await page.evaluate(() => document.querySelector('.task-row.done.pad-focused') === null),
+  ).toBe(true);
+
+  await pad.tap(BUTTON.DOWN);
+  await pad.tap(BUTTON.DOWN);
   const tab = page.locator('.tasks-tab');
   // The book of five chapters fits the tab; a later, longer chapter would not. The test
   // makes the tab short so that it has something to scroll.
   await tab.evaluate((n) => (n.style.height = '120px'));
   expect(await tab.evaluate((n) => n.scrollHeight > n.clientHeight)).toBe(true);
+  await tab.evaluate((n) => (n.scrollTop = 0));
   const top = await tab.evaluate((n) => n.scrollTop);
   await pad.stickFor('right', 0, 1, 10);
   await polls(page, 2);

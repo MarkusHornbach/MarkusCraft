@@ -3,6 +3,7 @@ import type { ItemStack } from '../actions/playerRecord';
 import { HOTBAR_SLOTS } from '../game/config';
 import { getItemDef, itemLabel } from '../items/items';
 import { createItemIcon } from './itemIcon';
+import { TaskTracker } from './TaskTracker';
 
 /** How long the selected block's name stays visible after a change. */
 const LABEL_VISIBLE_MS = 1600;
@@ -19,6 +20,9 @@ export class Hud {
   private readonly message: HTMLElement;
   /** Multiplayer notices ("Anna joined"), stacked at the top left. */
   private readonly netNotices: HTMLElement;
+  /** The top-left column: the task tracker, then the multiplayer notices below it. */
+  private readonly corner: HTMLElement;
+  private readonly tracker: TaskTracker;
   private netShown = '';
   /** What each bar slot shows now, so that only changed slots are redrawn. */
   private readonly shown: (ItemStack | null)[] = [];
@@ -64,10 +68,14 @@ export class Hud {
     this.notice.className = 'pickup-notice';
     this.element.appendChild(this.notice);
 
+    this.corner = document.createElement('div');
+    this.corner.className = 'hud-corner';
+    this.tracker = new TaskTracker(this.corner);
     this.netNotices = document.createElement('div');
     this.netNotices.className = 'net-notices';
     this.netNotices.setAttribute('role', 'status');
-    this.element.appendChild(this.netNotices);
+    this.corner.appendChild(this.netNotices);
+    this.element.appendChild(this.corner);
 
     this.label = document.createElement('div');
     this.label.className = 'hotbar-label';
@@ -167,6 +175,15 @@ export class Hud {
         return line;
       }),
     );
+  }
+
+  /**
+   * The task tracker (Polish 2); null hides it. While it shows, the multiplayer notices
+   * lie below it, and on touch the column starts below the menu button (CSS).
+   */
+  setTracker(task: { id: number; label: string; count: string } | null): void {
+    this.tracker.show(task);
+    this.corner.classList.toggle('tracking', task !== null);
   }
 
   /** The hint under the crosshair; null hides it. */

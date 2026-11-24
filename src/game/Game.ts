@@ -1,7 +1,7 @@
 // Game: wires world, player, renderer and UI together and runs the fixed-step loop.
 import type { Action } from '../actions/actions';
 import { type ActionResult, type BlockChange, heldItem } from '../actions/apply';
-import { type GameMode, createPlayerRecord } from '../actions/playerRecord';
+import { type GameMode, TRACK_HIDDEN, createPlayerRecord } from '../actions/playerRecord';
 import { type PlayerRecord } from '../actions/playerRecord';
 import { LOCAL_PLAYER_ID, LocalSession, type Session } from '../actions/Session';
 import { type BenchResult, issueText, parseIssueBody } from '../bench/benchReport';
@@ -126,8 +126,16 @@ import {
   tasksOf,
   unlockText,
 } from '../progress/progress';
-import { unlockOf } from '../progress/tables';
-import { bookView, lockedText, noticeTexts, progressRow } from '../progress/view';
+import { type Task, unlockOf } from '../progress/tables';
+import {
+  bookView,
+  lockedText,
+  noticeTexts,
+  progressRow,
+  trackedTask,
+  trackerCount,
+  trackerText,
+} from '../progress/view';
 import { ProgressNotice } from '../ui/ProgressNotice';
 import { IdbStore } from './idbStore';
 import { type NetConfig, readNetConfig } from './netConfig';
@@ -461,6 +469,12 @@ export class Game {
         this.refreshRecipes();
         this.refreshBook();
       },
+      onTrack: (task) => {
+        // Choosing the row the tracker shows hides it; any other row (or any row while
+        // hidden) is chosen. The action itself is a plain "set".
+        const shown = this.trackedNow();
+        this.session.submit({ kind: 'track', task: shown?.id === task ? TRACK_HIDDEN : task });
+      },
     });
     // Above the inventory screen (it comes later in the document), below the menus.
     this.progressNotice = new ProgressNotice(this.root);
@@ -716,6 +730,7 @@ export class Game {
     this.pauseScreen?.setWorld(meta.seed);
     this.pauseScreen?.setGameMode(meta.mode);
     this.touchHud?.setFlyAvailable(meta.mode === 'creative');
+    this.refreshTracker();
     this.updateChunkCenter();
     this.framesSinceIdle = 0;
   }
@@ -1658,6 +1673,21 @@ export class Game {
     this.advanceProgressNotice();
     this.refreshRecipes();
     this.refreshBook();
+    this.refreshTracker();
+  }
+
+  /** The task the tracker shows now (Adventure), or null. */
+  private trackedNow(): Task | null {
+    if (this.gameMode !== 'gathering') return null;
+    return trackedTask(this.session.record, this.progress);
+  }
+
+  /** The HUD's task tracker; it hides with the HUD by itself. */
+  private refreshTracker(): void {
+    const task = this.trackedNow();
+    this.hud.setTracker(
+      task ? { id: task.id, label: task.label, count: trackerCount(task, this.progress) } : null,
+    );
   }
 
   /** The next notice of the queue once the one shown has had its time (simulation time). */
@@ -1672,7 +1702,10 @@ export class Game {
   /** The Tasks tab, while the inventory of an Adventure world is open. */
   private refreshBook(): void {
     if (!this.inventoryOpen || this.gameMode !== 'gathering') return;
-    this.inventoryScreen.setBook(bookView(this.progress, this.session.record));
+    this.inventoryScreen.setBook(
+      bookView(this.progress, this.session.record),
+      this.trackedNow()?.id ?? null,
+    );
   }
 
   /** The clock of the action layer: simulation time since the world was opened. */
@@ -1695,6 +1728,8 @@ export class Game {
     this.hud.setSlots(record.slots);
     this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
     this.refreshRecipes();
+    this.refreshBook();
+    this.refreshTracker();
     this.markMetaDirty();
   }
 
@@ -2479,6 +2514,7 @@ export class Game {
   private inventoryHints(element: HTMLElement): PadHint[] {
     let select = 'Select';
     if (element.classList.contains('recipe-craft')) select = 'Craft';
+    else if (element.classList.contains('task-row')) select = 'Track';
     else if (element.classList.contains('inv-slot')) select = 'Pick / Put';
     const hints: PadHint[] = [
       { glyphs: ['A'], text: select },
@@ -2826,6 +2862,7 @@ export class Game {
     if (this.gameMode !== 'gathering') return null;
     const xp = this.session.record.xp;
     const chapter = openChapter(this.progress);
+    const tracked = this.trackedNow();
     return {
       level: levelOf(xp),
       xp,
@@ -2841,6 +2878,9 @@ export class Game {
           }))
         : [],
       notice: this.progressNoticeText(),
+      tracked: tracked ? { id: tracked.id, text: trackerText(tracked, this.progress) } : null,
+      // Read for the test API; the record field is set only by the action layer.
+      track: this.session.record.track,
     };
   }
 

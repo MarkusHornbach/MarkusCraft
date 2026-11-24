@@ -45,7 +45,7 @@ describe('format 4 (Phase 8 AC4.1)', () => {
   it('a Creative world stores an empty book', () => {
     const record = encodeMeta(sampleMeta());
     expect(record.progress).toEqual({ done: [], counts: [] });
-    expect(record.formatVersion).toBe(4);
+    expect(record.formatVersion).toBe(SAVE_FORMAT_VERSION);
   });
 });
 

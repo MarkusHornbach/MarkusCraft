@@ -6,6 +6,8 @@ import {
   type GameMode,
   type ItemStack,
   type PlayerRecord,
+  TRACK_AUTO,
+  TRACK_HIDDEN,
 } from '../actions/playerRecord';
 import {
   CHUNK_VOLUME,
@@ -224,9 +226,13 @@ export function encodeProgress(progress: WorldProgress): Record<string, unknown>
 
 /**
  * Reads a player record (save files and network messages); null if it does not check out.
- * `legacy`: a record of save format 1–3, which had no progress fields; it starts at 0 XP.
+ * `format`: the save format the record was written in. Formats 1–3 had no progress fields
+ * (the record starts at 0 XP), format 4 had no `track` (it starts at 0, automatic).
  */
-export function decodePlayer(value: unknown, legacy = false): PlayerRecord | null {
+export function decodePlayer(
+  value: unknown,
+  format: number = SAVE_FORMAT_VERSION,
+): PlayerRecord | null {
   if (!isObject(value)) return null;
   if (!Array.isArray(value.slots) || value.slots.length !== INVENTORY_SLOTS) return null;
   const slots: (ItemStack | null)[] = [];
@@ -249,13 +255,17 @@ export function decodePlayer(value: unknown, legacy = false): PlayerRecord | nul
     if (!isInt(b.y, 0, WORLD_HEIGHT - 1) || !isFiniteIn(b.startMs, 0, TIME_LIMIT)) return null;
     breaking = { x: b.x, y: b.y, z: b.z, startMs: b.startMs };
   }
-  if (legacy)
-    return { slots, selectedSlot: value.selectedSlot, breaking, xp: 0, found: [], crafted: [] };
+  const record = { slots, selectedSlot: value.selectedSlot, breaking };
+  if (format < 4) return { ...record, xp: 0, found: [], crafted: [], track: TRACK_AUTO };
   if (!isInt(value.xp, 0, XP_LIMIT)) return null;
   const found = decodeIds(value.found, FOUND_MAX);
   const crafted = decodeIds(value.crafted, CRAFTED_MAX);
   if (!found || !crafted) return null;
-  return { slots, selectedSlot: value.selectedSlot, breaking, xp: value.xp, found, crafted };
+  const progress = { xp: value.xp, found, crafted };
+  if (format < 5) return { ...record, ...progress, track: TRACK_AUTO };
+  // An unknown task id loads: the tracker treats it as a chosen task that is gone.
+  if (!isInt(value.track, TRACK_HIDDEN, 0xffff)) return null;
+  return { ...record, ...progress, track: value.track };
 }
 
 // --- world record ------------------------------------------------------------------
@@ -314,6 +324,7 @@ export function encodePlayer(player: PlayerRecord): Record<string, unknown> {
     xp: player.xp,
     found: [...player.found],
     crafted: [...player.crafted],
+    track: player.track,
   };
 }
 
@@ -356,7 +367,7 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
     if (value.moveMode !== 'walk' && value.moveMode !== 'fly') return damaged;
     // Formats 1–3 knew no progress: an old Gathering world opens with a fresh book.
     const legacy = value.formatVersion < 4;
-    const player = decodePlayer(value.player, legacy);
+    const player = decodePlayer(value.player, value.formatVersion);
     if (!player) return damaged;
     let progress: WorldProgress = EMPTY_PROGRESS;
     if (!legacy) {
@@ -369,9 +380,10 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
     let guests: GuestEntry[] = [];
     if (value.formatVersion >= 2) {
       if (!Array.isArray(value.guests)) return damaged;
+      const format = value.formatVersion;
       guests = limitGuests(
         (value.guests as unknown[])
-          .map((guest) => decodeGuest(guest, legacy))
+          .map((guest) => decodeGuest(guest, format))
           .filter((guest): guest is GuestEntry => guest !== null),
       );
     }
@@ -415,11 +427,11 @@ function decodePose(value: unknown): SavedPose | null {
 const PLAYER_KEY_PATTERN = /^[0-9a-f]{32}$/;
 const GUEST_NAME_MAX = 64;
 
-function decodeGuest(value: unknown, legacy: boolean): GuestEntry | null {
+function decodeGuest(value: unknown, format: number): GuestEntry | null {
   if (!isObject(value)) return null;
   if (typeof value.key !== 'string' || !PLAYER_KEY_PATTERN.test(value.key)) return null;
   if (typeof value.name !== 'string' || value.name.length > GUEST_NAME_MAX) return null;
-  const record = decodePlayer(value.record, legacy);
+  const record = decodePlayer(value.record, format);
   const pose = decodePose(value.pose);
   if (!record || !pose) return null;
   if (value.moveMode !== 'walk' && value.moveMode !== 'fly') return null;

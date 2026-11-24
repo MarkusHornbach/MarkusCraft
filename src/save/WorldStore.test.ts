@@ -86,7 +86,7 @@ describe('MemoryStore (Phase 3 AC3.4)', () => {
     const store = new MemoryStore();
     await store.create(sampleMeta({ id: 'a' }));
     store.worlds.set('bad', { id: 'bad', name: 'Broken' });
-    store.worlds.set('new', { id: 'new', name: 'Later', formatVersion: 5 });
+    store.worlds.set('new', { id: 'new', name: 'Later', formatVersion: 6 });
     expect((await store.list()).map((e) => [e.id, e.status])).toEqual([
       ['a', 'ok'],
       ['bad', 'damaged'],

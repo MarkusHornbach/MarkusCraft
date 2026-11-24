@@ -8,7 +8,8 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`): no `three`, D
 - `tables.ts` (chapters, tasks, levels, recipe unlocks, first-find and first-craft XP,
   `NATURAL_BLOCKS`, the bot's time model `BOT_TIME`), `check.ts` (static check),
   `progress.ts` (`WorldProgress`, levels, unlocks, `stepProgress`), `events.ts`
-  (`eventsOf`), `view.ts` (what the screens show: Tasks tab, notices, F3 row, lock texts)
+  (`eventsOf`), `view.ts` (what the screens show: Tasks tab, tracker, notices, F3 row, lock
+  texts)
 
 ## Tables
 
@@ -38,6 +39,15 @@ show from the host's messages, `outcomesOfBook` (finished tasks with the player'
 task unlocks, chapters) and `outcomesOfRecord` (its own finds, XP and level-ups). **Extension points** for later parts: a new event
 kind is one union member in `events.ts`; a new task type one member of `TaskType` and one
 `case` in `advance` (`progress.ts`), one in `check.ts` and one skill in the bot.
+
+## The tracked task (Polish 2)
+
+`trackedTask(record, progress)` is what the HUD tracker shows: null if `record.track` is
+`-1` or the book is complete; the chosen task while it is an open task of the open
+chapter; otherwise the first open task of the open chapter after the chosen one in table
+order, wrapping around (with `track` 0, or an unknown id: the chapter's first open task).
+Nothing is written when the shown task moves on. `trackerText` / `trackerCount` give the
+line ("Mine 32 logs 12 / 32", "–" for a reach task).
 
 ## Static check
 

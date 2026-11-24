@@ -67,7 +67,7 @@ element of a screen that is gone.
 ## The controller on the inventory (Phase 5 part B)
 
 Marks only: `data-pad-default` on the selected bar slot (Gathering), the first palette
-block (Creative) or, on the Crafting tab, the tab itself (a "Craft" button comes and goes;
+block (Creative) or, on the Crafting and Tasks tabs, the tab itself (a "Craft" button comes and goes;
 a default that changed would count as a new view); `data-pad-back` on "Close".
 `Game.onInventoryPadFrame`: Y closes, Start closes and pauses, B (and the browser's Back)
 puts a picked slot down or else closes (`InventoryScreen.cancelPick`), LB/RB change the
@@ -76,7 +76,10 @@ without B and Start. `padpress` arms the click guard (a capture listener sees th
 non-bubbling event). `RecipeList` treats `padpress` / `padrelease` on "Craft" like
 `pointerdown` / release, so the hold, the 500 ms delay and the suppressed click after a
 hold are the mouse's. Slots have an `aria-label` ("Slot 3: Planks"), which `ui.focus`
-reports; recipe buttons "Craft <item>" (e.g. "Craft Stick").
+reports; recipe buttons "Craft <item>" (e.g. "Craft Stick"). On the Tasks tab (Polish 2)
+D-pad down from the tab reaches the open task rows (buttons with the task's label as
+`aria-label`, hint "A Track"); done rows are no buttons and never take the focus. A row
+keeps its element when the mark or count changes, so the focus stays on it after A.
 
 ## Back guard
 

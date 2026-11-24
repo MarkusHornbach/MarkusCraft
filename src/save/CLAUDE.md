@@ -12,8 +12,14 @@ write what), `worldLock.ts` (one tab per world).
 ## Saving
 
 A world is one `WorldMeta` record plus one record per edited chunk (`save/saveFormat.ts`,
-`SAVE_FORMAT_VERSION`, now 4). Decoding validates every field and never throws; a change
+`SAVE_FORMAT_VERSION`, now 5). Decoding validates every field and never throws; a change
 to the format needs a new format version and a migration.
+
+Version 5 (Polish 2) adds `track` to every player record (the world's player, each guest
+entry and network records): an integer from −1 to 65 535; a format 5 record without it,
+or with another value, is damaged (a guest entry is dropped). Formats 1–4 load with
+`track` 0 (`decodePlayer(value, format)`) and are written back as 5. An unknown task id
+loads.
 
 Version 4 (Phase 8 part A) adds `progress` (`{ done, counts }`, stored for both modes,
 empty in Creative) and `xp`, `found`, `crafted` to every player record (the world's player
@@ -22,7 +28,7 @@ and each guest entry; `decodePlayer` requires them, also in network messages). L
 at most 1 024 distinct task ids; `counts` at most 1 024, one per task, counts 1–1e6. A
 format 4 record whose progress fields do not check out is damaged; unknown task, block and
 recipe ids load. Versions 1–3 load with an empty book and records at 0 XP (`decodePlayer`
-with `legacy`) and are written back as 4: an old Gathering world opens as an Adventure
+with their format) and are written back as the current version: an old Gathering world opens as an Adventure
 world at the start of the book.
 
 Version 3 (Phase 7 part A) adds `options` (`{ terrain, trees }`, validated by

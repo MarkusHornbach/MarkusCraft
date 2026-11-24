@@ -97,7 +97,9 @@ before the changed records (at most one per action; a pose that completes nothin
 nothing). `ClientSession` reports it through `onProgress` (`outcomesOfBook`) and derives
 its own level-ups and first finds from its records (`outcomesOfRecord`). Each player's
 `craft` is locked by its own level. With four players placing twice a second, every place
-changing the book, the host sends about 16.5 kB/s (AC8.6, limit 20).
+changing the book, the host sends about 16.5 kB/s (AC8.6, limit 20). Polish 2: records
+carry `track`; a guest's `track` is an action like any other (it counts towards `rate`),
+kept in its guest entry.
 
 ## The network test (Phase 6 part A)
 

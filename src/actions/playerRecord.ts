@@ -36,7 +36,17 @@ export interface PlayerRecord {
   readonly found: readonly number[];
   /** Recipe ids this player has crafted at least once, no duplicates. */
   readonly crafted: readonly number[];
+  /**
+   * The task the HUD tracker follows (Polish 2): `TRACK_AUTO` (0) nothing chosen,
+   * `TRACK_HIDDEN` (-1) hidden, or a chosen task id. Built only by `src/actions/`.
+   */
+  readonly track: number;
 }
+
+/** `PlayerRecord.track`: nothing chosen, the tracker shows the first open task. */
+export const TRACK_AUTO = 0;
+/** `PlayerRecord.track`: the player hid the tracker. */
+export const TRACK_HIDDEN = -1;
 
 /** The record of a new player: in Creative the bar holds the nine Phase 1 blocks. */
 export function createPlayerRecord(mode: GameMode): PlayerRecord {
@@ -46,5 +56,13 @@ export function createPlayerRecord(mode: GameMode): PlayerRecord {
       slots[slot] = { item, count: 1 };
     });
   }
-  return { slots, selectedSlot: 0, breaking: null, xp: 0, found: [], crafted: [] };
+  return {
+    slots,
+    selectedSlot: 0,
+    breaking: null,
+    xp: 0,
+    found: [],
+    crafted: [],
+    track: TRACK_AUTO,
+  };
 }

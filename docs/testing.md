@@ -82,6 +82,11 @@ chapter), notice }` or `null` in Creative; `recipes[]` has `locked` and `unlock`
   `tasks-tab-touch`, `recipe-list-locked`, `progress-notice` (`e2e/progress.spec.ts`,
   `e2e/progressTouch.spec.ts`). Part A2: shared progress in a room, `e2e/mpProgress.spec.ts`
   (no references).
+- Polish 2: `getState().progress` has `tracked` (`{ id, text } | null`, what the HUD's task
+  tracker shows) and `track` (the record's choice: 0 automatic, -1 hidden, or a task id);
+  `submit({ kind: 'track', task })` sets it. References `task-tracker` (PC, a clip of the
+  top-left corner) and `task-tracker-touch` (640 × 360, the canvas hidden)
+  (`e2e/taskTracker.spec.ts`, `e2e/progressTouch.spec.ts`).
 
 ## Controller
 

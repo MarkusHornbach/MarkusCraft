@@ -5,7 +5,8 @@ Shell (DOM). Screens change the world and items only through actions
 
 ## Files
 
-- `Hud.ts` (bar with counts, break progress, notices), `blockIcon.ts`, `itemIcon.ts`,
+- `Hud.ts` (bar with counts, break progress, notices), `TaskTracker.ts` (the tracked
+  task, part of the HUD), `blockIcon.ts`, `itemIcon.ts`,
   `DebugOverlay.ts`, `settings.ts`, `ui.css`, `activate.ts` (button helpers)
 - `InventoryScreen.ts` (27 slots or the Creative palette, bar, bin, tabs), `RecipeList.ts`
   (the "Crafting" tab: one row per recipe), `TasksTab.ts` (the "Tasks" tab),
@@ -39,9 +40,12 @@ and on "Items" after a world was loaded.
 The "Tasks" tab (`bookView` of `src/progress/view.ts`): "Level N" with an XP bar and
 "120 / 150 XP" ("Max level"), "Next level: …", one folded line per finished chapter, the
 open chapter's title and one fixed-height row per task ("3 / 8", "–" for a reach task, "✓"),
-"N more chapters" or "All tasks done.". Read-only: nothing in it is focusable; the
-controller's default focus is its tab; the right stick and a finger scroll it; it is as
-large as the recipe list. **Locked recipe rows** keep their place, are dimmed (class
+"N more chapters" or "All tasks done.". The open rows are buttons (Polish 2): a click, tap
+or A chooses the tracked task; the row the tracker shows is marked (class `tracked`, a
+highlighted border, "Tracked" next to the count); done rows stay plain. Rows keep their
+element, height and order while counts and the mark change. The controller's default
+focus is its tab; the right stick and a finger scroll it; it is as large as the recipe
+list. **Locked recipe rows** keep their place, are dimmed (class
 `locked`, dashed) and show "Level 3" or "Task: Mine 32 coal" instead of "Craft"; the tab
 count counts unlocked craftable rows only; a refused craft shows "Locked: Level 3" in the
 HUD. **The progress notice** (top centre, above the HUD and the open inventory, after the
@@ -51,6 +55,18 @@ from `noticeTexts`. On screens up to 480 px high it moves to the bottom edge whi
 inventory is open (the panel fills the height). The F3 overlay has a row "Progress" in
 Adventure worlds. In a room a finished task names its player ("Task done: Mine 32 logs
 (Anna) · +10 XP", for everyone); level-ups and first finds show only for their player.
+
+## The task tracker (Polish 2)
+
+One line in the HUD's top-left corner, "Mine 32 logs 12 / 32" ("–" for a reach task),
+from `trackedTask` and `trackerCount` (`src/progress/CLAUDE.md`): shown in Adventure worlds
+while playing, hidden with the HUD (inventory, pause, world menu), in Creative and when
+nothing is tracked or the book is complete. No pointer, no focus; only the label is cut
+with an ellipsis (at most 45 % of the view's width). It lives in `.hud-corner` with the
+room notices: while it shows they lie below it in one column; on touch the column then
+starts below the menu button. The F3 overlay lies above it. `Game.refreshTracker` runs on
+every `onProgress`, `onPlayer` and world load. A row press: `Game` sends `track` with `-1`
+if the row is the shown task, else its id (`src/actions/CLAUDE.md`).
 
 ## The recipe list keeps table order
 
