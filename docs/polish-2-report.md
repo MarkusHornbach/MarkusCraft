@@ -74,7 +74,8 @@ Phase 8 part A2 was merged (`main` merged into `polish-2-task-tracker` first).
 - `e2e/mpProgress.spec.ts` Phase 8 AC8.4: the first row's text includes "Tracked".
 - Format 5: `e2e/save.spec.ts`, `e2e/light.spec.ts` (fixtures saved again as format 5 with
   `track` 0); unit tests `saveFormat.test.ts`, `guests.test.ts`, `progressSave.test.ts`,
-  `WorldStore.test.ts` ("newer" is now format 6), `gatheringNet.test.ts` (a literal record).
+  `WorldStore.test.ts` ("newer" is now format 6), `gatheringNet.test.ts` (a literal record);
+  `repoHygiene.test.ts` counts 48 images (found by CI).
 
 ### References
 
