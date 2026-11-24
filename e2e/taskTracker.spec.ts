@@ -66,16 +66,21 @@ test('Polish 2 AC3.1: mouse: the tracker shows the first task; a click on a row 
   await expect(planks).toHaveClass(/tracked/);
   await expect(planks.locator('.task-mark')).toHaveText('Tracked');
   await expect(page.locator('.task-row.tracked')).toHaveCount(1);
-  // The rows keep their height and place.
-  const before = await page
-    .locator('.task-row')
-    .evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().toJSON() as DOMRect));
+  // The rows keep their height and place in the tab (the panel itself is centred and
+  // may move by a pixel when the Crafting tab's count appears).
+  const places = () =>
+    page.locator('.task-row').evaluateAll((rows) => {
+      const tab = rows[0]?.closest('.tasks-tab')?.getBoundingClientRect();
+      return rows.map((r) => {
+        const box = r.getBoundingClientRect();
+        return [box.x - (tab?.x ?? 0), box.y - (tab?.y ?? 0), box.width, box.height];
+      });
+    });
+  const before = await places();
   await give(page, LOG, 1);
   expect(await submit(page, { kind: 'craft', recipe: 1 })).toBe(true);
   await expect(planks.locator('.task-status')).toHaveText('4 / 64');
-  const after = await page
-    .locator('.task-row')
-    .evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().toJSON() as DOMRect));
+  const after = await places();
   expect(after).toEqual(before);
   await closeInventory(page);
   expect(await trackerLine(page)).toBe('Make 64 planks  4 / 64');

@@ -142,17 +142,6 @@ test("Polish 2 AC3.6: in a room the guest's tracker follows the shared book and 
   const code = await hostRoom(host.page);
   await joinRoom(guest.page, code);
 
-  // The host's notice "Anna joined" lies below its tracker, in one column.
-  const notice = host.page.locator('.net-notice', { hasText: 'joined' });
-  await expect(notice).toBeVisible();
-  const trackerBox = await host.page.locator('.task-tracker').boundingBox();
-  const noticeBox = await notice.boundingBox();
-  expect(trackerBox && noticeBox).toBeTruthy();
-  if (trackerBox && noticeBox) {
-    expect(noticeBox.y).toBeGreaterThanOrEqual(trackerBox.y + trackerBox.height);
-    expect(noticeBox.x).toBe(trackerBox.x);
-  }
-
   // Each player's own choice: the guest tracks "Make 64 planks", the host stays automatic.
   await guest.page.evaluate(() => window.__mc.submit({ kind: 'track', task: 2 }));
   await expect
@@ -174,4 +163,19 @@ test("Polish 2 AC3.6: in a room the guest's tracker follows the shared book and 
   expect((await state(host.page)).progress?.tracked?.text).toBe('Mine 32 logs  0 / 32');
   // The host keeps the guest's choice in its record of the guest.
   expect((await state(guest.page)).progress?.track).toBe(2);
+
+  // The host's notice "Anna left" lies below its tracker, in one column. (Notices last 5 s
+  // of wall-clock time; the test-mode HUD shows them after the next step.)
+  await guest.page.evaluate(() => window.__mc.net.leave());
+  await untilNet(host.page, (n) => n.notices.some((t) => t.includes('left')));
+  await host.page.evaluate(() => window.__mc.step(1));
+  const notice = host.page.locator('.net-notice', { hasText: 'left' });
+  await expect(notice).toBeVisible();
+  const trackerBox = await host.page.locator('.task-tracker').boundingBox();
+  const noticeBox = await notice.boundingBox();
+  expect(trackerBox && noticeBox).toBeTruthy();
+  if (trackerBox && noticeBox) {
+    expect(noticeBox.y).toBeGreaterThanOrEqual(trackerBox.y + trackerBox.height);
+    expect(noticeBox.x).toBe(trackerBox.x);
+  }
 });

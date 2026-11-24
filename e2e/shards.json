@@ -26,6 +26,7 @@
       "gathering.spec.ts",
       "inventory.spec.ts",
       "sky.spec.ts",
+      "taskTracker.spec.ts",
       "terrain.spec.ts",
       "torch.spec.ts",
       "ui.spec.ts"
