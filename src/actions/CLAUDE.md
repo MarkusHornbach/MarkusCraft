@@ -48,7 +48,9 @@ time 0: `Game` submits `break` in the step in which the `startBreak` was accepte
 `full`. `LocalSession` holds the book next to the record: after an accepted action in an
 Adventure world it runs `eventsOf` and `stepProgress` (`src/progress/CLAUDE.md`);
 `notePose(y)` (once per simulation step from `Game`) runs the pose step; records changed by
-XP go through `onPlayer`, the book through the new `onProgress(progress, outcomes)`.
+XP go through `onPlayer`, the book through the new `onProgress(progress, outcomes)`. In a
+room the host's session does the same for every player (`src/net/CLAUDE.md`, "Shared
+progress").
 
 ## Game modes
 

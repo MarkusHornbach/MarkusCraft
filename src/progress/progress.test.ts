@@ -12,6 +12,8 @@ import {
   levelOf,
   nextLevelXp,
   openChapter,
+  outcomesOfBook,
+  outcomesOfRecord,
   recipeUnlocked,
   recipesOfLevel,
   stepProgress,
@@ -271,5 +273,49 @@ describe('levels and unlocks', () => {
     expect(recipeUnlocked(20, fresh(), { done: [12], counts: [] }, T)).toBe(true);
     expect(unlockText(8, T)).toBe('Level 3');
     expect(unlockText(20, T)).toBe(`Task: ${getTask(12)?.label}`);
+  });
+});
+
+describe('what a guest shows (Phase 8 plan 5.12)', () => {
+  const rec = (xp: number, found: number[] = []): PlayerRecord => ({
+    ...createPlayerRecord('gathering'),
+    xp,
+    found,
+  });
+
+  it('outcomesOfBook: tasks with their player, task unlocks, then completed chapters', () => {
+    const before: WorldProgress = { done: [1, 2, 3], counts: [] };
+    const after: WorldProgress = { done: [1, 2, 3, 4], counts: [] };
+    expect(outcomesOfBook(before, after, [{ task: 4, by: 'Anna' }], T)).toEqual([
+      { kind: 'taskDone', task: 4, actor: 'Anna', by: 'Anna' },
+      { kind: 'chapterDone', chapter: 1 },
+    ]);
+    // The torch comes with task 12; an unknown task id is ignored.
+    const torch = outcomesOfBook(
+      EMPTY_PROGRESS,
+      { done: [12], counts: [] },
+      [
+        { task: 12, by: 'Ben' },
+        { task: 999, by: 'Ben' },
+      ],
+      T,
+    );
+    expect(torch).toEqual([
+      { kind: 'taskDone', task: 12, actor: 'Ben', by: 'Ben' },
+      { kind: 'unlocked', recipes: [20] },
+    ]);
+    // A replaced book (the test tool) shows nothing for chapters it does not complete.
+    expect(outcomesOfBook(after, EMPTY_PROGRESS, [], T)).toEqual([]);
+  });
+
+  it('outcomesOfRecord: first finds, XP and every level passed', () => {
+    expect(outcomesOfRecord(rec(20), rec(90, [Block.COAL_ORE]), 'me', T)).toEqual([
+      { kind: 'firstFind', player: 'me', block: Block.COAL_ORE },
+      { kind: 'xp', player: 'me', amount: 70 },
+      { kind: 'levelUp', player: 'me', level: 2, recipes: [5, 6, 7] },
+      { kind: 'levelUp', player: 'me', level: 3, recipes: [8, 9, 10, 11] },
+    ]);
+    expect(outcomesOfRecord(rec(20), rec(20), 'me', T)).toEqual([]);
+    expect(outcomesOfRecord(rec(90), rec(10), 'me', T)).toEqual([]);
   });
 });

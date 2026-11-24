@@ -48,12 +48,21 @@ const HOST: HostMessage[] = [
     pose: POSE,
     moveMode: 'fly',
     parts: 3,
+    progress: { done: [1, 2], counts: [{ task: 3, count: 7 }] },
   },
   { t: 'snapshot', part: 0, chunks: [[-1, 2, [0, 1, 32767, 19]]] },
   { t: 'ready' },
   { t: 'result', seq: 3, ok: true, notices: [{ item: 3, count: 1 }] },
   { t: 'result', seq: 4, ok: false, reason: 'reach' },
   { t: 'result', seq: 5, ok: false, reason: 'rate' },
+  { t: 'result', seq: 6, ok: false, reason: 'locked' },
+  { t: 'record', record: { ...RECORD, xp: 120, found: [16], crafted: [1, 4] } },
+  {
+    t: 'progress',
+    progress: { done: [1, 2, 3], counts: [{ task: 4, count: 2 }] },
+    done: [{ task: 3, by: 'Anna (2)' }],
+  },
+  { t: 'progress', progress: { done: [], counts: [] }, done: [] },
   { t: 'record', record: RECORD },
   { t: 'blocks', by: 1, changes: [1, 2, 3, 0, -5, 127, 9, 19] },
   { t: 'poses', poses: [{ id: 2, ...POSE, tp: false, fly: true, busy: false }] },
@@ -193,6 +202,52 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
     }
   });
 
+  it('Phase 8 AC8.3: refuses malformed progress messages and welcome.progress', () => {
+    const book = { done: [1], counts: [{ task: 2, count: 3 }] };
+    const message = (progress: unknown, done: unknown = []): string =>
+      JSON.stringify({ t: 'progress', progress, done });
+    expect(bad(message(book, [{ task: 1, by: 'Anna' }]), false)).toBe(false);
+    const badBooks: unknown[] = [
+      undefined,
+      null,
+      [],
+      { done: [1] },
+      { done: [1, 1], counts: [] },
+      { done: [0], counts: [] },
+      { done: [1.5], counts: [] },
+      { done: ['1'], counts: [] },
+      { done: [], counts: [{ task: 2, count: 0 }] },
+      { done: [], counts: [{ task: 2, count: 1_000_001 }] },
+      {
+        done: [],
+        counts: [
+          { task: 2, count: 1 },
+          { task: 2, count: 2 },
+        ],
+      },
+      { done: [], counts: [{ task: 70_000, count: 1 }] },
+      { done: Array.from({ length: 1025 }, (_, i) => i + 1), counts: [] },
+    ];
+    for (const progress of badBooks) expect(bad(message(progress), false)).toBe(true);
+    const badDone: unknown[] = [
+      null,
+      {},
+      [{ task: 1 }],
+      [{ task: 0, by: 'Anna' }],
+      [{ task: 1, by: '' }],
+      [{ task: 1, by: 'n'.repeat(40) }],
+      [{ task: 1, by: 5 }],
+      [null],
+      Array.from({ length: 1025 }, () => ({ task: 1, by: 'A' })),
+    ];
+    for (const done of badDone) expect(bad(message(book, done), false)).toBe(true);
+    expect(bad(JSON.stringify({ t: 'progress', progress: book }), false)).toBe(true);
+    const welcome = HOST.find((m) => m.t === 'welcome');
+    const withBook = (progress: unknown) => JSON.stringify({ ...welcome, progress });
+    expect(bad(withBook(book), false)).toBe(false);
+    for (const progress of badBooks) expect(bad(withBook(progress), false)).toBe(true);
+  });
+
   it('refuses oversized messages', () => {
     const name = 'a'.repeat(MAX_MESSAGE_BYTES);
     expect(bad(JSON.stringify({ t: 'hello', build: 'b', key: KEY, name }))).toBe(true);
@@ -236,6 +291,9 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
       '"action"',
       '"profile"',
       '"look"',
+      '"progress"',
+      '"done"',
+      '"counts"',
     ];
     for (let i = 0; i < 10_000; i++) {
       let text = '';

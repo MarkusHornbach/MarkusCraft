@@ -129,7 +129,8 @@ export function noticeTexts(
     switch (outcome.kind) {
       case 'taskDone': {
         const task = getTask(outcome.task);
-        if (task) texts.push(`Task done: ${task.label} · +${task.xp} XP`);
+        const by = outcome.by === undefined ? '' : ` (${outcome.by})`;
+        if (task) texts.push(`Task done: ${task.label}${by} · +${task.xp} XP`);
         break;
       }
       case 'chapterDone': {

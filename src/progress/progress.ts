@@ -52,7 +52,8 @@ export interface ProgressPlayer {
 
 /** What a step did, for notices and tests. */
 export type ProgressOutcome =
-  | { kind: 'taskDone'; task: number; actor: string }
+  /** `by`: the name of the actor, shown in rooms ("Task done: Mine 4 logs (Anna)"). */
+  | { kind: 'taskDone'; task: number; actor: string; by?: string }
   | { kind: 'chapterDone'; chapter: number }
   | { kind: 'xp'; player: string; amount: number }
   | { kind: 'firstFind'; player: string; block: number }
@@ -285,4 +286,58 @@ export function stepProgress(
     return { progress: world, records: NO_RECORDS, outcomes: NO_OUTCOMES };
   }
   return { progress, records: changedRecords, outcomes };
+}
+
+/**
+ * What a guest shows when the host reports a new book (Phase 8 part A2): each finished
+ * task with the name of its player and the recipes it unlocks, then each chapter the new
+ * book completes. `actor` of the outcomes is the player's name.
+ */
+export function outcomesOfBook(
+  before: WorldProgress,
+  after: WorldProgress,
+  done: readonly { task: number; by: string }[],
+  tables: ProgressTables = PROGRESS_TABLES,
+): ProgressOutcome[] {
+  const outcomes: ProgressOutcome[] = [];
+  for (const { task, by } of done) {
+    if (!tables.tasks.some((t) => t.id === task)) continue;
+    outcomes.push({ kind: 'taskDone', task, actor: by, by });
+    const recipes = recipesOfTask(task, tables);
+    if (recipes.length > 0) outcomes.push({ kind: 'unlocked', recipes });
+  }
+  for (const chapter of tables.chapters) {
+    const tasks = tasksOf(chapter.id, tables);
+    if (tasks.length === 0) continue;
+    const complete = (p: WorldProgress) => tasks.every((t) => p.done.includes(t.id));
+    if (complete(after) && !complete(before)) {
+      outcomes.push({ kind: 'chapterDone', chapter: chapter.id });
+    }
+  }
+  return outcomes;
+}
+
+/**
+ * What a guest shows when the host reports a new record of its own player: the XP it
+ * gained, its first finds and its level-ups, as the host's step reported them (`player`).
+ */
+export function outcomesOfRecord(
+  before: PlayerRecord,
+  after: PlayerRecord,
+  player: string,
+  tables: ProgressTables = PROGRESS_TABLES,
+): ProgressOutcome[] {
+  const outcomes: ProgressOutcome[] = [];
+  for (const block of after.found) {
+    if (!before.found.includes(block)) outcomes.push({ kind: 'firstFind', player, block });
+  }
+  if (after.xp > before.xp) {
+    outcomes.push({ kind: 'xp', player, amount: after.xp - before.xp });
+  }
+  const from = levelOf(before.xp, tables);
+  const to = levelOf(after.xp, tables);
+  for (let level = from + 1; level <= to; level++) {
+    outcomes.push({ kind: 'levelUp', player, level, recipes: recipesOfLevel(level, tables) });
+  }
+  return outcomes;
 }
