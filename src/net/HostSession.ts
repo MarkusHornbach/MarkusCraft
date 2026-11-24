@@ -43,6 +43,7 @@ import {
   type NetPose,
   type PlayerInfo,
   type RelayedPose,
+  type TaskDoneBy,
   decodeGuestMessage,
   encodeMessage,
   compactPose,
@@ -630,6 +631,7 @@ export class HostSession {
       pose,
       moveMode,
       parts: parts.length,
+      progress: this.book,
     });
     parts.forEach((chunks, part) => this.send(member, { t: 'snapshot', part, chunks }));
     this.send(member, { t: 'ready' });
@@ -788,6 +790,15 @@ export class HostSession {
     if (this.book !== before || outcomes.length > 0) {
       this.o.listener.onProgress?.(this.book, outcomes);
     }
+    // At most one `progress` per action; the guests' records follow (their notices: the
+    // task first, then their level).
+    if (this.book !== before) {
+      const done: TaskDoneBy[] = [];
+      for (const o of outcomes) {
+        if (o.kind === 'taskDone') done.push({ task: o.task, by: actor.name });
+      }
+      this.broadcastProgress(done);
+    }
     for (const member of changed) {
       if (member !== this.self) this.send(member, { t: 'record', record: member.record });
     }
@@ -806,6 +817,13 @@ export class HostSession {
   replaceBook(progress: WorldProgress): void {
     this.book = progress;
     this.o.listener.onProgress?.(progress, []);
+    this.broadcastProgress([]);
+  }
+
+  private broadcastProgress(done: TaskDoneBy[]): void {
+    for (const member of this.members.values()) {
+      if (member.conn) this.send(member, { t: 'progress', progress: this.book, done });
+    }
   }
 
   /** The host's own action, from its local door. */

@@ -17,7 +17,8 @@ import {
 } from '../game/config';
 import { LOOK_COUNT } from '../player/looks';
 import type { MoveMode } from '../player/player';
-import { decodePlayer, encodePlayer } from '../save/saveFormat';
+import type { WorldProgress } from '../progress/progress';
+import { decodePlayer, decodeProgress, encodePlayer } from '../save/saveFormat';
 import { type WorldOptions, decodeWorldOptions } from '../world/generation/worldOptions';
 import { isPlayerKey } from './roomCode';
 
@@ -80,6 +81,14 @@ export interface Welcome {
   moveMode: MoveMode;
   /** Number of snapshot parts that follow. */
   parts: number;
+  /** The world's task book (Phase 8 part A2; empty in Creative). */
+  progress: WorldProgress;
+}
+
+/** A task the last change finished, and the name of the player whose action did it. */
+export interface TaskDoneBy {
+  task: number;
+  by: string;
 }
 
 /**
@@ -115,6 +124,8 @@ export type HostMessage =
   | { t: 'ready' }
   | ResultMessage
   | { t: 'record'; record: PlayerRecord }
+  /** The world's task book changed (Phase 8 part A2), with the tasks that change finished. */
+  | { t: 'progress'; progress: WorldProgress; done: TaskDoneBy[] }
   | { t: 'blocks'; by: number; changes: number[] }
   | { t: 'poses'; poses: RelayedPose[] }
   | { t: 'joined'; id: number; name: string; slot: number; look: number }
@@ -276,6 +287,15 @@ function record(value: unknown): PlayerRecord {
   return decoded;
 }
 
+function progress(value: unknown): WorldProgress {
+  const decoded = decodeProgress(value);
+  if (!decoded) fail('progress');
+  return decoded;
+}
+
+/** At most every task of a book (the save format's limit of a done list). */
+const TASKS_MAX = 1024;
+
 function parse(text: unknown): Fields {
   if (typeof text !== 'string') fail('not text');
   if (text.length > MAX_MESSAGE_BYTES) fail('too long');
@@ -401,6 +421,7 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
           moveMode:
             m.moveMode === 'fly' ? 'fly' : m.moveMode === 'walk' ? 'walk' : fail('moveMode'),
           parts: int(m, 'parts', 0, ID_MAX),
+          progress: progress(m.progress),
         };
       case 'snapshot': {
         const chunks = arr(m, 'chunks', MAX_MESSAGE_BYTES).map((value): SnapshotChunk => {
@@ -439,6 +460,15 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
       }
       case 'record':
         return { t: 'record', record: record(m.record) };
+      case 'progress':
+        return {
+          t: 'progress',
+          progress: progress(m.progress),
+          done: arr(m, 'done', TASKS_MAX).map((value) => {
+            const d = obj(value, 'done');
+            return { task: int(d, 'task', 1, 0xffff), by: str(d, 'by', NAME_LENGTH, 1) };
+          }),
+        };
       case 'blocks': {
         const changes = arr(m, 'changes', MAX_MESSAGE_BYTES);
         if (changes.length % 4 !== 0 || changes.length === 0) fail('changes');
