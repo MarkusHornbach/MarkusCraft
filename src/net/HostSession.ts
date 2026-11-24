@@ -783,7 +783,10 @@ export class HostSession {
         member.record = record;
         changed.add(member);
       }
-      outcomes.push(...step.outcomes);
+      // Rooms name the player who finished a task.
+      for (const o of step.outcomes) {
+        outcomes.push(o.kind === 'taskDone' ? { ...o, by: actor.name } : o);
+      }
     }
     // The host's own record first: its screen reads it when the book is reported.
     if (changed.has(this.self)) this.o.listener.onPlayer(this.local.view(this.self.record));

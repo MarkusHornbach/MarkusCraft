@@ -1214,8 +1214,8 @@ export class Game {
         moveMode,
         player: welcome.record,
         guests: [],
-        // 8A2 brings the room's book; a guest's world is never saved.
-        progress: EMPTY_PROGRESS,
+        // The room's book; a guest's world is never saved.
+        progress: welcome.progress,
       },
       edits,
     );

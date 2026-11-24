@@ -43,6 +43,9 @@ export interface RigGuest {
   key: string;
   /** The last welcome the guest got. */
   welcome: Welcome | null;
+  /** The book and the outcomes the guest's screen was told (Adventure). */
+  progress: WorldProgress;
+  outcomes: ProgressOutcome[];
 }
 
 export interface RigOptions {
@@ -174,6 +177,8 @@ export class Rig {
       worlds: 0,
       key,
       welcome: null,
+      progress: EMPTY_PROGRESS,
+      outcomes: [],
     };
     guest.client = new ClientSession({
       network: { signaling: () => this.net.signaling(), directory: this.net.directory() },
@@ -204,6 +209,10 @@ export class Rig {
         onBlocks: (changes) => guest.blocks.push([...changes]),
         onPlayer: () => {},
         onResult: (action, result) => guest.answers.push({ action, result }),
+        onProgress: (progress, outcomes) => {
+          guest.progress = progress;
+          guest.outcomes.push(...outcomes);
+        },
         onPeer: (event) => guest.peers.push(event),
         onStatus: (status) => guest.statuses.push(status),
         onEnd: (reason) => guest.ends.push(reason),

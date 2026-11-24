@@ -9,6 +9,10 @@ import { breakTimeMs } from '../items/hardness';
 import { Item } from '../items/items';
 import { type WorldProgress, maxLevelXp } from '../progress/progress';
 import { FIRST_FIND_XP, getTask } from '../progress/tables';
+import { noticeTexts } from '../progress/view';
+import { LOCAL_PLAYER_ID } from '../actions/Session';
+import { type WorldMeta, decodeMeta, encodeMeta } from '../save/saveFormat';
+import { CLASSIC_GEN } from '../world/generation/worldOptions';
 import { Rig, type RigGuest, type RigOptions } from '../testing/netRig';
 import { Block } from '../world/blocks';
 
@@ -145,6 +149,7 @@ describe('shared progress in rooms (Phase 8 AC8.1)', () => {
       kind: 'taskDone',
       task: LOG_TASK,
       actor: String(g.client.selfId),
+      by: 'Guest1',
     });
   });
 
@@ -163,7 +168,12 @@ describe('shared progress in rooms (Phase 8 AC8.1)', () => {
     expect(rig.hostRecord.xp).toBe(xp);
     for (const g of gs) await until(rig, () => g.client.record.xp === xp);
     expect(guestXp(rig)).toEqual({ Guest1: xp, Guest2: xp, Guest3: xp });
-    expect(rig.hostOutcomes).toContainEqual({ kind: 'taskDone', task: LOG_TASK, actor: 'local' });
+    expect(rig.hostOutcomes).toContainEqual({
+      kind: 'taskDone',
+      task: LOG_TASK,
+      actor: 'local',
+      by: 'Hosta',
+    });
   });
 
   it('a guest who left before the task completes gets nothing', async () => {
@@ -284,5 +294,190 @@ describe('shared progress in rooms (Phase 8 AC8.1)', () => {
     rig.host.local.notePose(90);
     expect(rig.host.progress.done).toEqual([]);
     expect(rig.hostOutcomes).toEqual([]);
+  });
+});
+
+/** The notices a player's screen shows for what it was told. */
+function notices(outcomes: Parameters<typeof noticeTexts>[0]): string[] {
+  return noticeTexts(outcomes, LOCAL_PLAYER_ID);
+}
+
+describe('guests see the shared book (Phase 8 AC8.2)', () => {
+  it('a finished task reaches every guest with the name of its player; level-ups only the player concerned', async () => {
+    // The host is far ahead: only the guests reach level 2 with the last task of chapter 1.
+    const hostRecord = { ...createPlayerRecord('gathering'), xp: maxLevelXp() };
+    const progress: WorldProgress = {
+      done: [2, 3, 4],
+      counts: [{ task: LOG_TASK, count: taskOf(LOG_TASK).count - 1 }],
+    };
+    const { rig, gs } = await room(2, { progress, hostRecord });
+    const [g1, g2] = gs;
+    // Each guest is 10 XP short of level 2 (50).
+    for (const g of gs) await editGuest(rig, g, (r) => ({ ...r, xp: 40 }));
+    g1.outcomes.length = 0;
+    g2.outcomes.length = 0;
+    const c = cellNear(guestPose(rig, g1));
+    hostSet(rig, c, Block.LOG);
+    expect((await breakAsGuest(rig, g1, c))?.ok).toBe(true);
+    await until(rig, () => g2.client.record.xp === 50 && g1.client.record.xp === 50);
+    expect(g1.progress).toEqual(rig.host.progress);
+    expect(g2.client.progress).toEqual(rig.host.progress);
+    const taskLine = 'Task done: Mine 32 logs (Guest1) · +10 XP';
+    const levelLine = 'Level 2 · Unlocked: Wooden axe, Wooden shovel, Stone pickaxe';
+    for (const g of gs) {
+      expect(notices(g.outcomes)).toEqual([taskLine, 'Chapter done: First wood', levelLine]);
+    }
+    // The host sees the task and the chapter, and no level-up of others.
+    expect(notices(rig.hostOutcomes)).toEqual([taskLine, 'Chapter done: First wood']);
+  });
+
+  it('a first find shows only for its finder, on the guest screen too', async () => {
+    const { rig, gs } = await room(2);
+    const [g1, g2] = gs;
+    await editGuest(rig, g1, hold(Item.WOODEN_PICKAXE));
+    const c = cellNear(guestPose(rig, g1));
+    hostSet(rig, c, Block.COAL_ORE);
+    expect((await breakAsGuest(rig, g1, c))?.ok).toBe(true);
+    await until(rig, () => g1.outcomes.length > 0);
+    expect(notices(g1.outcomes)).toEqual(['First find: Coal ore · +20 XP']);
+    await rig.run(200);
+    expect(notices(g2.outcomes)).toEqual([]);
+    expect(notices(rig.hostOutcomes)).toEqual([]);
+  });
+
+  it('a guest joining mid-book receives the book in welcome', async () => {
+    const progress: WorldProgress = { done: [1, 2, 3, 4, 5], counts: [{ task: 6, count: 9 }] };
+    const { rig, gs } = await room(1, { progress });
+    const [g] = gs;
+    expect(g.welcome?.progress).toEqual(progress);
+    expect(g.client.progress).toEqual(progress);
+    // A Creative room sends an empty book.
+    const creative = new Rig({ mode: 'creative' });
+    await creative.open();
+    const cg = creative.guest();
+    expect(await creative.join(cg)).toBeNull();
+    expect(cg.welcome?.progress).toEqual({ done: [], counts: [] });
+    expect(rig.host.progress).toBe(progress);
+  });
+
+  it('a guest who leaves and returns keeps XP, finds and crafts', async () => {
+    const { rig, gs } = await room(1);
+    const [g] = gs;
+    await editGuest(rig, g, hold(Item.WOODEN_PICKAXE));
+    const c = cellNear(guestPose(rig, g));
+    hostSet(rig, c, Block.COAL_ORE);
+    expect((await breakAsGuest(rig, g, c))?.ok).toBe(true);
+    await editGuest(rig, g, (r) => {
+      const slots = r.slots.map(() => null) as PlayerRecord['slots'][number][];
+      slots[0] = { item: Block.LOG, count: 1 };
+      return { ...r, slots };
+    });
+    expect((await craftAsGuest(rig, g, 1))?.ok).toBe(true);
+    await until(rig, () => g.client.record.crafted.length === 1);
+    const kept = g.client.record;
+    expect(kept.xp).toBe(25);
+    g.client.leave();
+    await rig.run(200);
+    g.client.dispose();
+    const again = rig.guest({ key: g.key });
+    expect(await rig.join(again)).toBeNull();
+    expect(again.client.record).toMatchObject({ xp: 25, found: [Block.COAL_ORE], crafted: [1] });
+    // A new key starts at level 1.
+    const stranger = rig.guest({ key: 'cd'.repeat(16) });
+    expect(await rig.join(stranger)).toBeNull();
+    expect(stranger.client.record).toMatchObject({ xp: 0, found: [], crafted: [] });
+  });
+
+  it("the host's save and reload keeps the book and every guest entry's progress", async () => {
+    const first = (await room(2, { progress: logsLeft(1) })).rig;
+    const [g1, g2] = first.guests;
+    await editGuest(first, g2, hold(Item.WOODEN_PICKAXE));
+    const coal = cellNear(guestPose(first, g2), 1);
+    hostSet(first, coal, Block.COAL_ORE);
+    expect((await breakAsGuest(first, g2, coal))?.ok).toBe(true);
+    const c = cellNear(guestPose(first, g1));
+    hostSet(first, c, Block.LOG);
+    expect((await breakAsGuest(first, g1, c))?.ok).toBe(true);
+    await first.run(200);
+    first.host.close();
+    // What the host's autosave writes, through the save format.
+    const meta: WorldMeta = {
+      id: 'w1',
+      name: 'Shared',
+      seed: 1337,
+      mode: 'gathering',
+      generatorVersion: CLASSIC_GEN.version,
+      options: null,
+      formatVersion: 4,
+      createdMs: 1,
+      playedMs: 2,
+      time: 0.25,
+      pose: { x: 0.5, y: 80, z: 0.5, yaw: 0, pitch: 0 },
+      moveMode: 'walk',
+      player: first.hostRecord,
+      guests: first.host.guestEntries(),
+      progress: first.host.progress,
+    };
+    const loaded = decodeMeta(JSON.parse(JSON.stringify(encodeMeta(meta))));
+    if (!loaded.ok) throw new Error(JSON.stringify(loaded.error));
+    expect(loaded.value.progress).toEqual({ done: [LOG_TASK], counts: [] });
+    const byName = Object.fromEntries(loaded.value.guests.map((e) => [e.name, e.record]));
+    expect(byName.Guest1).toMatchObject({ xp: 10, found: [] });
+    expect(byName.Guest2).toMatchObject({ xp: 30, found: [Block.COAL_ORE] });
+    expect(loaded.value.player.xp).toBe(10);
+
+    const rig = new Rig({
+      mode: 'gathering',
+      guests: loaded.value.guests,
+      progress: loaded.value.progress,
+      hostRecord: loaded.value.player,
+    });
+    await rig.open();
+    const again = rig.guest({ key: g2.key });
+    expect(await rig.join(again, 5000)).toBeNull();
+    expect(again.client.progress).toEqual({ done: [LOG_TASK], counts: [] });
+    expect(again.client.record).toMatchObject({ xp: 30, found: [Block.COAL_ORE] });
+  });
+});
+
+describe('progress traffic (Phase 8 plan 5.12)', () => {
+  it('one progress message per action that changes the book; none for poses that complete nothing', async () => {
+    const { rig, gs } = await room(2);
+    const [g1, g2] = gs;
+    const c = cellNear(guestPose(rig, g1));
+    for (let i = 0; i < 5; i++) {
+      hostSet(rig, c, Block.LOG);
+      expect((await breakAsGuest(rig, g1, c))?.ok).toBe(true);
+    }
+    await rig.run(200);
+    expect(rig.host.progress.counts).toEqual([{ task: LOG_TASK, count: 5 }]);
+    expect(g1.client.progressReceived).toBe(5);
+    expect(g2.client.progressReceived).toBe(5);
+    // Moving around with no reach task open sends nothing.
+    const p = guestPose(rig, g1);
+    for (let i = 1; i <= 20; i++) {
+      g1.client.setPose({ ...p, y: p.y + i * 0.1, x: p.x + i * 0.1 }, rig.net.nowMs);
+      rig.host.local.notePose(p.y + i);
+      await rig.run(60);
+    }
+    expect(g1.client.progressReceived).toBe(5);
+    expect(g2.client.progressReceived).toBe(5);
+  });
+
+  it('a reach task open: poses below the height send nothing, the one reaching it sends one', async () => {
+    const before = Array.from({ length: CLIMB_TASK - 1 }, (_, i) => i + 1);
+    const { rig, gs } = await room(1, { progress: { done: before, counts: [] } });
+    const [g] = gs;
+    const p = guestPose(rig, g);
+    for (let i = 1; i <= 10; i++) {
+      g.client.setPose({ ...p, x: p.x + i * 0.1, y: 40 }, rig.net.nowMs);
+      rig.host.local.notePose(40);
+      await rig.run(60);
+    }
+    expect(g.client.progressReceived).toBe(0);
+    g.client.setPose({ ...p, y: 66 }, rig.net.nowMs);
+    rig.host.local.notePose(66);
+    await rig.run(200);
+    expect(g.client.progressReceived).toBe(1);
   });
 });
