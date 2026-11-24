@@ -122,10 +122,15 @@ export function trackedTask(
   return open[0] ?? null;
 }
 
+/** The count part of the tracker's line: "12 / 32", or "–" for a reach task. */
+export function trackerCount(task: Task, progress: WorldProgress): string {
+  const reach = task.type === 'reachBelow' || task.type === 'reachAbove';
+  return reach ? '–' : `${countOf(progress, task)} / ${task.count}`;
+}
+
 /** The tracker's line: "Mine 32 logs  12 / 32", "Reach depth 30  –". */
 export function trackerText(task: Task, progress: WorldProgress): string {
-  const reach = task.type === 'reachBelow' || task.type === 'reachAbove';
-  return `${task.label}  ${reach ? '–' : `${countOf(progress, task)} / ${task.count}`}`;
+  return `${task.label}  ${trackerCount(task, progress)}`;
 }
 
 /** The F3 row "Progress": "Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP". */

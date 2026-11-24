@@ -35,6 +35,8 @@ export interface InventoryScreenOptions {
   onCraftClick: (recipe: number) => void;
   /** Another tab was chosen. */
   onTab: (tab: InventoryTab) => void;
+  /** The Tasks tab: the row of an open task was activated (Polish 2). */
+  onTrack: (task: number) => void;
 }
 
 const HINTS: Record<GameMode, string> = {
@@ -230,7 +232,7 @@ export class InventoryScreen {
       onCraftUp: options.onCraftUp,
       onCraftClick: options.onCraftClick,
     });
-    this.tasks = new TasksTab(panel);
+    this.tasks = new TasksTab(panel, options.onTrack);
     parent.appendChild(this.element);
     this.setGameMode(this.gameMode);
   }
@@ -264,7 +266,7 @@ export class InventoryScreen {
     // On the recipe list the controller's focus starts on its tab: a "Craft" button comes and
     // goes, and a default that changes would count as a new view and move the focus.
     this.tabButtons.get('crafting')?.toggleAttribute('data-pad-default', this.tab === 'crafting');
-    // The Tasks tab has nothing to focus: the focus starts on its tab, as on Crafting.
+    // The focus starts on the Tasks tab itself, as on Crafting; D-pad down reaches the rows.
     this.tabButtons.get('tasks')?.toggleAttribute('data-pad-default', this.tab === 'tasks');
     this.itemsPage.hidden = this.tab !== 'items';
     this.recipes.element.hidden = this.tab !== 'crafting';
@@ -312,9 +314,9 @@ export class InventoryScreen {
     this.craftCount.hidden = count === 0;
   }
 
-  /** The task book on the Tasks tab (Adventure). */
-  setBook(view: BookView): void {
-    this.tasks.update(view);
+  /** The task book on the Tasks tab (Adventure), with the row the tracker shows marked. */
+  setBook(view: BookView, tracked: number | null): void {
+    this.tasks.update(view, tracked);
   }
 
   /** The furnace's progress bar in the row of a recipe; null hides it. */

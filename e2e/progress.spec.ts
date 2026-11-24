@@ -130,8 +130,10 @@ test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters a
   await expect(tab.locator('.task-row')).toHaveCount(4);
   await expect(tab.locator('.task-row').nth(1)).toContainText('Make 64 planks0 / 64');
   await expect(tab.locator('.tasks-footer')).toHaveText('4 more chapters');
-  // Nothing on the tab takes the focus: no buttons in it.
-  await expect(tab.locator('button, input')).toHaveCount(0);
+  // Polish 2: the open rows are buttons (they choose the tracked task); nothing else is.
+  await expect(tab.locator('button, input')).toHaveCount(4);
+  await expect(tab.locator('button.task-row')).toHaveCount(4);
+  await expect(tab.locator('.task-row.tracked')).toHaveText('Mine 32 logsTracked0 / 32');
 
   // A craft while the tab is open: the count and the XP move.
   await give(page, LOG, 1);

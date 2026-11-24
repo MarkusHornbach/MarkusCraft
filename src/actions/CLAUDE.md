@@ -27,13 +27,15 @@ test API tool), if a slot-changing inventory function is called outside `src/act
 tools. Phase 8: it also fails if `stepProgress` is called outside `actions/Session.ts` and
 `net/HostSession.ts`, `replaceProgress` outside the test tool `setProgress`, or a record's
 `xp`, `found` or `crafted` is given a value outside `src/progress/`, `src/actions/`, the
-save format and the test world of `progress=all`. Slots in actions and records count from 0; keys, HUD and
+save format and the test world of `progress=all`. Polish 2: a record's `track` is given a
+value only in `src/actions/`, the save format and once in `Game.ts` (`getState`). Slots in actions and records count from 0; keys, HUD and
 `getState().selectedSlot` count from 1.
 
 ## Actions and reasons
 
 `break`, `place`, `selectSlot`, `startBreak`, `moveStack`, `discard`, `setBarSlot`
-(Creative only), `craft { recipe }` (Gathering only). A refusal carries a short reason
+(Creative only), `craft { recipe }` (Gathering only), `track { task }` (Adventure only,
+Polish 2). A refusal carries a short reason
 (`reach`, `unbreakable`, `occupied`, `full`, `early`, `missing`, `mode`, `station`,
 `support`, `rate`, `locked`, `invalid`) that the UI maps to a text (`rate`, a room's limit for
 guests, has none); `ActionResult.notices` is a list of `{ item, count }`, not of strings.
@@ -51,6 +53,14 @@ Adventure world it runs `eventsOf` and `stepProgress` (`src/progress/CLAUDE.md`)
 XP go through `onPlayer`, the book through the new `onProgress(progress, outcomes)`. In a
 room the host's session does the same for every player (`src/net/CLAUDE.md`, "Shared
 progress").
+
+## The tracked task (Polish 2)
+
+`PlayerRecord.track`: `0` automatic (`TRACK_AUTO`, the default), `-1` hidden
+(`TRACK_HIDDEN`) or a chosen task id. `track { task }` sets it: `task` is an open task of
+the open chapter or `-1`; refusals `mode` (Creative), then `invalid` (an unknown id, a done
+task, another chapter's task, `0`). It changes only `track`, not `breaking`; the screen
+decides what a press means. What the tracker shows is derived (`trackedTask`).
 
 ## Game modes
 

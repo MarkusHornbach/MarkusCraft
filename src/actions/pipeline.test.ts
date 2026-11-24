@@ -70,6 +70,8 @@ const RECORD_TRACK_FIELD = /\btrack\s*:(?!\s*(?:number|readonly|string|boolean)\
 const RECORD_TRACK_ALLOWED: Record<string, number> = {
   // The encoder writes and the decoder reads the field (formats 1–4 and 5).
   'src/save/saveFormat.ts': 4,
+  // `getState().progress.track` reads the field for the test API.
+  'src/game/Game.ts': 1,
 };
 
 function countCalls(pattern: RegExp, skip: (file: string) => boolean): Record<string, number> {

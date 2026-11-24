@@ -326,3 +326,8 @@ Tests that no longer need doing, with the reason.
 - [ ] **CRAFT-11** (3C) Building blocks: are stone bricks, glass, bricks and the iron
       block worth their recipes? Result:
       Reason: Dropped by the owner, 2026-11-22.
+- [ ] **PROG-3** (8A1) The controller reaches the Tasks tab with RB (from Crafting) and
+      scrolls it with the right stick; B closes the inventory. Is it clear that nothing in
+      the tab can be selected? _PC or Phone, controller._ Result:
+      Reason: Polish 2 makes the open task rows selectable (the tracked task); PROG-9
+      replaces it.

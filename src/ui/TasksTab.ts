@@ -1,7 +1,16 @@
 // The "Tasks" tab of the inventory screen (Adventure, Phase 8): level, XP bar, next unlocks
-// and the task book. Read-only: nothing in it takes the focus; the panel scrolls.
-import type { BookView } from '../progress/view';
-import { element } from './activate';
+// and the task book. The open tasks are buttons that choose the tracked task (Polish 2).
+import type { BookView, TaskRowView } from '../progress/view';
+import { button, element } from './activate';
+
+/** One row of the open chapter, kept while its task and its done state stay the same. */
+interface Row {
+  element: HTMLElement;
+  done: boolean;
+  label: HTMLElement;
+  mark: HTMLElement;
+  status: HTMLElement;
+}
 
 export class TasksTab {
   readonly element: HTMLElement;
@@ -14,8 +23,15 @@ export class TasksTab {
   private readonly rows: HTMLElement;
   private readonly footer: HTMLElement;
   private shown = '';
+  /** Rows by task id: a row that only changes its count or mark keeps its element, so
+   * the controller's focus and the pointer stay on it. */
+  private rowsById = new Map<number, Row>();
 
-  constructor(parent: HTMLElement) {
+  /** `onChoose`: an open task's row was activated (click, tap, the controller's A). */
+  constructor(
+    parent: HTMLElement,
+    private readonly onChoose: (task: number) => void,
+  ) {
     this.element = element('div', 'tasks-tab');
     this.element.setAttribute('role', 'region');
     this.element.setAttribute('aria-label', 'Tasks');
@@ -30,15 +46,14 @@ export class TasksTab {
     this.finished = element('div', 'tasks-finished');
     this.chapter = element('div', 'tasks-chapter', '');
     this.rows = element('div', 'tasks-rows');
-    this.rows.setAttribute('role', 'list');
     this.footer = element('div', 'tasks-footer', '');
     this.element.append(head, this.next, this.finished, this.chapter, this.rows, this.footer);
     parent.appendChild(this.element);
   }
 
-  /** Shows the book; only a change touches the document. */
-  update(view: BookView): void {
-    const key = JSON.stringify(view);
+  /** Shows the book and marks the task the tracker shows; only a change touches the document. */
+  update(view: BookView, tracked: number | null): void {
+    const key = JSON.stringify([view, tracked]);
     if (key === this.shown) return;
     this.shown = key;
     this.level.textContent = `Level ${view.level}`;
@@ -51,21 +66,41 @@ export class TasksTab {
     );
     this.chapter.textContent = view.chapterTitle ?? '';
     this.chapter.hidden = view.chapterTitle === null;
-    this.rows.replaceChildren(
-      ...view.tasks.map((task) => {
-        const row = element('div', 'task-row');
-        row.setAttribute('role', 'listitem');
-        row.dataset.task = String(task.id);
-        row.classList.toggle('done', task.done);
-        row.append(
-          element('span', 'task-label', task.label),
-          element('span', 'task-status', task.status),
-        );
-        return row;
-      }),
-    );
+    const rows = new Map<number, Row>();
+    for (const task of view.tasks) {
+      const known = this.rowsById.get(task.id);
+      const row = known && known.done === task.done ? known : this.makeRow(task);
+      if (row.label.textContent !== task.label) row.label.textContent = task.label;
+      if (row.status.textContent !== task.status) row.status.textContent = task.status;
+      const isTracked = task.id === tracked;
+      row.element.classList.toggle('tracked', isTracked);
+      row.mark.textContent = isTracked ? 'Tracked' : '';
+      if (!task.done) row.element.setAttribute('aria-pressed', String(isTracked));
+      rows.set(task.id, row);
+    }
+    const elements = [...rows.values()].map((row) => row.element);
+    const same =
+      elements.length === this.rows.children.length &&
+      elements.every((node, index) => this.rows.children[index] === node);
+    if (!same) this.rows.replaceChildren(...elements);
+    this.rowsById = rows;
     this.footer.textContent = view.footer ?? '';
     this.footer.hidden = view.footer === null;
+  }
+
+  /** A done row is plain text; an open one is a button that chooses its task. */
+  private makeRow(task: TaskRowView): Row {
+    const node = task.done ? element('div', 'task-row done') : button('task-row', '');
+    node.dataset.task = String(task.id);
+    if (!task.done) {
+      node.setAttribute('aria-label', task.label);
+      node.addEventListener('click', () => this.onChoose(task.id));
+    }
+    const label = element('span', 'task-label', task.label);
+    const mark = element('span', 'task-mark', '');
+    const status = element('span', 'task-status', task.status);
+    node.append(label, mark, status);
+    return { element: node, done: task.done, label, mark, status };
   }
 
   /** Back to the top, as when a world is loaded. */

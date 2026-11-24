@@ -32,7 +32,7 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 8 part A2 (section "Progression", PROG-6 and PROG-7); 2026-11-24.
+Last updated: Polish 2 (section "Progression", PROG-8 to PROG-10; PROG-3 obsolete); 2026-11-24.
 
 ---
 
@@ -243,9 +243,6 @@ finished task, chapter and level.
 - [ ] **PROG-2** (8A1) The Tasks tab on the phone: level, XP bar, "Next level", the open
       chapter's tasks with their counts. Readable at arm's length? Does it scroll with a
       finger where needed? _Phone._ Result:
-- [ ] **PROG-3** (8A1) The controller reaches the Tasks tab with RB (from Crafting) and
-      scrolls it with the right stick; B closes the inventory. Is it clear that nothing in
-      the tab can be selected? _PC or Phone, controller._ Result:
 - [ ] **PROG-4** (8A1) The notices ("Task done: …", "Chapter done: …", "Level 3 · Unlocked:
       …", "First find: Coal ore …"): noticed, but not annoying? Do they ever hide something
       you need to see? _PC, Phone._ Result:
@@ -260,3 +257,16 @@ finished task, chapter and level.
       again: its level, XP bar and the recipes it unlocked are as before; the book is where
       the room left it. Then the PC saves and goes back to the worlds, opens the world again
       and opens it to others: the phone's player still has its level. _PC, Phone._ Result:
+- [ ] **PROG-8** (P2) The task tracker on the phone ("Mine 32 logs 0 / 32", top left,
+      below the menu button): readable at arm's length, never in the way of a button, the
+      bar or the notice at the top? In a room, do "Anna joined" and the other room notices
+      sit below it without crowding the corner? _Phone._ Result:
+- [ ] **PROG-9** (P2) Choosing the tracked task in the Tasks tab: a click on a row (PC), a
+      tap (phone), and with the controller D-pad down from the tab, then A. The row shows
+      "Tracked" and the tracker follows; choosing the tracked row again hides the tracker,
+      any row shows it again. Is it clear that the rows can be chosen and which one is
+      tracked? Done rows ("✓") cannot be chosen. _PC, Phone, controller._ Result:
+- [ ] **PROG-10** (P2) In a room of two each player tracks a different task: each sees
+      its own tracker, both counts follow the shared book. One leaves and joins again, and
+      the host saves, goes back to the worlds and opens the room again: each still tracks
+      its own task. _PC, Phone._ Result:

@@ -157,3 +157,53 @@ test('Phase 8 AC5.5 (touch): the notice never covers a touch button or the bar, 
   await page.waitForFunction(() => window.__mc.getState().paused);
   await expect(notice).toBeHidden();
 });
+
+test('Polish 2 AC3.3: at 640 × 360 the tracker lies below the menu button, inside the view, clear of the buttons, the bar and the notice; a tap on a row chooses it', async ({
+  page,
+}) => {
+  await phoneWorld(page);
+  const tracker = page.locator('.task-tracker');
+  await expect(tracker).toHaveText('Mine 32 logs  0 / 32');
+  const check = async () => {
+    const [box] = await boxes(page, '.task-tracker');
+    expectInside([box]);
+    const [menu] = await boxes(page, '.touch-menu');
+    expect(box.y).toBeGreaterThanOrEqual(menu.y + menu.height);
+    expect(box.x).toBeLessThan(menu.x + menu.width);
+    for (const other of await boxes(
+      page,
+      '.touch-button, .touch-menu, .hotbar, .touch-stick, .progress-notice',
+    )) {
+      expect(overlap(box, other), other.name).toBe(false);
+    }
+  };
+  await check();
+  // The world behind is not part of this reference: hide the canvas.
+  await page.locator('canvas.game-canvas').evaluate((node) => {
+    (node as HTMLElement).style.visibility = 'hidden';
+  });
+  await whenIdle(page);
+  await expect(page).toHaveScreenshot('task-tracker-touch.png', { maxDiffPixelRatio: 0.02 });
+
+  // A tap on a row of the Tasks tab chooses its task.
+  await page.locator('.touch-bag').tap();
+  await page.locator('.inventory-tab[data-tab="tasks"]').tap();
+  await page.locator('.task-row[data-task="3"]').tap();
+  expect((await getState(page)).progress?.tracked?.id).toBe(3);
+  await page.locator('.task-row[data-task="3"]').tap();
+  expect((await getState(page)).progress?.tracked).toBeNull();
+  await page.locator('.task-row[data-task="2"]').tap();
+  expect((await getState(page)).progress?.tracked?.id).toBe(2);
+  await page.locator('.inventory-close').tap();
+  await page.waitForFunction(() => window.__mc.getState().ui.screen === 'play');
+  await expect(tracker).toHaveText('Make 64 planks  0 / 64');
+
+  // A notice at the top centre: the tracker stays clear of it.
+  await page.evaluate(() => {
+    window.__mc.setProgress({ xp: 45 });
+    window.__mc.give(7, 4);
+    window.__mc.submit({ kind: 'craft', recipe: 3 });
+  });
+  await expect(page.locator('.progress-notice')).toBeVisible();
+  await check();
+});
