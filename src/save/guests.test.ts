@@ -41,8 +41,8 @@ describe('version 1 worlds (Phase 6 AC8.1)', () => {
       expect(decoded.ok).toBe(true);
       if (!decoded.ok) return;
       const { meta } = decoded.value;
-      expect(SAVE_FORMAT_VERSION).toBe(4);
-      expect(meta.formatVersion).toBe(4);
+      expect(SAVE_FORMAT_VERSION).toBe(5);
+      expect(meta.formatVersion).toBe(5);
       expect(meta.options).toBeNull();
       expect(meta.guests).toEqual([]);
       // Format 4 (Phase 8): a fresh book and level 1.
@@ -50,7 +50,13 @@ describe('version 1 worlds (Phase 6 AC8.1)', () => {
       const { formatVersion: _a, guests: _b, progress: _p, player, ...rest } = encodeMeta(meta);
       const { formatVersion: _c, player: oldPlayer, ...old } = stored;
       expect(rest).toEqual(old);
-      expect(player).toEqual({ ...(oldPlayer as object), xp: 0, found: [], crafted: [] });
+      expect(player).toEqual({
+        ...(oldPlayer as object),
+        xp: 0,
+        found: [],
+        crafted: [],
+        track: 0,
+      });
     });
   }
 

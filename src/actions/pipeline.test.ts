@@ -68,8 +68,8 @@ const RECORD_PROGRESS_ALLOWED: Record<string, number> = {
 const RECORD_TRACK_FIELD = /\btrack\s*:(?!\s*(?:number|readonly|string|boolean)\b)\s*[^\s]/g;
 /** Files outside `src/actions/` that may give `track` a value, with their counts. */
 const RECORD_TRACK_ALLOWED: Record<string, number> = {
-  // The decoder builds the field of stored and received records.
-  'src/save/saveFormat.ts': 2,
+  // The encoder writes and the decoder reads the field (formats 1–4 and 5).
+  'src/save/saveFormat.ts': 4,
 };
 
 function countCalls(pattern: RegExp, skip: (file: string) => boolean): Record<string, number> {

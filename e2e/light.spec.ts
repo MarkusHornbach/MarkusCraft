@@ -270,11 +270,11 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
   expect(Object.keys(meta).sort()).toEqual(
     [...Object.keys(PART_C_META), 'guests', 'progress'].sort(),
   );
-  expect(meta.formatVersion).toBe(4);
+  expect(meta.formatVersion).toBe(5);
   expect(meta.guests).toEqual([]);
   expect(meta.generatorVersion).toBe(1);
   expect(meta.time).toBeCloseTo(0.3, 9);
-  expect(meta.player).toEqual({ ...PART_C_META.player, xp: 0, found: [], crafted: [] });
+  expect(meta.player).toEqual({ ...PART_C_META.player, xp: 0, found: [], crafted: [], track: 0 });
   const chunks = stored.chunks.filter(
     (c) => (c as { worldId: string }).worldId === 'wpartc-fixture1',
   );

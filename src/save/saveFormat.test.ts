@@ -294,7 +294,7 @@ function migrated(text: string): string {
   return JSON.stringify({
     ...old,
     formatVersion: SAVE_FORMAT_VERSION,
-    player: { ...(old.player as object), xp: 0, found: [], crafted: [] },
+    player: { ...(old.player as object), xp: 0, found: [], crafted: [], track: 0 },
     guests: [],
     progress: { done: [], counts: [] },
   });
