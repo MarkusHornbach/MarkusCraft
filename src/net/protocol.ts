@@ -307,6 +307,7 @@ const REJECT_REASONS: readonly RejectReason[] = [
   'support',
   'mode',
   'rate',
+  'locked',
   'invalid',
 ];
 

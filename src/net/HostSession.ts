@@ -3,9 +3,15 @@
 // time of day. Pure: a later Node host can run it with any `Connection`.
 import { type Action, decodeAction } from '../actions/actions';
 import { type BlockChange, applyAction, heldItem } from '../actions/apply';
-import { EMPTY_PROGRESS, type WorldProgress } from '../progress/progress';
+import {
+  EMPTY_PROGRESS,
+  type ProgressOutcome,
+  type WorldProgress,
+  stepProgress,
+} from '../progress/progress';
+import { type ProgressEvent, eventsOf } from '../progress/events';
 import { type GameMode, type PlayerRecord, createPlayerRecord } from '../actions/playerRecord';
-import type { Session, SessionListener } from '../actions/Session';
+import { LOCAL_PLAYER_ID, type Session, type SessionListener } from '../actions/Session';
 import {
   ACTION_RATE_LIMIT,
   ACTION_RATE_WINDOW_MS,
@@ -45,6 +51,8 @@ import {
 import { normalizePlayerName, uniqueName } from './roomCode';
 import { splitEdits } from './snapshot';
 import type { Connection } from './transport';
+
+const NO_EVENTS: readonly ProgressEvent[] = Object.freeze([]);
 
 /** Something that happened to the other players, for notices and the player list. */
 export type PeerEvent =
@@ -97,8 +105,11 @@ export interface HostOptions {
   wallClock?: () => number;
   /** The guests the world remembers: a returning guest gets its items and place back. */
   guests?: readonly GuestEntry[];
-  /** The world's task book, which decides locked recipes; empty if not given. */
-  progress?: () => WorldProgress;
+  /**
+   * The world's task book when the room opens; empty if not given. From then on the host
+   * owns it (Phase 8 part A2) and reports every change through `onProgress`.
+   */
+  progress?: WorldProgress;
   listener: HostListener;
 }
 
@@ -198,6 +209,8 @@ export class HostSession {
   private baseMs: number;
   private frozenTime: boolean;
   private closed = false;
+  /** The world's task book, shared by everyone in the room (Adventure). */
+  private book: WorldProgress;
   /** The host's own door into the room: the `Session` that `Game` hands actions to. */
   readonly local: HostLocalSession;
 
@@ -208,6 +221,7 @@ export class HostSession {
     this.baseTime = options.time;
     this.baseMs = now;
     this.frozenTime = options.frozen;
+    this.book = options.progress ?? EMPTY_PROGRESS;
     for (const guest of options.guests ?? []) {
       // The host's own key is the host, never one of its guests.
       if (guest.key !== options.hostKey) this.departed.set(guest.key, guest);
@@ -258,6 +272,11 @@ export class HostSession {
 
   get frozen(): boolean {
     return this.frozenTime;
+  }
+
+  /** The world's task book as last changed. */
+  get progress(): WorldProgress {
+    return this.book;
   }
 
   /** Everyone in the room, the host first. */
@@ -684,18 +703,18 @@ export class HostSession {
   private decide(member: Member, action: Action, seq: number): void {
     this.refreshHostPose();
     const poses = [...this.members.values()].map((m) => m.pose);
-    const result = applyAction(
-      {
-        world: this.reader,
-        mode: this.o.mode,
-        pose: member.pose,
-        record: member.record,
-        players: poses,
-        progress: this.o.progress?.() ?? EMPTY_PROGRESS,
-      },
-      action,
-      this.o.clock(),
-    );
+    const ctx = {
+      world: this.reader,
+      mode: this.o.mode,
+      pose: member.pose,
+      record: member.record,
+      players: poses,
+      progress: this.book,
+    };
+    const result = applyAction(ctx, action, this.o.clock());
+    // Events read the world before the action's blocks are set.
+    const events = this.o.mode === 'gathering' ? eventsOf(action, result, ctx) : NO_EVENTS;
+    const changed = new Set<Member>();
     if (result.ok) {
       for (const c of result.blocks) {
         this.o.world.setBlock(c.x, c.y, c.z, c.id);
@@ -708,10 +727,10 @@ export class HostSession {
       }
       if (result.player) {
         member.record = result.player;
-        if (member === this.self) this.o.listener.onPlayer(this.local.view(result.player));
-        else this.send(member, { t: 'record', record: result.player });
+        changed.add(member);
       }
     }
+    this.runProgress(member, events, changed);
     if (member === this.self) {
       this.o.listener.onResult(action, result);
     } else if (result.ok) {
@@ -719,6 +738,74 @@ export class HostSession {
     } else {
       this.send(member, { t: 'result', seq, ok: false, reason: result.reason });
     }
+  }
+
+  // --- progress (Phase 8 part A2) ------------------------------------------------------
+
+  /** The id of a member in the progress step: the host's own player is the local one. */
+  private progressId(member: Member): string {
+    return member === this.self ? LOCAL_PLAYER_ID : String(member.id);
+  }
+
+  private memberOfProgressId(id: string): Member | undefined {
+    return id === LOCAL_PLAYER_ID ? this.self : this.members.get(Number(id));
+  }
+
+  /**
+   * Runs a player's events through the progress step with everyone in the room present,
+   * then reports what changed: records (`changed` holds those changed before), the book.
+   */
+  private runProgress(
+    actor: Member,
+    events: readonly ProgressEvent[],
+    changed: Set<Member> = new Set(),
+  ): void {
+    const outcomes: ProgressOutcome[] = [];
+    const before = this.book;
+    for (const event of events) {
+      const present = [...this.members.values()].map((m) => ({
+        id: this.progressId(m),
+        record: m.record,
+      }));
+      const step = stepProgress(
+        this.book,
+        { id: this.progressId(actor), record: actor.record },
+        event,
+        present,
+      );
+      if (step.progress === this.book && step.records.length === 0) continue;
+      this.book = step.progress;
+      for (const { id, record } of step.records) {
+        const member = this.memberOfProgressId(id);
+        if (!member) continue;
+        member.record = record;
+        changed.add(member);
+      }
+      outcomes.push(...step.outcomes);
+    }
+    // The host's own record first: its screen reads it when the book is reported.
+    if (changed.has(this.self)) this.o.listener.onPlayer(this.local.view(this.self.record));
+    if (this.book !== before || outcomes.length > 0) {
+      this.o.listener.onProgress?.(this.book, outcomes);
+    }
+    for (const member of changed) {
+      if (member !== this.self) this.send(member, { t: 'record', record: member.record });
+    }
+  }
+
+  /** The feet Y of the host's own player, once per simulation step (reach tasks). */
+  noteHostPose(y: number): void {
+    if (this.closed || this.o.mode !== 'gathering') return;
+    this.runProgress(this.self, [{ kind: 'pose', y }]);
+  }
+
+  /**
+   * Test tool (`setProgress`): replaces the world's task book past the action layer;
+   * everyone learns it.
+   */
+  replaceBook(progress: WorldProgress): void {
+    this.book = progress;
+    this.o.listener.onProgress?.(progress, []);
   }
 
   /** The host's own action, from its local door. */
@@ -791,6 +878,8 @@ export class HostSession {
     if (teleport) member.tpVersion = member.poseVersion;
     this.roster.push(member.id, p, now, teleport);
     this.roster.setFlags(member.id, flags.fly, flags.busy);
+    // The reach tasks of the book read the feet; nothing happens unless one is open.
+    if (this.o.mode === 'gathering') this.runProgress(member, [{ kind: 'pose', y: p.y }]);
     // A host without frames relays from here.
     this.relay(now);
   }
@@ -888,5 +977,15 @@ export class HostLocalSession implements Session {
   /** Test tool (`give`, `clearInventory`). */
   replaceRecord(record: PlayerRecord): void {
     this.host.replaceHostRecord(record);
+  }
+
+  /** The player's feet Y, once per simulation step from `Game`: the reach tasks. */
+  notePose(y: number): void {
+    this.host.noteHostPose(y);
+  }
+
+  /** Test tool (`setProgress`): the world's task book past the action layer. */
+  replaceProgress(progress: WorldProgress): void {
+    this.host.replaceBook(progress);
   }
 }

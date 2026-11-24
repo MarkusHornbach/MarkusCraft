@@ -16,6 +16,7 @@ import type { GuestEntry } from '../save/saveFormat';
 import { playerKeyFromBytes, roomPeerId } from '../net/roomCode';
 import { lookForKey } from '../player/looks';
 import { worldHash } from '../net/snapshot';
+import { EMPTY_PROGRESS, type ProgressOutcome, type WorldProgress } from '../progress/progress';
 
 export const BUILD = 'test123';
 export const CODE = 'ABCDEF';
@@ -58,6 +59,10 @@ export interface RigOptions {
   gen?: WorldGen;
   /** The generator of the checksum the host sends, if it is to differ (a forged welcome). */
   checksumGen?: WorldGen;
+  /** The world's task book when the room opens (Adventure). */
+  progress?: WorldProgress;
+  /** The host's record when the room opens; a fresh one if left out. */
+  hostRecord?: PlayerRecord;
 }
 
 /** The fake wall clock of a rig: milliseconds since 1970 at its start, plus the fake time. */
@@ -74,6 +79,9 @@ export class Rig {
   readonly hostAnswers: Answer[] = [];
   readonly hostPeers: PeerEvent[] = [];
   hostRecord: PlayerRecord;
+  /** The book and the outcomes the host's screen was told (Adventure). */
+  hostProgress: WorldProgress;
+  readonly hostOutcomes: ProgressOutcome[] = [];
   readonly guests: RigGuest[] = [];
   private keyCounter = 1;
   private idCounter = 0;
@@ -93,7 +101,8 @@ export class Rig {
       for (let cx = -2; cx <= 2; cx++) this.world.generate(cx, cz);
     }
     this.hostPose = { x: spawn.x + 0.5, y: spawn.y, z: spawn.z + 0.5, yaw: 0, pitch: 0 };
-    this.hostRecord = createPlayerRecord(mode);
+    this.hostRecord = options.hostRecord ?? createPlayerRecord(mode);
+    this.hostProgress = options.progress ?? EMPTY_PROGRESS;
     this.host = new HostSession({
       build: BUILD,
       world: this.world,
@@ -111,12 +120,17 @@ export class Rig {
       clock: () => this.net.nowMs,
       wallClock: () => RIG_EPOCH_MS + this.net.nowMs,
       guests: options.guests,
+      progress: options.progress,
       listener: {
         onBlocks: () => {},
         onPlayer: (record) => {
           this.hostRecord = record;
         },
         onResult: (action, result) => this.hostAnswers.push({ action, result }),
+        onProgress: (progress, outcomes) => {
+          this.hostProgress = progress;
+          this.hostOutcomes.push(...outcomes);
+        },
         onPeer: (event) => this.hostPeers.push(event),
       },
     });

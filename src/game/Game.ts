@@ -1167,6 +1167,7 @@ export class Game {
         onBlocks: (changes) => this.onBlocksChanged(changes),
         onPlayer: (record) => this.onPlayerChanged(record),
         onResult: (action, result) => this.onActionResult(action, result),
+        onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
       },
       openGuestWorld: (welcome, edits, rejoin) => this.openGuestWorld(welcome, edits, rejoin),
       useSession: (session, record) => this.useSession(session, record),
