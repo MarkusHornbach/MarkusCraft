@@ -16,6 +16,7 @@ describe('parseParams', () => {
       world: 'Test',
       mode: 'creative',
       testGen: { version: 1 },
+      progress: 'all',
       bench: 'off',
       join: null,
       name: null,
@@ -41,6 +42,7 @@ describe('parseParams', () => {
       world: 'Second',
       mode: 'creative',
       testGen: { version: 1 },
+      progress: 'all',
       bench: 'off',
       join: 'ABCDEF',
       name: 'Ann',
@@ -50,6 +52,9 @@ describe('parseParams', () => {
   });
   it('Phase 7 5.8: terrain and trees choose generator 2 for the test world', () => {
     expect(parseParams('?test=1', random).testGen).toEqual({ version: 1 });
+    // Phase 8: the book of an Adventure test world.
+    expect(parseParams('?test=1&progress=fresh', random).progress).toBe('fresh');
+    expect(parseParams('?test=1&progress=other', random).progress).toBe('all');
     expect(parseParams('?test=1&terrain=flat&trees=many', random).testGen).toEqual({
       version: 2,
       options: { terrain: 'flat', trees: 'many' },

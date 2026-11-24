@@ -3,6 +3,7 @@ import { HOTBAR_SLOTS, INVENTORY_SLOTS } from '../game/config';
 import { countItems } from '../items/inventory';
 import { BLOCK_ITEMS, Item } from '../items/items';
 import { Block } from '../world/blocks';
+import { EMPTY_PROGRESS } from '../progress/progress';
 import { type ActionContext, type ActionResult, applyAction } from './apply';
 import {
   type GameMode,
@@ -20,7 +21,14 @@ function context(mode: GameMode, slots: Record<number, ItemStack> = {}): ActionC
   const record = createPlayerRecord(mode);
   const filled = [...record.slots];
   for (const [index, stack] of Object.entries(slots)) filled[Number(index)] = stack;
-  return { world, mode, pose, record: { ...record, slots: filled }, players: [pose] };
+  return {
+    world,
+    mode,
+    pose,
+    record: { ...record, slots: filled },
+    players: [pose],
+    progress: EMPTY_PROGRESS,
+  };
 }
 
 function reasonOf(result: ActionResult): string {

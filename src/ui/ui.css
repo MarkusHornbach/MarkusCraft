@@ -1392,6 +1392,198 @@ canvas {
   }
 }
 
+/* ---- Task book (Phase 8 part A) ---- */
+
+/* A locked recipe stands back further and names what unlocks it (no "Craft" button). */
+.recipe-row.locked {
+  border-style: dashed;
+  background: rgba(0, 0, 0, 0.12);
+  color: #7d8ba0;
+}
+
+.recipe-row.locked .recipe-result canvas,
+.recipe-row.locked .recipe-ingredients {
+  opacity: 0.45;
+}
+
+.recipe-note.recipe-lock {
+  color: #c9d3e0;
+  font-weight: 600;
+}
+
+/* The Tasks tab: as large as the recipe list, read-only, scrolls inside the panel. */
+.tasks-tab {
+  width: 524px;
+  height: 284px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.tasks-tab[hidden],
+.tasks-next[hidden],
+.tasks-chapter[hidden],
+.tasks-footer[hidden] {
+  display: none;
+}
+
+.touch-mode .tasks-tab {
+  height: 300px;
+}
+
+.tasks-level-row {
+  flex: none;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.tasks-level {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.tasks-xp-bar {
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  background: rgba(20, 24, 32, 0.6);
+  overflow: hidden;
+}
+
+.tasks-xp-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #7fd15a;
+}
+
+.tasks-xp-text {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tasks-next {
+  flex: none;
+  font-size: 13px;
+  color: #ffd27f;
+}
+
+.tasks-finished {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: #9fd88a;
+}
+
+.tasks-chapter {
+  flex: none;
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tasks-rows {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Fixed height: a count that changes never moves a row. */
+.task-row {
+  flex: none;
+  height: 36px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 14px;
+}
+
+.task-row.done {
+  border-color: rgba(127, 209, 90, 0.45);
+  background: rgba(127, 209, 90, 0.1);
+  color: #cfe8c4;
+}
+
+.task-status {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tasks-footer {
+  flex: none;
+  font-size: 13px;
+  color: #9fb0c6;
+}
+
+/* The progress notice: top centre, above the HUD and the inventory, never in the way. */
+.progress-notice {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  max-width: min(440px, calc(100% - 300px));
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: rgba(10, 14, 22, 0.88);
+  box-shadow: inset 0 0 0 2px rgba(255, 210, 127, 0.7);
+  color: #ffe6b0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.progress-notice[hidden] {
+  display: none;
+}
+
+@media (max-height: 480px) {
+  .tasks-tab {
+    height: 278px;
+  }
+
+  .touch-mode .tasks-tab {
+    height: 288px;
+  }
+
+  .task-row {
+    height: 32px;
+  }
+
+  .progress-notice {
+    top: 4px;
+    font-size: 13px;
+    padding: 4px 10px;
+  }
+
+  /* The inventory panel fills a phone's height: the notice goes to the bottom edge, over
+     the panel's last line rather than its tabs. */
+  .progress-notice.over-inventory {
+    top: auto;
+    bottom: 4px;
+  }
+}
+
 /* ---- Performance test (Phase 4 part P) ---- */
 
 .bench-screen {

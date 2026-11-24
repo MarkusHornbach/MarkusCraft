@@ -117,7 +117,7 @@ test('Phase 5 AC3.1: the pad alone creates a world, plays, pauses, goes back and
   expect((await getState(page)).pad.active).toBe(true);
   await focusTo(page, pad, 'Create and play', [BUTTON.RIGHT]);
   // Up past the Trees and Terrain rows (Phase 7 part A) to the Mode row.
-  await focusTo(page, pad, 'Gathering', [
+  await focusTo(page, pad, 'Adventure', [
     BUTTON.UP,
     BUTTON.UP,
     BUTTON.UP,

@@ -234,6 +234,9 @@ test('Phase 6 AC9.7: a guest crafts, places a workbench and a furnace, and smelt
   const { host, guest, guestId } = await gatheringRoom(players);
   const { px, pz } = await platform(host.page, guest.page);
   const g = guest.page;
+  // Phase 8: a new guest starts at level 1; the furnace and glass need levels 3 and 5.
+  await host.page.evaluate(([p]) => window.__mc.setProgress({ xp: 480 }, p), [guestId]);
+  await expect.poll(async () => (await state(g)).progress?.xp).toBe(480);
   await giveGuest(host.page, g, guestId, LOG, 3);
   // Planks (recipe 1) and a workbench (recipe 3) without a station.
   await guestDoes(g, { kind: 'craft', recipe: 1 }, async () => (await have(g, PLANKS)) === 4);

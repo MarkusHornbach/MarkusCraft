@@ -30,6 +30,12 @@ export interface PlayerRecord {
   /** Selected bar slot, 0-based. */
   readonly selectedSlot: number;
   readonly breaking: BreakingState | null;
+  /** Experience points (Adventure, Phase 8); 0 in Creative. Built only by `src/progress/`. */
+  readonly xp: number;
+  /** Block ids of the ores this player has found (first finds), no duplicates. */
+  readonly found: readonly number[];
+  /** Recipe ids this player has crafted at least once, no duplicates. */
+  readonly crafted: readonly number[];
 }
 
 /** The record of a new player: in Creative the bar holds the nine Phase 1 blocks. */
@@ -40,5 +46,5 @@ export function createPlayerRecord(mode: GameMode): PlayerRecord {
       slots[slot] = { item, count: 1 };
     });
   }
-  return { slots, selectedSlot: 0, breaking: null };
+  return { slots, selectedSlot: 0, breaking: null, xp: 0, found: [], crafted: [] };
 }

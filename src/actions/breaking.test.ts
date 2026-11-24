@@ -6,6 +6,7 @@ import { Item } from '../items/items';
 import { mulberry32, randInt } from '../util/rng';
 import { Block } from '../world/blocks';
 import type { Action } from './actions';
+import { EMPTY_PROGRESS } from '../progress/progress';
 import { type ActionContext, type ActionResult, applyAction } from './apply';
 import { type ItemStack, type PlayerRecord, createPlayerRecord } from './playerRecord';
 import { LocalSession } from './Session';
@@ -36,7 +37,14 @@ function context(slots: Record<number, ItemStack> = {}): { world: Cells; ctx: Ac
   for (const [index, stack] of Object.entries(slots)) filled[Number(index)] = stack;
   return {
     world,
-    ctx: { world, mode: 'gathering', pose, record: { ...record, slots: filled }, players: [pose] },
+    ctx: {
+      world,
+      mode: 'gathering',
+      pose,
+      record: { ...record, slots: filled },
+      players: [pose],
+      progress: EMPTY_PROGRESS,
+    },
   };
 }
 
@@ -291,7 +299,14 @@ describe('Gathering through a session', () => {
       else action = { kind: 'setBarSlot', slot: randInt(rng, 9), item: Block.STONE };
       discarded = action.kind === 'discard' ? (before.slots[action.slot]?.count ?? 0) : 0;
       const result = applyAction(
-        { world, mode: 'gathering', pose, record: before, players: [pose] },
+        {
+          world,
+          mode: 'gathering',
+          pose,
+          record: before,
+          players: [pose],
+          progress: EMPTY_PROGRESS,
+        },
         action,
         now,
       );

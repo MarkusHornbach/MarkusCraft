@@ -16,6 +16,7 @@ import type { HostSession, PeerEvent } from '../net/HostSession';
 import type { NetPose, RoomInfo, Welcome } from '../net/protocol';
 import { makeRoomCode, normalizeRoomCode, roomCodeOf, roomPeerId } from '../net/roomCode';
 import type { GuestEntry, WorldEdits } from '../save/saveFormat';
+import type { WorldProgress } from '../progress/progress';
 import { type Network, SignalError, type Signaling } from '../net/transport';
 import type { TrafficMeter, TrafficRates } from '../net/traffic';
 import type { World } from '../world/World';
@@ -64,6 +65,8 @@ export interface MultiplayerGame {
   keepGuests(guests: GuestEntry[]): void;
   /** The guests in the room changed (joined, left, played): the world's record is unsaved. */
   guestsChanged(): void;
+  /** The world's task book; decides locked recipes in the room (Phase 8). */
+  progress(): WorldProgress;
   time(): number;
   frozen(): boolean;
   /** The game's listener: blocks, record and answers of its own player. */
@@ -286,6 +289,7 @@ export class Multiplayer {
       localClock: () => this.game.actionClock(),
       wallClock: () => Date.now(),
       guests: this.game.guests(),
+      progress: () => this.game.progress(),
       listener: { ...this.wrap(this.game.listener), onPeer: (e) => this.onPeer(e) },
     });
     signaling.onConnection = (conn) => host.accept(conn);

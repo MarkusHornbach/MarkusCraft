@@ -3,6 +3,7 @@
 // time of day. Pure: a later Node host can run it with any `Connection`.
 import { type Action, decodeAction } from '../actions/actions';
 import { type BlockChange, applyAction, heldItem } from '../actions/apply';
+import { EMPTY_PROGRESS, type WorldProgress } from '../progress/progress';
 import { type GameMode, type PlayerRecord, createPlayerRecord } from '../actions/playerRecord';
 import type { Session, SessionListener } from '../actions/Session';
 import {
@@ -96,6 +97,8 @@ export interface HostOptions {
   wallClock?: () => number;
   /** The guests the world remembers: a returning guest gets its items and place back. */
   guests?: readonly GuestEntry[];
+  /** The world's task book, which decides locked recipes; empty if not given. */
+  progress?: () => WorldProgress;
   listener: HostListener;
 }
 
@@ -688,6 +691,7 @@ export class HostSession {
         pose: member.pose,
         record: member.record,
         players: poses,
+        progress: this.o.progress?.() ?? EMPTY_PROGRESS,
       },
       action,
       this.o.clock(),

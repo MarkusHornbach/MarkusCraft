@@ -13,6 +13,7 @@ import { World } from '../world/World';
 import type { Action } from './actions';
 import type { ActionResult } from './apply';
 import { createPlayerRecord } from './playerRecord';
+import { completeProgress, maxLevelXp } from '../progress/progress';
 import { LocalSession } from './Session';
 
 type Cell = readonly [number, number, number];
@@ -52,12 +53,14 @@ class Script {
     this.pose = { x: spawn.x + 0.5, y: spawn.y, z: spawn.z + 0.5 };
     this.session = new LocalSession(
       { world: this.world, mode: 'gathering', pose: () => this.pose, nowMs: () => this.nowMs },
-      createPlayerRecord('gathering'),
+      // The Phase 3 path predates the task book: every recipe is unlocked.
+      { ...createPlayerRecord('gathering'), xp: maxLevelXp() },
       {
         onBlocks: () => {},
         onPlayer: () => {},
         onResult: (action, result) => this.onResult(action, result),
       },
+      completeProgress(),
     );
   }
 

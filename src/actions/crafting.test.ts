@@ -4,6 +4,8 @@ import { countItems } from '../items/inventory';
 import { Item } from '../items/items';
 import { RECIPES, type Recipe } from '../items/recipes';
 import { Block } from '../world/blocks';
+import { EMPTY_PROGRESS, completeProgress, maxLevelXp } from '../progress/progress';
+import { LEVELS } from '../progress/tables';
 import { type ActionContext, type ActionResult, applyAction } from './apply';
 import { type ItemStack, type PlayerRecord, createPlayerRecord } from './playerRecord';
 import { LocalSession } from './Session';
@@ -28,12 +30,20 @@ function recordWith(...stacks: [number, number][]): PlayerRecord {
   stacks.forEach(([item, count], index) => {
     slots[index] = { item, count };
   });
-  return { ...record, slots };
+  // Every recipe unlocked: these tests are about crafting, not about the book.
+  return { ...record, slots, xp: maxLevelXp() };
 }
 
 function context(record: PlayerRecord, mode: 'gathering' | 'creative' = 'gathering') {
   const world = new Cells();
-  const ctx: ActionContext = { world, mode, pose, record, players: [pose] };
+  const ctx: ActionContext = {
+    world,
+    mode,
+    pose,
+    record,
+    players: [pose],
+    progress: completeProgress(),
+  };
   return { world, ctx };
 }
 
@@ -199,8 +209,83 @@ describe('craft (Phase 3 AC10.2)', () => {
     session.submit({ kind: 'craft', recipe: recipe('planks').id });
     session.submit({ kind: 'craft', recipe: recipe('planks').id });
     expect(results.map(reasonOf)).toEqual(['ok', 'missing']);
-    expect(records.length).toBe(1);
+    // The craft's record, then the record with the first craft's XP (Phase 8).
+    expect(records.length).toBe(2);
+    expect(records[1].crafted).toEqual([recipe('planks').id]);
     expect(countItems(session.record.slots, Block.PLANKS)).toBe(4);
     expect(countItems(session.record.slots, Block.LOG)).toBe(0);
+  });
+});
+
+describe('locked recipes (Phase 8 AC3.1)', () => {
+  const fresh = (...stacks: [number, number][]): PlayerRecord => ({
+    ...recordWith(...stacks),
+    xp: 0,
+  });
+  const at = (record: PlayerRecord, progress = EMPTY_PROGRESS): ActionContext => ({
+    ...context(record).ctx,
+    progress,
+  });
+
+  it('a locked recipe is refused locked, before station and missing', () => {
+    // Stone pickaxe: level 2, a workbench recipe; no workbench near and no stone.
+    expect(reasonOf(craft(at(fresh()), 'stone_pickaxe'))).toBe('locked');
+    expect(reasonOf(craft(at(fresh()), 'torch'))).toBe('locked');
+    // Unknown ids stay invalid; Creative stays mode.
+    expect(reasonOf(applyAction(at(fresh()), { kind: 'craft', recipe: 99 }, 0))).toBe('invalid');
+    expect(reasonOf(craft({ ...at(fresh()), mode: 'creative' }, 'stone_pickaxe'))).toBe('mode');
+  });
+
+  it('unlocked at the level XP, or once the task is done', () => {
+    const level1 = fresh([Block.LOG, 1]);
+    expect(reasonOf(craft(at(level1), 'planks'))).toBe('ok');
+    expect(reasonOf(craft(at({ ...fresh(), xp: LEVELS[1] - 1 }), 'stone_pickaxe'))).toBe('locked');
+    expect(reasonOf(craft(at({ ...fresh(), xp: LEVELS[1] }), 'stone_pickaxe'))).toBe('station');
+    const torch = fresh([Item.STICK, 1], [Item.COAL, 1]);
+    expect(reasonOf(craft(at(torch, { done: [12], counts: [] }), 'torch'))).toBe('ok');
+  });
+
+  it('the session reports the first craft and a level-up through onProgress', () => {
+    const world = new Cells();
+    const outcomes: unknown[] = [];
+    const session = new LocalSession(
+      { world, mode: 'gathering', pose: () => pose, nowMs: () => 0 },
+      { ...fresh([Block.LOG, 2]), xp: LEVELS[1] - 4 },
+      {
+        onBlocks: () => {},
+        onPlayer: () => {},
+        onResult: () => {},
+        onProgress: (_p, o) => outcomes.push(...o),
+      },
+    );
+    session.submit({ kind: 'craft', recipe: recipe('planks').id });
+    expect(session.record.xp).toBe(LEVELS[1] + 1);
+    expect(outcomes).toContainEqual({
+      kind: 'levelUp',
+      player: 'local',
+      level: 2,
+      recipes: [5, 6, 7],
+    });
+    expect(session.progress.counts).toEqual([{ task: 2, count: 4 }]);
+  });
+
+  it('notePose completes a reach task in Adventure only', () => {
+    const done = { done: [1, 2, 3, 4], counts: [] };
+    const make = (mode: 'gathering' | 'creative'): LocalSession =>
+      new LocalSession(
+        { world: new Cells(), mode, pose: () => pose, nowMs: () => 0 },
+        fresh(),
+        { onBlocks: () => {}, onPlayer: () => {}, onResult: () => {} },
+        done,
+      );
+    const adventure = make('gathering');
+    adventure.notePose(50);
+    expect(adventure.progress).toBe(done);
+    adventure.notePose(64.2);
+    expect(adventure.progress.done).toContain(8);
+    expect(adventure.record.xp).toBe(15);
+    const creative = make('creative');
+    creative.notePose(70);
+    expect(creative.progress).toBe(done);
   });
 });

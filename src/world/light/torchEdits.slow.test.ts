@@ -8,6 +8,7 @@ import { COUNT, SIZE, boxOf, firstWrongCell, worldOf } from '../../testing/light
 import { TIMING_ENFORCED } from '../../testing/timing';
 import { mulberry32, randInt } from '../../util/rng';
 import { BLOCK_NEEDS_SUPPORT, Block, isSupport } from '../blocks';
+import { EMPTY_PROGRESS } from '../../progress/progress';
 
 describe('light after torch edits through the action layer', () => {
   it('Phase 4 AC6.8: 1 000 seeded actions with real torches keep the light equal to the slow check', () => {
@@ -41,7 +42,14 @@ describe('light after torch edits through the action layer', () => {
           : { kind: 'place', x, y, z, slot: roll < 0.75 ? 0 : roll < 0.9 ? 1 : 2 };
       const pose = { x: x + 0.5, y: y + 1, z: z + 0.5 };
       const result = applyAction(
-        { world, mode: 'creative', pose, record: { ...record, slots }, players: [] },
+        {
+          world,
+          mode: 'creative',
+          pose,
+          record: { ...record, slots },
+          players: [],
+          progress: EMPTY_PROGRESS,
+        },
         action,
         i,
       );

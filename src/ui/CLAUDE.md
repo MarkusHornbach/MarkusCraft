@@ -8,7 +8,8 @@ Shell (DOM). Screens change the world and items only through actions
 - `Hud.ts` (bar with counts, break progress, notices), `blockIcon.ts`, `itemIcon.ts`,
   `DebugOverlay.ts`, `settings.ts`, `ui.css`, `activate.ts` (button helpers)
 - `InventoryScreen.ts` (27 slots or the Creative palette, bar, bin, tabs), `RecipeList.ts`
-  (the "Crafting" tab: one row per recipe)
+  (the "Crafting" tab: one row per recipe), `TasksTab.ts` (the "Tasks" tab),
+  `ProgressNotice.ts` (the progress notice)
 - `WorldMenu.ts` (start screen: list of worlds, new world, delete), `PauseScreen.ts` (pause
   menu of a world; also the settings page), `TouchHud.ts` (stick, buttons, rotate hint),
   `BenchScreen.ts` (performance test: start page, progress line, result, "Interrupted"),
@@ -29,9 +30,27 @@ The inventory screen (`E`, `Esc`, touch button `bag`, the pad's Y) lies over the
 game and does not pause it; `Game` listens for its keys itself and `Input` ignores keys
 while it is open. The HUD is hidden and the touch controls are made invisible
 (`covered`), not removed. Closing requests the pointer lock again; if the browser refuses,
-the pause menu shows. In a Gathering world the screen has two tabs, "Items" and
-"Crafting" (the recipe list); it always opens on the tab it was closed with, and on
-"Items" after a world was loaded.
+the pause menu shows. In an Adventure world the screen has three tabs, "Items",
+"Crafting" (the recipe list) and "Tasks"; it always opens on the tab it was closed with,
+and on "Items" after a world was loaded.
+
+## The task book on screen (Phase 8 part A)
+
+The "Tasks" tab (`bookView` of `src/progress/view.ts`): "Level N" with an XP bar and
+"120 / 150 XP" ("Max level"), "Next level: …", one folded line per finished chapter, the
+open chapter's title and one fixed-height row per task ("3 / 8", "–" for a reach task, "✓"),
+"N more chapters" or "All tasks done.". Read-only: nothing in it is focusable; the
+controller's default focus is its tab; the right stick and a finger scroll it; it is as
+large as the recipe list. **Locked recipe rows** keep their place, are dimmed (class
+`locked`, dashed) and show "Level 3" or "Task: Mine 32 coal" instead of "Craft"; the tab
+count counts unlocked craftable rows only; a refused craft shows "Locked: Level 3" in the
+HUD. **The progress notice** (top centre, above the HUD and the open inventory, after the
+inventory in the document, never over the pause or world menu, no pointer, no focus): one
+line at a time from a queue, each `PROGRESS_NOTICE_MS` (3 000) of simulation time; texts
+from `noticeTexts`. On screens up to 480 px high it moves to the bottom edge while the
+inventory is open (the panel fills the height). The F3 overlay has a row "Progress" in
+Adventure worlds. "Open to others" is disabled in Adventure worlds with the note "Rooms in
+Adventure worlds come with the next update." until Phase 8 part A2.
 
 ## The recipe list keeps table order
 
@@ -50,11 +69,11 @@ rows is 136 px wide, so the controller labels fit on one line.
 
 Under the Mode row and its hint: "Terrain" (Flat, Balanced, Hilly) and "Trees" (None, Few,
 Normal, Many), radio groups built like the Mode row (`choiceRow`, `data-terrain`,
-`data-trees`); `showForm` preselects Balanced and Few. **The `None` rule:** in Gathering
+`data-trees`); `showForm` preselects Balanced and Few. **The `None` rule:** in Adventure
 `None` is disabled (not focusable) and the hint under Trees says "No trees only in Creative:
-Gathering needs wood."; switching to Gathering while `None` is chosen selects `Few`. The
+Adventure needs wood."; switching to Adventure while `None` is chosen selects `Few`. The
 form scrolls on small screens; the menu comes back at the top when it is shown again. A list
-row shows "Gathering · Balanced · Few trees", or "Creative · Classic" for generator 1. The
+row shows "Adventure · Balanced · Few trees", or "Creative · Classic" for generator 1. The
 F3 overlay has a row "World" ("Generator 2 · balanced · few", "Generator 1"). The settings
 page has the switch "Collide with leaves" below "Invert controller look", in every input
 mode (`src/player/CLAUDE.md`).

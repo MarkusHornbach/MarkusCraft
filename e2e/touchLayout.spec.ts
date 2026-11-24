@@ -547,9 +547,9 @@ for (const [device, view] of [
     await page.locator('.touch-bag').tap();
     await expect(page.locator('.inventory-screen')).toBeVisible();
 
-    // Both tabs and "Close" are finger-sized and on screen, on either page.
+    // The three tabs (Tasks since Phase 8) and "Close" are finger-sized and on screen.
     const header = '.inventory-tab, .inventory-close';
-    expect(await boxes(page, header)).toHaveLength(3);
+    expect(await boxes(page, header)).toHaveLength(4);
     expectFingerSized(await boxes(page, header));
     await page.locator('.inventory-tab[data-tab="crafting"]').tap();
     const list = page.locator('.recipe-list');
@@ -659,6 +659,8 @@ for (const [device, view] of [
     await openOnDevice(page);
     await tapCreate(page, 'gathering');
     await page.evaluate(() => {
+      // Every recipe unlocked (Phase 8): the torch comes with a task of the book.
+      window.__mc.setProgress({ xp: 480, done: Array.from({ length: 20 }, (_, i) => i + 1) });
       window.__mc.give(257, 1);
       window.__mc.give(256, 1);
     });
@@ -731,6 +733,10 @@ for (const [device, view] of [
     );
     await openOnDevice(page);
     await tapCreate(page, 'gathering');
+    // Every recipe unlocked (Phase 8): the walk through the list crafts coal and torches.
+    await page.evaluate(() =>
+      window.__mc.setProgress({ xp: 480, done: Array.from({ length: 20 }, (_, i) => i + 1) }),
+    );
     await page.locator('.touch-bag').tap();
     await page.locator('.inventory-tab[data-tab="crafting"]').tap();
     await expect(page.locator('.recipe-list')).toBeVisible();

@@ -1,6 +1,7 @@
 // Test helper: a valid world record to start from.
 import { createPlayerRecord } from '../actions/playerRecord';
 import { SAVE_FORMAT_VERSION } from '../game/config';
+import { EMPTY_PROGRESS } from '../progress/progress';
 import type { WorldMeta } from '../save/saveFormat';
 
 export function sampleMeta(overrides: Partial<WorldMeta> = {}): WorldMeta {
@@ -19,6 +20,7 @@ export function sampleMeta(overrides: Partial<WorldMeta> = {}): WorldMeta {
     moveMode: 'walk',
     player: createPlayerRecord('creative'),
     guests: [],
+    progress: EMPTY_PROGRESS,
     ...overrides,
   };
 }

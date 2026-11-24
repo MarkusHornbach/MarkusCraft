@@ -35,6 +35,8 @@ export default defineConfig({
         'src/util/**',
         'src/actions/**',
         'src/items/**',
+        'src/progress/**',
+        'src/bot/**',
         'src/save/**',
         'src/bench/**',
         'src/net/**',

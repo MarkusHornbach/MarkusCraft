@@ -36,15 +36,16 @@ export interface WorldMenuOptions {
 /** The parts of the menu: the list of worlds, the "New world" form, the confirmation. */
 export type View = 'list' | 'form' | 'confirm';
 
-const MODE_LABELS: Record<GameMode, string> = { creative: 'Creative', gathering: 'Gathering' };
+// The id `gathering` is shown as "Adventure" (Phase 8).
+const MODE_LABELS: Record<GameMode, string> = { creative: 'Creative', gathering: 'Adventure' };
 /** The modes in the order of the form; the first one is preselected. */
 const FORM_MODES: readonly GameMode[] = ['gathering', 'creative'];
 const MODE_HINTS: Record<GameMode, string> = {
-  gathering: 'Gather blocks before you build. No flying.',
+  gathering: 'Adventure: gather, craft and follow the task book.',
   creative: 'All blocks, instant breaking, flying.',
 };
 /** Shown under the Trees row while Gathering rules out "None" (Phase 7 part A). */
-export const NO_TREES_HINT = 'No trees only in Creative: Gathering needs wood.';
+export const NO_TREES_HINT = 'No trees only in Creative: Adventure needs wood.';
 export const STORAGE_NOTE = 'Worlds are saved in this browser, on this device only.';
 
 function playedDate(ms: number): string {

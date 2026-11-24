@@ -154,6 +154,8 @@ export const HOTBAR_SLOTS = 9;
 export const BREAK_TOLERANCE_MS = 100;
 /** A pickup notice ("+1 Stone") and the "Inventory full" hint stay this long. */
 export const NOTICE_MS = 1500;
+/** How long one progress notice ("Task done: …") shows, in simulation time (Phase 8). */
+export const PROGRESS_NOTICE_MS = 3000;
 
 export const DAY_LENGTH_SECONDS = 20 * 60;
 export const START_TIME_OF_DAY = 0.1;
@@ -189,8 +191,10 @@ export const TOUCH_PIXEL_RATIO_MAX = 1.5;
 /**
  * Version of the save format; a world saved by a newer version is not opened. Version 2
  * (Phase 6 part C) adds the guests of the world; version 1 records load without any.
+ * Version 3 adds the world options, version 4 (Phase 8) the task book and the progress
+ * fields of player records.
  */
-export const SAVE_FORMAT_VERSION = 3;
+export const SAVE_FORMAT_VERSION = 4;
 /** Guests a world keeps (items and place); beyond this the one seen longest ago goes. */
 export const GUESTS_MAX = 32;
 export const WORLD_NAME_MAX = 24;

@@ -69,7 +69,7 @@ a later session, update the pin to match and regenerate the reference screenshot
 
 - `index.html`, `src/main.ts` (entry point)
 - pure: `src/world/`, `src/actions/`, `src/items/`, `src/save/`, `src/net/`,
-  `src/player/`, `src/bench/`, `src/util/`
+  `src/player/`, `src/bench/`, `src/util/`, `src/progress/`, `src/bot/`
 - shell: `src/game/` (`Game.ts`, `config.ts`), `src/input/`, `src/render/` (with
   `textures/`), `src/ui/`; `src/testing/` (test helpers)
 - `e2e/` (Playwright, `e2e/screenshots/`), `scripts/` (dev tools), `scripts/ci/` (CI
@@ -88,7 +88,7 @@ many rounds, the two sides in turn.
 ## Architecture invariants
 
 - **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/`, `items/`,
-  `bench/` and `net/` must not import `three` or `peerjs`, touch the DOM or use
+  `bench/`, `net/`, `progress/` and `bot/` must not import `three` or `peerjs`, touch the DOM or use
   `Math.random` / `Date.now` (enforced by ESLint rules). They are tested in Node. Only
   `render/`, `ui/`, `input/` and `game/` may use Three.js and browser APIs. The same rule
   covers `render/textures/tiles.ts`, `itemIcons.ts`, `cracks.ts` and `figureTexture.ts`.
@@ -113,7 +113,7 @@ many rounds, the two sides in turn.
 - **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 2, with
   world options); old versions and `TERRAIN_CHECKSUM_1337_V1` never change: `src/world/CLAUDE.md`.
 - **Saving.** One `WorldMeta` record plus one record per edited chunk (`SAVE_FORMAT_VERSION`,
-  now 3); decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`.
+  now 4, with the task book); decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`.
 - **Light.** Sky and block light per cell (0–15) are a pure function of the blocks, never
   saved. **The invariant:** after any edits, loads and unloads the
   stored light of every lit chunk equals what the slow reference (`lightCheck.ts`) works
@@ -144,6 +144,8 @@ deviations" of the reports whose status row names it:
 - `src/world/CLAUDE.md`: chunks, generation, light, meshing, block flags
 - `src/actions/CLAUDE.md`: actions, refusal reasons, game modes
 - `src/items/CLAUDE.md`: items, tools, gating, recipes
+- `src/progress/CLAUDE.md`: task book, XP, levels, recipe unlocks, the progress step
+- `src/bot/CLAUDE.md`: the goal bot, its time model, `scripts/progressRun.ts`
 - `src/save/CLAUDE.md`: the save format, stores
 - `src/net/CLAUDE.md`: rooms, protocol, breaking together, network test
 - `src/input/CLAUDE.md`: input modes, controller, focus, back guard
@@ -306,10 +308,13 @@ hold:
 | Fix CI   | –                       | `docs/fix-ci-flaky-report.md`  | back guard window, net test waits         |
 | Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget           |
 | 7A       | `docs/phase-7a-plan.md` | `docs/phase-7a-report.md`      | generator 2, save format 3, leaves        |
+| 8A1      | `docs/phase-8a-plan.md` | `docs/phase-8a1-report.md`     | progress, save format 4, Tasks tab, bot   |
 
 - **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
   prompt asks for it; otherwise Phase 4 is complete. The rest of Phase 7 (custom blocks,
-  textures, characters, names, effects) is not planned. At the start of a session look for
+  textures, characters, names, effects) is not planned. Phase 8 ("Adventure"): part A is
+  planned in `docs/phase-8a-plan.md`; 8A1 is built, 8A2 (co-op, plan 5.12) is next;
+  parts B–E are not planned. At the start of a session look for
   issues with the label `perf-run`; the latest are all green (issue #37), the Web Workers
   line says "not needed". Numbers from software WebGL (cloud sessions, CI) are never
   evidence.
