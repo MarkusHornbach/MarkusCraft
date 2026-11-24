@@ -47,7 +47,7 @@ progress, done: [{ task, by }] }`, sent to every guest when the book changes (at
 | AC8.4 | `e2e/mpProgress.spec.ts`: the guest (Anna) mines the last of 32 logs with real mouse input; both pages show "Task done: Mine 32 logs (Anna) · +10 XP", the Tasks tab with "✓" and "10 / 50 XP"; both XP values went 0 → 10                                                                                                                                            |
 | AC8.5 | `e2e/mpMenus.spec.ts` Phase 6 AC7.10: the button is enabled in an Adventure world, no note, and the room opens                                                                                                                                                                                                                                                        |
 | AC8.6 | `progressNet.test.ts` "the traffic of an Adventure room": four moving players, each guest places a stone brick twice a second with "Place 64 stone bricks" open, so every place changes the book: the host sends 16.5 kB/s (limit 20; the Creative scenario of Phase 6 AC14.6 sends 12.9)                                                                             |
-| AC8.7 | All `mp*.spec.ts` (project `multiplayer`), see "Known issues"                                                                                                                                                                                                                                                                                                         |
+| AC8.7 | All `mp*.spec.ts` (project `multiplayer`): 48 of 49 here, the one failure as in 8A1, see "Known issues"; CI runs all                                                                                                                                                                                                                                                  |
 
 ## Decisions and deviations
 
@@ -68,9 +68,13 @@ progress, done: [{ task, by }] }`, sent to every guest when the book changes (at
 
 ## Known issues
 
-- `e2e/mpRooms.spec.ts` Phase 6 AC5.5 (the time of day follows the host) failed in one of
-  three runs in this container: a brightness comparison under software WebGL, untouched by
-  this part. CI decides.
+- The full run of the project `multiplayer` in this container: 48 of 49 passed (23.8
+  minutes). `e2e/mpMenus.spec.ts` Phase 6 AC7.10 fails here as in 8A1 (on its base commit
+  too): the fifth player's second join stays at "Connecting…", so the new check of AC8.5
+  at the end of that test is not reached in this container. CI decides.
+- `e2e/mpRooms.spec.ts` Phase 6 AC5.5 (the time of day follows the host) failed in two of
+  four runs in this container (it passed in the full run): a brightness comparison under
+  software WebGL, untouched by this part. CI decides.
 
 ## Measured performance
 
