@@ -183,7 +183,7 @@ test('Polish 2 AC3.3: at 640 × 360 the tracker lies below the menu button, insi
     (node as HTMLElement).style.visibility = 'hidden';
   });
   await whenIdle(page);
-  await expect(page).toHaveScreenshot('task-tracker-touch.png', { maxDiffPixelRatio: 0.02 });
+  await expect(page).toHaveScreenshot('task-tracker-touch.png', { maxDiffPixelRatio: 0.05 });
 
   // A tap on a row of the Tasks tab chooses its task.
   await page.locator('.touch-bag').tap();

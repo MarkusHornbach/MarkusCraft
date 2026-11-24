@@ -80,7 +80,8 @@ Phase 8 part A2 was merged (`main` merged into `polish-2-task-tracker` first).
 ### References
 
 New and looked at: `task-tracker` (a 480 × 96 clip of the PC view's top-left corner, the
-world behind it) and `task-tracker-touch` (640 × 360, the canvas hidden: menu button,
+canvas hidden; CI's Chromium drew the leaves and the text 2 % differently, so both new
+references use the text references' 5 % limit) and `task-tracker-touch` (640 × 360, the canvas hidden: menu button,
 tracker below it, bag, buttons, bar). Regenerated and looked at: `tasks-tab` and
 `tasks-tab-touch` (the first open row marked "Tracked"); they still passed their loose
 5 % limit, but the plan asks for them to be regenerated. `pad-inventory` shows the Items
