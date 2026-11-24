@@ -4,7 +4,7 @@ import { createPlayerRecord } from '../actions/playerRecord';
 import { Block } from '../world/blocks';
 import { EMPTY_PROGRESS, completeProgress, stepProgress } from './progress';
 import { STARTING_TABLES as T } from '../testing/startingTables';
-import { bookView, lockedText, noticeTexts, progressRow } from './view';
+import { bookView, lockedText, noticeTexts, progressRow, trackedTask, trackerText } from './view';
 
 const record = (xp: number) => ({ ...createPlayerRecord('gathering'), xp });
 
@@ -126,5 +126,52 @@ describe('texts', () => {
       T,
     );
     expect(noticeTexts(craft.outcomes, 'me', T)).toEqual([]);
+  });
+});
+
+describe('trackedTask (Polish 2 AC1.2)', () => {
+  const tracking = (track: number) => ({ ...createPlayerRecord('gathering'), track });
+  const shown = (track: number, done: number[]) =>
+    trackedTask(tracking(track), { done, counts: [] }, T)?.id ?? null;
+
+  it('Polish 2 AC1.2: automatic shows the first open task of the open chapter', () => {
+    expect(shown(0, [])).toBe(1);
+    expect(shown(0, [1, 3])).toBe(2);
+  });
+
+  it('Polish 2 AC1.2: a chosen open task is shown', () => {
+    expect(shown(3, [])).toBe(3);
+    expect(shown(2, [1])).toBe(2);
+  });
+
+  it('Polish 2 AC1.2: when the chosen task is done the next open task after it shows', () => {
+    expect(shown(2, [2])).toBe(3);
+    expect(shown(2, [2, 3])).toBe(4);
+    // Wrapping around to the first open task of the chapter.
+    expect(shown(4, [4])).toBe(1);
+    expect(shown(4, [1, 4])).toBe(2);
+  });
+
+  it('Polish 2 AC1.2: a new chapter shows its first open task', () => {
+    expect(shown(4, [1, 2, 3, 4])).toBe(5);
+    expect(shown(0, [1, 2, 3, 4, 5])).toBe(6);
+    // An id this build does not know counts as a chosen task that is gone.
+    expect(shown(999, [1, 2, 3, 4])).toBe(5);
+  });
+
+  it('Polish 2 AC1.2: hidden and a complete book show nothing', () => {
+    expect(shown(-1, [])).toBeNull();
+    expect(trackedTask(tracking(0), completeProgress(T), T)).toBeNull();
+    expect(trackedTask(tracking(20), completeProgress(T), T)).toBeNull();
+  });
+
+  it('the line: label, two spaces, count or a dash', () => {
+    const progress = { done: [1, 2, 3, 4, 5, 6, 7], counts: [] };
+    const mine = trackedTask(tracking(0), { done: [], counts: [{ task: 1, count: 3 }] }, T);
+    expect(mine && trackerText(mine, { done: [], counts: [{ task: 1, count: 3 }] })).toBe(
+      'Mine 4 logs  3 / 4',
+    );
+    const climb = trackedTask(tracking(0), progress, T);
+    expect(climb && trackerText(climb, progress)).toBe('Climb to height 64  –');
   });
 });

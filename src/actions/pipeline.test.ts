@@ -64,6 +64,14 @@ const RECORD_PROGRESS_ALLOWED: Record<string, number> = {
   'src/game/Game.ts': 1,
 };
 
+/** A value given to a record's tracked task (`track: …`), not a type (`track: number`). */
+const RECORD_TRACK_FIELD = /\btrack\s*:(?!\s*(?:number|readonly|string|boolean)\b)\s*[^\s]/g;
+/** Files outside `src/actions/` that may give `track` a value, with their counts. */
+const RECORD_TRACK_ALLOWED: Record<string, number> = {
+  // The decoder builds the field of stored and received records.
+  'src/save/saveFormat.ts': 2,
+};
+
 function countCalls(pattern: RegExp, skip: (file: string) => boolean): Record<string, number> {
   const found: Record<string, number> = {};
   for (const path of sourceFiles('src')) {
@@ -123,6 +131,19 @@ describe('single pipeline for progress (Phase 8 plan 5.5)', () => {
   it('the field pattern finds values and ignores types', () => {
     expect('{ ...r, xp: 5, found: [], crafted }'.match(RECORD_PROGRESS_FIELD)?.length).toBe(2);
     expect('readonly xp: number; found: readonly number[]'.match(RECORD_PROGRESS_FIELD)).toBeNull();
+  });
+});
+
+describe('single pipeline for the tracked task (Polish 2)', () => {
+  it("Polish 2 AC1.3: a record's track is built only by actions and the save format", () => {
+    const found = countCalls(RECORD_TRACK_FIELD, (file) => file.startsWith('src/actions/'));
+    expect(found).toEqual(RECORD_TRACK_ALLOWED);
+  });
+
+  it('Polish 2 AC1.3: the pattern finds values and ignores types', () => {
+    expect('{ ...r, track: action.task }'.match(RECORD_TRACK_FIELD)?.length).toBe(1);
+    expect('{ ...r, track: -1 }'.match(RECORD_TRACK_FIELD)?.length).toBe(1);
+    expect('readonly track: number;'.match(RECORD_TRACK_FIELD)).toBeNull();
   });
 });
 

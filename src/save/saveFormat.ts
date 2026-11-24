@@ -250,12 +250,28 @@ export function decodePlayer(value: unknown, legacy = false): PlayerRecord | nul
     breaking = { x: b.x, y: b.y, z: b.z, startMs: b.startMs };
   }
   if (legacy)
-    return { slots, selectedSlot: value.selectedSlot, breaking, xp: 0, found: [], crafted: [] };
+    return {
+      slots,
+      selectedSlot: value.selectedSlot,
+      breaking,
+      xp: 0,
+      found: [],
+      crafted: [],
+      track: 0,
+    };
   if (!isInt(value.xp, 0, XP_LIMIT)) return null;
   const found = decodeIds(value.found, FOUND_MAX);
   const crafted = decodeIds(value.crafted, CRAFTED_MAX);
   if (!found || !crafted) return null;
-  return { slots, selectedSlot: value.selectedSlot, breaking, xp: value.xp, found, crafted };
+  return {
+    slots,
+    selectedSlot: value.selectedSlot,
+    breaking,
+    xp: value.xp,
+    found,
+    crafted,
+    track: 0,
+  };
 }
 
 // --- world record ------------------------------------------------------------------

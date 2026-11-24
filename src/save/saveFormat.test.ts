@@ -53,6 +53,7 @@ describe('save format', () => {
         xp: 0,
         found: [],
         crafted: [],
+        track: 0,
       },
     });
     const decoded = decodeWorld(

@@ -58,6 +58,15 @@ export interface CraftAction {
   recipe: number;
 }
 
+/**
+ * Adventure: the task the HUD tracker shows (Polish 2): an open task of the open chapter,
+ * or `-1` to hide the tracker. The screen decides what a press on a row means.
+ */
+export interface TrackAction {
+  kind: 'track';
+  task: number;
+}
+
 /** An action survives JSON unchanged. */
 export type Action =
   | SelectSlotAction
@@ -67,7 +76,8 @@ export type Action =
   | MoveStackAction
   | DiscardAction
   | SetBarSlotAction
-  | CraftAction;
+  | CraftAction
+  | TrackAction;
 export type ActionKind = Action['kind'];
 
 export type DecodeResult = { ok: true; action: Action } | { ok: false; error: string };
@@ -90,6 +100,10 @@ const isItemId: Check = (value) =>
 /** Whether the id names a recipe is checked by `applyAction`. */
 const isRecipeId: Check = isItemId;
 
+/** A task id or -1 (hide); whether the task is open is checked by `applyAction`. */
+const isTrackTask: Check = (value) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= -1 && value <= 0xffff;
+
 /** The fields of every kind, besides `kind` itself, with their checks. */
 const FIELDS: Record<ActionKind, Record<string, Check>> = {
   selectSlot: { slot: isBarSlot },
@@ -100,6 +114,7 @@ const FIELDS: Record<ActionKind, Record<string, Check>> = {
   discard: { slot: isSlot },
   setBarSlot: { slot: isBarSlot, item: isItemId },
   craft: { recipe: isRecipeId },
+  track: { task: isTrackTask },
 };
 
 function fail(error: string): DecodeResult {

@@ -1,5 +1,5 @@
-// What the screens show of the book: the Tasks tab, notices, the F3 row, lock texts. Pure.
-import type { PlayerRecord } from '../actions/playerRecord';
+// What the screens show of the book: Tasks tab, tracker, notices, F3 row, lock texts. Pure.
+import { type PlayerRecord, TRACK_HIDDEN } from '../actions/playerRecord';
 import { itemLabel } from '../items/items';
 import { getRecipe } from '../items/recipes';
 import { getBlockDef } from '../world/blocks';
@@ -14,7 +14,7 @@ import {
   recipesOfLevel,
   tasksOf,
 } from './progress';
-import { PROGRESS_TABLES, type ProgressTables } from './tables';
+import { PROGRESS_TABLES, type ProgressTables, type Task } from './tables';
 
 /** One row of the open chapter on the Tasks tab. */
 export interface TaskRowView {
@@ -94,6 +94,38 @@ export function bookView(
         ? `${later} more chapter${later === 1 ? '' : 's'}`
         : null,
   };
+}
+
+/**
+ * The task the HUD tracker shows (Polish 2 plan 5.2), or null (hidden): the chosen task
+ * while it is open; otherwise the next open task of the open chapter after the chosen one
+ * in table order, wrapping around (with nothing chosen: the chapter's first open task).
+ * Nothing is written when the shown task moves on; the record keeps the chosen id.
+ */
+export function trackedTask(
+  record: PlayerRecord,
+  progress: WorldProgress,
+  tables: ProgressTables = PROGRESS_TABLES,
+): Task | null {
+  if (record.track === TRACK_HIDDEN) return null;
+  const chapter = openChapter(progress, tables);
+  if (!chapter) return null;
+  const open = tasksOf(chapter.id, tables).filter((t) => !progress.done.includes(t.id));
+  const chosen = open.find((t) => t.id === record.track);
+  if (chosen) return chosen;
+  // The chosen task is done or gone: the first open one after its place in the table.
+  const place = tables.tasks.findIndex((t) => t.id === record.track);
+  if (place >= 0) {
+    const after = open.find((t) => tables.tasks.indexOf(t) > place);
+    if (after) return after;
+  }
+  return open[0] ?? null;
+}
+
+/** The tracker's line: "Mine 32 logs  12 / 32", "Reach depth 30  –". */
+export function trackerText(task: Task, progress: WorldProgress): string {
+  const reach = task.type === 'reachBelow' || task.type === 'reachAbove';
+  return `${task.label}  ${reach ? '–' : `${countOf(progress, task)} / ${task.count}`}`;
 }
 
 /** The F3 row "Progress": "Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP". */
