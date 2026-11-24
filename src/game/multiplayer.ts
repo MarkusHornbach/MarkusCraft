@@ -289,7 +289,7 @@ export class Multiplayer {
       localClock: () => this.game.actionClock(),
       wallClock: () => Date.now(),
       guests: this.game.guests(),
-      progress: () => this.game.progress(),
+      progress: this.game.progress(),
       listener: { ...this.wrap(this.game.listener), onPeer: (e) => this.onPeer(e) },
     });
     signaling.onConnection = (conn) => host.accept(conn);
@@ -647,6 +647,7 @@ export class Multiplayer {
       onBlocks: (changes) => listener.onBlocks(changes),
       onPlayer: (record) => listener.onPlayer(record),
       onResult: (action: Action, result) => listener.onResult(action, result),
+      onProgress: (progress, outcomes) => listener.onProgress?.(progress, outcomes),
     };
   }
 

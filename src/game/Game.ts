@@ -24,6 +24,7 @@ import {
   type WorldEdits,
   type WorldMeta,
   makeWorldId,
+  decodeProgress,
   metaGen,
   normalizeName,
   seedFromText,
@@ -195,8 +196,6 @@ const TEXT_NOT_OPENED = 'This world could not be opened.';
 const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.';
 const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 const TEXT_INVENTORY_FULL = 'Inventory full';
-/** Phase 8 part A1: rooms in Adventure worlds come with part A2 (the test API still opens them). */
-const TEXT_ADVENTURE_ROOMS = 'Rooms in Adventure worlds come with the next update.';
 const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
 const TEXT_NEEDS_SUPPORT = 'Needs a block underneath';
 const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
@@ -1167,6 +1166,7 @@ export class Game {
         onBlocks: (changes) => this.onBlocksChanged(changes),
         onPlayer: (record) => this.onPlayerChanged(record),
         onResult: (action, result) => this.onActionResult(action, result),
+        onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
       },
       openGuestWorld: (welcome, edits, rejoin) => this.openGuestWorld(welcome, edits, rejoin),
       useSession: (session, record) => this.useSession(session, record),
@@ -1213,8 +1213,8 @@ export class Game {
         moveMode,
         player: welcome.record,
         guests: [],
-        // 8A2 brings the room's book; a guest's world is never saved.
-        progress: EMPTY_PROGRESS,
+        // The room's book; a guest's world is never saved.
+        progress: welcome.progress,
       },
       edits,
     );
@@ -1272,12 +1272,7 @@ export class Game {
         host,
         self,
       })),
-      disabledReason:
-        this.netConfig.signal === null
-          ? TEXT_UNAVAILABLE
-          : this.gameMode === 'gathering'
-            ? TEXT_ADVENTURE_ROOMS
-            : null,
+      disabledReason: this.netConfig.signal === null ? TEXT_UNAVAILABLE : null,
       touch: this.mode === 'touch',
       message: this.roomMessage,
     });
@@ -2786,14 +2781,18 @@ export class Game {
    * Test tool: sets a player's XP and the world's done list (clearing the counts), past
    * the action layer.
    */
-  private testSetProgress(patch: { xp?: number; done?: number[] }, player?: number): void {
-    const { xp, done } = patch;
+  private testSetProgress(
+    patch: { xp?: number; done?: number[]; counts?: { task: number; count: number }[] },
+    player?: number,
+  ): void {
+    const { xp, done, counts } = patch;
     if (xp !== undefined) {
       if (!Number.isInteger(xp) || xp < 0) throw new Error(`Bad XP ${String(xp)}`);
       this.testEditRecord(player, (record) => ({ ...record, xp }));
     }
-    if (done !== undefined) {
-      const progress: WorldProgress = { done: [...done], counts: [] };
+    if (done !== undefined || counts !== undefined) {
+      const progress = decodeProgress({ done: done ?? this.progress.done, counts: counts ?? [] });
+      if (!progress) throw new Error(`Bad progress ${JSON.stringify(patch)}`);
       const session = this.session as GameSession;
       if (session.replaceProgress) session.replaceProgress(progress);
       else this.onProgressChanged(progress, []);

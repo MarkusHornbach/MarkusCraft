@@ -287,9 +287,13 @@ export interface TestApi {
   openWorld(name: string, seed: number, mode?: GameMode, progress?: 'all' | 'fresh'): Promise<void>;
   /**
    * Sets the XP of the player (on a host with `player`, of that guest) and replaces the
-   * world's done list, clearing the counts (test tool, Phase 8).
+   * world's done list, clearing the counts, or setting them to `counts` (test tool, Phase 8;
+   * on a host every guest learns the book).
    */
-  setProgress(patch: { xp?: number; done?: number[] }, player?: number): void;
+  setProgress(
+    patch: { xp?: number; done?: number[]; counts?: { task: number; count: number }[] },
+    player?: number,
+  ): void;
   /**
    * Puts items into the inventory directly, as far as they fit (test tool); on a host with
    * `player`, into that guest's inventory (Phase 6 part C).

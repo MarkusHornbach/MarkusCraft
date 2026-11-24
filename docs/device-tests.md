@@ -32,7 +32,7 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
   subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 8 part A1 (section "Progression", PROG-1 to PROG-5); 2026-11-23.
+Last updated: Phase 8 part A2 (section "Progression", PROG-6 and PROG-7); 2026-11-24.
 
 ---
 
@@ -251,3 +251,12 @@ finished task, chapter and level.
       you need to see? _PC, Phone._ Result:
 - [ ] **PROG-5** (8A1) A locked recipe row ("Level 3" or "Task: Mine 32 coal" instead of
       "Craft"): is it clear why it cannot be made and what to do about it? _PC._ Result:
+- [ ] **PROG-6** (8A2) Two players on two devices (PC and phone) in a fresh Adventure world
+      of the PC, opened to others on the PR preview: finish chapter 1 together (one mines
+      logs, the other makes planks). Both see "Task done: … (name) · +10 XP" for every task,
+      "Chapter done: First wood" and their own "Level 2 · Unlocked: …"; both Tasks tabs show
+      the same counts. Does it feel like one shared book? _PC, Phone._ Result:
+- [ ] **PROG-7** (8A2) In that room the phone's player leaves ("Leave world") and joins
+      again: its level, XP bar and the recipes it unlocked are as before; the book is where
+      the room left it. Then the PC saves and goes back to the worlds, opens the world again
+      and opens it to others: the phone's player still has its level. _PC, Phone._ Result:

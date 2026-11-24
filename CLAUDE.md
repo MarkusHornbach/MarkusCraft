@@ -309,15 +309,14 @@ hold:
 | Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget           |
 | 7A       | `docs/phase-7a-plan.md` | `docs/phase-7a-report.md`      | generator 2, save format 3, leaves        |
 | 8A1      | `docs/phase-8a-plan.md` | `docs/phase-8a1-report.md`     | progress, save format 4, Tasks tab, bot   |
+| 8A2      | `docs/phase-8a-plan.md` | `docs/phase-8a2-report.md`     | shared progress, protocol, mp specs       |
 
 - **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
-  prompt asks for it; otherwise Phase 4 is complete. The rest of Phase 7 (custom blocks,
-  textures, characters, names, effects) is not planned. Phase 8 ("Adventure"): part A is
-  planned in `docs/phase-8a-plan.md`; 8A1 is built, 8A2 (co-op, plan 5.12) is next;
-  parts B–E are not planned. At the start of a session look for
-  issues with the label `perf-run`; the latest are all green (issue #37), the Web Workers
-  line says "not needed". Numbers from software WebGL (cloud sessions, CI) are never
-  evidence.
+  prompt asks for it. The rest of Phase 7 (custom blocks, textures, characters, names,
+  effects) is not planned. Phase 8 ("Adventure"): part A is built (8A1, 8A2); parts B–E
+  are not planned. At the start of a session look for issues with the label `perf-run`;
+  the latest are all green (issue #37), the Web Workers line says "not needed". Numbers
+  from software WebGL (cloud sessions, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
   2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
   (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;

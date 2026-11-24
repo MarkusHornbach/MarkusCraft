@@ -3,7 +3,13 @@
 import type { Action } from '../actions/actions';
 import type { ActionResult, BlockChange } from '../actions/apply';
 import type { PlayerRecord } from '../actions/playerRecord';
-import type { Session, SessionListener } from '../actions/Session';
+import { LOCAL_PLAYER_ID, type Session, type SessionListener } from '../actions/Session';
+import {
+  EMPTY_PROGRESS,
+  type WorldProgress,
+  outcomesOfBook,
+  outcomesOfRecord,
+} from '../progress/progress';
 import {
   DAY_LENGTH_SECONDS,
   HEARTBEAT_TIMEOUT_MS,
@@ -38,6 +44,13 @@ import {
   type SignalState,
   type Signaling,
 } from './transport';
+
+/** Whether the host changed a record's XP, first finds or first crafts. */
+function progressChanged(a: PlayerRecord, b: PlayerRecord): boolean {
+  return (
+    a.xp !== b.xp || a.found.length !== b.found.length || a.crafted.length !== b.crafted.length
+  );
+}
 
 export type ClientStatus = 'offline' | 'connecting' | 'syncing' | 'online' | 'reconnecting';
 
@@ -120,6 +133,8 @@ export class ClientSession implements Session {
   private world: GuestWorld | null = null;
   /** The record as the screen sees it: break start times on the screen's clock. */
   private current: PlayerRecord | null = null;
+  /** The world's task book as the host last reported it (Phase 8 part A2). */
+  private book: WorldProgress = EMPTY_PROGRESS;
   private readonly breakClock = new BreakClock();
   private seq = 0;
   private readonly pending = new Map<number, Action>();
@@ -141,6 +156,8 @@ export class ClientSession implements Session {
   lastResult: { seq: number; ok: boolean; reason: string | null } | null = null;
   /** Poses sent so far (tests count them). */
   posesSent = 0;
+  /** `progress` messages received so far (tests count them). */
+  progressReceived = 0;
 
   constructor(options: ClientOptions) {
     this.o = options;
@@ -169,6 +186,11 @@ export class ClientSession implements Session {
 
   get frozen(): boolean {
     return this.frozenTime;
+  }
+
+  /** The world's task book as the host last reported it. */
+  get progress(): WorldProgress {
+    return this.book;
   }
 
   // --- joining ---------------------------------------------------------------------------
@@ -401,10 +423,24 @@ export class ClientSession implements Session {
         this.o.listener.onResult(action, result);
         break;
       }
-      case 'record':
+      case 'record': {
+        const before = this.current;
         this.current = this.breakClock.view(m.record);
         this.o.listener.onPlayer(this.current);
+        // Level-ups and first finds the guest learns from its own record (plan 5.12).
+        if (before && progressChanged(before, m.record)) {
+          const outcomes = outcomesOfRecord(before, m.record, LOCAL_PLAYER_ID);
+          this.o.listener.onProgress?.(this.book, outcomes);
+        }
         break;
+      }
+      case 'progress': {
+        const before = this.book;
+        this.book = m.progress;
+        this.progressReceived++;
+        this.o.listener.onProgress?.(m.progress, outcomesOfBook(before, m.progress, m.done));
+        break;
+      }
       case 'blocks': {
         const changes: BlockChange[] = [];
         for (let i = 0; i < m.changes.length; i += 4) {
@@ -486,6 +522,7 @@ export class ClientSession implements Session {
         this.selfName = welcome.name;
         this.selfSlot = welcome.slot;
         this.current = welcome.record;
+        this.book = welcome.progress;
         this.pending.clear();
         this.roster.clear();
         for (const p of welcome.players) {

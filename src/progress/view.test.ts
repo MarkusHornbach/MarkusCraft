@@ -107,6 +107,9 @@ describe('texts', () => {
       'Task done: Mine 3 iron ore · +25 XP',
       'Chapter done: Into the dark',
     ]);
+    // In a room the task names its player (Phase 8 plan 5.12).
+    const named = step.outcomes.map((o) => (o.kind === 'taskDone' ? { ...o, by: 'Anna' } : o));
+    expect(noticeTexts(named, 'other', T)[0]).toBe('Task done: Mine 3 iron ore (Anna) · +25 XP');
     const coal = stepProgress(
       { done: [...Array(11).keys()].map((i) => i + 1), counts: [{ task: 12, count: 2 }] },
       me,
