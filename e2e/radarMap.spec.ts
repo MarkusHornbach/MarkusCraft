@@ -89,7 +89,8 @@ test('Phase 8B1 AC4.1 AC4.3 AC4.5: four tabs; the map with legend; it reopens on
   // this container's font more than 24 px are free, with CI's wider one 22 (touch 18).
   expect(await headerSlack(page)).toBeGreaterThanOrEqual(0);
   await hideWorld(page);
-  await expect(page.locator('.inventory-panel')).toHaveScreenshot('map-tab.png', {
+  // The tab alone (fixed size): the header's height follows the font, which differs in CI.
+  await expect(page.locator('.map-tab')).toHaveScreenshot('map-tab.png', {
     maxDiffPixelRatio: 0.05,
   });
   // Moving while it is open changes the legend's distance.
@@ -189,7 +190,7 @@ test.describe('touch', () => {
       (node as HTMLElement).style.visibility = 'hidden';
     });
     await whenIdle(page);
-    await expect(page.locator('.inventory-panel')).toHaveScreenshot('map-tab-touch.png', {
+    await expect(page.locator('.map-tab')).toHaveScreenshot('map-tab-touch.png', {
       maxDiffPixelRatio: 0.05,
     });
   });

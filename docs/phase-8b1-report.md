@@ -121,7 +121,8 @@ Browser specs run locally (alone, `MC_CONTAINER_GPU_STALL=1`): `radar`, `radarTo
 
 ### References
 
-New: `radar-circle`, `radar-circle-touch`, `map-tab`, `map-tab-touch` (all looked at:
+New: `radar-circle`, `radar-circle-touch`, `map-tab`, `map-tab-touch` (the Map tab
+alone, since the panel's height follows the header font, which differs in CI; all looked at:
 coal dots and iron diamonds apart, hints upright, the circle clear of the buttons; on the
 map water, beach, grass and forest apart, rings and legend readable). Regenerated and
 looked at, with a real change: `gathering-hud`, `stations` (the circle top-right),
