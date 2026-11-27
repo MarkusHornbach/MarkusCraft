@@ -1744,7 +1744,7 @@ export class Game {
     );
   }
 
-  /** What unlocks each locked recipe, as the list says it ("Level 3", "Task: Mine 3 coal"). */
+  /** What unlocks each locked recipe, as the list says it ("Level 3", "Task: Make 2 coal"). */
   private recipeLocks(): Map<number, string> {
     const locks = new Map<number, string>();
     if (this.gameMode !== 'gathering') return locks;

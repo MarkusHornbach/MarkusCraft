@@ -185,8 +185,12 @@ describe('XP, finds, crafts and levels (Phase 8 AC2.2)', () => {
       level: 2,
       recipes: [5, 6, 7],
     });
-    const coal: WorldProgress = { done: atChapter(3).done, counts: [{ task: 12, count: 2 }] };
-    const unlock = stepProgress(coal, me(), mine(Block.COAL_ORE, Item.COAL), [me()], T);
+    // Fix Adventure 1: the torch comes with task 11 "Make 2 coal" (starting count).
+    const coal: WorldProgress = {
+      done: [...atChapter(3).done, 9, 10],
+      counts: [{ task: 11, count: 1 }],
+    };
+    const unlock = stepProgress(coal, me(), craft(11, Item.COAL, 1), [me()], T);
     expect(unlock.outcomes).toContainEqual({ kind: 'unlocked', recipes: [20] });
     expect(recipesOfLevel(4, T)).toEqual([16, 18]);
   });
@@ -270,9 +274,22 @@ describe('levels and unlocks', () => {
     expect(recipeUnlocked(7, fresh(), EMPTY_PROGRESS, T)).toBe(false);
     expect(recipeUnlocked(7, { ...fresh(), xp: 30 }, EMPTY_PROGRESS, T)).toBe(true);
     expect(recipeUnlocked(20, { ...fresh(), xp: 9999 }, EMPTY_PROGRESS, T)).toBe(false);
-    expect(recipeUnlocked(20, fresh(), { done: [12], counts: [] }, T)).toBe(true);
+    expect(recipeUnlocked(20, fresh(), { done: [12], counts: [] }, T)).toBe(false);
+    expect(recipeUnlocked(20, fresh(), { done: [11], counts: [] }, T)).toBe(true);
     expect(unlockText(8, T)).toBe('Level 3');
-    expect(unlockText(20, T)).toBe(`Task: ${getTask(12)?.label}`);
+    expect(unlockText(20, T)).toBe(`Task: ${getTask(11)?.label}`);
+  });
+
+  it('a recipe crafted once stays unlocked (Fix Adventure 1 AC1.2)', () => {
+    const torchMaker = frozen({ ...fresh(), crafted: [20] });
+    const book = frozen({ done: [12], counts: [] });
+    expect(recipeUnlocked(20, torchMaker, EMPTY_PROGRESS, T)).toBe(true);
+    expect(recipeUnlocked(20, torchMaker, book, T)).toBe(true);
+    expect(recipeUnlocked(20, fresh(), book, T)).toBe(false);
+    // A level recipe crafted once survives XP below its level.
+    const iron = frozen({ ...fresh(), xp: 0, crafted: [12] });
+    expect(recipeUnlocked(12, iron, EMPTY_PROGRESS, T)).toBe(true);
+    expect(recipeUnlocked(13, iron, EMPTY_PROGRESS, T)).toBe(false);
   });
 });
 
@@ -290,18 +307,18 @@ describe('what a guest shows (Phase 8 plan 5.12)', () => {
       { kind: 'taskDone', task: 4, actor: 'Anna', by: 'Anna' },
       { kind: 'chapterDone', chapter: 1 },
     ]);
-    // The torch comes with task 12; an unknown task id is ignored.
+    // The torch comes with task 11; an unknown task id is ignored.
     const torch = outcomesOfBook(
       EMPTY_PROGRESS,
-      { done: [12], counts: [] },
+      { done: [11], counts: [] },
       [
-        { task: 12, by: 'Ben' },
+        { task: 11, by: 'Ben' },
         { task: 999, by: 'Ben' },
       ],
       T,
     );
     expect(torch).toEqual([
-      { kind: 'taskDone', task: 12, actor: 'Ben', by: 'Ben' },
+      { kind: 'taskDone', task: 11, actor: 'Ben', by: 'Ben' },
       { kind: 'unlocked', recipes: [20] },
     ]);
     // A replaced book (the test tool) shows nothing for chapters it does not complete.

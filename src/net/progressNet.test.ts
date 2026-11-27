@@ -236,6 +236,31 @@ describe('shared progress in rooms (Phase 8 AC8.1)', () => {
     expect(await craftAsGuest(rig, g2, STONE_PICKAXE)).toEqual({ ok: false, reason: 'locked' });
   });
 
+  it('Fix Adventure 1 AC1.4: a crafted torch stays unlocked for its crafter only', async () => {
+    const TORCH = 20;
+    // Task 12 done, task 11 not: the torch is locked for anyone who never crafted it.
+    const progress: WorldProgress = { done: [1, 2, 3, 4, 5, 6, 7, 8, 12], counts: [] };
+    const torchStuff = (r: PlayerRecord, crafted: number[]): PlayerRecord => {
+      const slots = r.slots.map(() => null) as PlayerRecord['slots'][number][];
+      slots[0] = { item: Item.STICK, count: 4 };
+      slots[1] = { item: Item.COAL, count: 4 };
+      return { ...r, slots, crafted };
+    };
+    const fresh = createPlayerRecord('gathering');
+    // The host made torches before, the guest did not.
+    const a = await room(1, { progress, hostRecord: torchStuff(fresh, [TORCH]) });
+    await editGuest(a.rig, a.gs[0], (r) => torchStuff(r, []));
+    expect(await craftAsGuest(a.rig, a.gs[0], TORCH)).toEqual({ ok: false, reason: 'locked' });
+    a.rig.host.local.submit({ kind: 'craft', recipe: TORCH });
+    expect(a.rig.hostAnswers.at(-1)?.result.ok).toBe(true);
+    // The reverse: the guest made torches before, the host did not.
+    const b = await room(1, { progress, hostRecord: torchStuff(fresh, []) });
+    await editGuest(b.rig, b.gs[0], (r) => torchStuff(r, [TORCH]));
+    expect((await craftAsGuest(b.rig, b.gs[0], TORCH))?.ok).toBe(true);
+    b.rig.host.local.submit({ kind: 'craft', recipe: TORCH });
+    expect(b.rig.hostAnswers.at(-1)?.result).toEqual({ ok: false, reason: 'locked' });
+  });
+
   it('a first craft gives XP to the crafter only', async () => {
     const { rig, gs } = await room(2);
     const [g1, g2] = gs;

@@ -7,7 +7,8 @@ scope). The seed of the bot and balancing tool later parts extend.
 
 - `Bot.ts` (`Bot`, `runBot`, `playerMinutes`), `report.ts` (median and maximum per task,
   chapter and level-up, the balance targets, Markdown), `bot.slow.test.ts` (seed 1337,
-  balanced, few trees: the book completes, every recipe unlocked, light invariant holds)
+  balanced, few trees: the book completes, every recipe unlocked, light invariant holds),
+  `darkBreak.test.ts`
 - `scripts/progressRun.ts` runs it: `npx vite-node scripts/progressRun.ts` (12 runs: seeds
   1, 1337, 42, 2024 × flat, balanced, hilly, trees "Few"; about a minute), `--quick` (seed
   1337 balanced only).
@@ -36,3 +37,13 @@ PROG-1). The script prints, per task, chapter and level-up, the median and maxim
 estimated minutes over the runs and checks the targets: total 30–45 minutes, no task above
 5, no chapter above 12, no gap between level-ups above 8 (medians). A task's time is the
 time since the previous task was finished, so a task done as a by-product shows near 0.
+
+## Dark breaks (Fix Adventure 1)
+
+A report, never a failure: a break counts as dark while no light-source recipe is
+unlocked for the bot and the brightest of the block's six faces has `max(sky, block)` ≤
+`DARK_LIGHT` (4); the bot lights the 3 × 3 chunks around the block first.
+`BotRun.darkBreaks` lists them per task and block; `scripts/progressRun.ts` prints the
+median and maximum per task, all blocks and `DARK_BLOCKS` only. What it cannot judge: a
+player digs open pits where the bot tunnels sideways, the bot ignores the night, and how
+dark is too dark on a real screen (device test PROG-11).

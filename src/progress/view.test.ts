@@ -80,7 +80,7 @@ describe('texts', () => {
 
   it('lock texts', () => {
     expect(lockedText(8, T)).toBe('Locked: Level 3');
-    expect(lockedText(20, T)).toBe('Locked: Mine 3 coal');
+    expect(lockedText(20, T)).toBe('Locked: Make 2 coal');
   });
 
   it('notices of a step, in order, only the own level-ups and finds', () => {
@@ -111,9 +111,9 @@ describe('texts', () => {
     const named = step.outcomes.map((o) => (o.kind === 'taskDone' ? { ...o, by: 'Anna' } : o));
     expect(noticeTexts(named, 'other', T)[0]).toBe('Task done: Mine 3 iron ore (Anna) · +25 XP');
     const coal = stepProgress(
-      { done: [...Array(11).keys()].map((i) => i + 1), counts: [{ task: 12, count: 2 }] },
+      { done: [...Array(10).keys()].map((i) => i + 1), counts: [{ task: 11, count: 1 }] },
       me,
-      { kind: 'mine', block: Block.COAL_ORE, item: 256, count: 1 },
+      { kind: 'craft', recipe: 11, item: 256, count: 1 },
       [me],
       T,
     );

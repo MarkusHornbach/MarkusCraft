@@ -58,7 +58,8 @@ const PINNED_UNLOCKS: Record<number, string> = {
   17: 'L5',
   18: 'L4',
   19: 'L7',
-  20: 'T12',
+  // Fix Adventure 1: the torch comes with task 11 "Make 16 coal" (was task 12).
+  20: 'T11',
 };
 
 function pinTasks(tasks: typeof TASKS): Record<number, [number, string, number]> {
@@ -89,7 +90,7 @@ describe('progress tables (Phase 8 AC1.1)', () => {
     expect(TASKS.map((t) => t.id)).toEqual(TASKS.map((_, i) => i + 1));
   });
 
-  it('pins the unlock of every recipe id', () => {
+  it('pins the unlock of every recipe id (Fix Adventure 1 AC1.1)', () => {
     const now = Object.fromEntries(
       RECIPE_UNLOCKS.map(({ recipe, unlock }) => [
         recipe,

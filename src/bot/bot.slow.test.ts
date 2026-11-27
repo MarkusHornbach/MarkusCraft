@@ -13,5 +13,8 @@ describe('goal bot (Phase 8 AC6.2)', () => {
     expect(run.levelUps.map((l) => l.level)).toEqual([2, 3, 4, 5, 6, 7]);
     expect(run.lightErrors).toBe(0);
     expect(run.actions).toBeGreaterThan(100);
+    // Fix Adventure 1 AC2.3: dark breaks are reported until the torch is unlocked (task 11),
+    // never after it. How many there are before it is a report, not a failure.
+    expect(run.darkBreaks.filter((d) => d.task > 11)).toEqual([]);
   });
 });

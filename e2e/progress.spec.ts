@@ -58,7 +58,8 @@ test('Phase 8 plan 5.8: progress=all is the default of an Adventure test world; 
     locked: true,
     unlock: { level: 2 },
   });
-  expect(fresh.recipes.find((r) => r.name === 'torch')?.unlock).toEqual({ task: 12 });
+  // Fix Adventure 1: the torch comes with task 11 "Make 16 coal".
+  expect(fresh.recipes.find((r) => r.name === 'torch')?.unlock).toEqual({ task: 11 });
   await openGame(page);
   expect(await progress(page)).toBeNull();
 });
@@ -66,6 +67,8 @@ test('Phase 8 plan 5.8: progress=all is the default of an Adventure test world; 
 const WORKBENCH = 15;
 const PLANKS = 7;
 const STICK = 257;
+const FURNACE = 16;
+const TORCH = 19;
 
 async function openTab(page: Page, tab: 'items' | 'crafting' | 'tasks'): Promise<void> {
   if (!(await getState(page)).ui.screen.startsWith('inventory')) await page.keyboard.press('KeyE');
@@ -101,7 +104,7 @@ test('Phase 8 AC3.2: locked rows are dimmed, say what unlocks them, have no butt
   await expect(row('wooden_pickaxe')).not.toHaveClass(/locked/);
   await expect(row('wooden_pickaxe').locator('.recipe-craft')).toBeVisible();
   await row('torch').scrollIntoViewIfNeeded();
-  await expect(row('torch').locator('.recipe-note')).toHaveText('Task: Mine 32 coal');
+  await expect(row('torch').locator('.recipe-note')).toHaveText('Task: Make 16 coal');
   const state = await getState(page);
   expect(state.recipes.filter((r) => r.locked).map((r) => r.name)).toContain('wooden_axe');
   expect(state.recipes.find((r) => r.name === 'wooden_axe')?.craftable).toBe(false);
@@ -113,6 +116,59 @@ test('Phase 8 AC3.2: locked rows are dimmed, say what unlocks them, have no butt
   expect(await submit(page, { kind: 'craft', recipe: 5 })).toBe('locked');
   await whenIdle(page);
   await expect(page.locator('.hud-message')).toHaveText('Locked: Level 2');
+});
+
+test('Fix Adventure 1 AC1.5: one real smelt finishes "Make 16 coal", which unlocks the torch', async ({
+  page,
+}) => {
+  await openGame(page, { mode: 'gathering', progress: 'fresh' });
+  const { px, pz } = await standOnPlatform(page);
+  await setBlock(page, px, PLATFORM_Y + 1, pz - 2, FURNACE);
+  // Chapter 3 open, furnace made and placed, one coal short of 16; level 3 for coal.
+  await page.evaluate(() =>
+    window.__mc.setProgress({
+      xp: 160,
+      done: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      counts: [{ task: 11, count: 15 }],
+    }),
+  );
+  await give(page, LOG, 2);
+  await give(page, STICK, 1);
+  expect((await getState(page)).recipes.find((r) => r.name === 'torch')?.unlock).toEqual({
+    task: 11,
+  });
+  await openTab(page, 'crafting');
+  const row = (name: string) => page.locator(`.recipe-row[data-recipe="${name}"]`);
+  await row('torch').scrollIntoViewIfNeeded();
+  await expect(row('torch')).toHaveClass(/locked/);
+  await expect(row('torch').locator('.recipe-note')).toHaveText('Task: Make 16 coal');
+  await expect(row('torch').locator('.recipe-craft')).toBeHidden();
+
+  await row('coal').scrollIntoViewIfNeeded();
+  await row('coal').locator('.recipe-craft').click();
+  await step(page, 1);
+  expect((await getState(page)).smelting?.recipe).toBe(11);
+  await step(page, 120);
+  expect((await getState(page)).smelting).toBeNull();
+  expect((await progress(page))?.done).toContain(11);
+  const notices: string[] = [];
+  for (let i = 0; i < 6 && !notices.includes('Unlocked: Torch'); i++) {
+    const text = (await progress(page))?.notice;
+    if (text && !notices.includes(text)) notices.push(text);
+    if (!notices.includes('Unlocked: Torch')) await step(page, 60);
+  }
+  expect(notices).toEqual(['Task done: Make 16 coal · +20 XP', 'Unlocked: Torch']);
+  await whenIdle(page);
+  await expect(page.locator('.progress-notice')).toHaveText('Unlocked: Torch');
+
+  await row('torch').scrollIntoViewIfNeeded();
+  await expect(row('torch')).not.toHaveClass(/locked/);
+  const torchButton = row('torch').locator('.recipe-craft');
+  await expect(torchButton).toBeVisible();
+  await torchButton.click();
+  await step(page, 1);
+  const slots = (await getState(page)).inventory.slots;
+  expect(slots.some((s) => s?.item === TORCH && s.count === 4)).toBe(true);
 });
 
 test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters and counts, and updates while open', async ({

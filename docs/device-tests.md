@@ -20,19 +20,23 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
 - Debug overlay: F3 on the PC, the "Debug overlay" switch in the pause menu on touch
   devices.
 
-**How it is kept up to date** (for implementation sessions, see `CLAUDE.md`)
+**How it is kept up to date** (for sessions; the root `CLAUDE.md` points here)
 
-- Every phase part adds its new tests here, in the section they belong to, with the part
-  as origin (for example "4B").
+- Every phase part adds its new tests here, in the section they belong to, with an id
+  (`LIGHT-9`, `TOUCH-12`, …) and the part as origin (for example "4B"). Its report names
+  the ids it added. Ids are never reused.
 - This file lists open tests only. When the owner has ticked a test, the next session that
   touches this file moves it unchanged to "Passed" in `docs/device-tests-done.md`.
 - A test that a later change makes pointless is moved to "Obsolete" in
   `docs/device-tests-done.md` with one line of reason; it is not deleted silently.
-- Results the owner wrote down are never changed or removed by a session. A test whose
-  subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
+- Results the owner wrote down (after "Result:" or into a table) are never changed or
+  removed by a session. A test whose subject changed gets a new entry; the old one, with
+  its result, moves to "Obsolete".
+- Read `docs/device-tests-done.md` when a test's history matters. Update "Last updated"
+  below whenever the open list changes.
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Polish 2 (section "Progression", PROG-8 to PROG-10; PROG-3 obsolete); 2026-11-24.
+Last updated: Fix Adventure 1 (CRAFT-14, PAD-17, PROG-11, PROG-12; PROG-5 obsolete); 2026-11-27.
 
 ---
 
@@ -169,6 +173,10 @@ in the "New world" form; the defaults are Balanced and Few. "None" is for Creati
       four per second. By mouse (PC) and by finger (Phone): does a short press still feel
       immediate? Does scrolling the list on the phone, starting on a "Craft" button, never
       craft? Result:
+- [ ] **CRAFT-14** (FA1) With the mouse (PC) and with a finger (Phone), smelt several
+      items in a row (coal from logs at a furnace): the "Craft" button stays where it is,
+      with the bar filling it. Is it clear that the furnace is busy, and that a press during
+      the bar does nothing? _PC, Phone._ Result:
 
 ## 9. Controller (Phase 5)
 
@@ -228,6 +236,9 @@ after a press. The buttons are listed in the pause menu while the controller is 
       breaking a block in a crowded spot. Each B continues the game once and never pauses it
       again by itself. Then, in play, B followed about a second later by the phone's back
       gesture: the gesture pauses. _Phone._ Result:
+- [ ] **PAD-17** (FA1) With the controller, smelt coal several times in a row: the frame
+      stays on "Craft" during and after each smelt; A again makes the next one; holding A
+      keeps the furnace going. _PC, Phone._ Result:
 
 ## 10. Progression (Phase 8 part A)
 
@@ -246,8 +257,6 @@ finished task, chapter and level.
 - [ ] **PROG-4** (8A1) The notices ("Task done: …", "Chapter done: …", "Level 3 · Unlocked:
       …", "First find: Coal ore …"): noticed, but not annoying? Do they ever hide something
       you need to see? _PC, Phone._ Result:
-- [ ] **PROG-5** (8A1) A locked recipe row ("Level 3" or "Task: Mine 32 coal" instead of
-      "Craft"): is it clear why it cannot be made and what to do about it? _PC._ Result:
 - [ ] **PROG-6** (8A2) Two players on two devices (PC and phone) in a fresh Adventure world
       of the PC, opened to others on the PR preview: finish chapter 1 together (one mines
       logs, the other makes planks). Both see "Task done: … (name) · +10 XP" for every task,
@@ -270,3 +279,12 @@ finished task, chapter and level.
       its own tracker, both counts follow the shared book. One leaves and joins again, and
       the host saves, goes back to the worlds and opens the room again: each still tracks
       its own task. _PC, Phone._ Result:
+- [ ] **PROG-11** (FA1) A fresh Adventure world (seed 1337, the form's defaults) on the PC,
+      played from chapter 3: before "Make 16 coal" is done the torch row says "Task: Make 16
+      coal"; finishing it shows "Unlocked: Torch". Then "Mine 32 coal" with torches. Was any
+      task before the torch too dark to do comfortably, by day or at night? Did it feel
+      unfair that the torches made and placed in chapter 3 did not count for chapter 4's
+      torch tasks? _PC._ Result:
+- [ ] **PROG-12** (FA1) A locked recipe row ("Level 3" or "Task: Make 16 coal" instead of
+      "Craft"): is it clear why it cannot be made and what to do about it? (Replaces
+      PROG-5.) _PC._ Result:

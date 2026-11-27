@@ -1398,21 +1398,30 @@ canvas {
   color: #ffd27f;
 }
 
-.recipe-progress {
-  width: 76px;
-  height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  border-radius: 4px;
-  box-sizing: border-box;
-  background: rgba(20, 24, 32, 0.6);
+/* The furnace's bar fills the "Craft" button from the left, behind its label; the
+   button keeps its place and size (Fix Adventure 1). */
+.recipe-craft {
+  position: relative;
   overflow: hidden;
+  isolation: isolate;
+}
+
+.recipe-row.smelting .recipe-craft {
+  background: #2f5c23;
+}
+
+.recipe-progress {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .recipe-progress-fill {
   display: block;
   width: 0;
   height: 100%;
-  background: #ffa640;
+  background: #d98a2b;
 }
 
 @media (max-height: 480px) {

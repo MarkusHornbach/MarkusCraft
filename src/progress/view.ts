@@ -199,7 +199,7 @@ export function noticeTexts(
   return texts;
 }
 
-/** The HUD text of a `locked` refusal: "Locked: Level 3", "Locked: Mine 3 coal". */
+/** The HUD text of a `locked` refusal: "Locked: Level 3", "Locked: Make 2 coal". */
 export function lockedText(recipe: number, tables: ProgressTables = PROGRESS_TABLES): string {
   const unlock = tables.recipeUnlocks.find((u) => u.recipe === recipe)?.unlock ?? { level: 1 };
   if ('level' in unlock) return `Locked: Level ${unlock.level}`;

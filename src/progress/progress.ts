@@ -94,19 +94,23 @@ function unlockIn(tables: ProgressTables, recipe: number): Unlock {
   return tables.recipeUnlocks.find((u) => u.recipe === recipe)?.unlock ?? { level: 1 };
 }
 
-/** Whether a player may craft a recipe: its level reached, or its task done. */
+/**
+ * Whether a player may craft a recipe: crafted by this player before (a recipe is never
+ * locked again, whatever the tables say now), its level reached, or its task done.
+ */
 export function recipeUnlocked(
   recipe: number,
   record: PlayerRecord,
   progress: WorldProgress,
   tables: ProgressTables = PROGRESS_TABLES,
 ): boolean {
+  if (record.crafted.includes(recipe)) return true;
   const unlock = unlockIn(tables, recipe);
   if ('level' in unlock) return levelOf(record.xp, tables) >= unlock.level;
   return progress.done.includes(unlock.task);
 }
 
-/** What unlocks a recipe, as the screen says it: "Level 3", "Task: Mine 3 coal". */
+/** What unlocks a recipe, as the screen says it: "Level 3", "Task: Make 2 coal". */
 export function unlockText(recipe: number, tables: ProgressTables = PROGRESS_TABLES): string {
   const unlock = unlockIn(tables, recipe);
   if ('level' in unlock) return `Level ${unlock.level}`;

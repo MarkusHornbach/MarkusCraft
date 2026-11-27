@@ -331,3 +331,7 @@ Tests that no longer need doing, with the reason.
       the tab can be selected? _PC or Phone, controller._ Result:
       Reason: Polish 2 makes the open task rows selectable (the tracked task); PROG-9
       replaces it.
+- [ ] **PROG-5** (8A1) A locked recipe row ("Level 3" or "Task: Mine 32 coal" instead of
+      "Craft"): is it clear why it cannot be made and what to do about it? _PC._ Result:
+      Reason: Fix Adventure 1 moved the torch's unlock to "Make 16 coal", so the example
+      "Task: Mine 32 coal" no longer exists; PROG-12 asks the same question.

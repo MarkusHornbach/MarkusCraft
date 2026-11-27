@@ -1,6 +1,6 @@
 // The goal bot's table: estimated player minutes per task, chapter and level-up over many
 // runs, and the balance targets of plan 5.10. Pure.
-import { CHAPTERS, TASKS } from '../progress/tables';
+import { CHAPTERS, DARK_BLOCKS, TASKS } from '../progress/tables';
 import { type BotRun, playerMinutes } from './Bot';
 
 /** Balance targets (plan 5.10), in estimated player minutes (median over the runs). */
@@ -147,5 +147,57 @@ export function formatReport(report: BotReport): string {
       `blocks broken: median ${report.broken.median.toFixed(0)}, max ${report.broken.max}`,
     '',
     ...report.checks.map((c) => `- [${c.ok ? 'x' : ' '}] ${c.text}`),
+  ].join('\n');
+}
+
+/** Dark breaks of one task over the runs: all blocks, and only those of `DARK_BLOCKS`. */
+export interface DarkRow {
+  task: number;
+  label: string;
+  all: { median: number; max: number };
+  ores: { median: number; max: number };
+}
+
+/**
+ * The dark-break report (Fix Adventure 1): per task with any dark break in any run, the
+ * median and maximum over all runs. A report only: it never makes a run fail.
+ */
+export function darkBreakRows(
+  runs: readonly BotRun[],
+  darkBlocks: readonly number[] = DARK_BLOCKS,
+): DarkRow[] {
+  const rows: DarkRow[] = [];
+  for (const task of TASKS) {
+    const all = runs.map((r) =>
+      r.darkBreaks.filter((d) => d.task === task.id).reduce((n, d) => n + d.count, 0),
+    );
+    if (all.every((n) => n === 0)) continue;
+    const ores = runs.map((r) =>
+      r.darkBreaks
+        .filter((d) => d.task === task.id && darkBlocks.includes(d.block))
+        .reduce((n, d) => n + d.count, 0),
+    );
+    const stat = (values: number[]) => ({ median: median(values), max: Math.max(...values) });
+    rows.push({
+      task: task.id,
+      label: `${task.id} ${task.label}`,
+      all: stat(all),
+      ores: stat(ores),
+    });
+  }
+  return rows;
+}
+
+/** The dark-break table as Markdown. */
+export function formatDarkBreaks(rows: readonly DarkRow[], runs: number): string {
+  return [
+    `Dark breaks before a light source (${runs} runs; report only, never a failure)`,
+    '',
+    '| Task | All: median | All: max | Ores: median | Ores: max |',
+    '| --- | ---: | ---: | ---: | ---: |',
+    ...rows.map(
+      (r) => `| ${r.label} | ${r.all.median} | ${r.all.max} | ${r.ores.median} | ${r.ores.max} |`,
+    ),
+    ...(rows.length === 0 ? ['| (none) | | | | |'] : []),
   ].join('\n');
 }
