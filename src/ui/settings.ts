@@ -10,6 +10,8 @@ import {
   PAD_SENSITIVITY_DEFAULT,
   PAD_SENSITIVITY_MAX,
   PAD_SENSITIVITY_MIN,
+  RADAR_SIZE_DEFAULT,
+  RADAR_SIZE_MAX,
   RENDER_DISTANCE_DEFAULT,
   RENDER_DISTANCE_MAX,
   RENDER_DISTANCE_MIN,
@@ -41,6 +43,8 @@ export interface Settings {
   collideLeaves: boolean;
   /** The radar circle on the game screen (Phase 8 part B1); the Map tab stays either way. */
   radar: boolean;
+  /** "Radar circle size" (after Phase 8 part B2b): 0 Small, 1 Medium, 2 Large. */
+  radarSize: number;
 }
 
 /** The settings that are numbers (each has a slider). */
@@ -56,6 +60,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   padInvertY: false,
   collideLeaves: false,
   radar: true,
+  radarSize: RADAR_SIZE_DEFAULT,
 };
 
 /** The part of the Storage interface that is used; lets tests pass a fake. */
@@ -109,6 +114,9 @@ export function validateSettings(raw: unknown): Settings {
         : DEFAULT_SETTINGS.collideLeaves,
     // A missing field reads as on (the default).
     radar: typeof source.radar === 'boolean' ? source.radar : DEFAULT_SETTINGS.radar,
+    radarSize: Math.round(
+      numberInRange(source.radarSize, 0, RADAR_SIZE_MAX, DEFAULT_SETTINGS.radarSize),
+    ),
   };
 }
 
@@ -144,6 +152,7 @@ export function saveSettings(storage: SettingsStorage | null, settings: Settings
       padInvertY,
       collideLeaves,
       radar,
+      radarSize,
       ...rest
     } = validateSettings(settings);
     // The settings added after Phase 1 are only written once they were changed, so the
@@ -157,6 +166,7 @@ export function saveSettings(storage: SettingsStorage | null, settings: Settings
     if (padInvertY !== DEFAULT_SETTINGS.padInvertY) stored.padInvertY = padInvertY;
     if (collideLeaves !== DEFAULT_SETTINGS.collideLeaves) stored.collideLeaves = collideLeaves;
     if (radar !== DEFAULT_SETTINGS.radar) stored.radar = radar;
+    if (radarSize !== DEFAULT_SETTINGS.radarSize) stored.radarSize = radarSize;
     storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(stored));
   } catch {
     // Storage can be full or blocked (private mode); the game works without it.

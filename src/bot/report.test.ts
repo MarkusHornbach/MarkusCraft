@@ -6,9 +6,11 @@ import {
   buildReport,
   darkBreakRows,
   formatDarkBreaks,
+  formatPlaces,
   formatRadar,
   formatReport,
   median,
+  spawnPlaces,
 } from './report';
 import { Block } from '../world/blocks';
 
@@ -50,6 +52,7 @@ function run(minutes: number, completed = true): BotRun {
         bruteForce: { dx: 9, dy: -6, dz: 2, dist: 11 },
       },
     ],
+    places: [],
   };
 }
 
@@ -124,5 +127,39 @@ describe('dark-break report (Fix Adventure 1 AC2.4)', () => {
     const off = run(2);
     off.radar = [{ ...off.radar[0], radar: null }];
     expect(formatRadar([off])).toContain('| NO |');
+  });
+});
+
+describe('places in the report (Phase 8B2b AC5.3)', () => {
+  it('prints the median distance from the spawn and the task 16 agreement', () => {
+    const one = run(1);
+    one.places = [
+      { task: 16, kind: 'shaft', radar: null, bruteForce: null, block: null },
+      {
+        task: 16,
+        kind: 'cave',
+        radar: { dx: 1, dy: 2, dz: 3, dist: 3.7 },
+        bruteForce: { dx: 1, dy: 2, dz: 3, dist: 3.7 },
+        block: 0,
+      },
+    ];
+    const text = formatPlaces(
+      [one],
+      [
+        { shaft: 30, cave: 10 },
+        { shaft: 50, cave: null },
+        { shaft: 40, cave: 20 },
+      ],
+    );
+    expect(text).toContain('| shaft | 3 | 40 | 50 | yes (1) |');
+    expect(text).toContain('| cave | 2 | 15 | 20 | yes (1) |');
+    const gen3 = spawnPlaces(
+      1337,
+      { version: 3, options: { terrain: 'balanced', trees: 'few' } },
+      192,
+    );
+    expect(gen3.shaft).toBeGreaterThanOrEqual(24);
+    expect(gen3.shaft).toBeLessThanOrEqual(64);
+    expect(spawnPlaces(1337, { version: 1 }, 192)).toEqual({ shaft: null, cave: null });
   });
 });

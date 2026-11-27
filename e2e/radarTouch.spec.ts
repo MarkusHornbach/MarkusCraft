@@ -37,7 +37,7 @@ for (const size of [
   { width: 640, height: 360 },
   { width: 1280, height: 720 },
 ]) {
-  test(`Phase 8B1 AC3.2 AC3.7: touch ${size.width} × ${size.height}: below the bag button, 88 px, over no button and not the tracker`, async ({
+  test(`Phase 8B1 AC3.2 AC3.7: touch ${size.width} × ${size.height}: below the bag button, Medium, over no button and not the tracker`, async ({
     page,
   }) => {
     await page.setViewportSize(size);
@@ -46,8 +46,11 @@ for (const size of [
     const box = await page.locator(circle).boundingBox();
     const bag = await page.locator('.touch-bag').boundingBox();
     if (!box || !bag) throw new Error('circle or bag button missing');
-    expect(box.width).toBe(88);
-    expect(box.height).toBe(88);
+    // Medium (128 px) since the owner's finding after B2b; a small phone's room may take a
+    // pixel off (B1: 88 px, now Small).
+    expect(box.width).toBeGreaterThanOrEqual(size.width === 640 ? 120 : 128);
+    expect(box.width).toBeLessThanOrEqual(128);
+    expect(box.height).toBe(box.width);
     // Right edges aligned; the circle's top one gap (8 px) below the bag button.
     expect(box.x + box.width).toBeCloseTo(bag.x + bag.width, 0);
     expect(box.y).toBeCloseTo(bag.y + bag.height + 8, 0);

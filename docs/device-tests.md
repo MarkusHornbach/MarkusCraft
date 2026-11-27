@@ -36,7 +36,7 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
   below whenever the open list changes.
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 8 part B2a (CAVE-1 to CAVE-6); 2026-11-27.
+Last updated: Phase 8 part B2b (PLACE-1 to PLACE-6; RADAR-3 and RADAR-5 obsolete); 2026-11-27.
 
 ---
 
@@ -301,15 +301,9 @@ down they are ("5↓", "↑", "="). The settings page switches the circle ("Rada
 - [ ] **RADAR-2** (8B1) On the phone in an Adventure world with the radar: the F3 row "Radar"
       while walking and turning (scan and draw times). Does the game feel as smooth with the
       circle on as with it off? _Phone._ Result:
-- [ ] **RADAR-3** (8B1) The circle: are coal and iron told apart at a glance, are the hints
-      readable, is it in the way anywhere (PC top right; phone below the bag)? _PC, Phone._
-      Result:
 - [ ] **RADAR-4** (8B1) Finding ore with the radar (seed 1337, the form's defaults, from
       task 12 on): do the hints lead to coal and iron without making it trivial? How long
       did "Mine 20 iron ore" take compared with before? _PC._ Result:
-- [ ] **RADAR-5** (8B1) The Map tab with mouse, touch and controller: readable on the
-      phone, the terrain recognisable (lake, hills), the legend clear? _PC, Phone,
-      controller._ Result:
 - [ ] **RADAR-6** (8B1) Tracking "Mine 20 iron ore" makes the circle show iron only: is that
       understandable, or confusing? _PC._ Result:
 - [ ] **RADAR-7** (8B1) Walk on the surface away from the start point until the circle shows
@@ -340,3 +334,23 @@ their terrain.
       Did the caves or the shaft make it more fun, or too easy? _PC._ Result:
 - [ ] **CAVE-6** (8B2a) A room in a new world: does the guest see the same caves and shaft?
       _PC + Phone._ Result:
+
+In a world with caves the radar also shows the nearest mine shafts (light brown hollow
+squares, "Shaft") and cave entrances (grey downward triangles, "Cave"), with arrows on the
+rim for those up to 192 blocks away. The Map tab fills the screen (on the phone the tabs
+sit beside the map); the settings page has "Radar circle size" (Small, Medium, Large).
+
+- [ ] **PLACE-1** (8B2b) The circle with shaft and cave symbols: told apart from coal and
+      iron at a glance? Too crowded? _PC, Phone._ Result:
+- [ ] **PLACE-2** (8B2b) The Map tab's legend with four rows on the phone: readable? _Phone._
+      Result:
+- [ ] **PLACE-3** (8B2b) Follow the radar from the start point to the nearest cave entrance
+      and down to iron: does it lead there? _PC._ Result:
+- [ ] **PLACE-4** (8B2b) The rim arrow of a shaft far away (up to 192 blocks): clear where
+      to go? _PC._ Result:
+- [ ] **PLACE-5** (8B2b) "Radar circle size": is Medium a good default? Does Large hide too
+      much of the view? On the phone it never covers a button (on small phones Large stays
+      at Medium's size): ok? _PC, Phone._ Result:
+- [ ] **PLACE-6** (8B2b) The Map tab filling the screen with mouse, touch and controller:
+      big enough now, the terrain recognisable, the legend clear? On the phone the tabs move
+      beside the map: still easy to switch tabs? _PC, Phone, controller._ Result:

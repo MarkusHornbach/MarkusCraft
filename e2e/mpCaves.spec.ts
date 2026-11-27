@@ -50,3 +50,36 @@ test('Phase 8B2a AC4.3: a guest joins a generator 3 world and sees the same tunn
     await guest.page.evaluate(([x, y, z]) => window.__mc.getBlock(x, y, z), [end.x, end.y, end.z]),
   ).toBe(0);
 });
+
+test('Phase 8B2b AC6.4: at the host’s cell the guest’s radar shows the host’s nearest shaft and cave', async ({
+  players,
+}) => {
+  const host = await openTestPlayer(players, { query: { gen: '3', mode: 'gathering' } });
+  const guest = await openTestPlayer(players, { query: { name: 'Anna' } });
+  const code = await hostRoom(host.page);
+  await joinRoom(guest.page, code);
+  const pose = (await state(host.page)).player;
+  await guest.page.evaluate(async (p) => {
+    window.__mc.setPlayer({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: 0 });
+    await window.__mc.whenIdle();
+  }, pose);
+  const radar = async (page: Page) => {
+    await page.evaluate(async () => {
+      window.__mc.step(20);
+      await window.__mc.whenIdle();
+    });
+    const r = (await state(page)).radar;
+    if (!r) throw new Error('no radar');
+    return r;
+  };
+  const hostRadar = await radar(host.page);
+  const guestRadar = await radar(guest.page);
+  for (const kind of ['shaft', 'cave']) {
+    const nearest = (r: typeof hostRadar) => {
+      const e = r.entries.find((entry) => entry.kind === kind);
+      return e ? [e.dx, e.dy, e.dz] : null;
+    };
+    expect(nearest(hostRadar), kind).not.toBeNull();
+    expect(nearest(guestRadar), kind).toEqual(nearest(hostRadar));
+  }
+});

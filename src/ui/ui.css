@@ -726,6 +726,23 @@ canvas {
     text-shadow: 0 2px 0 #2f7d3a;
   }
 
+  /* The title stands left of the play buttons, so the settings keep one more row ("Radar
+     circle size", after Phase 8 part B2b) and the menu still fits 360 px. */
+  .touch-mode .pause-screen .pause-title {
+    float: left;
+    margin: 11px 0 0 2px;
+    font-size: 18px;
+  }
+
+  /* Narrower buttons keep title and buttons on one line with wider fonts too (CI). */
+  .touch-mode .pause-screen .pause-buttons .play-button {
+    padding: 0 16px;
+  }
+
+  .touch-mode .pause-screen .pause-buttons .back-button {
+    padding: 8px 12px;
+  }
+
   .touch-mode .play-button {
     padding: 0 34px;
   }
@@ -2424,11 +2441,24 @@ button.task-row:hover {
   height: 88px;
 }
 
-/* The Map tab (Phase 8 part B1): as large as the other tabs; the square map at the panel's
-   height, the legend beside it. */
+/* The Map tab (Phase 8 part B1): the square map at the tab's height, the legend beside it.
+   On the Map tab the panel fills the screen (the owner's finding after B1: the map was too
+   small); `MapTab` sizes the canvas to the largest square that leaves the legend room. */
+.inventory-screen[data-tab='map'] .inventory-panel {
+  width: calc(100% - 24px);
+  height: calc(100% - 24px);
+  margin: 12px;
+}
+
+/* A fixed header height: the map's size follows it, and must not change with the font. */
+.inventory-screen[data-tab='map'] .inventory-header {
+  height: 36px;
+}
+
 .map-tab {
-  width: 524px;
-  height: 284px;
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   box-sizing: border-box;
   display: flex;
 }
@@ -2437,10 +2467,6 @@ button.task-row:hover {
 .map-locked[hidden],
 .map-body[hidden] {
   display: none;
-}
-
-.touch-mode .map-tab {
-  height: 300px;
 }
 
 .map-locked {
@@ -2460,12 +2486,11 @@ button.task-row:hover {
   gap: 12px;
   width: 100%;
   height: 100%;
+  min-height: 0;
 }
 
 .map-canvas {
   flex: none;
-  height: 100%;
-  aspect-ratio: 1;
   border-radius: 6px;
 }
 
@@ -2481,8 +2506,12 @@ button.task-row:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 15px;
   color: #ffffff;
+}
+
+.map-legend-row[hidden] {
+  display: none;
 }
 
 .map-legend-symbol {
@@ -2491,12 +2520,67 @@ button.task-row:hover {
   height: 16px;
 }
 
+/* A phone: the panel takes the whole height and the header moves into a column beside the
+   map, above the legend, so the square is as high as the screen. The map tab and its body
+   give their children to the panel's grid (`display: contents`). */
 @media (max-height: 480px) {
-  .map-tab {
-    height: 278px;
+  .inventory-screen[data-tab='map'] .inventory-panel {
+    width: calc(100% - 8px);
+    height: 100%;
+    margin: 0 4px;
+    border-radius: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 8px;
   }
 
-  .touch-mode .map-tab {
-    height: 288px;
+  .inventory-screen[data-tab='map'] .inventory-header {
+    grid-column: 2;
+    grid-row: 1;
+    align-items: flex-start;
+    height: auto;
+  }
+
+  .inventory-screen[data-tab='map'] .inventory-title {
+    display: none;
+  }
+
+  .inventory-screen[data-tab='map'] .inventory-tabs {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .inventory-screen[data-tab='map'] .map-tab,
+  .inventory-screen[data-tab='map'] .map-body:not([hidden]) {
+    display: contents;
+  }
+
+  .inventory-screen[data-tab='map'] .map-canvas {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .inventory-screen[data-tab='map'] .map-legend {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .inventory-screen[data-tab='map'] .map-locked {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .map-legend {
+    gap: 4px;
+    padding-top: 0;
+  }
+
+  .map-legend-row {
+    font-size: 13px;
+    gap: 6px;
   }
 }

@@ -107,9 +107,15 @@ kinds, 8 each), legend (texts), draws }`; `ui.tab` may be `map`; `settings.radar
   settings, so the switch is tested from the menu. The test tool `setBlock` also tells the
   radar. Mining a vein through actions: `e2e/radar.ts` (`mineCell`, `veinAt`); touch
   layouts need the menu flow (`openTouchAdventure`), since test mode keeps 960 × 540.
-  References `radar-circle`, `radar-circle-touch`, `map-tab`, `map-tab-touch`
-  (`e2e/radar.spec.ts`, `e2e/radarTouch.spec.ts`, `e2e/radarMap.spec.ts`); rooms:
+  References `radar-circle`, `radar-circle-touch` (both at the default size Medium),
+  `map-tab` (`e2e/radar.spec.ts`, `e2e/radarTouch.spec.ts`, `e2e/radarMap.spec.ts`); rooms:
   `e2e/mpRadar.spec.ts`. Bench scenario `radar`: `src/bench/CLAUDE.md`.
+- Phase 8 part B2b (places): in `gen=3` worlds `entries`, `beyond` and `map.legend` also
+  hold the kinds `shaft` and `cave` (2 per kind on the circle, 4 on the map);
+  `settings.radarSize` (0–2). `openTouchAdventure(page, settings)` stores settings first
+  (its world is generator 3). References `radar-places` (PC circle, `gen=3`) and
+  `map-tab-places` (640 × 360, the whole screen) in `e2e/radarPlaces.spec.ts`; the room
+  check in `e2e/mpCaves.spec.ts`.
 
 ## Controller
 

@@ -160,6 +160,8 @@ import { type ReleaseLock, acquireWorldLock } from './worldLock';
 const POINTER_LOCK_WAIT_MS = 1000;
 /** Time the view may need to settle after entering or leaving fullscreen. */
 const FULLSCREEN_SETTLE_MS = 500;
+/** The touch layout's gap (`--touch-gap` in `ui.css`): the circle starts this far below the bag. */
+const TOUCH_CIRCLE_GAP_PX = 8;
 
 /** While the recipe list is open, the stations around the player are looked for this often. */
 const STATION_CHECK_STEPS = 15;
@@ -454,6 +456,8 @@ export class Game {
     this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
     this.hud.setSelected(this.selectedSlot, false);
     this.radar = new Radar(this.hud.element);
+    this.radar.circle.setSize(this.settings.radarSize);
+    this.radar.circle.setRoomMeasure(() => this.touchCircleRoom());
     this.debug = new DebugOverlay(this.root);
     this.inventoryScreen = new InventoryScreen(this.root, {
       tiles: this.renderer.atlas.tiles,
@@ -1541,7 +1545,8 @@ export class Game {
   private benchHost(): BenchHost {
     return {
       loadWorld: (renderDistance, gen) => {
-        this.useSettings({ ...DEFAULT_SETTINGS, renderDistance });
+        // The circle keeps B1's size, so the radar scenario stays comparable.
+        this.useSettings({ ...DEFAULT_SETTINGS, renderDistance, radarSize: 0 });
         const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative', gen);
         this.loadWorld(meta, new Map());
         // The loop runs the simulation; no pointer lock is asked for.
@@ -2084,6 +2089,10 @@ export class Game {
     this.gamepad.setLook(settings.padSensitivity, settings.padInvertY);
     // Takes effect at once; physics only tests the cells the player newly enters.
     this.movement.collideLeaves = settings.collideLeaves;
+    if (this.radar.circle.size !== this.radar.circle.sizeFor(settings.radarSize)) {
+      this.radar.circle.setSize(settings.radarSize);
+      this.radar.invalidate();
+    }
     if (!this.chunksIdle()) this.framesSinceIdle = 0;
   }
 
@@ -2114,8 +2123,32 @@ export class Game {
     else if (portrait && !this.paused) this.setPaused(true);
   }
 
+  /**
+   * On touch: from one gap below the bag button down to 4 px above the highest button on
+   * the right (break, place, up, down); null while they are not laid out.
+   */
+  private touchCircleRoom(): number | null {
+    const box = (name: string): DOMRect | null => {
+      const node = this.root.querySelector(`.touch-${name}`);
+      const rect = node?.getBoundingClientRect();
+      return rect && rect.height > 0 ? rect : null;
+    };
+    const bag = box('bag');
+    if (!bag) return null;
+    let below = Infinity;
+    for (const name of ['break', 'place', 'up', 'down']) {
+      const rect = box(name);
+      if (rect) below = Math.min(below, rect.top);
+    }
+    if (below === Infinity) return null;
+    return below - 4 - (bag.bottom + TOUCH_CIRCLE_GAP_PX);
+  }
+
   private resize(): void {
     this.updateOrientation();
+    const circleSize = this.radar.circle.size;
+    this.radar.circle.refit();
+    if (this.radar.circle.size !== circleSize) this.radar.invalidate();
     if (this.params.test) {
       // Fixed logical resolution so screenshots do not depend on the window.
       this.root.style.width = `${TEST_VIEW_WIDTH}px`;
@@ -3081,6 +3114,7 @@ export class Game {
         padInvertY: this.settings.padInvertY,
         collideLeaves: this.settings.collideLeaves,
         radar: this.settings.radar,
+        radarSize: this.settings.radarSize,
       },
       pad: this.gamepad.state(this.padActive),
       render: {

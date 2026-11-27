@@ -30,11 +30,12 @@ test('Phase 8B1 AC3.1 AC3.2 AC3.6: with progress=all the circle shows top-right 
     radar.entries.filter((e) => e.kind === 'coal').length + radar.beyond.length,
   ).toBeGreaterThan(0);
   for (const e of radar.entries) expect(e.screen).not.toBeNull();
-  // PC: 12 px from the top and right edges, 112 px.
+  // PC: 12 px from the top and right edges; 168 px, the default size Medium since the
+  // owner's finding after B2b (B1: 112 px, now Small; `e2e/radarPlaces.spec.ts`).
   await expect(page.locator(circle)).toBeVisible();
   const box = await page.locator(circle).boundingBox();
   const width = page.viewportSize()?.width ?? 0;
-  expect(box).toEqual({ x: width - 12 - 112, y: 12, width: 112, height: 112 });
+  expect(box).toEqual({ x: width - 12 - 168, y: 12, width: 168, height: 168 });
   // Not over the tracker.
   const tracker = await page.locator('.task-tracker').boundingBox();
   if (tracker) expect(tracker.x + tracker.width).toBeLessThan(box?.x ?? 0);

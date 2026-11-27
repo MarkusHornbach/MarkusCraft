@@ -97,7 +97,8 @@ row shows "Adventure · Balanced · Few trees", or "Creative · Classic" for gen
 F3 overlay has a row "World" ("Generator 2 · balanced · few", "Generator 1"). The settings
 page has the switch "Collide with leaves" below "Invert controller look", then "Radar
 circle" (`settings.radar`, default on), in every input mode; on phones "Collide with leaves"
-and "Radar circle" share a line.
+and "Radar circle" share a line. The slider "Radar circle size" (Small, Medium, Large)
+follows (B2b; sizes and the full-screen Map tab: `src/radar/CLAUDE.md`).
 
 ## "Your player" (Phase 6 part D)
 

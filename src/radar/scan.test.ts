@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, RADAR_FAR_RADIUS, RADAR_RADIUS } from '../game/config';
 import { Block } from '../world/blocks';
 import { World } from '../world/World';
-import { RADAR_KINDS, radarKindByKey } from './kinds';
+import { ORE_RADAR_KINDS, RADAR_KINDS, radarKindByKey } from './kinds';
 import { hintLabel, hintOf, scanRadar, worldProbe, type BlockProbe, type ScanInput } from './scan';
 import { VEIN_INDEX_COLUMNS, VeinIndex } from './veins';
 
@@ -69,7 +69,7 @@ describe('scanRadar', () => {
     const index = new VeinIndex(1337, GEN);
     const scan = scanRadar(input(index, at, NO_WORLD, 4));
     const many = scanRadar(input(index, at, NO_WORLD, 50));
-    for (const kind of RADAR_KINDS) {
+    for (const kind of ORE_RADAR_KINDS) {
       const few = scan.entries.filter((e) => e.kind === kind.key);
       const all = many.entries.filter((e) => e.kind === kind.key);
       expect(few.length).toBe(4);

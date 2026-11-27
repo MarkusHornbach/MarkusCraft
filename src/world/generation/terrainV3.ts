@@ -13,7 +13,7 @@ import {
   shaftYRange,
 } from './shafts';
 import { findSpawn, type SpawnPoint } from './spawn';
-import type { TerrainSource } from './terrain';
+import type { Place, TerrainSource } from './terrain';
 import { TerrainV2 } from './terrainV2';
 import { TREE_CANOPY_RADIUS, trunkHeight } from './trees';
 import type { WorldOptions } from './worldOptions';
@@ -95,6 +95,27 @@ export class TerrainV3 extends TerrainV2 {
   /** True if column (x, z) lies in a mine shaft's footprint. */
   inShaftFootprint(x: number, z: number): boolean {
     return this.shafts.shaftAt(x, z) !== null;
+  }
+
+  /**
+   * The shafts (their log column at the collar) and the entrance mouths (the lowest carved
+   * cell of the start column that is open to the sky) whose cell lies in the area.
+   */
+  placesIn(minX: number, minZ: number, maxX: number, maxZ: number, out: Place[]): void {
+    const inside = (x: number, z: number): boolean =>
+      x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+    for (const s of this.shafts.shaftsIn(minX, minZ, maxX, maxZ)) {
+      if (inside(s.x, s.z)) out.push({ kind: 'shaft', x: s.x, y: s.top, z: s.z });
+    }
+    for (const shape of this.caves.shapesIn(minX, minZ, maxX, maxZ)) {
+      if (shape.kind !== 'entrance' || !inside(shape.startX, shape.startZ)) continue;
+      const x = shape.startX;
+      const z = shape.startZ;
+      // The mouth starts one above the surface; the carving reaches down from there.
+      let y = shape.startY - 1;
+      while (y > 0 && this.caves.carved(x, y, z)) y--;
+      out.push({ kind: 'cave', x, y: y + 1, z });
+    }
   }
 
   /** Builds every shaft whose footprint touches the chunk at block origin (x0, z0). */

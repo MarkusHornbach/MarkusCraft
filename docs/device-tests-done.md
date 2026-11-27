@@ -335,3 +335,13 @@ Tests that no longer need doing, with the reason.
       "Craft"): is it clear why it cannot be made and what to do about it? _PC._ Result:
       Reason: Fix Adventure 1 moved the torch's unlock to "Make 16 coal", so the example
       "Task: Mine 32 coal" no longer exists; PROG-12 asks the same question.
+- [ ] **RADAR-3** (8B1) The circle: are coal and iron told apart at a glance, are the hints
+      readable, is it in the way anywhere (PC top right; phone below the bag)? _PC, Phone._
+      Result:
+      Reason: Phase 8 part B2b made the circle larger (setting "Radar circle size",
+      default Medium) and added places; PLACE-1 and PLACE-5 replace it.
+- [ ] **RADAR-5** (8B1) The Map tab with mouse, touch and controller: readable on the
+      phone, the terrain recognisable (lake, hills), the legend clear? _PC, Phone,
+      controller._ Result:
+      Reason: Phase 8 part B2b makes the Map tab fill the screen (on the phone the tabs
+      move beside the map); PLACE-6 replaces it.
