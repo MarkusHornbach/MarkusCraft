@@ -4,6 +4,7 @@ import { CHUNK_SIZE, RADAR_CIRCLE_PER_KIND, RADAR_FAR_RADIUS, RADAR_RADIUS } fro
 import { findSpawn } from '../world/generation/spawn';
 import { getTerrain } from '../world/generation/terrain';
 import { World } from '../world/World';
+import type { WorldGen } from '../world/generation/worldOptions';
 import { expectFasterThan } from '../testing/timing';
 import { RADAR_KINDS } from './kinds';
 import { scanRadar, worldProbe, type ScanInput } from './scan';
@@ -53,6 +54,64 @@ describe('radar scan cost', () => {
     );
     expectFasterThan(Math.min(...warm), WARM_LIMIT_MS);
     expectFasterThan(Math.min(...cold), COLD_LIMIT_MS);
+  });
+});
+
+/** Warm and cold best times of a scan around the spawn of a world of `gen`. */
+function scanTimes(gen: WorldGen): { warm: number; cold: number } {
+  const spawn = findSpawn(getTerrain(1337, gen));
+  const world = new World(1337, gen);
+  const r = Math.ceil(64 / CHUNK_SIZE);
+  const scx = Math.floor(spawn.x / CHUNK_SIZE);
+  const scz = Math.floor(spawn.z / CHUNK_SIZE);
+  for (let dz = -r; dz <= r; dz++)
+    for (let dx = -r; dx <= r; dx++) world.generate(scx + dx, scz + dz);
+  const scan = (index: VeinIndex): number => {
+    const start = performance.now();
+    scanRadar({
+      index,
+      x: Math.floor(spawn.x),
+      y: Math.floor(spawn.y),
+      z: Math.floor(spawn.z),
+      probe: worldProbe(world),
+      kinds: RADAR_KINDS,
+      perKind: RADAR_CIRCLE_PER_KIND,
+      radius: RADAR_RADIUS,
+      farRadius: RADAR_FAR_RADIUS,
+    });
+    return performance.now() - start;
+  };
+  const warmIndex = new VeinIndex(1337, gen);
+  let warm = Infinity;
+  let cold = Infinity;
+  for (let i = 0; i < 10; i++) {
+    scan(warmIndex);
+    scan(new VeinIndex(1337, gen));
+  }
+  for (let i = 0; i < 30; i++) {
+    warm = Math.min(warm, scan(warmIndex));
+    cold = Math.min(cold, scan(new VeinIndex(1337, gen)));
+  }
+  return { warm, cold };
+}
+
+describe('radar scan cost on generator 3', () => {
+  it('Phase 8B2a AC2.4 a scan costs at most 1.5 × (cold) and 1.3 × (warm) generator 2', () => {
+    const options = { terrain: 'balanced', trees: 'few' } as const;
+    // Each side measured twice, in turn; the best of each counts.
+    let two = { warm: Infinity, cold: Infinity };
+    let three = { warm: Infinity, cold: Infinity };
+    for (let round = 0; round < 2; round++) {
+      const a = scanTimes({ version: 2, options });
+      const b = scanTimes({ version: 3, options });
+      two = { warm: Math.min(two.warm, a.warm), cold: Math.min(two.cold, a.cold) };
+      three = { warm: Math.min(three.warm, b.warm), cold: Math.min(three.cold, b.cold) };
+    }
+    console.log(
+      `radar scan generator 2 → 3: warm ${two.warm.toFixed(2)} → ${three.warm.toFixed(2)} ms, cold ${two.cold.toFixed(2)} → ${three.cold.toFixed(2)} ms`,
+    );
+    expectFasterThan(three.cold, two.cold * 1.5);
+    expectFasterThan(three.warm, two.warm * 1.3);
   });
 });
 
