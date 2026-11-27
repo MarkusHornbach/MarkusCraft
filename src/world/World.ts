@@ -2,7 +2,14 @@
 import { CHUNK_SIZE, WORLD_HEIGHT } from '../game/config';
 import { BLOCK_SOLID, Block } from './blocks';
 import { type Chunk, blockIndex, chunkKey, createChunk, toChunkCoord, toLocalCoord } from './chunk';
-import { generateChunk } from './generation/terrain';
+import {
+  type BlockState,
+  type StateReader,
+  type WorldStates,
+  initialState,
+  stateKindOf,
+} from './blockState';
+import { generateChunk, getTerrain } from './generation/terrain';
 import { CLASSIC_GEN, type WorldGen } from './generation/worldOptions';
 import { checkChunkLight } from './light/lightCheck';
 import { lightChunk } from './light/lightChunk';
@@ -16,7 +23,7 @@ import { changesLight, lightDifference, updateLight } from './light/lightUpdate'
  */
 export type LightListener = (cx: number, cz: number, lit: boolean) => void;
 
-export class World {
+export class World implements StateReader {
   readonly seed: number;
   /** The terrain generator (version and options) this world was created with. */
   readonly gen: WorldGen;
@@ -26,6 +33,13 @@ export class World {
    * re-applied when it is generated again. This map is what saving writes.
    */
   readonly edits: Map<string, Map<number, number>>;
+  /**
+   * Block states per chunk (block index → state), for the whole world like `edits`: kept
+   * when a chunk unloads, saved with the world, sent to joining guests (Phase 8 part B3a).
+   */
+  readonly states: WorldStates;
+  /** States dropped because their cell's block has another kind (the F3 row). */
+  droppedStates = 0;
   // One-entry cache: consecutive block reads usually hit the same chunk.
   private lastChunk: Chunk | null = null;
   /** Opacity and emission per block id. Tests swap in tables with emitters. */
@@ -33,15 +47,20 @@ export class World {
   /** Set by the chunk manager, which remeshes what light changed. */
   onLightChange: LightListener | null = null;
 
-  /** `edits` are the saved edits of a loaded world; the world takes the map over. */
+  /**
+   * `edits` and `states` are the saved edits and block states of a loaded world; the
+   * world takes the maps over.
+   */
   constructor(
     seed: number,
     gen: WorldGen = CLASSIC_GEN,
     edits: Map<string, Map<number, number>> = new Map(),
+    states: WorldStates = new Map(),
   ) {
     this.seed = seed >>> 0;
     this.gen = gen;
     this.edits = edits;
+    this.states = states;
   }
 
   /** Version of the terrain generator this world was created with. */
@@ -76,8 +95,21 @@ export class World {
     const chunk = createChunk(cx, cz, generateChunk(this.seed, cx, cz, this.gen));
     const edits = this.edits.get(chunkKey(cx, cz));
     if (edits) for (const [index, id] of edits) chunk.blocks[index] = id;
+    this.dropStrayStates(chunkKey(cx, cz), chunk.blocks);
     this.chunks.set(chunkKey(cx, cz), chunk);
     return chunk;
+  }
+
+  /** A loaded state on a cell whose block has another kind is dropped, and counted. */
+  private dropStrayStates(key: string, blocks: Uint8Array): void {
+    const states = this.states.get(key);
+    if (!states) return;
+    for (const [index, state] of states) {
+      if (stateKindOf(blocks[index]) === state.kind) continue;
+      states.delete(index);
+      this.droppedStates++;
+    }
+    if (states.size === 0) this.states.delete(key);
   }
 
   /** Adds externally created chunk data (used by tests to build small worlds). */
@@ -143,6 +175,13 @@ export class World {
       this.edits.set(key, edits);
     }
     edits.set(index, id);
+    // A state lives only in a cell of its kind: another block takes it away.
+    const states = this.states.get(key);
+    const state = states?.get(index);
+    if (states && state && stateKindOf(id) !== state.kind) {
+      states.delete(index);
+      if (states.size === 0) this.states.delete(key);
+    }
     const chunk = this.getChunk(cx, cz);
     if (!chunk) {
       // Light of chunks around it may depend on the block; it cannot be worked out now.
@@ -166,6 +205,57 @@ export class World {
       this.lightTables,
     );
     this.reportLight(cx, cz, mask);
+    return true;
+  }
+
+  // --- block state -----------------------------------------------------------------------
+
+  /** The stored state of a cell, or null; does not look at the block. */
+  storedState(x: number, y: number, z: number): BlockState | null {
+    if (y < 0 || y >= WORLD_HEIGHT) return null;
+    const states = this.states.get(chunkKey(toChunkCoord(x), toChunkCoord(z)));
+    return states?.get(blockIndex(toLocalCoord(x), y, toLocalCoord(z))) ?? null;
+  }
+
+  /**
+   * The state of a cell for game logic: the stored one, or the initial one of its block
+   * (an empty chest); null for a block without state, also in a chunk that is not loaded.
+   */
+  getState(x: number, y: number, z: number): BlockState | null {
+    return this.stateFor(this.getBlock(x, y, z), x, y, z);
+  }
+
+  /** The state of a cell whose block the caller knows (the host's far reader). */
+  stateFor(block: number, x: number, y: number, z: number): BlockState | null {
+    const kind = stateKindOf(block);
+    if (kind === null) return null;
+    const stored = this.storedState(x, y, z);
+    if (stored && stored.kind === kind) return stored;
+    return initialState(block, x, y, z, getTerrain(this.seed, this.gen));
+  }
+
+  /**
+   * Stores (or with null removes) the state of a cell. Called only by the sessions, after
+   * the action's blocks (`pipeline.test.ts`). A state for a loaded cell whose block has
+   * another kind is not stored. Never touches light. Returns whether it was stored.
+   */
+  setState(x: number, y: number, z: number, state: BlockState | null): boolean {
+    if (y < 0 || y >= WORLD_HEIGHT) return false;
+    const key = chunkKey(toChunkCoord(x), toChunkCoord(z));
+    const index = blockIndex(toLocalCoord(x), y, toLocalCoord(z));
+    let states = this.states.get(key);
+    if (state === null) {
+      states?.delete(index);
+      if (states && states.size === 0) this.states.delete(key);
+      return true;
+    }
+    const chunk = this.getChunk(toChunkCoord(x), toChunkCoord(z));
+    if (chunk && stateKindOf(chunk.blocks[index]) !== state.kind) return false;
+    if (!states) {
+      states = new Map();
+      this.states.set(key, states);
+    }
+    states.set(index, state);
     return true;
   }
 

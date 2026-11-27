@@ -179,6 +179,8 @@ export const CRAFT_REPEAT_MS = 250;
 /** Slots of a player's inventory; the first `HOTBAR_SLOTS` are the bar. */
 export const INVENTORY_SLOTS = 36;
 export const STACK_SIZE = 99;
+/** Slots of a chest (Phase 8 part B3a): three rows of nine. */
+export const CHEST_SLOTS = 27;
 export const HOTBAR_SLOTS = 9;
 /** A `break` may arrive this much before its time is up (Gathering). */
 export const BREAK_TOLERANCE_MS = 100;
