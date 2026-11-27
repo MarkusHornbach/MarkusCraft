@@ -15,6 +15,7 @@ import { createNoise2D, fbm2D, type Noise2D } from '../../util/noise';
 import { deriveSeed, hash2, hash2Float } from '../../util/rng';
 import { Block } from '../blocks';
 import { chunkKey } from '../chunk';
+import { ColumnCache } from './columnCache';
 import { CLAY_COLUMN, markClayColumns, placeOres } from './ores';
 import {
   BEACH_ABOVE,
@@ -87,6 +88,7 @@ const LAYER = CHUNK_SIZE * CHUNK_SIZE;
 const GRID = CHUNK_SIZE + 2;
 const HEIGHT_CACHE_CHUNKS = 512;
 const ROCK_COLUMN = 3;
+const STONE_TOP_CACHE = 4096;
 
 /** Terrain of one seed and one set of world options. Holds no world state. */
 export class TerrainV2 {
@@ -116,6 +118,8 @@ export class TerrainV2 {
   private readonly flags = new Uint8Array(LAYER);
   /** Column heights of recently generated chunks. A cache only: it never changes results. */
   private readonly heightCache = new Map<string, Uint8Array>();
+  /** `stoneTop` of recently asked columns (the radar asks the same ones again). */
+  private readonly stoneTops = new ColumnCache(STONE_TOP_CACHE);
 
   constructor(seed: number, options: WorldOptions) {
     this.seed = seed >>> 0;
@@ -225,12 +229,53 @@ export class TerrainV2 {
     const h = this.cachedHeightAt(x, z);
     if (h < SEA_LEVEL) return false;
     if (this.aboveRockLine(h, x, z)) return true;
-    return (
-      Math.abs(h - this.cachedHeightAt(x + 1, z)) >= ROCK_SLOPE ||
-      Math.abs(h - this.cachedHeightAt(x - 1, z)) >= ROCK_SLOPE ||
-      Math.abs(h - this.cachedHeightAt(x, z + 1)) >= ROCK_SLOPE ||
-      Math.abs(h - this.cachedHeightAt(x, z - 1)) >= ROCK_SLOPE
+    return this.rockOf(
+      h,
+      x,
+      z,
+      this.cachedHeightAt(x + 1, z),
+      this.cachedHeightAt(x - 1, z),
+      this.cachedHeightAt(x, z + 1),
+      this.cachedHeightAt(x, z - 1),
     );
+  }
+
+  /**
+   * The rock rule of a land column of height `h` with its four neighbours' heights: the
+   * one decision of `generateChunk` and `isRock`.
+   */
+  private rockOf(
+    h: number,
+    x: number,
+    z: number,
+    e: number,
+    w: number,
+    s: number,
+    n: number,
+  ): boolean {
+    return (
+      h >= SEA_LEVEL &&
+      (this.aboveRockLine(h, x, z) ||
+        Math.abs(h - e) >= ROCK_SLOPE ||
+        Math.abs(h - w) >= ROCK_SLOPE ||
+        Math.abs(h - s) >= ROCK_SLOPE ||
+        Math.abs(h - n) >= ROCK_SLOPE)
+    );
+  }
+
+  /** Highest stone cell of the column before the ores (rock: its height; else below the soil). */
+  stoneTop(x: number, z: number): number {
+    return this.stoneTops.get(x, z, this.computeStoneTop);
+  }
+
+  private readonly computeStoneTop = (x: number, z: number): number => {
+    const h = this.cachedHeightAt(x, z);
+    return this.isRock(x, z) ? h : h - DIRT_DEPTH - 1;
+  };
+
+  /** True if generation leaves stone in the cell before the ores are placed. */
+  oreHost(x: number, y: number, z: number): boolean {
+    return y >= 1 && y <= this.stoneTop(x, z);
   }
 
   private heightsOf(cx: number, cz: number): Uint8Array {
@@ -312,13 +357,15 @@ export class TerrainV2 {
         const g = lx + 1 + (lz + 1) * GRID;
         const h = heights[g];
         const column = lx + lz * CHUNK_SIZE;
-        const rock =
-          h >= SEA_LEVEL &&
-          (this.aboveRockLine(h, x0 + lx, z0 + lz) ||
-            Math.abs(h - heights[g + 1]) >= ROCK_SLOPE ||
-            Math.abs(h - heights[g - 1]) >= ROCK_SLOPE ||
-            Math.abs(h - heights[g + GRID]) >= ROCK_SLOPE ||
-            Math.abs(h - heights[g - GRID]) >= ROCK_SLOPE);
+        const rock = this.rockOf(
+          h,
+          x0 + lx,
+          z0 + lz,
+          heights[g + 1],
+          heights[g - 1],
+          heights[g + GRID],
+          heights[g - GRID],
+        );
         blocks[column] = Block.BEDROCK;
         if (rock) {
           flags[column] = ROCK_COLUMN;
