@@ -40,8 +40,8 @@ export const TERRAIN_CHECKSUMS_1337_V3: Readonly<Record<string, number>> = {
   'balanced/few': 2671568332,
   'balanced/normal': 1711089731,
   'balanced/many': 2952111101,
-  'hilly/none': 3736612257,
-  'hilly/few': 759229731,
-  'hilly/normal': 3609804604,
-  'hilly/many': 1986712728,
+  'hilly/none': 3597418401,
+  'hilly/few': 620035875,
+  'hilly/normal': 4167167292,
+  'hilly/many': 1429350040,
 };

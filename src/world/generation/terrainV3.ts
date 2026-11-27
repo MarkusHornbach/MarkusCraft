@@ -3,14 +3,17 @@ import { CHUNK_SIZE, CHUNK_VOLUME, WORLD_HEIGHT } from '../../game/config';
 import { Block } from '../blocks';
 import { CaveCarver, MASK_WORDS } from './caves';
 import { placeOres } from './ores';
-import { SHAFT_HALF, ShaftPlanner, shaftBlock, shaftYRange } from './shafts';
+import { SHAFT_HALF, type Shaft, ShaftPlanner, shaftBlock, shaftYRange } from './shafts';
 import { findSpawn, type SpawnPoint } from './spawn';
 import type { TerrainSource } from './terrain';
 import { TerrainV2 } from './terrainV2';
-import { trunkHeight } from './trees';
+import { TREE_CANOPY_RADIUS, trunkHeight } from './trees';
 import type { WorldOptions } from './worldOptions';
 
 const LAYER = CHUNK_SIZE * CHUNK_SIZE;
+/** Trees of a chunk reach this far beyond it (their canopy). */
+const TREE_MARGIN = TREE_CANOPY_RADIUS;
+const TREE_SIDE = CHUNK_SIZE + 2 * TREE_MARGIN;
 const WORDS_PER_COLUMN = WORLD_HEIGHT / 32;
 /** The spawn wants no carved cell within this many columns ... */
 const SPAWN_CAVE_COLUMNS = 2;
@@ -25,11 +28,19 @@ export class TerrainV3 extends TerrainV2 {
   readonly caves: CaveCarver;
   readonly shafts: ShaftPlanner;
   private spawn: SpawnPoint | null = null;
+  /** While a chunk's trees are placed: the shafts near it and a memo per column. */
+  private nearShafts: Shaft[] = [];
+  private readonly leafMemo = new Int8Array(TREE_SIDE * TREE_SIDE);
+  private memoX0 = 0;
+  private memoZ0 = 0;
 
   constructor(seed: number, options: WorldOptions) {
     super(seed, options);
     this.hooks = true;
-    const heights = { heightAt: (x: number, z: number) => this.cachedHeightAt(x, z) };
+    const heights = {
+      heightAt: (x: number, z: number) => this.cachedHeightAt(x, z),
+      continentAt: (x: number, z: number) => this.continentAt(x, z),
+    };
     this.caves = new CaveCarver(this.seed, heights);
     this.shafts = new ShaftPlanner(this.seed, heights, this.caves, () => this.spawnPoint());
   }
@@ -43,6 +54,16 @@ export class TerrainV3 extends TerrainV2 {
     const mask = this.caves.mask(cx, cz);
     if (mask) carve(blocks, mask);
     this.placeShafts(blocks, x0, z0);
+    const r = TREE_MARGIN;
+    this.nearShafts = this.shafts.shaftsIn(
+      x0 - r,
+      z0 - r,
+      x0 + CHUNK_SIZE - 1 + r,
+      z0 + CHUNK_SIZE - 1 + r,
+    );
+    this.leafMemo.fill(-1);
+    this.memoX0 = x0 - r;
+    this.memoZ0 = z0 - r;
     this.placeTreesPhase(blocks, x0, z0);
     return blocks;
   }
@@ -114,12 +135,27 @@ export class TerrainV3 extends TerrainV2 {
     return super.oreHost(x, y, z) && !this.caves.carved(x, y, z) && !this.inShaft(x, y, z);
   }
 
+  /** Whether column (x, z) lies in the footprint of one of the shafts near the chunk. */
+  private nearShaftFootprint(x: number, z: number): boolean {
+    for (const s of this.nearShafts) {
+      if (Math.abs(x - s.x) <= SHAFT_HALF && Math.abs(z - s.z) <= SHAFT_HALF) return true;
+    }
+    return false;
+  }
+
+  // The hooks are asked only while `generateChunk` places the chunk's trees.
   protected override treeBlocked(x: number, z: number, ground: number): boolean {
-    return this.caves.carved(x, ground, z) || this.inShaftFootprint(x, z);
+    return this.caves.carved(x, ground, z) || this.nearShaftFootprint(x, z);
   }
 
   protected override leafBlocked(x: number, z: number): boolean {
-    return this.inShaftFootprint(x, z) || this.carvedColumn(x, z);
+    const i = x - this.memoX0 + (z - this.memoZ0) * TREE_SIDE;
+    let blocked = this.leafMemo[i];
+    if (blocked < 0) {
+      blocked = this.nearShaftFootprint(x, z) || this.carvedColumn(x, z) ? 1 : 0;
+      this.leafMemo[i] = blocked;
+    }
+    return blocked === 1;
   }
 
   /**

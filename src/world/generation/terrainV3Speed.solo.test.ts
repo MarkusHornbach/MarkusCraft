@@ -10,17 +10,19 @@ const OPTIONS = { terrain: 'balanced', trees: 'few' } as const;
 const SEEDS = [1, 42, 1337, 2024];
 
 /**
- * Per chunk over the 9 × 9 chunks around the origin (the area of the face budget), the
- * spawn already known: the game finds it before it loads a chunk, for every generator.
+ * Per chunk over the 15 × 15 chunks around the origin (what the game generates at the
+ * phone's default render distance 5), the spawn already known: the game finds it before
+ * it loads a chunk, for every generator. Caves are worked out per 64 × 64 region with a
+ * reach of 32: a small area pays for the regions around it (9 × 9 chunks: about 1.3 ×).
  */
 function run(make: (seed: number) => TerrainV2, seed: number): number {
   const terrain = make(seed);
   findSpawn(terrain);
   const start = performance.now();
-  for (let cz = -4; cz <= 4; cz++) {
-    for (let cx = -4; cx <= 4; cx++) terrain.generateChunk(cx, cz);
+  for (let cz = -7; cz <= 7; cz++) {
+    for (let cx = -7; cx <= 7; cx++) terrain.generateChunk(cx, cz);
   }
-  return (performance.now() - start) / 81;
+  return (performance.now() - start) / 225;
 }
 
 describe('generator 3 speed', () => {
@@ -31,7 +33,7 @@ describe('generator 3 speed', () => {
     const v3 = (seed: number): TerrainV3 => new TerrainV3(seed, OPTIONS);
     const two = SEEDS.map(() => Infinity);
     const three = SEEDS.map(() => Infinity);
-    for (let round = 0; round < 25; round++) {
+    for (let round = 0; round < 12; round++) {
       SEEDS.forEach((seed, i) => {
         two[i] = Math.min(two[i], run(v2, seed));
         three[i] = Math.min(three[i], run(v3, seed));

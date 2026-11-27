@@ -45,6 +45,16 @@ export interface ShapeCurve {
   ampTo: number;
 }
 
+/** The lowest column height where the continent noise is at least 0 (all shapes). */
+export const LAND_MIN_HEIGHT = 50;
+/**
+ * A bound of how much the continent noise changes per block: a simplex kernel's gradient is
+ * at most 0.079 per unit, three kernels and the scale 99 give 23.5, an octave of the fbm
+ * adds at most 23.5 / 360 per block whatever its frequency, and three octaves divided by
+ * their total weight 1.75 give 0.112.
+ */
+export const CONTINENT_SLOPE = 0.12;
+
 /** Slope of the base curve below c = 0, as in version 1. Never change it (water share). */
 const WATER_SLOPE = 26;
 
@@ -180,6 +190,16 @@ export class TerrainV2 {
     const hills = amplitude * (d * 0.6 + Math.abs(d) * 0.4);
     const h = Math.round(base + hills);
     return h < MIN_SURFACE ? MIN_SURFACE : h > MAX_SURFACE ? MAX_SURFACE : h;
+  }
+
+  /**
+   * The continent noise of column (x, z) (3 of the 8 octaves of `heightAt`). Where it is
+   * at least 0 the column's height is at least `LAND_MIN_HEIGHT` for every shape (base ≥
+   * 51, hills ≥ -0.2 × amplitude, and the base grows faster with c than the amplitude), so
+   * it is never water. It changes by at most `CONTINENT_SLOPE` per block.
+   */
+  continentAt(x: number, z: number): number {
+    return fbm2D(this.continent, x * CONTINENT_SCALE, z * CONTINENT_SCALE, 3);
   }
 
   isUnderWater(x: number, z: number): boolean {

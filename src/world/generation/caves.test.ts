@@ -1,6 +1,7 @@
 // Capsules and the carve mask of generator 3 (Phase 8 part B2a).
 import { describe, expect, it } from 'vitest';
 import { CaveCarver, rasterCapsule } from './caves';
+import { CONTINENT_SLOPE, LAND_MIN_HEIGHT, TerrainV2 } from './terrainV2';
 import { TerrainV3 } from './terrainV3';
 
 describe('caves', () => {
@@ -28,5 +29,39 @@ describe('caves', () => {
       for (let cx = 2; cx >= -2; cx--) expect(b.mask(cx, cz)).toEqual(a.mask(cx, cz));
     }
     expect(a.shapesIn(-200, -200, 200, 200).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the land bound of the water rule', () => {
+  it('Phase 8B2a where the continent noise is at least 0 the ground is at least LAND_MIN_HEIGHT', () => {
+    for (const terrain of ['flat', 'balanced', 'hilly'] as const) {
+      for (const seed of [1, 42, 1337]) {
+        const t = new TerrainV2(seed, { terrain, trees: 'none' });
+        for (let z = -600; z <= 600; z += 7) {
+          for (let x = -600; x <= 600; x += 7) {
+            if (t.continentAt(x, z) >= 0) {
+              expect(t.heightAt(x, z)).toBeGreaterThanOrEqual(LAND_MIN_HEIGHT);
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('the continent slope bound', () => {
+  it('Phase 8B2a the continent value changes by at most CONTINENT_SLOPE per block', () => {
+    let steepest = 0;
+    for (const seed of [1, 42, 1337, 2024, 7]) {
+      const t = new TerrainV2(seed, { terrain: 'balanced', trees: 'none' });
+      for (let z = -2000; z <= 2000; z += 13) {
+        for (let x = -2000; x <= 2000; x += 13) {
+          const c = t.continentAt(x, z);
+          steepest = Math.max(steepest, Math.abs(t.continentAt(x + 1, z) - c));
+          steepest = Math.max(steepest, Math.abs(t.continentAt(x, z + 1) - c));
+        }
+      }
+    }
+    expect(steepest).toBeLessThanOrEqual(CONTINENT_SLOPE);
   });
 });

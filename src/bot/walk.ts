@@ -24,6 +24,8 @@ export interface WalkOptions {
   lightAbove?: number;
   /** The search stops after this many cells (default 200 000). */
   maxCells?: number;
+  /** Only cells this accepts are stood on (for example the cells of one tunnel). */
+  allowed?: (x: number, y: number, z: number) => boolean;
   /** Horizontal limits (inclusive); the search never leaves them. */
   minX?: number;
   maxX?: number;
@@ -70,8 +72,10 @@ export function walkTo(
   options: WalkOptions = {},
 ): number | null {
   const lightAbove = options.lightAbove;
+  const allowed = options.allowed;
   const lit = (x: number, y: number, z: number): boolean =>
-    lightAbove === undefined || (world.blockLight?.(x, y, z) ?? 0) > lightAbove;
+    (allowed === undefined || allowed(x, y, z)) &&
+    (lightAbove === undefined || (world.blockLight?.(x, y, z) ?? 0) > lightAbove);
   const inside = (x: number, z: number): boolean =>
     (options.minX === undefined || x >= options.minX) &&
     (options.maxX === undefined || x <= options.maxX) &&

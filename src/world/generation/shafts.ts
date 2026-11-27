@@ -152,6 +152,7 @@ export class ShaftPlanner {
   private readonly spawnOf: () => SpawnPoint;
   private spawnShaftCache: Shaft | null | undefined;
   private readonly grid = new Map<number, Shaft | null>();
+  private readonly candidates = new Map<number, { x: number; z: number; hash: number } | null>();
 
   constructor(seed: number, heights: HeightSource, caves: CaveCarver, spawn: () => SpawnPoint) {
     this.seed = seed >>> 0;
@@ -229,6 +230,16 @@ export class ShaftPlanner {
 
   /** Where grid cell (gx, gz) would put its shaft (by hashes only), or null. */
   private gridCandidate(gx: number, gz: number): { x: number; z: number; hash: number } | null {
+    const key = (gx + 0x8000) * 0x10000 + (gz + 0x8000);
+    let candidate = this.candidates.get(key);
+    if (candidate === undefined) {
+      candidate = this.computeCandidate(gx, gz);
+      this.candidates.set(key, candidate);
+    }
+    return candidate;
+  }
+
+  private computeCandidate(gx: number, gz: number): { x: number; z: number; hash: number } | null {
     const hash = hash2(this.seed ^ SALT_SHAFT, gx, gz);
     const rng = mulberry32(hash);
     if (rng() >= SHAFT_CHANCE) return null;

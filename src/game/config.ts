@@ -37,9 +37,9 @@ export const CAVE_REACH = 32;
 export const CAVE_RADIUS_MIN = 1.8;
 export const CAVE_RADIUS_MAX = 2.4;
 /** Tunnels per region: 0 to this many, decided by the region's hash. */
-export const CAVE_TUNNELS_MAX = 6;
+export const CAVE_TUNNELS_MAX = 4;
 /** Share of tunnels that are entrances (open at the surface). */
-export const CAVE_ENTRANCE_SHARE = 0.6;
+export const CAVE_ENTRANCE_SHARE = 0.7;
 /** Entrances start only on dry land up to this surface height. */
 export const CAVE_ENTRANCE_MAX_Y = 84;
 /** Entrances descend to a hashed height in this range. */

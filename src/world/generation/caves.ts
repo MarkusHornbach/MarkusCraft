@@ -26,10 +26,16 @@ import {
 import { hash2, hash32, mulberry32, type Rng } from '../../util/rng';
 import { ColumnCache } from './columnCache';
 import { BEACH_ABOVE, DIRT_DEPTH, MIN_SURFACE } from './terrainRules';
+import { CONTINENT_SLOPE, LAND_MIN_HEIGHT } from './terrainV2';
 
 /** The noise heights of a terrain (the uncarved ground), as the rules see them. */
 export interface HeightSource {
   heightAt(x: number, z: number): number;
+  /**
+   * The continent value of a column (cheaper than the height): at least 0 means a height
+   * of at least `LAND_MIN_HEIGHT`; it changes by at most `CONTINENT_SLOPE` per block.
+   */
+  continentAt?(x: number, z: number): number;
 }
 
 export type CaveKind = 'entrance' | 'deep' | 'ravine';
@@ -71,19 +77,21 @@ const DEEP_MAX_Y = 36;
 const FLOOR_FACTOR = 0.75;
 /** No carved cell within this many columns (and up to this far below) of a water column. */
 const WATER_CLEARANCE = 2;
+/** The farthest column the clearance looks at (the corner of its square). */
+const WATER_REACH = WATER_CLEARANCE * Math.SQRT2;
 const SALT_CAVE = 0xca7e;
 const SALT_RAVINE = 0x5a71;
 const REGION_CACHE = 96;
 const MASK_CACHE = 512;
 /** Ravines: path length, top width and floor height ranges. */
-const RAVINE_MIN_LENGTH = 40;
+const RAVINE_MIN_LENGTH = 64;
 const RAVINE_MAX_LENGTH = 80;
 const RAVINE_MIN_WIDTH = 3;
 const RAVINE_MAX_WIDTH = 7;
 const RAVINE_MIN_FLOOR = 14;
 const RAVINE_MAX_FLOOR = 24;
 /** Ravine ends rise this much per block along (at most 1). */
-const RAVINE_SLOPE = 0.7;
+const RAVINE_SLOPE = 0.9;
 /** A ravine reaches at most this far from its start (half its length plus its width). */
 const RAVINE_REACH = RAVINE_MAX_LENGTH;
 /** Words per chunk mask: 16 × 16 columns of 128 bits. */
@@ -127,9 +135,11 @@ class SpanBuilder {
 }
 
 /**
- * Adds the cells of a capsule from (ax, ay, az) to (bx, by, bz) as column spans: a cell is
- * inside when its centre lies within `r` of the segment, the vertical distance counted
- * against `rDown` below the axis and `rUp` above it. A chamber is a capsule of length 0.
+ * Adds the cells of a capsule from (ax, ay, az) to (bx, by, bz) as column spans. A column
+ * whose centre lies within `r` (horizontally) of the segment's ground projection is carved
+ * around the axis height above its nearest point: down to `rDown`, up to `rUp`, both
+ * shrinking towards the rim like a circle's. So the floor follows the axis exactly and a
+ * column costs one interval, not a cell test per height. A chamber has length 0.
  */
 export function rasterCapsule(
   out: { push(x: number, z: number, y0: number, y1: number): void },
@@ -146,43 +156,28 @@ export function rasterCapsule(
   const dx = bx - ax;
   const dy = by - ay;
   const dz = bz - az;
-  const len2 = dx * dx + dy * dy + dz * dz;
   const x0 = Math.floor(Math.min(ax, bx) - r);
   const x1 = Math.ceil(Math.max(ax, bx) + r);
   const z0 = Math.floor(Math.min(az, bz) - r);
   const z1 = Math.ceil(Math.max(az, bz) + r);
-  const y0 = Math.max(0, Math.floor(Math.min(ay, by) - rDown));
-  const y1 = Math.min(WORLD_HEIGHT - 1, Math.ceil(Math.max(ay, by) + rUp));
   const r2 = r * r;
-  const down = r / rDown;
-  const up = r / rUp;
   const hLen2 = dx * dx + dz * dz;
   for (let z = z0; z <= z1; z++) {
     const pz = z + 0.5;
     for (let x = x0; x <= x1; x++) {
       const px = x + 0.5;
-      // The horizontal distance to the segment bounds the 3D one: skip columns beyond it.
-      let th = hLen2 > 0 ? ((px - ax) * dx + (pz - az) * dz) / hLen2 : 0;
-      th = th < 0 ? 0 : th > 1 ? 1 : th;
-      const hx = px - (ax + dx * th);
-      const hz = pz - (az + dz * th);
-      if (hx * hx + hz * hz > r2) continue;
-      let first = -1;
-      let last = -1;
-      for (let y = y0; y <= y1; y++) {
-        const py = y + 0.5;
-        let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy + (pz - az) * dz) / len2 : 0;
-        t = t < 0 ? 0 : t > 1 ? 1 : t;
-        const ex = px - (ax + dx * t);
-        let ey = py - (ay + dy * t);
-        const ez = pz - (az + dz * t);
-        ey *= ey < 0 ? down : up;
-        if (ex * ex + ey * ey + ez * ez <= r2) {
-          if (first < 0) first = y;
-          last = y;
-        } else if (first >= 0) break;
-      }
-      if (first >= 0) out.push(x, z, first, last);
+      let t = hLen2 > 0 ? ((px - ax) * dx + (pz - az) * dz) / hLen2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const hx = px - (ax + dx * t);
+      const hz = pz - (az + dz * t);
+      const e2 = hx * hx + hz * hz;
+      if (e2 > r2) continue;
+      const k = Math.sqrt(r2 - e2) / r;
+      const cy = ay + dy * t;
+      // Cells whose centre lies in [cy - rDown·k, cy + rUp·k].
+      const first = Math.max(0, Math.ceil(cy - rDown * k - 0.5));
+      const last = Math.min(WORLD_HEIGHT - 1, Math.floor(cy + rUp * k - 0.5));
+      if (first <= last) out.push(x, z, first, last);
     }
   }
 }
@@ -206,6 +201,53 @@ function snapshot(
   };
 }
 
+/** A shape's spans by column: column key → [y0, y1, y0, y1, …]. */
+function columnTable(b: CaveShape): Map<number, number[]> {
+  const columns = new Map<number, number[]>();
+  for (let s = 0; s < b.count; s++) {
+    const o = s * 4;
+    const key = (b.spans[o] + 0x8000) * 0x10000 + (b.spans[o + 1] + 0x8000);
+    let list = columns.get(key);
+    if (!list) columns.set(key, (list = []));
+    list.push(b.spans[o + 2], b.spans[o + 3]);
+  }
+  return columns;
+}
+
+/**
+ * Whether two shapes come within one cell of each other: a span of `a` lies in a column
+ * next to (or in) a column of `b`, with heights overlapping when grown by one.
+ */
+function touchesColumns(a: CaveShape, b: CaveShape, columns: Map<number, number[]>): boolean {
+  for (let s = 0; s < a.count; s++) {
+    const o = s * 4;
+    const x = a.spans[o];
+    const z = a.spans[o + 1];
+    if (x + 1 < b.minX || x - 1 > b.maxX || z + 1 < b.minZ || z - 1 > b.maxZ) continue;
+    const y0 = a.spans[o + 2] - 1;
+    const y1 = a.spans[o + 3] + 1;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const list = columns.get((x + dx + 0x8000) * 0x10000 + (z + dz + 0x8000));
+        if (!list) continue;
+        for (let k = 0; k < list.length; k += 2)
+          if (list[k] <= y1 && list[k + 1] >= y0) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** What the rules read of a span list (a builder or a shape). */
+interface SpanList {
+  spans: Int32Array;
+  count: number;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
 /**
  * The caves of one seed over a height source: tunnels, chambers and ravines as shapes per
  * region, and the carve mask per chunk. Holds caches only; results never depend on them.
@@ -216,6 +258,9 @@ export class CaveCarver {
   /** Heights of recently asked columns: the rules ask each one many times. */
   private readonly heightCache = new ColumnCache(16384);
   private readonly tunnelRegions = new Map<number, CaveShape[]>();
+  private readonly rawRegions = new Map<number, CaveShape[]>();
+  private readonly columnTables = new WeakMap<CaveShape, Map<number, number[]>>();
+  private readonly candidateRegions = new Map<number, (CaveShape | null)[]>();
   private readonly ravineRegions = new Map<number, CaveShape | null>();
   private readonly masks = new Map<number, Uint32Array | null>();
   private readonly builder = new SpanBuilder();
@@ -232,6 +277,20 @@ export class CaveCarver {
   }
 
   private readonly computeHeight = (x: number, z: number): number => this.source.heightAt(x, z);
+  /** The continent value in millionths (-1e6 without a continent: never land). */
+  private readonly computeLand = (x: number, z: number): number =>
+    Math.round((this.source.continentAt?.(x, z) ?? -1) * 1e6);
+  private readonly landCache = new ColumnCache(16384);
+
+  private continent(x: number, z: number): number {
+    return this.landCache.get(x, z, this.computeLand) / 1e6;
+  }
+
+  /** A lower bound of the height of column (x, z): cheap on the land side of the continent. */
+  private heightAtLeast(x: number, z: number): number {
+    if (this.continent(x, z) >= 0) return LAND_MIN_HEIGHT;
+    return this.heights.heightAt(x, z);
+  }
 
   /** The noise height of column (x, z), through the cache. */
   private readonly heights: HeightSource = {
@@ -345,6 +404,8 @@ export class CaveCarver {
   private readonly computeWaterFloor = (x: number, z: number): number => {
     let floor = 255;
     const c = WATER_CLEARANCE;
+    // Far enough on the land side, no column within the clearance can be water.
+    if (this.continent(x, z) >= WATER_REACH * CONTINENT_SLOPE + 1e-6) return floor;
     for (let dz = -c; dz <= c; dz++) {
       const row = this.rowFloors.get(x, z + dz, this.computeRowFloor);
       if (row < floor) floor = row;
@@ -356,16 +417,17 @@ export class CaveCarver {
   private readonly computeRowFloor = (x: number, z: number): number => {
     let floor = 255;
     const c = WATER_CLEARANCE;
+    // Far enough on the land side, no column of the row can be water (rounding: 1e-6).
+    if (this.continent(x, z) >= c * CONTINENT_SLOPE + 1e-6) return floor;
     for (let dx = -c; dx <= c; dx++) {
-      const h = this.heights.heightAt(x + dx, z);
+      const h = this.heightAtLeast(x + dx, z);
       if (h <= SEA_LEVEL && h - c < floor) floor = h - c;
     }
     return floor;
   };
 
   /** Whether the spans in the builder keep the water rule (and, deep, stay in the stone). */
-  private keepsRules(deep: boolean, from: number): boolean {
-    const b = this.builder;
+  private keepsRules(b: SpanList, deep: boolean, from: number): boolean {
     const spans = b.spans;
     for (let s = from; s < b.count; s++) {
       const o = s * 4;
@@ -374,14 +436,16 @@ export class CaveCarver {
       const y1 = spans[o + 3];
       // The lowest lake bed is MIN_SURFACE: nothing deeper can come near water.
       if (y1 >= MIN_SURFACE - WATER_CLEARANCE && y1 >= this.waterFloor(x, z)) return false;
-      if (deep && y1 > this.heights.heightAt(x, z) - DIRT_DEPTH - 2) return false;
+      // Deep tunnels stay in the stone; the exact height only where the bound is not enough.
+      if (deep && y1 > this.heightAtLeast(x, z) - DIRT_DEPTH - 2) {
+        if (y1 > this.heights.heightAt(x, z) - DIRT_DEPTH - 2) return false;
+      }
     }
     return true;
   }
 
   /** Whether any span in the builder lies in (or next to) a ravine's footprint. */
-  private touchesRavine(): boolean {
-    const b = this.builder;
+  private touchesRavine(b: SpanList): boolean {
     if (b.count === 0) return false;
     const ravines: CaveShape[] = [];
     const qx0 = Math.floor((b.minX - 1 - RAVINE_REACH) / RAVINE_REGION);
@@ -415,12 +479,19 @@ export class CaveCarver {
     return false;
   }
 
-  /** The kept tunnels of cave region (rx, rz), worked out once and cached. */
+  /**
+   * The kept tunnels of cave region (rx, rz), worked out once and cached: the region's
+   * tunnels that keep the rules, less those that cross an entrance. A deep tunnel that
+   * touches any entrance is dropped, and of two entrances that touch the one earlier in
+   * region and tunnel order stays; so an entrance's floor is never cut by another tunnel
+   * and the way down and back up holds (decided on the tunnels before this rule, so it
+   * never depends on the order regions are worked out).
+   */
   tunnelsOf(rx: number, rz: number): CaveShape[] {
     const key = regionKey(rx, rz);
     let tunnels = this.tunnelRegions.get(key);
     if (!tunnels) {
-      tunnels = this.computeTunnels(rx, rz);
+      tunnels = this.keptTunnels(rx, rz);
       if (this.tunnelRegions.size >= REGION_CACHE) {
         for (const oldest of this.tunnelRegions.keys()) {
           this.tunnelRegions.delete(oldest);
@@ -432,20 +503,130 @@ export class CaveCarver {
     return tunnels;
   }
 
+  private keptTunnels(rx: number, rz: number): CaveShape[] {
+    const own = this.rawTunnelsOf(rx, rz);
+    if (own.length === 0) return own;
+    const ownCandidates = this.candidatesOf(rx, rz);
+    const kept: CaveShape[] = [];
+    for (const tunnel of own) {
+      // A kept entrance is its own candidate: its place in the region's order.
+      const index = ownCandidates.indexOf(tunnel);
+      let dropped = false;
+      for (let dz = -1; dz <= 1 && !dropped; dz++) {
+        for (let dx = -1; dx <= 1 && !dropped; dx++) {
+          const others = this.candidatesOf(rx + dx, rz + dz);
+          for (let j = 0; j < others.length && !dropped; j++) {
+            const other = others[j];
+            if (!other || other === tunnel) continue;
+            if (index >= 0) {
+              // Region order (z, then x), then the tunnel's place in its region.
+              const earlier = dz < 0 || (dz === 0 && (dx < 0 || (dx === 0 && j < index)));
+              if (!earlier) continue;
+            }
+            if (this.touches(tunnel, other)) dropped = true;
+          }
+        }
+      }
+      if (!dropped) kept.push(tunnel);
+    }
+    return kept;
+  }
+
+  /** `touches` with each shape's column table built once. */
+  private touches(a: CaveShape, b: CaveShape): boolean {
+    if (a.maxX + 1 < b.minX || b.maxX + 1 < a.minX) return false;
+    if (a.maxZ + 1 < b.minZ || b.maxZ + 1 < a.minZ) return false;
+    let columns = this.columnTables.get(b);
+    if (!columns) {
+      columns = columnTable(b);
+      this.columnTables.set(b, columns);
+    }
+    return touchesColumns(a, b, columns);
+  }
+
+  /** The tunnels of region (rx, rz) that keep the rules, before the crossing rule. */
+  private rawTunnelsOf(rx: number, rz: number): CaveShape[] {
+    const key = regionKey(rx, rz);
+    let tunnels = this.rawRegions.get(key);
+    if (!tunnels) {
+      tunnels = this.computeTunnels(rx, rz);
+      if (this.rawRegions.size >= REGION_CACHE) {
+        for (const oldest of this.rawRegions.keys()) {
+          this.rawRegions.delete(oldest);
+          break;
+        }
+      }
+      this.rawRegions.set(key, tunnels);
+    }
+    return tunnels;
+  }
+
+  /** The random stream of tunnel `i` of region (rx, rz) and the region's tunnel count. */
+  private regionHash(rx: number, rz: number): number {
+    return hash2(this.seed ^ SALT_CAVE, rx, rz);
+  }
+
+  private tunnelRng(regionHash: number, i: number): Rng {
+    return mulberry32(hash32(regionHash + Math.imul(i + 1, 0x9e3779b9)));
+  }
+
+  /**
+   * The entrances of region (rx, rz) as they would be carved before the rules, by tunnel
+   * index (null: a deep tunnel, or an entrance without a dry start). The crossing rule
+   * looks at these, so it needs no heights of the neighbouring regions.
+   */
+  private candidatesOf(rx: number, rz: number): (CaveShape | null)[] {
+    const key = regionKey(rx, rz);
+    let list = this.candidateRegions.get(key);
+    if (!list) {
+      const hash = this.regionHash(rx, rz);
+      const count = hash % (CAVE_TUNNELS_MAX + 1);
+      list = [];
+      for (let i = 0; i < count; i++) {
+        list.push(this.buildTunnel(rx, rz, this.tunnelRng(hash, i), 'entrance', false));
+      }
+      if (this.candidateRegions.size >= REGION_CACHE * 2) {
+        for (const oldest of this.candidateRegions.keys()) {
+          this.candidateRegions.delete(oldest);
+          break;
+        }
+      }
+      this.candidateRegions.set(key, list);
+    }
+    return list;
+  }
+
+  /** The tunnels of region (rx, rz) that keep the water, soil and ravine rules. */
   private computeTunnels(rx: number, rz: number): CaveShape[] {
-    const regionHash = hash2(this.seed ^ SALT_CAVE, rx, rz);
-    const count = regionHash % (CAVE_TUNNELS_MAX + 1);
+    const hash = this.regionHash(rx, rz);
+    const count = hash % (CAVE_TUNNELS_MAX + 1);
+    const candidates = this.candidatesOf(rx, rz);
     const tunnels: CaveShape[] = [];
     for (let i = 0; i < count; i++) {
-      const rng = mulberry32(hash32(regionHash + Math.imul(i + 1, 0x9e3779b9)));
-      const tunnel = this.buildTunnel(rx, rz, rng);
+      const candidate = candidates[i];
+      if (candidate) {
+        if (this.keepsRules(candidate, false, 0) && !this.touchesRavine(candidate)) {
+          tunnels.push(candidate);
+        }
+        continue;
+      }
+      const tunnel = this.buildTunnel(rx, rz, this.tunnelRng(hash, i), 'deep', true);
       if (tunnel) tunnels.push(tunnel);
     }
     return tunnels;
   }
 
-  /** One tunnel of region (rx, rz) from its random stream, or null if it is dropped. */
-  private buildTunnel(rx: number, rz: number, rng: Rng): CaveShape | null {
+  /**
+   * One tunnel of region (rx, rz) from its random stream, if it is of kind `want` (and,
+   * with `rules`, keeps them); otherwise null.
+   */
+  private buildTunnel(
+    rx: number,
+    rz: number,
+    rng: Rng,
+    want: 'entrance' | 'deep',
+    rules: boolean,
+  ): CaveShape | null {
     const entrance = rng() < CAVE_ENTRANCE_SHARE;
     const sx = rx * CAVE_REGION + Math.floor(rng() * CAVE_REGION);
     const sz = rz * CAVE_REGION + Math.floor(rng() * CAVE_REGION);
@@ -460,6 +641,7 @@ export class CaveCarver {
     const chamberRadius = 3 + rng() * 2;
     const chamberUp = 2.5 + rng();
     const jointSalt = Math.floor(rng() * 0x7fffffff);
+    if (entrance !== (want === 'entrance')) return null;
 
     let y: number;
     let mouthY = Math.floor(startY);
@@ -517,7 +699,7 @@ export class CaveCarver {
         this.chamber(nx, ny, nz, r, chamberRadius * 0.8, chamberUp * 0.85);
       }
       // A tunnel that breaks a rule is dropped as a whole: stop as soon as it does.
-      if (!this.keepsRules(!entrance, before)) return null;
+      if (rules && !this.keepsRules(b, !entrance, before)) return null;
       x = nx;
       y = ny;
       z = nz;
@@ -526,12 +708,12 @@ export class CaveCarver {
     if (entrance && y > target) return null;
     const before = b.count;
     this.chamber(x, y, z, r, chamberRadius, chamberUp);
-    if (!this.keepsRules(!entrance, before)) return null;
+    if (rules && !this.keepsRules(b, !entrance, before)) return null;
     this.clampBedrock(b);
     const ex = Math.floor(x);
     const ey = Math.floor(y);
     const ez = Math.floor(z);
-    if (this.touchesRavine()) return null;
+    if (rules && this.touchesRavine(b)) return null;
     return snapshot(b, {
       kind: entrance ? 'entrance' : 'deep',
       startX: sx,
@@ -662,14 +844,17 @@ export class CaveCarver {
     for (let s = 0; s < b.count; s++) {
       if (this.waterFloor(b.spans[s * 4], b.spans[s * 4 + 1]) < 255) return null;
     }
+    // The end the walk check looks for: the lowest floor cell.
+    let lowest = 0;
+    for (let s = 1; s < b.count; s++) if (b.spans[s * 4 + 2] < b.spans[lowest * 4 + 2]) lowest = s;
     return snapshot(b, {
       kind: 'ravine',
       startX: Math.floor(px[0]),
       startY: this.heights.heightAt(Math.floor(px[0]), Math.floor(pz[0])) + 1,
       startZ: Math.floor(pz[0]),
-      endX: Math.floor(px[half]),
-      endY: floorY,
-      endZ: Math.floor(pz[half]),
+      endX: b.spans[lowest * 4],
+      endY: b.spans[lowest * 4 + 2],
+      endZ: b.spans[lowest * 4 + 1],
     });
   }
 }
