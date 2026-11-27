@@ -109,11 +109,14 @@ many rounds, the two sides in turn.
   actions. The tables are append-only: never renumber or reuse an id. `blocks.test.ts`,
   `items.test.ts` and `recipes.test.ts` pin them. Every placeable block is an item with the block's id; items that are no blocks
   start at 256 (`Item.COAL`). An unknown stored item id still loads and shows as "Unknown
-  item"; a newer build must never make a world "damaged".
+  item"; a newer build must never make a world "damaged". Block state kinds (the chest's)
+  belong to the save format: a new kind needs a new format version.
 - **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 3: caves,
   with world options); old versions and their checksums never change: `src/world/generation/CLAUDE.md`.
 - **Saving.** One `WorldMeta` record plus one record per edited chunk (`SAVE_FORMAT_VERSION`,
-  now 5, with the task book and the tracked task); decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`.
+  now 6, with the task book, the tracked task, block states (chests) and the book version);
+  decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`. Block
+  state: `src/world/CLAUDE.md`.
 - **Light.** Sky and block light per cell (0–15) are a pure function of the blocks, never
   saved. **The invariant:** after any edits, loads and unloads the
   stored light of every lit chunk equals what the slow reference (`lightCheck.ts`) works
@@ -308,13 +311,14 @@ hold:
 | 8B1       | `docs/phase-8b1-plan.md`       | `docs/phase-8b1-report.md`       | radar, ores, feature unlocks, Map tab      |
 | 8B2a      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2a-report.md`      | generator 3, caves, walk check, `caves`    |
 | 8B2b      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2b-report.md`      | radar places, map and circle size          |
+| 8B3a1     | `docs/phase-8b3a-plan.md`      | `docs/phase-8b3a1-report.md`     | block state, chest, save format 6, rooms   |
 
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
   planned. Phase 8: A, "Fix Adventure 1", B1 (radar), B2a (generator 3, caves) and B2b (places on
-  the radar, a larger map) are built; B3a (chests as storage, `docs/phase-8b3a-plan.md`) is
-  planned as two parts, B3a1 (block state, save format 6, rooms) then B3a2 (chest screen,
-  task 21); B3b on and C–E are not planned. At a session's start look
+  the radar, a larger map) are built; of B3a (chests as storage, `docs/phase-8b3a-plan.md`)
+  B3a1 (block state, save format 6, rooms; the chest only through the test API) is built,
+  B3a2 (chest screen, task 21) is next; B3b on and C–E are not planned. At a session's start look
   for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
   needed"). Numbers from software WebGL (cloud, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase

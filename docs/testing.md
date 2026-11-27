@@ -117,6 +117,14 @@ kinds, 8 each), legend (texts), draws }`; `ui.tab` may be `map`; `settings.radar
   `map-tab-places` (640 × 360, the whole screen) in `e2e/radarPlaces.spec.ts`; the room
   check in `e2e/mpCaves.spec.ts`.
 
+- Phase 8 part B3a1 (chests, no screen yet): `give(20, n)` gives chests; `submit` takes
+  `chestMove`, `quickMove`, `takeAll`, `openChest`, `closeChest`; `getChest(x, y, z)` gives
+  the 27 slots (`{ item, count } | null`) or null where no chest is (also in a chunk that is
+  not loaded); `getState().world.chests` counts chests with at least one item;
+  `getState().net.worldHash` covers block states. The F3 row "Chests" ("3 chests · 1.2 kB",
+  "· 1 dropped") shows while the world has block states. `e2e/chest.spec.ts` (single
+  player, `save=1`), `e2e/mpChest.spec.ts` (a room, a late guest).
+
 ## Controller
 
 Controller tests call `installFakePads(page)` (`e2e/gamepad.ts`) before `goto`; it
@@ -136,6 +144,11 @@ should). `BUTTON` has the standard indices.
 
 ## Multiplayer
 
+- The network test (Phase 6 part A): a screen of its own (`nettest`), opened by "Network
+  test" on the settings page; "Back" returns there. Its test id is
+  `mc-<build>-t-<4 characters>`; it lists the others from PeerJS discovery every 3 s,
+  connects with "Connect", runs 20 pings and 1 MB in 16 kB messages (`NetTestRun`), reads
+  the candidate pair from `getStats()` and gives one verdict line.
 - Part A: `__mc.netNetwork()` gives a test the page's PeerJS network to drive directly;
   outside a room `getState().net` is `{ role, available, build, test }`, with `test` the
   network test's state while its screen is open.

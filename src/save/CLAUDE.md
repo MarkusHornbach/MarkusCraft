@@ -6,14 +6,28 @@ write what), `worldLock.ts` (one tab per world).
 
 ## Files
 
-- `saveFormat.ts` (records with the world's guests, validation, names, seeds),
+- `saveFormat.ts` (records with the world's guests and block states, validation, names,
+  seeds),
   `WorldStore.ts` (interface + `MemoryStore`)
 
 ## Saving
 
 A world is one `WorldMeta` record plus one record per edited chunk (`save/saveFormat.ts`,
-`SAVE_FORMAT_VERSION`, now 5). Decoding validates every field and never throws; a change
+`SAVE_FORMAT_VERSION`, now 6). Decoding validates every field and never throws; a change
 to the format needs a new format version and a migration.
+
+Version 6 (Phase 8 part B3a) adds block states to chunk records, `states: [[index, kind,
+[slot, item, count, …]], …]` (the filled slots; left out when a chunk has none), and the
+book version `progress.book` (an integer ≥ 1). A chunk record may hold states without
+edits; a chunk named for a write is written even when empty, so no stale state survives.
+Validation: index in the chunk and once, a kind the format knows (state kinds belong to
+the format: a new kind needs a new version), slot 0–26 once, item 1–65 535 (unknown ids
+load), count 1–`STACK_SIZE`; a state that does not check out makes the world damaged. A
+format 6 record without a valid `book` is damaged, one with a `book` above `BOOK_VERSION`
+is "newer". Formats 1–5 load with book 1 and no states and are written back as 6; a
+decoded meta's book is upgraded to `BOOK_VERSION` by `upgradeBook` (`src/progress/book.ts`).
+A full chest of 27 different stacks costs at most 400 bytes (AC4.4). An older build lists a
+format 6 world as "Saved by a newer version" and never writes it.
 
 Version 5 (Polish 2) adds `track` to every player record (the world's player, each guest
 entry and network records): an integer from −1 to 65 535; a format 5 record without it,
@@ -48,7 +62,7 @@ as version 2 (decoded metas always carry the current version). How the host fill
 Stores implement `WorldStore`: `IdbStore` (database `markuscraft`, stores `worlds` and
 `chunks`) in normal play and with `save=1`, `MemoryStore` in test mode. `Autosave`
 decides when to write; `Game` marks chunks and the meta record dirty.
-`Game.loadWorld(meta, edits)` swaps world, chunk manager, meshes, player and session in
+`Game.loadWorld(meta, edits, states)` swaps world, chunk manager, meshes, player and session in
 place. Until a world is open `Game` holds an empty placeholder world.
 
 The autosave writes nothing while a performance test runs (`src/bench/CLAUDE.md`) or while

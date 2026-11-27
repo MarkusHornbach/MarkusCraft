@@ -22,7 +22,9 @@ answer asynchronously. `applyAction` is pure and never mutates its inputs;
 `src/actions/pipeline.test.ts` fails if `.setBlock(` is called anywhere but in
 `actions/Session.ts`, `net/HostSession.ts` (the host applies an action),
 `net/ClientSession.ts` (a guest applies the host's blocks) and once in `Game.ts` (the
-test API tool), if a slot-changing inventory function is called outside `src/actions/`
+test API tool), if `.setState(` is called outside the three sessions (Phase 8 part B3a) or a
+chest state is built from slots outside `src/actions/`, `blockState.ts` and the guest that
+applies the host's slots, if a slot-changing inventory function is called outside `src/actions/`
 (one call in `Game.ts` for `give`), or if `replaceRecord` is called outside the two test
 tools. Phase 8: it also fails if `stepProgress` is called outside `actions/Session.ts` and
 `net/HostSession.ts`, `replaceProgress` outside the test tool `setProgress`, or a record's
@@ -35,13 +37,31 @@ value only in `src/actions/`, the save format and once in `Game.ts` (`getState`)
 
 `break`, `place`, `selectSlot`, `startBreak`, `moveStack`, `discard`, `setBarSlot`
 (Creative only), `craft { recipe }` (Gathering only), `track { task }` (Adventure only,
-Polish 2). A refusal carries a short reason
+Polish 2), and the chest actions (below). A refusal carries a short reason
 (`reach`, `unbreakable`, `occupied`, `full`, `early`, `missing`, `mode`, `station`,
-`support`, `rate`, `locked`, `invalid`) that the UI maps to a text (`rate`, a room's limit for
-guests, has none); `ActionResult.notices` is a list of `{ item, count }`, not of strings.
+`support`, `rate`, `locked`, `notEmpty`, `invalid`) that the UI maps to a text (`rate`, a
+room's limit for guests, has none); `ActionResult.notices` is a list of `{ item, count }`, not of strings.
 A `break` may return two block changes: the broken cell, then the cell above it if a
 block that needs support stands there (the support rule: `src/world/CLAUDE.md`). Break
 time 0: `Game` submits `break` in the step in which the `startBreak` was accepted.
+
+## Chests (Phase 8 part B3a)
+
+`ActionContext.states` reads block states (the world, or the host's `FarReader`); an
+accepted result may carry `states: StateChange[]`, which the sessions set after the blocks
+and report through `onStates`. Actions (both modes; the cell's rules, then the block must be
+a chest, else `invalid`): `chestMove { x, y, z, from, fromChest, to, toChest, item }`
+(move, merge, swap as `moveStack`, inside a side or across; Creative swaps equal items),
+`quickMove { x, y, z, slot, fromChest, item }` (onto stacks of the item first, then free
+slots: chest in slot order, player 9–35 then the bar, Creative the bar; `full` if nothing
+moved), `takeAll { x, y, z }` (`missing` if empty, `full` if nothing moved), `openChest`
+and `closeChest {}` (change nothing; a room tracks viewers). `item` is the item the screen
+showed: another item or an empty slot answers `missing`. Creative player slots are 0–8
+(9–35 `invalid`). Every accepted move stores the chest explicitly; placing a chest stores an
+empty one. **Breaking a chest:** Adventure needs room for the chest and all its contents
+together (`startBreak` and `break`, `full`, HUD "No room for the chest's items"), then adds
+them with one notice per item kind and removes the state; Creative answers `notEmpty`
+("Empty the chest first") while it holds items. The support rule is unchanged.
 
 ## Progress (Phase 8 part A)
 

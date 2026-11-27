@@ -5,7 +5,8 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`): no `three`, n
 
 ## Files
 
-- `blocks.ts` (block + tile table), `chunk.ts`, `World.ts`, `ChunkManager.ts`,
+- `blocks.ts` (block + tile table), `blockState.ts` (block state), `chunk.ts`, `World.ts`,
+  `ChunkManager.ts`,
   `raycast.ts`, `dayNight.ts` (time → sun, sky colours, daylight)
 - `generation/`: the terrain generators (`src/world/generation/CLAUDE.md`)
 - `light/`: `lightRules.ts` (levels, packing, the step rule), `lightChunk.ts` (light of a
@@ -33,6 +34,23 @@ the torch 6/16 × 14/16); a ray that misses the box goes on, and the target outl
 box's size. The mesher draws a torch with `emitTorch` (ten quads, the light of its own
 cell, no ambient occlusion). Its icon is painted (`itemIcons.ts`, see
 `src/render/CLAUDE.md`).
+
+## Block state (Phase 8 part B3a)
+
+`BlockState` (`blockState.ts`) is a union of plain, immutable, JSON-safe values with a
+`kind`; today one member, `ChestState { kind: 'chest', slots }` with `CHEST_SLOTS` (27)
+entries. `STATE_KIND_OF_BLOCK` maps a block to the kind its cells carry (only the chest,
+block 20). `World.states` (chunk key → block index → state) is kept for the whole world
+like `World.edits`: kept when a chunk unloads, taken over from a loaded world, saved,
+sent to joining guests. **Rules:** a state lives only in a cell whose block has its kind;
+`World.setBlock` to a block of another kind removes the cell's state in the same call;
+`World.setState` refuses a loaded cell of another kind; a loaded state on such a cell is
+dropped when its chunk is generated and counted (`droppedStates`, F3). A chest without a
+stored state reads as `initialState(block, x, y, z, source)`, the hook for derived
+contents (generated loot, later), today an empty chest. Once touched (placed, an item
+moved) a chest is stored explicitly, also when empty, so derived contents never come back.
+`setState(` is called only by the sessions (`pipeline.test.ts`); state never touches
+light. A new kind (the furnace) needs a new save format version (`src/save/CLAUDE.md`).
 
 ## Light
 
