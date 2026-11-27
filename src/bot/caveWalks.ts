@@ -174,3 +174,68 @@ export function walkShaft(walk: WalkWorld, shaft: Shaft): WalkResult {
   const up = walkTo(walk, chamber, (x, y, z) => x === top.x && y === top.y && z === top.z, limits);
   return { down, up };
 }
+
+/** What `scripts/progressRun.ts` prints per run of generator 3. */
+export interface CaveCheck {
+  entrances: number;
+  entrancesWalked: number;
+  shaftWalked: boolean;
+  /** Steps of the walk from the spawn to the spawn shaft's chamber (null: none). */
+  spawnToChamber: number | null;
+}
+
+/** Walks the entrances within 96 blocks of the spawn and the spawn shaft of one world. */
+export function checkCaves(
+  walk: WalkWorld,
+  spawn: Cell,
+  shapes: readonly CaveShape[],
+  shaft: Shaft | null,
+  cave: CaveCells,
+): CaveCheck {
+  let walked = 0;
+  for (const shape of shapes) {
+    const result = walkEntrance(walk, shape, cave);
+    if (result.down !== null && result.up !== null) walked++;
+  }
+  let shaftWalked = false;
+  let spawnToChamber: number | null = null;
+  if (shaft) {
+    const result = walkShaft(walk, shaft);
+    shaftWalked = result.down !== null && result.up !== null;
+    const margin = 8;
+    spawnToChamber = walkTo(
+      walk,
+      spawn,
+      (x, y, z) =>
+        y === shaft.floor &&
+        Math.abs(x - shaft.x) <= SHAFT_HALF &&
+        Math.abs(z - shaft.z) <= SHAFT_HALF,
+      {
+        minX: Math.min(spawn.x, shaft.x) - margin,
+        maxX: Math.max(spawn.x, shaft.x) + margin,
+        minZ: Math.min(spawn.z, shaft.z) - margin,
+        maxZ: Math.max(spawn.z, shaft.z) + margin,
+      },
+    );
+  }
+  return { entrances: shapes.length, entrancesWalked: walked, shaftWalked, spawnToChamber };
+}
+
+/** The "Generator 3" section of `scripts/progressRun.ts`. */
+export function formatCaveChecks(checks: readonly CaveCheck[]): string {
+  const entrances = checks.reduce((n, c) => n + c.entrances, 0);
+  const walked = checks.reduce((n, c) => n + c.entrancesWalked, 0);
+  const shafts = checks.filter((c) => c.shaftWalked).length;
+  const steps = checks
+    .map((c) => c.spawnToChamber)
+    .filter((s): s is number => s !== null)
+    .sort((a, b) => a - b);
+  const median = steps.length > 0 ? steps[steps.length >> 1] : null;
+  return [
+    `Generator 3 (${checks.length} worlds)`,
+    '',
+    `- Entrances within 96 blocks of the spawn walked down to y ≤ 30 and back: ${walked} of ${entrances}`,
+    `- Spawn shafts walked top → chamber → top in torch light: ${shafts} of ${checks.length}`,
+    `- Walk from the spawn to the spawn shaft's chamber: median ${median ?? '–'} steps (${steps.length} of ${checks.length} reached)`,
+  ].join('\n');
+}

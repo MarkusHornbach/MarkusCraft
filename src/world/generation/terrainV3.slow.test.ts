@@ -6,6 +6,7 @@ import { SHAFT_HALF, shaftBlock } from './shafts';
 import { findSpawn } from './spawn';
 import { generateChunk, getTerrain } from './terrain';
 import { TerrainV3 } from './terrainV3';
+import { World } from '../World';
 import { TERRAIN_SHAPES, TREE_DENSITIES, type WorldGen, type WorldOptions } from './worldOptions';
 
 const SEEDS = [1, 42, 1337, 2024];
@@ -239,5 +240,33 @@ describe('generator 3 rules', () => {
         }
       }
     }
+  });
+
+  it('Phase 8B2a AC2.3 the light invariant holds after breaking into a tunnel from the surface', () => {
+    const gen: WorldGen = { version: 3, options: { terrain: 'balanced', trees: 'few' } };
+    const terrain = getTerrain(1337, gen) as TerrainV3;
+    // A deep tunnel cell with solid ground above it.
+    const tunnel = terrain.caves.shapesIn(-300, -300, 300, 300).find((s) => s.kind === 'deep');
+    expect(tunnel).toBeDefined();
+    if (!tunnel) return;
+    const x = tunnel.endX;
+    const z = tunnel.endZ;
+    const world = new World(1337, gen);
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    for (let dz = -2; dz <= 2; dz++)
+      for (let dx = -2; dx <= 2; dx++) world.generate(cx + dx, cz + dz);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) world.light(cx + dx, cz + dz);
+    expect(world.verifyLight()).toBe(0);
+    let y = world.surfaceY(x, z);
+    let broken = 0;
+    while (y > 0 && !terrain.carved(x, y, z)) {
+      world.setBlock(x, y, z, Block.AIR);
+      broken++;
+      y--;
+    }
+    expect(broken).toBeGreaterThan(3);
+    expect(terrain.carved(x, y, z)).toBe(true);
+    expect(world.verifyLight()).toBe(0);
   });
 });

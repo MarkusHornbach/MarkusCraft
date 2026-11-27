@@ -547,6 +547,9 @@ export class Bot {
       item = PILLAR_BLOCKS.find((b) => this.count(b) > 0);
       if (item === undefined) this.fail('no blocks for a pillar');
     }
+    // A torch in the feet cell (the bot's own, or a mine shaft's) is taken first: a block
+    // cannot be placed into its cell.
+    if (this.block([x, y, z]) === Block.TORCH) this.breakBlock([x, y, z]);
     this.moveTo([x, y + 1, z], true);
     this.placeAt([x, y, z], item);
   }
