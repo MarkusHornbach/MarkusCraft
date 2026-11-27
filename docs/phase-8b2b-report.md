@@ -114,8 +114,12 @@ Distances are horizontal, from the spawn to the place's cell.
     1; an old profile reads as Medium.
 12. **The pause menu on a phone keeps fitting 360 px**: the new slider row pushed "Copy
     link" 22 px below the screen; the title "MarkusCraft" now stands left of the play
-    buttons on screens up to 480 px high (touch), which frees one line.
-13. **`map-tab-touch` was removed**: since B2a the menu world is generator 3, so B1's touch
+    buttons on screens up to 480 px high (touch), which frees one line. Title (18 px) and
+    buttons (narrower padding) stay on one line with CI's wider font too (checked here with
+    DejaVu Sans forced: "Copy link" ends at 357 px of 360).
+13. **The Map tab's header is 36 px high** on larger screens: the map's size follows it,
+    and CI's font made it 1 px lower than here, which changed the reference's size.
+14. **`map-tab-touch` was removed**: since B2a the menu world is generator 3, so B1's touch
     map reference showed the same screen as the new `map-tab-places`. B1's touch test keeps
     its layout checks.
 

@@ -730,7 +730,17 @@ canvas {
      circle size", after Phase 8 part B2b) and the menu still fits 360 px. */
   .touch-mode .pause-screen .pause-title {
     float: left;
-    margin: 10px 0 0 4px;
+    margin: 11px 0 0 2px;
+    font-size: 18px;
+  }
+
+  /* Narrower buttons keep title and buttons on one line with wider fonts too (CI). */
+  .touch-mode .pause-screen .pause-buttons .play-button {
+    padding: 0 16px;
+  }
+
+  .touch-mode .pause-screen .pause-buttons .back-button {
+    padding: 8px 12px;
   }
 
   .touch-mode .play-button {
@@ -2440,6 +2450,11 @@ button.task-row:hover {
   margin: 12px;
 }
 
+/* A fixed header height: the map's size follows it, and must not change with the font. */
+.inventory-screen[data-tab='map'] .inventory-header {
+  height: 36px;
+}
+
 .map-tab {
   width: 100%;
   flex: 1 1 0;
@@ -2525,6 +2540,7 @@ button.task-row:hover {
     grid-column: 2;
     grid-row: 1;
     align-items: flex-start;
+    height: auto;
   }
 
   .inventory-screen[data-tab='map'] .inventory-title {
