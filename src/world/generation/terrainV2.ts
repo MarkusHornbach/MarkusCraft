@@ -104,6 +104,8 @@ export class TerrainV2 {
   private readonly level: TreeLevel | null;
   /** The level's highest chance: a column whose hash is above it is never a candidate. */
   private readonly maxChance: number;
+  /** Whether the tree hooks of a later version are asked (false: version 2's fast path). */
+  protected hooks = false;
   /**
    * Candidate chance per column of the chunk being generated and its rim (-1: not computed
    * yet), so the forest noise is evaluated once per column and never per neighbour check.
@@ -197,7 +199,7 @@ export class TerrainV2 {
   }
 
   /** Whether column (x, z) wants a tree, by hashes only (the terrain is checked apart). */
-  private isOrigin(x: number, z: number): boolean {
+  protected isOrigin(x: number, z: number): boolean {
     if (!this.level) return false;
     if (!this.isCandidate(x, z)) return false;
     // Version 1's spacing rule: among candidates closer than the minimum spacing the one
@@ -244,7 +246,7 @@ export class TerrainV2 {
    * The rock rule of a land column of height `h` with its four neighbours' heights: the
    * one decision of `generateChunk` and `isRock`.
    */
-  private rockOf(
+  protected rockOf(
     h: number,
     x: number,
     z: number,
@@ -268,7 +270,7 @@ export class TerrainV2 {
     return this.stoneTops.get(x, z, this.computeStoneTop);
   }
 
-  private readonly computeStoneTop = (x: number, z: number): number => {
+  protected readonly computeStoneTop = (x: number, z: number): number => {
     const h = this.cachedHeightAt(x, z);
     return this.isRock(x, z) ? h : h - DIRT_DEPTH - 1;
   };
@@ -295,7 +297,7 @@ export class TerrainV2 {
     return heights;
   }
 
-  private cachedHeightAt(x: number, z: number): number {
+  protected cachedHeightAt(x: number, z: number): number {
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
     const heights = this.heightsOf(cx, cz);
@@ -347,6 +349,20 @@ export class TerrainV2 {
     const blocks = new Uint8Array(CHUNK_VOLUME);
     const x0 = cx * CHUNK_SIZE;
     const z0 = cz * CHUNK_SIZE;
+    const maxHeight = this.fillBase(blocks, cx, cz);
+    placeOres(this.seed, blocks, x0, z0, maxHeight);
+    this.placeTreesPhase(blocks, x0, z0);
+    return blocks;
+  }
+
+  /**
+   * First phase of a chunk: bedrock, stone, soil, water and clay. Leaves the chunk's column
+   * heights (with the rim) in `heights` and the column flags in `flags` for the later
+   * phases; returns the highest column. Version 3 builds on the same phases.
+   */
+  protected fillBase(blocks: Uint8Array, cx: number, cz: number): number {
+    const x0 = cx * CHUNK_SIZE;
+    const z0 = cz * CHUNK_SIZE;
     const heights = this.heights;
     const maxHeight = this.fillHeights(cx, cz);
 
@@ -394,19 +410,44 @@ export class TerrainV2 {
         for (let y = h; y > h - CLAY_DEPTH; y--) blocks[column + y * LAYER] = Block.CLAY;
       }
     }
-    placeOres(this.seed, blocks, x0, z0, maxHeight);
-    if (this.level) {
-      this.chances.fill(-1);
-      this.chanceX0 = x0 - TREE_REACH;
-      this.chanceZ0 = z0 - TREE_REACH;
-      this.chancesActive = true;
-      try {
-        this.placeTrees(blocks, x0, z0);
-      } finally {
-        this.chancesActive = false;
-      }
+    return maxHeight;
+  }
+
+  /** Height of a column of the chunk last passed to `fillBase` (local coordinates). */
+  protected baseHeight(lx: number, lz: number): number {
+    return this.heights[lx + 1 + (lz + 1) * GRID];
+  }
+
+  /** Last phase of a chunk: the trees (after `fillBase` of the same chunk). */
+  protected placeTreesPhase(blocks: Uint8Array, x0: number, z0: number): void {
+    if (!this.level) return;
+    this.chances.fill(-1);
+    this.chanceX0 = x0 - TREE_REACH;
+    this.chanceZ0 = z0 - TREE_REACH;
+    this.chancesActive = true;
+    try {
+      this.placeTrees(blocks, x0, z0);
+    } finally {
+      this.chancesActive = false;
     }
-    return blocks;
+  }
+
+  /**
+   * Whether a tree rooted on ground `ground` of column (x, z) is left out; version 2 has
+   * no such rule, version 3 keeps trees off carved columns and shafts.
+   */
+  protected treeBlocked(x: number, z: number, ground: number): boolean {
+    void x;
+    void z;
+    void ground;
+    return false;
+  }
+
+  /** Whether a leaf may not go into column (x, z) (version 3: a shaft's footprint). */
+  protected leafBlocked(x: number, z: number): boolean {
+    void x;
+    void z;
+    return false;
   }
 
   /**
@@ -427,6 +468,7 @@ export class TerrainV2 {
           ? this.flags[ox - x0 + (oz - z0) * CHUNK_SIZE] === ROCK_COLUMN
           : this.isRock(ox, oz);
         if (rock) continue;
+        if (this.hooks && this.treeBlocked(ox, oz, ground)) continue;
         const topLog = ground + trunkHeight(this.seed, ox, oz);
 
         // Leaves first; they only fill air, so terrain and other trunks stay intact.
@@ -440,6 +482,7 @@ export class TerrainV2 {
               const lx = ox + dx - x0;
               if (lx < 0 || lx >= CHUNK_SIZE) continue;
               if (!hasLeaf(this.seed, ox, oz, dx, dy, dz)) continue;
+              if (this.hooks && this.leafBlocked(ox + dx, oz + dz)) continue;
               const i = lx + lz * CHUNK_SIZE + y * LAYER;
               if (blocks[i] === Block.AIR) blocks[i] = Block.LEAVES;
             }
