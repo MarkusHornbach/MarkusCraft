@@ -19,6 +19,7 @@ const ORDER = [
   'torches',
   'players',
   'radar',
+  'caves',
   'stand',
   'walk',
   'fly',
@@ -26,10 +27,11 @@ const ORDER = [
   'torches',
   'players',
   'radar',
+  'caves',
   'stand',
 ];
 const HINTS = [
-  'Takes about 4 minutes',
+  'Takes about 5 minutes',
   'Plug in the charger',
   'Close other apps and tabs',
   'Switch battery saver off',
@@ -59,7 +61,7 @@ async function untilPhase(page: Page, wanted: string, timeout = 200_000): Promis
 
 /** Waits until the run has loaded its world: from then on the rules of 5.5 watch it. */
 async function untilMeasuring(page: Page): Promise<void> {
-  await expect(page.locator('.bench-progress')).toContainText('scenario 1 of 15', {
+  await expect(page.locator('.bench-progress')).toContainText('scenario 1 of 17', {
     timeout: 60_000,
   });
 }
@@ -193,12 +195,12 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5, Phase 6 A
   expect(lines.length).toBeGreaterThanOrEqual(5);
   for (const text of lines) {
     expect(text).toMatch(
-      /^Performance test – scenario \d+ of 15: (standing|walking|flying|building|torches at night|four players|radar)$/,
+      /^Performance test – scenario \d+ of 17: (standing|walking|flying|building|torches at night|four players|radar|caves)$/,
     );
   }
   const numbers = lines.map((text) => Number(/scenario (\d+)/.exec(text)?.[1]));
   expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
-  expect(numbers[numbers.length - 1]).toBe(15);
+  expect(numbers[numbers.length - 1]).toBe(17);
   // Phase 6 AC15.2: the three simulated guests were drawn during `players`.
   expect((await getState(page)).bench?.figures).toBe(3);
   // None of them is left once the run is over.
@@ -209,10 +211,12 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5, Phase 6 A
   if (!result) throw new Error('no result');
   expect(result.quick).toBe(true);
   expect(result.format).toBe(1);
-  expect(result.suite).toBe(4);
+  expect(result.suite).toBe(5);
   expect(result.workers).toBe('quick');
   expect(result.scenarios.map((s) => s.id)).toEqual(ORDER);
-  expect(result.scenarios.map((s) => s.rd)).toEqual([2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2]);
+  expect(result.scenarios.map((s) => s.rd)).toEqual([
+    2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 2,
+  ]);
   for (const s of result.scenarios) {
     expect(s.frames, s.id).toBeGreaterThan(0);
     expect(s.ms, s.id).toBeGreaterThan(0);
@@ -244,12 +248,12 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5, Phase 6 A
 
   // AC3.2: the result screen.
   const rows = page.locator('.bench-row');
-  await expect(rows).toHaveCount(15);
+  await expect(rows).toHaveCount(17);
   expect(
     await rows.evaluateAll((list) => list.map((r) => (r as HTMLElement).dataset.scenario)),
   ).toEqual(ORDER);
   const lights = await page.locator('.bench-row .bench-light').allTextContents();
-  expect(lights.length).toBe(15);
+  expect(lights.length).toBe(17);
   for (const light of lights) expect(light).toMatch(/^[GYR]( \(cut off\))?$/);
   await expect(page.locator('.bench-workers')).toHaveText(
     'Web Workers (Part C): not a measurement',
@@ -325,7 +329,7 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5, Phase 6 A
   await page.locator('.bench-last-button').click();
   expect(await phase(page)).toBe('result');
   expect(await page.evaluate(() => window.__mc.benchResult())).toEqual(result);
-  await expect(page.locator('.bench-row')).toHaveCount(15);
+  await expect(page.locator('.bench-row')).toHaveCount(17);
   // An interrupted run does not replace it.
   await page.locator('.bench-again-button').click();
   await untilPhase(page, 'running');

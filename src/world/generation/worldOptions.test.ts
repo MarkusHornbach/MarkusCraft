@@ -11,6 +11,7 @@ import {
   isKnownGeneratorVersion,
   optionsOf,
   sameWorldGen,
+  worldGenKey,
   worldGenOf,
 } from './worldOptions';
 
@@ -62,13 +63,16 @@ describe('world options', () => {
   it('pair generator versions with options', () => {
     expect(isKnownGeneratorVersion(1)).toBe(true);
     expect(isKnownGeneratorVersion(2)).toBe(true);
-    expect(isKnownGeneratorVersion(3)).toBe(false);
+    expect(isKnownGeneratorVersion(3)).toBe(true);
+    expect(isKnownGeneratorVersion(4)).toBe(false);
     const options = { terrain: 'flat', trees: 'many' } as const;
     expect(worldGenOf(1, null)).toEqual(CLASSIC_GEN);
     expect(worldGenOf(1, options)).toBeNull();
     expect(worldGenOf(2, options)).toEqual({ version: 2, options });
     expect(worldGenOf(2, null)).toBeNull();
-    expect(worldGenOf(3, options)).toBeNull();
+    expect(worldGenOf(3, options)).toEqual({ version: 3, options });
+    expect(worldGenOf(3, null)).toBeNull();
+    expect(worldGenOf(4, options)).toBeNull();
     expect(optionsOf(CLASSIC_GEN)).toBeNull();
     expect(optionsOf({ version: 2, options })).toEqual(options);
     expect(sameWorldGen(CLASSIC_GEN, { version: 1 })).toBe(true);
@@ -79,6 +83,14 @@ describe('world options', () => {
     expect(
       sameWorldGen({ version: 2, options }, { version: 2, options: { ...options, trees: 'few' } }),
     ).toBe(false);
+    // Phase 8B2a AC1.6: generator 3 takes the same options, but is another generator.
+    expect(sameWorldGen({ version: 3, options }, { version: 3, options: { ...options } })).toBe(
+      true,
+    );
+    expect(sameWorldGen({ version: 2, options }, { version: 3, options })).toBe(false);
+    expect(worldGenKey({ version: 3, options })).toBe('3:flat:many');
+    expect(worldGenKey({ version: 2, options })).toBe('2:flat:many');
+    expect(optionsOf({ version: 3, options })).toEqual(options);
   });
 
   it('are described for the world list and the overlay', () => {
@@ -92,6 +104,13 @@ describe('world options', () => {
     expect(debugWorldGen(CLASSIC_GEN)).toBe('Generator 1');
     expect(debugWorldGen({ version: 2, options: DEFAULT_WORLD_OPTIONS })).toBe(
       'Generator 2 · balanced · few',
+    );
+    // Phase 8B2a AC1.6
+    expect(describeWorldGen({ version: 3, options: DEFAULT_WORLD_OPTIONS })).toBe(
+      'Balanced · Few trees · Caves',
+    );
+    expect(debugWorldGen({ version: 3, options: DEFAULT_WORLD_OPTIONS })).toBe(
+      'Generator 3 · balanced · few',
     );
   });
 });

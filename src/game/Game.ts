@@ -66,6 +66,7 @@ import { chunkKey, toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
+import { TerrainV3, caveSites } from '../world/generation/terrainV3';
 import {
   type WorldGen,
   type WorldOptions,
@@ -81,7 +82,6 @@ import { BackGuard } from './backGuard';
 import { heapMb, readBenchEnv } from './benchEnv';
 import {
   ACTION_REPEAT_MS,
-  BENCH_GENERATOR_VERSION,
   BENCH_SEED,
   BENCH_START_DELAY_MS,
   BENCH_STORAGE_KEY,
@@ -1540,11 +1540,9 @@ export class Game {
   /** What the runner may do with the game: the real world, physics and action layer. */
   private benchHost(): BenchHost {
     return {
-      loadWorld: (renderDistance) => {
+      loadWorld: (renderDistance, gen) => {
         this.useSettings({ ...DEFAULT_SETTINGS, renderDistance });
-        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative', {
-          version: BENCH_GENERATOR_VERSION,
-        });
+        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative', gen);
         this.loadWorld(meta, new Map());
         // The loop runs the simulation; no pointer lock is asked for.
         this.paused = false;
@@ -3173,6 +3171,10 @@ export class Game {
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
       terrainChecksum: () => terrainChecksum(this.world.seed, this.world.gen),
+      caveSites: () => {
+        const terrain = getTerrain(this.world.seed, this.world.gen);
+        return terrain instanceof TerrainV3 ? caveSites(terrain) : null;
+      },
       getLight: (x, y, z) => this.lightAt(x, y, z),
       verifyLight: () => this.world.verifyLight(),
       lightChecksum: () => lightChecksumOf((cx, cz) => this.world.lightOf(cx, cz)),

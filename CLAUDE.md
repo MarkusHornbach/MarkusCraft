@@ -110,8 +110,8 @@ many rounds, the two sides in turn.
   `items.test.ts` and `recipes.test.ts` pin them. Every placeable block is an item with the block's id; items that are no blocks
   start at 256 (`Item.COAL`). An unknown stored item id still loads and shows as "Unknown
   item"; a newer build must never make a world "damaged".
-- **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 2, with
-  world options); old versions and `TERRAIN_CHECKSUM_1337_V1` never change: `src/world/CLAUDE.md`.
+- **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 3: caves,
+  with world options); old versions and their checksums never change: `src/world/generation/CLAUDE.md`.
 - **Saving.** One `WorldMeta` record plus one record per edited chunk (`SAVE_FORMAT_VERSION`,
   now 5, with the task book and the tracked task); decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`.
 - **Light.** Sky and block light per cell (0–15) are a pure function of the blocks, never
@@ -141,7 +141,8 @@ many rounds, the two sides in turn.
 Before changing an area, read its file (it lists the area's files) and the "Decisions and
 deviations" of the reports whose status row names it:
 
-- `src/world/CLAUDE.md`: chunks, generation, light, meshing, block flags
+- `src/world/CLAUDE.md`: chunks, light, meshing, block flags
+- `src/world/generation/CLAUDE.md`: generators 1–3, caves, mine shafts, checksums, spawn
 - `src/actions/CLAUDE.md`: actions, refusal reasons, game modes
 - `src/items/CLAUDE.md`: items, tools, gating, recipes
 - `src/progress/CLAUDE.md`: task book, XP, levels, recipe unlocks, the progress step
@@ -305,11 +306,13 @@ hold:
 | Polish 2  | `docs/polish-2-plan.md`        | `docs/polish-2-report.md`        | tracker, `track`, save format 5, Tasks tab |
 | Fix Adv 1 | `docs/fix-adventure-1-plan.md` | `docs/fix-adventure-1-report.md` | torch unlock, dark rule, smelting row      |
 | 8B1       | `docs/phase-8b1-plan.md`       | `docs/phase-8b1-report.md`       | radar, ores, feature unlocks, Map tab      |
+| 8B2a      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2a-report.md`      | generator 3, caves, walk check, `caves`    |
 
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
-  planned. Phase 8: A, "Fix Adventure 1" and B1 (radar) are built; B2 on
-  and C–E are not planned. At a session's start look
+  planned. Phase 8: A, "Fix Adventure 1", B1 (radar) and B2a (generator 3, caves) are built; B2b
+  (places on the radar) is planned in `docs/phase-8b2-plan.md`; B3 on and C–E are not planned. At a
+  session's start look
   for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
   needed"). Numbers from software WebGL (cloud, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase

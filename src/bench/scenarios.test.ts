@@ -11,6 +11,7 @@ import { findSpawn } from '../world/generation/spawn';
 import { getTerrain } from '../world/generation/terrain';
 import { World } from '../world/World';
 import {
+  CAVES_GEN,
   BENCH_SPAWN,
   EDIT_CELLS,
   FLY_HEIGHT,
@@ -21,6 +22,7 @@ import {
   TORCH_HOVER,
   buildSuite,
   getScenario,
+  scenarioGen,
 } from './scenarios';
 
 function scenarioOf(id: string): Scenario {
@@ -282,6 +284,7 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       ['torches', 1, 1200, 'torches at night'],
       ['players', 1, 1200, 'four players'],
       ['radar', 1, 1200, 'radar'],
+      ['caves', 1, 1200, 'caves'],
     ]);
     expect(SCENARIOS.map((s) => s.time ?? null)).toEqual([
       null,
@@ -289,6 +292,7 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       null,
       null,
       0.75,
+      null,
       null,
       null,
     ]);
@@ -301,13 +305,25 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       null,
       [2, 5, 8],
       null,
+      null,
     ]);
     expect(getScenario('players')?.start).toMatchObject({
       ...BENCH_SPAWN,
       yaw: PLAYERS_YAW,
       mode: 'walk',
     });
-    expect(BENCH_SUITE_VERSION).toBe(4);
+    expect(BENCH_SUITE_VERSION).toBe(5);
+    // Phase 8B2a AC2.5: only `caves` plays in another world, generator 3 at the spawn.
+    expect(SCENARIOS.map((s) => scenarioGen(s).version)).toEqual([1, 1, 1, 1, 1, 1, 1, 3]);
+    const caves = getScenario('caves');
+    const spawn = findSpawn(getTerrain(BENCH_SEED, CAVES_GEN));
+    expect(caves?.start).toMatchObject({
+      x: spawn.x + 0.5,
+      y: spawn.y,
+      z: spawn.z + 0.5,
+      mode: 'walk',
+    });
+    expect(caves?.start.yaw).toBe(getScenario('walk')?.start.yaw);
     // Phase 8B1 AC6.1: only `radar` shows the circle and turns the view (1.5° per step).
     expect(SCENARIOS.map((s) => s.radar === true)).toEqual([
       false,
@@ -317,6 +333,7 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       false,
       false,
       true,
+      false,
     ]);
     const radar = getScenario('radar');
     expect(radar?.start).toMatchObject({ ...BENCH_SPAWN, mode: 'walk' });
@@ -337,6 +354,7 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       'torches@5',
       'players@5',
       'radar@5',
+      'caves@5',
       'stand@8',
       'walk@8',
       'fly@8',
@@ -344,10 +362,12 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       'torches@8',
       'players@8',
       'radar@8',
+      'caves@8',
       'stand@5',
     ]);
     expect(full.map((e) => e.steps)).toEqual([
-      600, 1200, 1200, 900, 1200, 1200, 1200, 600, 1200, 1200, 900, 1200, 1200, 1200, 600,
+      600, 1200, 1200, 900, 1200, 1200, 1200, 1200, 600, 1200, 1200, 900, 1200, 1200, 1200, 1200,
+      600,
     ]);
     expect(full.every((e) => e.warmup === 120)).toBe(true);
     // A fresh world per block.
@@ -359,7 +379,9 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       false,
       false,
       false,
+      false,
       true,
+      false,
       false,
       false,
       false,
@@ -376,10 +398,10 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
     expect(quick.map((e) => e.scenario.id)).toEqual(full.map((e) => e.scenario.id));
     expect(quick.map((e) => e.fresh)).toEqual(full.map((e) => e.fresh));
     expect(quick.map((e) => e.renderDistance)).toEqual([
-      2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2,
+      2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 2,
     ]);
     expect(quick.map((e) => e.steps)).toEqual([
-      30, 60, 60, 45, 60, 60, 60, 30, 60, 60, 45, 60, 60, 60, 30,
+      30, 60, 60, 45, 60, 60, 60, 60, 30, 60, 60, 45, 60, 60, 60, 60, 30,
     ]);
     expect(quick.every((e) => e.warmup === 6)).toBe(true);
   });

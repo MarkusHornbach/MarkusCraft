@@ -24,3 +24,24 @@ export const TERRAIN_CHECKSUMS_1337_V2: Readonly<Record<string, number>> = {
   'hilly/normal': 3992534389,
   'hilly/many': 1986712728,
 };
+
+/**
+ * `terrainChecksum(1337, { version: 3, options })` for every combination (Phase 8 part
+ * B2a AC1.1), pinned once the cave density was tuned. They must never change. "flat/many"
+ * and "balanced/many" equal version 2's: their spawn (and so the spawn shaft) lies far from
+ * the origin and no tunnel touches its 3 × 3 chunks.
+ */
+export const TERRAIN_CHECKSUMS_1337_V3: Readonly<Record<string, number>> = {
+  'flat/none': 1187198291,
+  'flat/few': 2311718407,
+  'flat/normal': 3116820216,
+  'flat/many': 1702540350,
+  'balanced/none': 3601326056,
+  'balanced/few': 2671568332,
+  'balanced/normal': 1711089731,
+  'balanced/many': 2952111101,
+  'hilly/none': 3597418401,
+  'hilly/few': 620035875,
+  'hilly/normal': 4167167292,
+  'hilly/many': 1429350040,
+};

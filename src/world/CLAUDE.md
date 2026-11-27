@@ -7,10 +7,7 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`): no `three`, n
 
 - `blocks.ts` (block + tile table), `chunk.ts`, `World.ts`, `ChunkManager.ts`,
   `raycast.ts`, `dayNight.ts` (time → sun, sky colours, daylight)
-- `generation/`: `worldOptions.ts` (options, `WorldGen`, labels, validation), `terrain.ts`
-  (version 1: heights, rock, layers; dispatch, checksum), `terrainV2.ts` (version 2: shapes,
-  forests), `terrainRules.ts` (constants of both), `ores.ts` (veins, clay), `trees.ts`,
-  `spawn.ts`, `columnCache.ts`
+- `generation/`: the terrain generators (`src/world/generation/CLAUDE.md`)
 - `light/`: `lightRules.ts` (levels, packing, the step rule), `lightChunk.ts` (light of a
   chunk from scratch), `lightUpdate.ts` (after an edit), `lightCheck.ts` (slow reference;
   tests and `verifyLight`)
@@ -73,42 +70,8 @@ gives the chunk manager only what is left of `CHUNK_BUDGET_MS` (Phase 4 part E).
 
 ## Generator version
 
-Every world stores its generator: `WorldGen` is `{ version: 1 }` or `{ version: 2, options:
-{ terrain, trees } }` (`worldOptions.ts`; the strings are append-only, pinned by
-`worldOptions.test.ts`). `GENERATOR_VERSION` (2) is what the "New world" form gives; the
-automatic world of `?test=1` and the bench (`BENCH_GENERATOR_VERSION`) stay version 1.
-`generateChunk(seed, cx, cz, gen)`, `terrainChecksum(seed, gen)` and `getTerrain(seed, gen)`
-(cached per seed and generator) dispatch on the version. An old version keeps producing the
-same blocks for ever: a change to generation adds a version. `Terrain` (version 1) is never
-changed; `TERRAIN_CHECKSUM_1337_V1` and the twelve `TERRAIN_CHECKSUMS_1337_V2`
-(`src/testing/terrainChecksum.ts`) never change; checked in Node and in the browser.
-`World.gen` passes the generator to every chunk; `FarReader`, test rigs and tools pass it on.
-
-**Version 2** (`TerrainV2`, Phase 7 part A) uses version 1's noise tables (`deriveSeed` 1–3)
-and rules after the heights (rock, beaches, dirt, water, clay, ores). Shapes
-(`SHAPE_CURVES`): `hilly` is version 1's height curve exactly; `balanced` and `flat` keep the
-base below c = 0 (the water share) and flatten only the land. Trees: a forest noise
-(`deriveSeed` 4, 1/160, two octaves) gives each column a weight; the level's row of
-`TREE_LEVELS` (`meadow`, `forest`, `lo`, `hi`) turns it into a candidate chance; version 1's
-spacing rule (3, highest hash wins) and tree shape follow; `none` has no trees. The chance
-is cached per column of the chunk and its rim while a chunk is generated.
-
-**For the radar** (Phase 8 part B1): `veinCells` is the radar's copy of the vein walk
-(`placeKind` keeps its own inline one for speed; the radar's agreement test proves they
-agree), and `TerrainSource.oreHost(x, y, z)` says where generation leaves stone
-before the ores (rock columns 1…h, others 1…h − `DIRT_DEPTH` − 1; the rock rule is
-`rockOf`, shared with the chunk loop; cached per column).
-
-**Spawn:** version 1 (and `none`) as before: the grass column nearest the origin with no
-trunk within `SPAWN_TREE_CLEARANCE`. With trees, version 2 also wants `SPAWN_MIN_TREES` (8)
-trunks within `SPAWN_WOOD_RADIUS` (40), searched up to `SPAWN_WOOD_RINGS` (256) rings over a
-summed-area table of trunks, then falls back to the plain rule. `Game` finds the spawn with
-the world's generator.
-
-**Measuring:** `npx vite-node scripts/terrainStats.ts` prints plains, water, beach, high
-land, rock, trees per 1000 grass columns, open land, ores and clay per preset over the
-plan's eight seeds (`src/testing/terrainMeasure.ts`, also used by
-`terrainV2Stats.slow.test.ts`), and the generation time. Numbers: `docs/phase-7a-report.md`.
+Generators 1–3 (caves, mine shafts), their checksums, spawn, `oreHost` and the cave
+budgets: `src/world/generation/CLAUDE.md`.
 
 Hot paths here (meshing, generation) avoid per-block allocations; use typed arrays. Before
 changing light, the chunk manager or the mesher read the "Decisions and deviations" of

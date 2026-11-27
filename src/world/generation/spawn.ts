@@ -39,6 +39,7 @@ function isSuitable(terrain: TerrainSource, x: number, z: number): boolean {
  * `SPAWN_MIN_TREES` trunks within `SPAWN_WOOD_RADIUS`, up to `SPAWN_WOOD_RINGS` rings.
  */
 export function findSpawn(terrain: TerrainSource): SpawnPoint {
+  if (terrain.spawnPoint) return terrain.spawnPoint();
   if (terrain.wantsWood) {
     const wooded = findWoodedSpawn(terrain);
     if (wooded) return wooded;

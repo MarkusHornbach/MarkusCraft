@@ -23,7 +23,7 @@ export interface BenchScreenOptions {
 }
 
 export const BENCH_HINTS: readonly string[] = [
-  'Takes about 4 minutes',
+  'Takes about 5 minutes',
   'Plug in the charger',
   'Close other apps and tabs',
   'Switch battery saver off',

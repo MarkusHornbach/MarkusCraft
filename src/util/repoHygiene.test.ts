@@ -46,7 +46,8 @@ describe('repository hygiene (AC12.4)', () => {
     // `figure-sheet` and `player-section`. Phase 7 part A added `gen2-balanced-few`,
     // `gen2-flat-many` and `gen2-hilly-normal`. Phase 8 part A1 added `tasks-tab`,
     // `tasks-tab-touch`, `recipe-list-locked` and `progress-notice`. Polish 2 added
-    // `task-tracker` and `task-tracker-touch`.
-    expect(assets.length).toBe(52);
+    // `task-tracker` and `task-tracker-touch`. Phase 8 part B2a added `cave-tunnel`,
+    // `mine-shaft` and `ravine`.
+    expect(assets.length).toBe(55);
   });
 });

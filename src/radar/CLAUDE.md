@@ -25,8 +25,9 @@ generator leaves stone before the ores (`TerrainSource.oreHost`) and no earlier 
 took it (kinds are placed in `ORE_KINDS` order, coal before iron). `VeinIndex(seed, gen)`
 holds per ore cell column (6 × 6 blocks) the veins whose origin lies in it, only their ore
 cells; at most `VEIN_INDEX_COLUMNS` (2 048) columns, the oldest dropped. It never depends
-on the world. The agreement test proves the index equals `generateChunk`'s ores for four
-seeds, generator 1 and the twelve generator 2 presets.
+on the world. The agreement tests prove the index equals `generateChunk`'s ores for four
+seeds, generator 1 and the twelve presets of generators 2 and 3 (`agreementV3.slow.test.ts`:
+also around the spawn shaft and a ravine; the comparison is `src/testing/radarAgreement.ts`).
 
 `scanRadar` asks a probe per cell: the block of a loaded chunk, or null where the chunk is
 not loaded. A cell counts if the probe shows the kind's block or knows nothing; mined cells

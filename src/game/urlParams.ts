@@ -88,7 +88,7 @@ export function parseParams(search: string, randomSeed: () => number): GameParam
     save: query.get('save') === '1',
     world: normalizeName(query.get('world') ?? '', 'Test'),
     mode: query.get('mode') === 'gathering' ? 'gathering' : 'creative',
-    testGen: testGenParam(query.get('terrain'), query.get('trees')),
+    testGen: testGenParam(query.get('terrain'), query.get('trees'), query.get('gen')),
     progress: query.get('progress') === 'fresh' ? 'fresh' : 'all',
     bench: test ? 'off' : bench,
     join: normalizeRoomCode(query.get('join') ?? ''),
@@ -104,13 +104,22 @@ function lookParam(text: string | null): number | null {
   return isLookChoice(look) ? look : null;
 }
 
-/** `terrain=` and `trees=` (Phase 7 part A); invalid values are ignored. */
-function testGenParam(terrainText: string | null, treesText: string | null): WorldGen {
+/**
+ * `terrain=` and `trees=` (Phase 7 part A) and `gen=2|3` (Phase 8 part B2a); invalid
+ * values are ignored. Without `gen`, `terrain` or `trees` give generator 2; `gen=3` alone
+ * gives generator 3 with the default options; nothing gives generator 1.
+ */
+function testGenParam(
+  terrainText: string | null,
+  treesText: string | null,
+  genText: string | null,
+): WorldGen {
   const terrain = isTerrainShape(terrainText) ? terrainText : null;
   const trees = isTreeDensity(treesText) ? treesText : null;
-  if (terrain === null && trees === null) return CLASSIC_GEN;
+  const version = genText === '2' ? 2 : genText === '3' ? 3 : null;
+  if (terrain === null && trees === null && version === null) return CLASSIC_GEN;
   return {
-    version: 2,
+    version: version ?? 2,
     options: {
       terrain: terrain ?? DEFAULT_WORLD_OPTIONS.terrain,
       trees: trees ?? DEFAULT_WORLD_OPTIONS.trees,
