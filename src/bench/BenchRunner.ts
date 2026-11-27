@@ -27,13 +27,15 @@ import {
   type SuiteEntry,
   type SuiteKind,
   buildSuite,
+  scenarioGen,
 } from './scenarios';
+import { type WorldGen, worldGenKey } from '../world/generation/worldOptions';
 import { isThrottled, workersVerdict } from './verdict';
 
 /** What the runner needs from the game. `Game` implements it; tests pass a fake. */
 export interface BenchHost {
-  /** Opens a fresh test world at this render distance, replacing the one before. */
-  loadWorld(renderDistance: number): void;
+  /** Opens a fresh test world of `gen` at this render distance, replacing the one before. */
+  loadWorld(renderDistance: number, gen: WorldGen): void;
   setPlayer(pose: ScenarioPose): void;
   /** Sets the time of day (0..1); the clock stands still during a run. */
   setTime(time: number): void;
@@ -112,6 +114,8 @@ export class BenchRunner {
   private sinceMs: number | null = null;
   /** Time the fresh world of this block was loaded, until its ready time is taken. */
   private loadedMs: number | null = null;
+  /** `worldGenKey` of the world loaded last. */
+  private loadedGen = '';
   /** The window's last step was played; the frame that follows closes it. */
   private windowDone = false;
   private cut = false;
@@ -216,9 +220,14 @@ export class BenchRunner {
     const entry = this.entries[this.index];
     this.options.onProgress(this.progress);
     this.host.setInput(NO_INPUT);
-    if (entry.fresh) {
-      this.host.loadWorld(entry.renderDistance);
-      this.loadedMs = nowMs;
+    // A block starts in a fresh world (its ready time is taken); a scenario of another
+    // generator (`caves`) loads its own world in the block, without a ready time.
+    const gen = scenarioGen(entry.scenario);
+    const genKey = worldGenKey(gen);
+    if (entry.fresh || genKey !== this.loadedGen) {
+      this.host.loadWorld(entry.renderDistance, gen);
+      this.loadedGen = genKey;
+      if (entry.fresh) this.loadedMs = nowMs;
     }
     this.host.setPlayer(entry.scenario.start);
     this.host.setTime(entry.scenario.time ?? BENCH_TIME);

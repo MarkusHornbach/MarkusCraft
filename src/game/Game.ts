@@ -81,7 +81,6 @@ import { BackGuard } from './backGuard';
 import { heapMb, readBenchEnv } from './benchEnv';
 import {
   ACTION_REPEAT_MS,
-  BENCH_GENERATOR_VERSION,
   BENCH_SEED,
   BENCH_START_DELAY_MS,
   BENCH_STORAGE_KEY,
@@ -1540,11 +1539,9 @@ export class Game {
   /** What the runner may do with the game: the real world, physics and action layer. */
   private benchHost(): BenchHost {
     return {
-      loadWorld: (renderDistance) => {
+      loadWorld: (renderDistance, gen) => {
         this.useSettings({ ...DEFAULT_SETTINGS, renderDistance });
-        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative', {
-          version: BENCH_GENERATOR_VERSION,
-        });
+        const meta = this.newWorldMeta('Performance test', BENCH_SEED, BENCH_TIME, 'creative', gen);
         this.loadWorld(meta, new Map());
         // The loop runs the simulation; no pointer lock is asked for.
         this.paused = false;

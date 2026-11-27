@@ -21,7 +21,9 @@ import {
   SIM_HZ,
   WALK_SPEED,
 } from '../game/config';
+import { findSpawn } from '../world/generation/spawn';
 import { generateChunk, getTerrain } from '../world/generation/terrain';
+import type { WorldGen } from '../world/generation/worldOptions';
 import { Block } from '../world/blocks';
 import { blockIndex, chunkKey, toChunkCoord, toLocalCoord } from '../world/chunk';
 import type { MoveInput } from '../player/physics';
@@ -62,6 +64,33 @@ export interface Scenario {
   radar?: boolean;
   /** The view direction (yaw, radians) to set before this step, if the script turns. */
   yaw?(step: number, steps: number): number;
+  /** The world's generator; the bench's generator 1 world if absent (Phase 8 part B2a). */
+  gen?: WorldGen;
+}
+
+/** The generator of a scenario's world. */
+export function scenarioGen(scenario: Scenario): WorldGen {
+  return scenario.gen ?? { version: BENCH_GENERATOR_VERSION };
+}
+
+/** The world of the scenario `caves`: what new worlds get, with the default options. */
+export const CAVES_GEN: WorldGen = { version: 3, options: { terrain: 'balanced', trees: 'few' } };
+let cavesSpawn: ScenarioPose | null = null;
+
+/** The start of `caves`: the spawn of its world (worked out once), facing like `walk`. */
+function cavesStart(): ScenarioPose {
+  if (!cavesSpawn) {
+    const spawn = findSpawn(getTerrain(BENCH_SEED, CAVES_GEN));
+    cavesSpawn = {
+      x: spawn.x + 0.5,
+      y: spawn.y,
+      z: spawn.z + 0.5,
+      yaw: WALK_YAW,
+      pitch: 0,
+      mode: 'walk',
+    };
+  }
+  return cavesSpawn;
 }
 
 /** Where a simulated guest is before a step, and whether it holds break. */
@@ -424,6 +453,21 @@ export const SCENARIOS: readonly Scenario[] = [
     action: noAction,
     radar: true,
     yaw: (step) => WALK_YAW + step * RADAR_TURN_PER_STEP,
+  },
+  {
+    // Phase 8 part B2a: the walk in a generator 3 world (tunnels, ravines, the spawn
+    // shaft; caves cost faces even where nobody sees them). Last in the table, so a block
+    // loads the generator 3 world once and the next block starts in the bench world again.
+    id: 'caves',
+    version: 1,
+    label: 'caves',
+    steps: 1200,
+    get start(): ScenarioPose {
+      return cavesStart();
+    },
+    input: () => WALK_INPUT,
+    action: noAction,
+    gen: CAVES_GEN,
   },
 ];
 
