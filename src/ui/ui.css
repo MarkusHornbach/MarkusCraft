@@ -1082,7 +1082,7 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .inventory-title {
@@ -1204,11 +1204,15 @@ canvas {
 
 .inventory-tabs {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   margin-right: auto;
 }
 
+/* Four tabs since Phase 8 part B1: narrower than other menu buttons, so the header keeps
+   room for fonts a little wider than this container's (the panel never grows). */
 .inventory-tab {
+  padding-left: 12px;
+  padding-right: 12px;
   background: transparent;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
   color: #a9c4e6;
@@ -1221,7 +1225,7 @@ canvas {
 }
 
 .touch-mode .inventory-tab {
-  min-width: 72px;
+  min-width: 64px;
 }
 
 /* The number of recipes that can be made now, after "Crafting". */

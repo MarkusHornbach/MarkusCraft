@@ -20,6 +20,30 @@ async function openMap(page: Page): Promise<void> {
   await step(page, 20);
 }
 
+/** Free room in the inventory header: its width minus what its parts need. */
+function headerSlack(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const header = document.querySelector<HTMLElement>('.inventory-header');
+    if (!header) return -1;
+    const parts = [...header.children] as HTMLElement[];
+    const gap = parseFloat(getComputedStyle(header).columnGap) || 0;
+    const tabs = header.querySelector<HTMLElement>('.inventory-tabs');
+    const tabGap = tabs ? parseFloat(getComputedStyle(tabs).columnGap) || 0 : 0;
+    let needed = gap * (parts.length - 1);
+    for (const part of parts) {
+      if (part === tabs) {
+        const list = [...part.children] as HTMLElement[];
+        needed +=
+          list.reduce((n, t) => n + t.getBoundingClientRect().width, 0) +
+          tabGap * (list.length - 1);
+      } else {
+        needed += part.getBoundingClientRect().width;
+      }
+    }
+    return header.getBoundingClientRect().width - needed;
+  });
+}
+
 /** The world behind is hidden for the references (the panel is translucent). */
 async function hideWorld(page: Page): Promise<void> {
   await page.locator('canvas.game-canvas').evaluate((node) => {
@@ -61,6 +85,9 @@ test('Phase 8B1 AC4.1 AC4.3 AC4.5: four tabs; the map with legend; it reopens on
     expect(box.y + box.height).toBeLessThanOrEqual(panel.y + panel.height);
     expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width);
   }
+  // The header with four tabs leaves room for slightly wider fonts (CI's): the panel is as
+  // wide as the items page.
+  expect(await headerSlack(page)).toBeGreaterThanOrEqual(24);
   await hideWorld(page);
   await expect(page.locator('.inventory-panel')).toHaveScreenshot('map-tab.png', {
     maxDiffPixelRatio: 0.05,
@@ -157,6 +184,7 @@ test.describe('touch', () => {
       expect(box.y + box.height).toBeLessThanOrEqual(panel.y + panel.height + 0.5);
       expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width + 0.5);
     }
+    expect(await headerSlack(page)).toBeGreaterThanOrEqual(24);
     await page.locator('canvas.game-canvas').evaluate((node) => {
       (node as HTMLElement).style.visibility = 'hidden';
     });
