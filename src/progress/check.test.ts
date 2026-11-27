@@ -1,6 +1,7 @@
 // The static check names the culprit of each broken table (Phase 8 AC1.2).
 import { describe, expect, it } from 'vitest';
 import { Item } from '../items/items';
+import { Block } from '../world/blocks';
 import { checkTables } from './check';
 import { STARTING_TABLES } from '../testing/startingTables';
 import { PROGRESS_TABLES as SHIPPED, type ProgressTables, type RecipeUnlock } from './tables';
@@ -110,5 +111,50 @@ describe('static check (Phase 8 AC1.2)', () => {
         'recipe 99: unknown level 9',
       ]),
     );
+  });
+});
+
+describe('the light rule (Fix Adventure 1 AC2.1)', () => {
+  const torchOn = (unlock: RecipeUnlock['unlock']): Partial<ProgressTables> =>
+    unlocks((l) => l.map((u) => (u.recipe === 20 ? { recipe: 20, unlock } : u)));
+
+  it('Fix Adventure 1 AC2.1: the shipped tables pass with the guaranteed XP per chapter', () => {
+    expect(SHIPPED.darkBlocks).toEqual([Block.COAL_ORE, Block.IRON_ORE]);
+    const result = checkTables(SHIPPED);
+    expect(result.errors).toEqual([]);
+    expect(result.chapters.map((c) => c.xp)).toEqual([50, 125, 235, 380, 520]);
+  });
+
+  it('Fix Adventure 1 AC2.1: the torch on task 12 (the tables before) fails: task 12 needs light', () => {
+    expect(errorsOf(variant(torchOn({ task: 12 })))).toEqual([
+      'chapter 3 "Stone and fire" cannot be finished: task 12 "Mine 3 coal": needs light (coal ore), no light source before it',
+    ]);
+  });
+
+  it('Fix Adventure 1 AC2.1: the torch on task 14 fails: a reach below without light', () => {
+    expect(errorsOf(variant(torchOn({ task: 14 })))).toEqual(
+      expect.arrayContaining([
+        'chapter 3 "Stone and fire" cannot be finished: task 12 "Mine 3 coal": needs light (coal ore), no light source before it',
+      ]),
+    );
+    // Without coal ore in the dark, the depth task is what fails (and the torch tasks,
+    // whose recipe is still locked).
+    const errors = errorsOf(variant({ ...torchOn({ task: 14 }), darkBlocks: [Block.IRON_ORE] }));
+    expect(errors).toContain(
+      'chapter 4 "Into the dark" cannot be finished: task 14 "Reach depth 30": needs light (depth 30), no light source before it',
+    );
+  });
+
+  it('Fix Adventure 1 AC2.1: coal ore in the dark and the torch at level 7 fails at task 12', () => {
+    const errors = errorsOf(variant({ ...torchOn({ level: 7 }), darkBlocks: [Block.COAL_ORE] }));
+    expect(errors).toEqual([
+      'chapter 3 "Stone and fire" cannot be finished: task 12 "Mine 3 coal": needs light (coal ore), no light source before it',
+    ]);
+  });
+
+  it('Fix Adventure 1 AC2.1: without dark blocks the torch on task 12 passes: the rule catches it', () => {
+    const result = checkTables(variant({ ...torchOn({ task: 12 }), darkBlocks: [] }));
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
   });
 });

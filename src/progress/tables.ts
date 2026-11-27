@@ -73,6 +73,12 @@ export const NATURAL_BLOCKS: readonly number[] = [
   Block.IRON_ORE,
 ];
 
+/**
+ * Natural blocks a player normally finds only in the dark (underground): the static check
+ * treats them as no source until a light source can be made (Fix Adventure 1).
+ */
+export const DARK_BLOCKS: readonly number[] = [Block.COAL_ORE, Block.IRON_ORE];
+
 /** Everything the engine and the static check read; tests build broken variants of it. */
 export interface ProgressTables {
   readonly chapters: readonly Chapter[];
@@ -86,6 +92,8 @@ export interface ProgressTables {
   readonly firstCraftXp: number;
   /** Per-recipe overrides of `firstCraftXp` (recipe id → XP). */
   readonly firstCraftOverrides: ReadonlyMap<number, number>;
+  /** Blocks found only in the dark (`DARK_BLOCKS`); the static check's light rule. */
+  readonly darkBlocks: readonly number[];
 }
 
 export const CHAPTERS: readonly Chapter[] = [
@@ -176,6 +184,7 @@ export const PROGRESS_TABLES: ProgressTables = {
   firstFindXp: FIRST_FIND_XP,
   firstCraftXp: FIRST_CRAFT_XP,
   firstCraftOverrides: FIRST_CRAFT_OVERRIDES,
+  darkBlocks: DARK_BLOCKS,
 };
 
 /** The bot's time model (plan 5.10). `humanFactor` is calibrated by device test PROG-1. */

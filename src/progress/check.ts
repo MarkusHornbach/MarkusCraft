@@ -3,6 +3,7 @@ import { WORLD_HEIGHT } from '../game/config';
 import { dropOf } from '../items/hardness';
 import { getItemDef, toolOf } from '../items/items';
 import { RECIPES, type Recipe, STATION_BLOCKS } from '../items/recipes';
+import { BLOCK_EMISSION, getBlockDef } from '../world/blocks';
 import { NATURAL_BLOCKS, type ProgressTables, type Task, type Unlock, levelIn } from './tables';
 
 /** XP and level at the end of one chapter, as the fixed point reaches them. */
@@ -122,8 +123,28 @@ function checkReachability(
     return state.done.has(unlock.task);
   };
 
+  /** Recipes whose result is a block that emits light (the torch). */
+  const lightSources = recipes.filter((r) => {
+    const block = getItemDef(r.result.item)?.block ?? null;
+    return block !== null && BLOCK_EMISSION[block] > 0;
+  });
+  const dark = new Set(tables.darkBlocks);
+  /** Whether a light source is unlocked and can be made: then dark blocks count. */
+  let lit = false;
+  const sourceBlocks = (): readonly number[] =>
+    lit ? NATURAL_BLOCKS : NATURAL_BLOCKS.filter((b) => !dark.has(b));
+
   /** Items the player can get now: mined with tools it can get, crafted from them. */
   const obtainable = (): Set<number> => {
+    const have = obtainableFrom();
+    if (!lit && lightSources.some((r) => have.has(r.result.item))) {
+      lit = true;
+      return obtainableFrom();
+    }
+    return have;
+  };
+
+  const obtainableFrom = (): Set<number> => {
     const have = new Set<number>();
     for (let changed = true; changed;) {
       changed = false;
@@ -134,7 +155,7 @@ function checkReachability(
         }
       };
       const held = [null, ...[...have].filter((item) => toolOf(item) !== null)];
-      for (const block of NATURAL_BLOCKS) {
+      for (const block of sourceBlocks()) {
         for (const tool of held) {
           const drop = dropOf(block, tool);
           if (drop) add(drop.item);
@@ -151,7 +172,7 @@ function checkReachability(
 
   const sourcesOf = (item: number, have: Set<number>): number[] => {
     const held = [null, ...[...have].filter((i) => toolOf(i) !== null)];
-    return NATURAL_BLOCKS.filter((block) =>
+    return sourceBlocks().filter((block) =>
       held.some((tool) => dropOf(block, tool)?.item === item),
     );
   };
@@ -198,9 +219,26 @@ function checkReachability(
       case 'place':
         return have.has(task.target);
       case 'reachBelow':
+        return lit;
       case 'reachAbove':
         return true;
     }
+  };
+
+  /** Why a stuck task would be possible with light ("coal ore", "depth 30"), else null. */
+  const needsLight = (task: Task): string | null => {
+    if (lit) return null;
+    if (task.type === 'reachBelow') return `depth ${task.target}`;
+    lit = true;
+    const have = obtainableFrom();
+    const possible = canDo(task, have);
+    const sources = task.type === 'mine' ? sourcesOf(task.target, have) : [];
+    lit = false;
+    if (!possible) return null;
+    const needed = sources.filter((b) => dark.has(b));
+    return (needed.length > 0 ? needed : [...dark])
+      .map((b) => getBlockDef(b).label.toLowerCase())
+      .join(', ');
   };
 
   const complete = (task: Task, have: Set<number>): void => {
@@ -245,8 +283,10 @@ function checkReachability(
     const stuck = tasks.filter((t) => !state.done.has(t.id));
     if (stuck.length > 0) {
       for (const task of stuck) {
+        const light = needsLight(task);
+        const why = light === null ? '' : `: needs light (${light}), no light source before it`;
         errors.push(
-          `chapter ${chapter.id} "${chapter.title}" cannot be finished: task ${task.id} "${task.label}"`,
+          `chapter ${chapter.id} "${chapter.title}" cannot be finished: task ${task.id} "${task.label}"${why}`,
         );
       }
       return { errors, chapters };
