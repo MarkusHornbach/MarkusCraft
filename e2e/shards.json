@@ -12,6 +12,7 @@
     ],
     [
       "breaking.spec.ts",
+      "caves.spec.ts",
       "fullscreen.spec.ts",
       "inventoryScreen.spec.ts",
       "leaves.spec.ts",
@@ -47,7 +48,7 @@
     ]
   ],
   "multiplayer": [
-    ["mpMenus.spec.ts", "mpPlayers.spec.ts", "mpProgress.spec.ts"],
+    ["mpCaves.spec.ts", "mpMenus.spec.ts", "mpPlayers.spec.ts", "mpProgress.spec.ts"],
     ["mpFigure.spec.ts", "mpGathering.spec.ts", "mpRadar.spec.ts"],
     ["mpHarden.spec.ts", "mpRooms.spec.ts"]
   ]

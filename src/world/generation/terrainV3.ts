@@ -3,7 +3,15 @@ import { CHUNK_SIZE, CHUNK_VOLUME, WORLD_HEIGHT } from '../../game/config';
 import { Block } from '../blocks';
 import { CaveCarver, MASK_WORDS } from './caves';
 import { placeOres } from './ores';
-import { SHAFT_HALF, type Shaft, ShaftPlanner, shaftBlock, shaftYRange } from './shafts';
+import {
+  SHAFT_HALF,
+  type Shaft,
+  ShaftPlanner,
+  shaftBlock,
+  shaftChamberCell,
+  shaftTopCell,
+  shaftYRange,
+} from './shafts';
 import { findSpawn, type SpawnPoint } from './spawn';
 import type { TerrainSource } from './terrain';
 import { TerrainV2 } from './terrainV2';
@@ -206,4 +214,58 @@ function carve(blocks: Uint8Array, mask: Uint32Array): void {
       blocks[column + (yBase + bit) * LAYER] = Block.AIR;
     }
   }
+}
+
+/** A cell of the world. */
+export interface SiteCell {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** Where a test finds the caves of a generator 3 world (the test API's `caveSites`). */
+export interface CaveSites {
+  /** The spawn shaft: the standing cell on its collar and one in its chamber. */
+  shaft: { x: number; z: number; top: SiteCell; chamber: SiteCell } | null;
+  /** The entrance whose mouth lies nearest the spawn: its mouth and its deep end. */
+  entrance: { mouth: SiteCell; end: SiteCell } | null;
+  /** The ravine nearest the spawn: its first end (on the surface) and its lowest floor cell. */
+  ravine: { start: SiteCell; floor: SiteCell } | null;
+}
+
+/** The spawn shaft, the nearest entrance and the nearest ravine (within 256 blocks). */
+export function caveSites(terrain: TerrainV3): CaveSites {
+  const spawn = terrain.spawnPoint();
+  const s = terrain.shafts.spawnShaft();
+  const shapes = terrain.caves.shapesIn(spawn.x - 256, spawn.z - 256, spawn.x + 256, spawn.z + 256);
+  const nearest = (kind: string) => {
+    let best = null;
+    let bestD = Infinity;
+    for (const shape of shapes) {
+      if (shape.kind !== kind) continue;
+      const d = Math.hypot(shape.startX - spawn.x, shape.startZ - spawn.z);
+      if (d < bestD) {
+        bestD = d;
+        best = shape;
+      }
+    }
+    return best;
+  };
+  const entrance = nearest('entrance');
+  const ravine = nearest('ravine');
+  return {
+    shaft: s ? { x: s.x, z: s.z, top: shaftTopCell(s), chamber: shaftChamberCell(s) } : null,
+    entrance: entrance
+      ? {
+          mouth: { x: entrance.startX, y: entrance.startY, z: entrance.startZ },
+          end: { x: entrance.endX, y: entrance.endY, z: entrance.endZ },
+        }
+      : null,
+    ravine: ravine
+      ? {
+          start: { x: ravine.startX, y: ravine.startY, z: ravine.startZ },
+          floor: { x: ravine.endX, y: ravine.endY, z: ravine.endZ },
+        }
+      : null,
+  };
 }

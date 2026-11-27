@@ -24,6 +24,8 @@ export interface WalkOptions {
   lightAbove?: number;
   /** The search stops after this many cells (default 200 000). */
   maxCells?: number;
+  /** Filled with the cells of the way found, start to goal (when one is found). */
+  path?: Cell[];
   /** Only cells this accepts are stood on (for example the cells of one tunnel). */
   allowed?: (x: number, y: number, z: number) => boolean;
   /** Horizontal limits (inclusive); the search never leaves them. */
@@ -86,12 +88,23 @@ export function walkTo(
   }
   const maxCells = options.maxCells ?? 200_000;
   const seen = new Set<string>([key(start.x, start.y, start.z)]);
+  const parents = options.path
+    ? new Map<string, Cell | null>([[key(start.x, start.y, start.z), null]])
+    : null;
   let frontier: Cell[] = [start];
   let steps = 0;
   while (frontier.length > 0 && seen.size < maxCells) {
     const next: Cell[] = [];
     for (const c of frontier) {
-      if (goal(c.x, c.y, c.z)) return steps;
+      if (goal(c.x, c.y, c.z)) {
+        if (parents && options.path) {
+          const way: Cell[] = [];
+          for (let at: Cell | null = c; at; at = parents.get(key(at.x, at.y, at.z)) ?? null)
+            way.push(at);
+          options.path.push(...way.reverse());
+        }
+        return steps;
+      }
       const headroom = isFree(world.block(c.x, c.y + 2, c.z));
       for (const [dx, dz] of DIRS) {
         const nx = c.x + dx;
@@ -101,6 +114,7 @@ export function walkTo(
           const k = key(nx, y, nz);
           if (seen.has(k) || !lit(nx, y, nz)) return;
           seen.add(k);
+          parents?.set(k, c);
           next.push({ x: nx, y, z: nz });
         };
         if (isStanding(world, nx, c.y, nz)) {

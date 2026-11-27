@@ -29,6 +29,10 @@ light against the slow reference after each of 2 000 random edits. The three pas
   part A) make the test world generator 2 with these options; a missing one takes its
   default (Balanced, Few), an invalid value is ignored. Without both the test world is
   generator 1, so `?test=1&seed=1337` keeps the terrain of every older spec and reference.
+- `gen=2|3` (with `test=1`, Phase 8 part B2a) picks the test world's generator; with
+  `terrain` and `trees` or their defaults. `gen=3` alone is generator 3, balanced, few
+  trees (caves and mine shafts); without `gen` the rule above holds. In specs:
+  `openGame(page, { gen: 3 })`.
 - `progress=all|fresh` (with `test=1`, Phase 8 part A): the task book of an Adventure test
   world (`mode=gathering`). Default `all`: every task done and the player at the maximum
   level, so older specs that craft keep working; `fresh` starts the book. Worlds made by
@@ -71,6 +75,12 @@ light against the slow reference after each of 2 000 random edits. The three pas
   `setCollideLeaves(on)` switches "Collide with leaves" without storing it (test mode has no
   settings page). References `gen2-balanced-few`, `gen2-flat-many`, `gen2-hilly-normal`
   (`e2e/terrain.spec.ts`).
+- Phase 8 part B2a: `getState().world.generatorVersion` is 3 in caves worlds;
+  `caveSites()` gives generator 3's spawn shaft (`top`, `chamber` standing cells),
+  nearest entrance (`mouth`, deep `end`) and ravine (`start`, lowest `floor`), or null for
+  older generators (pure: `caveSites` in `terrainV3.ts`). Poses of the references
+  `cave-tunnel`, `mine-shaft`, `ravine` come from `src/testing/caveViews.ts`
+  (`e2e/caves.spec.ts`); `e2e/mpCaves.spec.ts` is the room of a generator 3 world.
 - Phase 8 part A: `openWorld(name, seed, mode?, progress?)` (a new Adventure world's book,
   default `all`); `setProgress({ xp?, done?, counts? }, player?)` sets the XP (on a host with a
   guest's id: that guest's) through the single `replaceRecord` of the test tools, and

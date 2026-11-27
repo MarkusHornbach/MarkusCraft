@@ -36,7 +36,7 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
   below whenever the open list changes.
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Phase 8 part B1 (RADAR-1 to RADAR-7); 2026-11-27.
+Last updated: Phase 8 part B2a (CAVE-1 to CAVE-6); 2026-11-27.
 
 ---
 
@@ -315,3 +315,28 @@ down they are ("5↓", "↑", "="). The settings page switches the circle ("Rada
 - [ ] **RADAR-7** (8B1) Walk on the surface away from the start point until the circle shows
       an arrow on its rim for a kind (no vein of it within 48 blocks): is it clear where to
       go? _PC._ Result:
+
+## 12. Caves and places (Phase 8 part B2)
+
+New worlds (both modes) get generator 3: the world list says "· Caves". Tunnels wind
+through the underground; some open on dry land and slope down to iron depth, deep ones
+connect chambers. A few ravines cut down from the surface. A mine shaft with a log frame,
+plank stairs and torches leads down to a chamber at about height 12; one lies 24–64
+blocks from the start point of every new world (seed 1337 with the form's defaults: about
+24 blocks north-east of the start point). Older worlds keep
+their terrain.
+
+- [ ] **CAVE-1** (8B2a) Performance test on the phone: the new `caves` row against `walk`
+      (frame time, lights). _Phone._ Result:
+- [ ] **CAVE-2** (8B2a) A new Adventure world: follow an entrance tunnel down to iron depth
+      with torches and back up. Is it easy to find the way, too dark, too bright? _PC,
+      Phone._ Result:
+- [ ] **CAVE-3** (8B2a) Walk the surface of a new world: do cave mouths and ravines look
+      natural? Any hole beside water, floating tree, odd edge? _PC._ Result:
+- [ ] **CAVE-4** (8B2a) The mine shaft near the start point: found without the radar?
+      Stairs easy to walk down and up (touch and controller too)? Is the torch light
+      enough? _PC, Phone, controller._ Result:
+- [ ] **CAVE-5** (8B2a) "Mine 20 iron ore" in a new world: how long, compared with RADAR-4?
+      Did the caves or the shaft make it more fun, or too easy? _PC._ Result:
+- [ ] **CAVE-6** (8B2a) A room in a new world: does the guest see the same caves and shaft?
+      _PC + Phone._ Result:

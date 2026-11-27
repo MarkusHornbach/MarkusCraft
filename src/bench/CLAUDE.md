@@ -57,7 +57,10 @@ scenario are never compared (`compare.ts` keeps them in separate rows).
 part B, suite version 2), `players` (below, suite version 3) and `radar` (Phase 8 part B1,
 suite version 4: the `walk` input with the view turning 1.5° per step, `Scenario.yaw`
 through `BenchHost.setYaw`, and the radar circle shown in the bench's Creative world,
-`Scenario.radar`).
+`Scenario.radar`) and `caves` (Phase 8 part B2a, suite version 5: the `walk` input from
+the spawn of a generator 3 world of seed 1337, balanced, few trees; `Scenario.gen`, last
+in the table, so the runner loads that world inside the block without taking a ready
+time, and the next block starts in the bench world again).
 
 ## The scenario `players` (Phase 6 part E)
 

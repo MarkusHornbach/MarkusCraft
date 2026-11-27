@@ -211,10 +211,12 @@ test('Phase 4P AC2.5, AC2.6, AC2.8, AC3.2, AC3.3, AC3.5, AC3.6, AC4.5, Phase 6 A
   if (!result) throw new Error('no result');
   expect(result.quick).toBe(true);
   expect(result.format).toBe(1);
-  expect(result.suite).toBe(4);
+  expect(result.suite).toBe(5);
   expect(result.workers).toBe('quick');
   expect(result.scenarios.map((s) => s.id)).toEqual(ORDER);
-  expect(result.scenarios.map((s) => s.rd)).toEqual([2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2]);
+  expect(result.scenarios.map((s) => s.rd)).toEqual([
+    2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 2,
+  ]);
   for (const s of result.scenarios) {
     expect(s.frames, s.id).toBeGreaterThan(0);
     expect(s.ms, s.id).toBeGreaterThan(0);

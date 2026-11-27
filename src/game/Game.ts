@@ -66,6 +66,7 @@ import { chunkKey, toChunkCoord } from '../world/chunk';
 import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksum } from '../world/generation/terrain';
+import { TerrainV3, caveSites } from '../world/generation/terrainV3';
 import {
   type WorldGen,
   type WorldOptions,
@@ -3170,6 +3171,10 @@ export class Game {
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),
       terrainChecksum: () => terrainChecksum(this.world.seed, this.world.gen),
+      caveSites: () => {
+        const terrain = getTerrain(this.world.seed, this.world.gen);
+        return terrain instanceof TerrainV3 ? caveSites(terrain) : null;
+      },
       getLight: (x, y, z) => this.lightAt(x, y, z),
       verifyLight: () => this.world.verifyLight(),
       lightChecksum: () => lightChecksumOf((cx, cz) => this.world.lightOf(cx, cz)),

@@ -7,11 +7,13 @@ scope). The seed of the bot and balancing tool later parts extend.
 
 - `Bot.ts` (`Bot`, `runBot`, `playerMinutes`), `report.ts` (median and maximum per task,
   chapter and level-up, the balance targets, Markdown), `bot.slow.test.ts` (seed 1337,
-  balanced, few trees: the book completes, every recipe unlocked, light invariant holds),
-  `darkBreak.test.ts`
+  balanced, few trees, generators 2 and 3: the book completes, every recipe unlocked,
+  light invariant holds), `darkBreak.test.ts`
+- `walk.ts` (the walk check), `caveWalks.ts` (entrances, ravines, shafts; the report
+  section), `caveWalks.slow.test.ts` (Phase 8 part B2a AC3.1–AC3.3)
 - `scripts/progressRun.ts` runs it: `npx vite-node scripts/progressRun.ts` (12 runs: seeds
-  1, 1337, 42, 2024 × flat, balanced, hilly, trees "Few"; about a minute), `--quick` (seed
-  1337 balanced only).
+  1, 1337, 42, 2024 × flat, balanced, hilly, trees "Few", generator 3; about a minute),
+  `--quick` (seed 1337 balanced only), `--gen 2` (generator 2, for comparisons).
 
 ## How it plays
 
@@ -56,3 +58,16 @@ unlocked for the bot and the brightest of the block's six faces has `max(sky, bl
 median and maximum per task, all blocks and `DARK_BLOCKS` only. What it cannot judge: a
 player digs open pits where the bot tunnels sideways, the bot ignores the night, and how
 dark is too dark on a real screen (device test PROG-11).
+
+## The walk check (Phase 8 part B2a)
+
+`walkTo` (pure) is a breadth-first search over standing cells (air or torch, a solid cube
+below, a free cell above) of the blocks as they are: a 4-neighbour at the same height, one
+up (with a free cell above the head first) or any drop; never water, a solid block or a
+leaf; options: a block-light floor, limits, an `allowed` cell test, the path found. It
+proves generator 3's promises without digging: every entrance within 96 of the spawn
+reaches y ≤ 30 from its mouth and back (standing in its own cells or on the surface
+beside it, never in another cave or a shaft), every ravine's floor from the surface, the
+spawn shaft's top to its chamber and back in torch light. The bot does not use caves; on
+generator 3 it may fall into one and climbs out with its pillar (it takes a torch out of
+its feet cell first). Dark breaks of tasks 1–11 equal generator 2's (`docs/phase-8b2a-report.md`).

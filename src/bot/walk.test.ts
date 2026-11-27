@@ -28,7 +28,9 @@ describe('walk check', () => {
     for (let x = 1; x <= 4; x++) for (let y = 1; y <= x; y++) cells[`${x},${y},0`] = Block.STONE;
     const w = world(cells);
     expect(walkTo(w, { x: 0, y: 1, z: 0 }, at(4, 5, 0), box)).toBe(4);
-    expect(walkTo(w, { x: 4, y: 5, z: 0 }, at(0, 1, 0), box)).toBe(4);
+    const path: { x: number; y: number; z: number }[] = [];
+    expect(walkTo(w, { x: 4, y: 5, z: 0 }, at(0, 1, 0), { ...box, path })).toBe(4);
+    expect(path.map((c) => c.y)).toEqual([5, 4, 3, 2, 1]);
   });
 
   it('Phase 8B2a never jumps two blocks, but drops any depth', () => {

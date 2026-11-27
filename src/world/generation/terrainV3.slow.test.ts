@@ -99,6 +99,8 @@ const NEIGHBOURS = [
   [0, 0, -1],
 ] as const;
 
+// The rules check reads 48 worlds of 81 + 9 chunks: up to a minute alone, more beside
+// other slow files.
 describe('generator 3 rules', () => {
   it('Phase 8B2a AC1.3 AC1.4 bedrock, water, trees, shafts, torches and ores', () => {
     let totalCarved = 0;
@@ -165,7 +167,7 @@ describe('generator 3 rules', () => {
       }
     }
     expect(totalCarved).toBeGreaterThan(0);
-  });
+  }, 240_000);
 
   it('Phase 8B2a AC1.5 the spawn is grass with no cave below; the spawn shaft lies near it', () => {
     let near = 0;
