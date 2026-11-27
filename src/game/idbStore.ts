@@ -11,6 +11,7 @@ import {
   listEntries,
 } from '../save/saveFormat';
 import type { WorldStore } from '../save/WorldStore';
+import type { WorldStates } from '../world/blockState';
 import { SAVE_DATABASE } from './config';
 
 const WORLDS = 'worlds';
@@ -92,9 +93,14 @@ export class IdbStore implements WorldStore {
     await done(transaction);
   }
 
-  async saveChunks(worldId: string, edits: WorldEdits, keys: Iterable<string>): Promise<void> {
+  async saveChunks(
+    worldId: string,
+    edits: WorldEdits,
+    keys: Iterable<string>,
+    states?: WorldStates,
+  ): Promise<void> {
     // Encoded before the first await: the records are a snapshot of this moment.
-    const records = encodeChunks(worldId, edits, keys);
+    const records = encodeChunks(worldId, edits, keys, states);
     if (records.length === 0) return;
     const transaction = this.db.transaction(CHUNKS, 'readwrite');
     const store = transaction.objectStore(CHUNKS);

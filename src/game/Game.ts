@@ -60,6 +60,7 @@ import { PlayerSection } from '../ui/PlayerSection';
 import { lookForKey } from '../player/looks';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
+import type { StateChange, WorldStates } from '../world/blockState';
 import { ChunkManager } from '../world/ChunkManager';
 import { PerfStats } from './perfStats';
 import { chunkKey, toChunkCoord } from '../world/chunk';
@@ -99,6 +100,7 @@ import {
   PLAYER_EYE_HEIGHT,
   REACH,
   ROOM_LIST_REFRESH_MS,
+  BOOK_VERSION,
   SAVE_FORMAT_VERSION,
   SIM_DT,
   SIM_HZ,
@@ -708,20 +710,21 @@ export class Game {
       player: createPlayerRecord(mode),
       guests: [],
       progress: EMPTY_PROGRESS,
+      book: BOOK_VERSION,
     };
   }
 
   /**
    * Opens a world in place: replaces world, chunk manager, chunk meshes, player and
    * session without reloading the page, and frees the GPU buffers of the old world.
-   * `edits` is taken over by the new world.
+   * `edits` and `states` are taken over by the new world.
    */
-  loadWorld(meta: WorldMeta, edits: WorldEdits): void {
+  loadWorld(meta: WorldMeta, edits: WorldEdits, states: WorldStates = new Map()): void {
     // A room belongs to its world: another world closes it.
     if (this.mp.role === 'host') this.mp.leave();
     this.renderer.clearChunkMeshes();
     const gen = metaGen(meta);
-    this.world = new World(meta.seed, gen, edits);
+    this.world = new World(meta.seed, gen, edits, states);
     this.movement = this.movementOf(this.world);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
     this.spawn = findSpawn(getTerrain(meta.seed, gen));
@@ -790,7 +793,7 @@ export class Game {
       if (!meta || this.world !== world || this.bench || this.mp.role === 'guest') return;
       const start = performance.now();
       // Both calls take their snapshot at once, before anything is awaited.
-      const chunks = store.saveChunks(meta.id, world.edits, batch.chunks);
+      const chunks = store.saveChunks(meta.id, world.edits, batch.chunks, world.states);
       const saved = this.currentMeta(meta);
       const record = batch.meta ? store.saveMeta(saved) : Promise.resolve();
       await Promise.all([chunks, record]);
@@ -837,7 +840,7 @@ export class Game {
     } else {
       const loaded = await this.store.load(entry.id);
       if (!loaded || !loaded.ok) throw new Error(`World "${wanted}" cannot be opened`);
-      this.loadWorld(loaded.value.meta, loaded.value.edits);
+      this.loadWorld(loaded.value.meta, loaded.value.edits, loaded.value.states);
     }
     this.lastLoadMs = performance.now() - start;
   }
@@ -930,7 +933,7 @@ export class Game {
     }
     this.requestPersistence();
     this.releaseWorldLock = await acquireWorldLock(meta.id);
-    return { meta, edits: new Map() };
+    return { meta, edits: new Map(), states: new Map() };
   }
 
   /** Asks the browser once not to evict the stored worlds. The answer does not matter. */
@@ -962,7 +965,7 @@ export class Game {
     else if (!this.padActive) this.requestPointerLock();
     try {
       const loaded = await load();
-      this.loadWorld(loaded.meta, loaded.edits);
+      this.loadWorld(loaded.meta, loaded.edits, loaded.states);
       // Playing a world counts as "last played", also when nothing in it changes.
       this.markMetaDirty();
       if (this.mode === 'touch') {
@@ -1207,11 +1210,13 @@ export class Game {
       frozen: () => this.params.freeze,
       listener: {
         onBlocks: (changes) => this.onBlocksChanged(changes),
+        onStates: (changes) => this.onStatesChanged(changes),
         onPlayer: (record) => this.onPlayerChanged(record),
         onResult: (action, result) => this.onActionResult(action, result),
         onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
       },
-      openGuestWorld: (welcome, edits, rejoin) => this.openGuestWorld(welcome, edits, rejoin),
+      openGuestWorld: (welcome, edits, states, rejoin) =>
+        this.openGuestWorld(welcome, edits, states, rejoin),
       useSession: (session, record) => this.useSession(session, record),
       guestEnded: (text) => this.leaveGuestWorld(text),
       roleChanged: () => this.onNetRoleChanged(),
@@ -1235,7 +1240,12 @@ export class Game {
    * A guest's world arrived: it is opened like a stored world but never saved. After a
    * reconnect the player stays where it is.
    */
-  private openGuestWorld(welcome: Welcome, edits: WorldEdits, rejoin: boolean): World {
+  private openGuestWorld(
+    welcome: Welcome,
+    edits: WorldEdits,
+    states: WorldStates,
+    rejoin: boolean,
+  ): World {
     const p = this.player;
     const now = Date.now();
     const pose = rejoin ? { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch } : welcome.pose;
@@ -1258,8 +1268,10 @@ export class Game {
         guests: [],
         // The room's book; a guest's world is never saved.
         progress: welcome.progress,
+        book: BOOK_VERSION,
       },
       edits,
+      states,
     );
     this.mp.noteTeleport();
     return this.world;
@@ -1682,6 +1694,7 @@ export class Game {
       record,
       {
         onBlocks: (changes) => this.onBlocksChanged(changes),
+        onStates: (changes) => this.onStatesChanged(changes),
         onPlayer: (changed) => this.onPlayerChanged(changed),
         onResult: (action, result) => this.onActionResult(action, result),
         onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
@@ -1754,6 +1767,11 @@ export class Game {
     }
     // A station may have been placed or taken away.
     this.refreshRecipes();
+  }
+
+  /** The session set block states (a chest's slots): their chunks are saved. */
+  private onStatesChanged(changes: readonly StateChange[]): void {
+    for (const { x, z } of changes) this.markChunkDirty(x, z);
   }
 
   /** The session confirmed a new record of the player: show it and save it. */

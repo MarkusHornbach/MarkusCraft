@@ -443,6 +443,7 @@ describe('guests see the shared book (Phase 8 AC8.2)', () => {
       player: first.hostRecord,
       guests: first.host.guestEntries(),
       progress: first.host.progress,
+      book: 1,
     };
     const loaded = decodeMeta(JSON.parse(JSON.stringify(encodeMeta(meta))));
     if (!loaded.ok) throw new Error(JSON.stringify(loaded.error));

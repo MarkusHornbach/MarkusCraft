@@ -44,7 +44,7 @@ describe('format 4 (Phase 8 AC4.1)', () => {
 
   it('a Creative world stores an empty book', () => {
     const record = encodeMeta(sampleMeta());
-    expect(record.progress).toEqual({ done: [], counts: [] });
+    expect(record.progress).toEqual({ done: [], counts: [], book: 1 });
     expect(record.formatVersion).toBe(SAVE_FORMAT_VERSION);
   });
 });
@@ -133,7 +133,7 @@ describe('malformed progress (Phase 8 AC4.3)', () => {
   it('unknown task, block and recipe ids load', () => {
     const record = {
       ...(withPlayer({ found: [200, 65535], crafted: [999] }) as object),
-      progress: { done: [500], counts: [{ task: 777, count: 5 }] },
+      progress: { done: [500], counts: [{ task: 777, count: 5 }], book: 1 },
     };
     const decoded = decodeMeta(throughJson(record));
     expect(decoded.ok).toBe(true);

@@ -1,4 +1,5 @@
 // WorldStore: where worlds are kept. The interface, and a store in memory for tests.
+import type { WorldStates } from '../world/blockState';
 import {
   type ChunkRecord,
   type Decoded,
@@ -20,8 +21,13 @@ export interface WorldStore {
   /** Null if no world has this id. */
   load(id: string): Promise<Decoded<LoadedWorld> | null>;
   saveMeta(meta: WorldMeta): Promise<void>;
-  /** Writes the edits of the chunks named by `keys` (chunk keys of `edits`). */
-  saveChunks(worldId: string, edits: WorldEdits, keys: Iterable<string>): Promise<void>;
+  /** Writes the edits and block states of the chunks named by `keys`. */
+  saveChunks(
+    worldId: string,
+    edits: WorldEdits,
+    keys: Iterable<string>,
+    states?: WorldStates,
+  ): Promise<void>;
   /** Removes the world and all its chunk records. */
   delete(id: string): Promise<void>;
 }
@@ -57,9 +63,15 @@ export class MemoryStore implements WorldStore {
     this.worlds.set(meta.id, encodeMeta(meta));
   }
 
-  async saveChunks(worldId: string, edits: WorldEdits, keys: Iterable<string>): Promise<void> {
+  async saveChunks(
+    worldId: string,
+    edits: WorldEdits,
+    keys: Iterable<string>,
+    states?: WorldStates,
+  ): Promise<void> {
     this.checkWrite();
-    for (const record of encodeChunks(worldId, edits, keys)) this.chunks.set(record.key, record);
+    for (const record of encodeChunks(worldId, edits, keys, states))
+      this.chunks.set(record.key, record);
   }
 
   async delete(id: string): Promise<void> {

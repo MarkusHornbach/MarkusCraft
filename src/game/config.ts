@@ -224,9 +224,16 @@ export const TOUCH_PIXEL_RATIO_MAX = 1.5;
  * Version of the save format; a world saved by a newer version is not opened. Version 2
  * (Phase 6 part C) adds the guests of the world; version 1 records load without any.
  * Version 3 adds the world options, version 4 (Phase 8) the task book and the progress
- * fields of player records, version 5 (Polish 2) the tracked task of player records.
+ * fields of player records, version 5 (Polish 2) the tracked task of player records,
+ * version 6 (Phase 8 part B3a) block states in chunk records and the book version.
  */
-export const SAVE_FORMAT_VERSION = 5;
+export const SAVE_FORMAT_VERSION = 6;
+/**
+ * Version of the task book (`progress.book` in the save, format 6). A world with a higher
+ * book is "newer"; a lower one is upgraded on loading (`upgradeBook`). 1 = the 20 tasks
+ * of Phase 8 part A and Fix Adventure 1.
+ */
+export const BOOK_VERSION = 1;
 /** Guests a world keeps (items and place); beyond this the one seen longest ago goes. */
 export const GUESTS_MAX = 32;
 export const WORLD_NAME_MAX = 24;

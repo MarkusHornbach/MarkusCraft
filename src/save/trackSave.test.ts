@@ -45,8 +45,8 @@ describe('format 5 (Polish 2 AC2.1)', () => {
   it('Polish 2 AC2.1: round trip of track, the guests too', () => {
     const meta = tracking();
     const record = encodeMeta(meta);
-    expect(SAVE_FORMAT_VERSION).toBe(5);
-    expect(record.formatVersion).toBe(5);
+    expect(SAVE_FORMAT_VERSION).toBe(6);
+    expect(record.formatVersion).toBe(6);
     expect((record.player as { track: number }).track).toBe(3);
     expect(decodeMeta(throughJson(record))).toEqual({ ok: true, value: meta });
   });
@@ -60,7 +60,7 @@ describe('format 5 (Polish 2 AC2.1)', () => {
     expect(decoded.value.guests.map((g) => g.record.track)).toEqual([0]);
     expect(decoded.value.progress).toEqual(tracking().progress);
     const written = encodeMeta(decoded.value);
-    expect(written.formatVersion).toBe(5);
+    expect(written.formatVersion).toBe(6);
     expect((written.player as { track: number }).track).toBe(0);
   });
 

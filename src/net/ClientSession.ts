@@ -20,6 +20,7 @@ import {
   RECONNECT_WINDOW_MS,
 } from '../game/config';
 import type { WorldEdits } from '../save/saveFormat';
+import type { WorldStates } from '../world/blockState';
 import { wrapTime } from '../world/dayNight';
 import { type WorldGen, worldGenOf } from '../world/generation/worldOptions';
 import { BreakClock } from './breakTiming';
@@ -78,7 +79,7 @@ export interface ClientListener extends SessionListener {
    * The world arrived: on joining, and again after a reconnect (`rejoin`). Returns the
    * world that the host's blocks are set in from now on.
    */
-  onWorld(welcome: Welcome, edits: WorldEdits, rejoin: boolean): GuestWorld;
+  onWorld(welcome: Welcome, edits: WorldEdits, states: WorldStates, rejoin: boolean): GuestWorld;
   onPeer(event: PeerEvent): void;
   onStatus(status: ClientStatus): void;
   /** The room is over for this guest (not called while joining fails). */
@@ -531,7 +532,7 @@ export class ClientSession implements Session {
         this.adoptTime(welcome.time, welcome.frozen, now);
         this.lastPose = null;
         this.lastPingMs = -Infinity;
-        this.world = this.o.listener.onWorld(welcome, joinParts(attempt.parts), rejoin);
+        this.world = this.o.listener.onWorld(welcome, joinParts(attempt.parts), new Map(), rejoin);
         this.setStatus('online');
         attempt.resolve();
         return;

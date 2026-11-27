@@ -19,6 +19,7 @@ import type { GuestEntry, WorldEdits } from '../save/saveFormat';
 import type { WorldProgress } from '../progress/progress';
 import { type Network, SignalError, type Signaling } from '../net/transport';
 import type { TrafficMeter, TrafficRates } from '../net/traffic';
+import type { WorldStates } from '../world/blockState';
 import type { World } from '../world/World';
 import { terrainChecksum } from '../world/generation/terrain';
 import { type PlayerIdentity, loadIdentity, saveIdentity } from './playerIdentity';
@@ -72,7 +73,7 @@ export interface MultiplayerGame {
   /** The game's listener: blocks, record and answers of its own player. */
   listener: SessionListener;
   /** A guest's world arrived: open it (never saved) and return it. */
-  openGuestWorld(welcome: Welcome, edits: WorldEdits, rejoin: boolean): World;
+  openGuestWorld(welcome: Welcome, edits: WorldEdits, states: WorldStates, rejoin: boolean): World;
   /** The session `Game` hands its actions to; null: a local session with this record. */
   useSession(session: Session | null, record: PlayerRecord): void;
   /** A guest's room ended: back to the world list with the text. */
@@ -346,8 +347,8 @@ export class Multiplayer {
       checksum: (seed, gen) => options.checksum ?? terrainChecksum(seed, gen),
       listener: {
         ...this.wrap(this.game.listener),
-        onWorld: (welcome, edits, rejoin) => {
-          const world = this.game.openGuestWorld(welcome, edits, rejoin);
+        onWorld: (welcome, edits, states, rejoin) => {
+          const world = this.game.openGuestWorld(welcome, edits, states, rejoin);
           this.game.useSession(client, welcome.record);
           return world;
         },
@@ -645,6 +646,8 @@ export class Multiplayer {
   private wrap(listener: SessionListener): SessionListener {
     return {
       onBlocks: (changes) => listener.onBlocks(changes),
+      onStates: (changes) => listener.onStates?.(changes),
+      onViewers: (viewers) => listener.onViewers?.(viewers),
       onPlayer: (record) => listener.onPlayer(record),
       onResult: (action: Action, result) => listener.onResult(action, result),
       onProgress: (progress, outcomes) => listener.onProgress?.(progress, outcomes),

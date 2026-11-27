@@ -11,6 +11,14 @@ import {
 import type { BlockState, StateChange, StateReader } from '../world/blockState';
 import type { GameMode, PlayerRecord } from './playerRecord';
 
+/** The players who have one chest open (a room). */
+export interface ChestViewers {
+  x: number;
+  y: number;
+  z: number;
+  ids: readonly number[];
+}
+
 export interface SessionListener {
   /** Blocks were set in the world (already applied when this is called). */
   onBlocks(changes: readonly BlockChange[]): void;
@@ -19,6 +27,11 @@ export interface SessionListener {
    * same action; already applied when this is called.
    */
   onStates?(changes: readonly StateChange[]): void;
+  /**
+   * Who has the chest open that this player has open (a room, Phase 8 part B3a): player
+   * ids, this player too; `ids` empty when the chest was broken.
+   */
+  onViewers?(viewers: ChestViewers): void;
   /** The local player's confirmed record changed. */
   onPlayer(record: PlayerRecord): void;
   /** The answer to a submitted action. */
