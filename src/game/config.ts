@@ -474,5 +474,18 @@ export const RADAR_SCAN_STEPS = 15;
 export const RADAR_DRAW_STEPS = 4;
 /** The heading-up circle redraws after the view turned by this many degrees. */
 export const RADAR_TURN_DEG = 2;
-export const RADAR_CIRCLE_PX = 112;
-export const RADAR_CIRCLE_TOUCH_PX = 88;
+/** The circle's edge per setting "Radar circle size" (Small, Medium, Large); PC and touch. */
+export const RADAR_CIRCLE_SIZES_PX: readonly number[] = [112, 168, 224];
+export const RADAR_CIRCLE_TOUCH_SIZES_PX: readonly number[] = [88, 128, 168];
+/** "Radar circle size": 0 Small, 1 Medium (the default), 2 Large. */
+export const RADAR_SIZE_DEFAULT = 1;
+export const RADAR_SIZE_MAX = 2;
+// Places on the radar (Phase 8 part B2b): mine shafts and cave entrances.
+/** Nearest places per place kind on the circle and on the Map tab. */
+export const RADAR_CIRCLE_PLACES = 2;
+export const RADAR_MAP_PLACES = 4;
+/** A place kind with none in range points to its nearest place up to this far. */
+export const RADAR_PLACE_FAR_RADIUS = 192;
+/** `PlaceIndex` caches places per square region of this edge, at most this many regions. */
+export const PLACE_REGION = 64;
+export const PLACE_INDEX_REGIONS = 256;

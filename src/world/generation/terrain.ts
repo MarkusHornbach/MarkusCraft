@@ -378,6 +378,15 @@ export class Terrain {
   }
 }
 
+/** A place the radar points at (Phase 8 part B2b): a mine shaft or a cave entrance. */
+export interface Place {
+  kind: 'shaft' | 'cave';
+  /** Shaft: the log column at the collar's height; cave: the mouth's lowest air cell open to the sky. */
+  x: number;
+  y: number;
+  z: number;
+}
+
 /** What every generator version offers the spawn search, the game and the tools. */
 export interface TerrainSource {
   readonly seed: number;
@@ -399,6 +408,12 @@ export interface TerrainSource {
    * placed from it) works it out here, through `findSpawn`; `findSpawn` returns it.
    */
   spawnPoint?(): SpawnPoint;
+  /**
+   * Appends the places whose cell lies in the area (inclusive), shafts first, each kind in
+   * a fixed order; worked out like generation, without generating blocks. Absent: none
+   * (versions 1 and 2).
+   */
+  placesIn?(minX: number, minZ: number, maxX: number, maxZ: number, out: Place[]): void;
 }
 
 const terrains = new Map<string, TerrainSource>();

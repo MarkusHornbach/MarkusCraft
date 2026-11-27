@@ -1,5 +1,5 @@
 // The radar circle (Phase 8 part B1): heading-up, top-right, part of the HUD. No pointer, no focus.
-import { RADAR_CIRCLE_PX, RADAR_CIRCLE_TOUCH_PX, RADAR_RADIUS } from '../game/config';
+import { RADAR_CIRCLE_SIZES_PX, RADAR_CIRCLE_TOUCH_SIZES_PX, RADAR_RADIUS } from '../game/config';
 import type { RadarKind } from '../radar/kinds';
 import { hintLabel, type RadarScan } from '../radar/scan';
 import { css, drawArrow, drawHint, drawSymbol, fitCanvas } from './radarDraw';
@@ -30,7 +30,7 @@ export class RadarCircle {
   }
 
   get size(): number {
-    return this.touch ? RADAR_CIRCLE_TOUCH_PX : RADAR_CIRCLE_PX;
+    return (this.touch ? RADAR_CIRCLE_TOUCH_SIZES_PX : RADAR_CIRCLE_SIZES_PX)[0];
   }
 
   setShown(shown: boolean): void {
