@@ -10,7 +10,7 @@ browser side (PeerJS, `Multiplayer`, build variables) is in `src/game/CLAUDE.md`
   (fake clock, seeded delays), `netTest.ts` (ids, messages and one run of the network test,
   candidate pair, texts), `protocol.ts` (messages, `encodeMessage`, validating decoders per
   direction, `validPose`), `roomCode.ts` (codes, peer ids, names, player keys)
-- `snapshot.ts` (edits → snapshot parts → edits, `worldHash`), `HostSession.ts` (the host:
+- `snapshot.ts` (edits and states → snapshot parts → back, `worldHash`), `HostSession.ts` (the host:
   players, `applyAction` per player, relay, time of day; `local` is the host's own
   `Session`), `ClientSession.ts` (the guest: join, sync, pose, ping, reconnect; a
   `Session`), `interpolation.ts` (`PoseBuffer`, `RemoteRoster`), `authority.ts`
@@ -101,13 +101,20 @@ changing the book, the host sends about 16.5 kB/s (AC8.6, limit 20). Polish 2: r
 carry `track`; a guest's `track` is an action like any other (it counts towards `rate`),
 kept in its guest entry.
 
-## The network test (Phase 6 part A)
+## Chests in rooms (Phase 8 part B3a)
 
-A screen of its own (`nettest`), opened by "Network test" on the settings page; "Back"
-returns there. Its test id is `mc-<build>-t-<4 characters>`; it lists the others from
-PeerJS discovery every 3 s, connects with "Connect", runs 20 pings and 1 MB in 16 kB
-messages (`NetTestRun`), reads the candidate pair from `getStats()` and gives one verdict
-line.
+Snapshot parts carry `states` (`[cx, cz, index, kind, slots]`, as in a chunk record) after
+the edits, a state never split (`splitSnapshot`, `joinStates`); `worldHash(edits, states)`
+covers them. The host sets an action's states after its blocks and sends every guest
+`chest { x, y, z, slots }` (only changed slots, count 0 empties) or `{ …, gone: true }`,
+after `blocks`, before `record`s; the guest patches its stored state (or an empty chest),
+`onStates`. `FarReader.getState` reads chests the host has not loaded. **Viewers:** the
+host keeps every player's open chest (`openChest` / `closeChest`, counted for `rate`) and
+sends `viewers { x, y, z, ids }` to each of its viewers when the set changes (open, close,
+leave); a broken chest's viewers get `ids: []` (`onViewers`). `result.notices` takes up to 32. Four moving players, each guest moving twice a second in one chest: 14.4 kB/s from the
+host (AC3.5, limit 20).
+
+The network test (Phase 6 part A): `docs/testing.md`, "Multiplayer".
 
 Before changing the network layer read the "Decisions and deviations" of
 `docs/phase-6a-report.md` to `docs/phase-6e-report.md` (sessions and protocol: 6B; timed

@@ -9,7 +9,8 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`): no `three`, D
   `NATURAL_BLOCKS`, the bot's time model `BOT_TIME`), `check.ts` (static check),
   `progress.ts` (`WorldProgress`, levels, unlocks, `stepProgress`), `events.ts`
   (`eventsOf`), `view.ts` (what the screens show: Tasks tab, tracker, notices, F3 row, lock
-  texts)
+  texts), `book.ts` (book versions: `upgradeBook` brings an older world's book, saved as
+  `progress.book`, up to `BOOK_VERSION`, now 1 without rules; Phase 8 part B3a)
 
 ## Tables
 

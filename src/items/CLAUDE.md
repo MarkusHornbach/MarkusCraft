@@ -4,7 +4,9 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`).
 
 ## Files
 
-- `items.ts` (item table, tools), `inventory.ts` (functions on the 36 slots),
+- `items.ts` (item table, tools, `PALETTE_ITEMS`: the Creative palette, without the chest
+  until B3a2), `inventory.ts` (functions on the 36 slots; `transferStack`,
+  `addItemsInOrder` and `fitsAll` for a chest's 27),
   `hardness.ts` (break times, tool speed, gating, drop table), `recipes.ts` (recipe table,
   stations near a player, recipe status)
 

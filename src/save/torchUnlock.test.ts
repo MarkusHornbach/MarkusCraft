@@ -31,8 +31,8 @@ describe('existing worlds keep or gain the torch (Fix Adventure 1 AC1.3)', () =>
   ];
 
   it.each(cases)('Fix Adventure 1 AC1.3: %s', (_name, meta, unlocked) => {
-    expect(SAVE_FORMAT_VERSION).toBe(5);
-    expect(encodeMeta(meta).formatVersion).toBe(5);
+    expect(SAVE_FORMAT_VERSION).toBe(6);
+    expect(encodeMeta(meta).formatVersion).toBe(6);
     const loaded = load(meta);
     expect(loaded).toEqual(meta);
     expect(recipeUnlocked(TORCH, loaded.player, loaded.progress)).toBe(unlocked);

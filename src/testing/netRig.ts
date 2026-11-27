@@ -13,6 +13,8 @@ import { HostSession, type PeerEvent } from '../net/HostSession';
 import { MemoryNetwork, type MemorySignaling } from '../net/memoryTransport';
 import type { NetPose, Welcome } from '../net/protocol';
 import type { GuestEntry } from '../save/saveFormat';
+import type { ChestViewers } from '../actions/Session';
+import type { StateChange } from '../world/blockState';
 import { playerKeyFromBytes, roomPeerId } from '../net/roomCode';
 import { lookForKey } from '../player/looks';
 import { worldHash } from '../net/snapshot';
@@ -46,6 +48,9 @@ export interface RigGuest {
   /** The book and the outcomes the guest's screen was told (Adventure). */
   progress: WorldProgress;
   outcomes: ProgressOutcome[];
+  /** Chest states and viewers the guest's screen was told (Phase 8 part B3a). */
+  states: StateChange[][];
+  viewers: ChestViewers[];
 }
 
 export interface RigOptions {
@@ -85,6 +90,8 @@ export class Rig {
   /** The book and the outcomes the host's screen was told (Adventure). */
   hostProgress: WorldProgress;
   readonly hostOutcomes: ProgressOutcome[] = [];
+  /** Chest viewers the host's screen was told (Phase 8 part B3a). */
+  readonly hostViewers: ChestViewers[] = [];
   readonly guests: RigGuest[] = [];
   private keyCounter = 1;
   private idCounter = 0;
@@ -135,6 +142,7 @@ export class Rig {
           this.hostOutcomes.push(...outcomes);
         },
         onPeer: (event) => this.hostPeers.push(event),
+        onViewers: (viewers) => this.hostViewers.push(viewers),
       },
     });
     this.hostSignaling = this.net.signaling();
@@ -179,6 +187,8 @@ export class Rig {
       welcome: null,
       progress: EMPTY_PROGRESS,
       outcomes: [],
+      states: [],
+      viewers: [],
     };
     guest.client = new ClientSession({
       network: { signaling: () => this.net.signaling(), directory: this.net.directory() },
@@ -194,11 +204,11 @@ export class Rig {
       clock: () => this.net.nowMs,
       checksum: (seed, gen) => options.checksum ?? terrainChecksum(seed, gen),
       listener: {
-        onWorld: (welcome, edits) => {
+        onWorld: (welcome, edits, states) => {
           guest.welcome = welcome;
           const gen = worldGenOf(welcome.generatorVersion, welcome.options);
           if (!gen) throw new Error('The welcome has no known generator');
-          guest.world = new World(welcome.seed, gen, edits);
+          guest.world = new World(welcome.seed, gen, edits, states);
           // The chunks around the start, as the guest's chunk manager would load them.
           for (let cz = -2; cz <= 2; cz++) {
             for (let cx = -2; cx <= 2; cx++) guest.world.generate(cx, cz);
@@ -207,6 +217,8 @@ export class Rig {
           return guest.world;
         },
         onBlocks: (changes) => guest.blocks.push([...changes]),
+        onStates: (changes) => guest.states.push([...changes]),
+        onViewers: (viewers) => guest.viewers.push(viewers),
         onPlayer: () => {},
         onResult: (action, result) => guest.answers.push({ action, result }),
         onProgress: (progress, outcomes) => {
@@ -249,10 +261,10 @@ export class Rig {
   }
 
   hostHash(): number {
-    return worldHash(this.world.edits);
+    return worldHash(this.world.edits, this.world.states);
   }
 
   guestHash(guest: RigGuest): number {
-    return guest.world ? worldHash(guest.world.edits) : -1;
+    return guest.world ? worldHash(guest.world.edits, guest.world.states) : -1;
   }
 }

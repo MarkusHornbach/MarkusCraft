@@ -24,7 +24,7 @@ import {
 
 describe('block registry (AC3.3)', () => {
   it('has complete properties for every id, in id order', () => {
-    expect(BLOCKS.length).toBe(20);
+    expect(BLOCKS.length).toBe(21);
     BLOCKS.forEach((def, index) => {
       expect(def.id).toBe(index);
       expect(def.name).toMatch(/^[a-z_]+$/);
@@ -80,6 +80,7 @@ describe('block registry (AC3.3)', () => {
       'stone_bricks',
       'iron_block',
       'torch',
+      'chest',
     ]);
     expect(HOTBAR_BLOCKS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(isSolid(Block.AIR)).toBe(false);
@@ -119,6 +120,7 @@ describe('block registry (AC3.3)', () => {
       STONE_BRICKS: 17,
       IRON_BLOCK: 18,
       TORCH: 19,
+      CHEST: 20,
     });
     expect(BLOCKS.map((b) => [b.id, b.name])).toEqual(
       Object.entries(Block).map(([key, id]) => [id, key.toLowerCase()]),
@@ -146,6 +148,21 @@ describe('block registry (AC3.3)', () => {
     // Workbench and furnace have a top of their own.
     expect(getBlockDef(Block.WORKBENCH).tiles).toEqual({ top: 16, side: 17, bottom: 8 });
     expect(getBlockDef(Block.FURNACE).tiles).toEqual({ top: 19, side: 18, bottom: 19 });
+  });
+
+  it('Phase 8B3a AC1.1: adds the chest as block 20, an opaque breakable cube', () => {
+    const chest = getBlockDef(Block.CHEST);
+    expect(chest.id).toBe(20);
+    expect(chest.name).toBe('chest');
+    expect(chest.label).toBe('Chest');
+    expect(chest.solid).toBe(true);
+    expect(chest.breakable).toBe(true);
+    expect(chest.shape).toBe('cube');
+    expect(chest.slot).toBeNull();
+    expect(BLOCK_RENDER[Block.CHEST]).toBe(RENDER_OPAQUE);
+    expect(chest.tiles).toEqual({ top: 23, side: 24, bottom: 23 });
+    expect(Tile.CHEST_TOP).toBe(23);
+    expect(Tile.CHEST_SIDE).toBe(24);
   });
 
   it('treats unknown ids like air', () => {
@@ -181,6 +198,7 @@ describe('block flags (Phase 4 AC6.1, AC6.2)', () => {
       stone_bricks: cube(true, true),
       iron_block: cube(true, true),
       torch: [false, true, 'torch', true],
+      chest: cube(true, true),
     });
     for (const def of BLOCKS) {
       expect(BLOCK_TARGETABLE[def.id]).toBe(def.targetable ? 1 : 0);
@@ -204,7 +222,7 @@ describe('block flags (Phase 4 AC6.1, AC6.2)', () => {
 
   it('makes the torch placeable and leaves every other block as it was', () => {
     const placeable = BLOCKS.filter((b) => isPlaceable(b.id)).map((b) => b.id);
-    expect(placeable).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19]);
+    expect(placeable).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
   });
 
   it('lets only solid full cubes carry a torch', () => {
@@ -214,6 +232,6 @@ describe('block flags (Phase 4 AC6.1, AC6.2)', () => {
     expect(supports).not.toContain('air');
     expect(supports).toContain('glass');
     expect(supports).toContain('leaves');
-    expect(supports.length).toBe(17);
+    expect(supports.length).toBe(18);
   });
 });

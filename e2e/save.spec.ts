@@ -349,14 +349,15 @@ for (const [label, fixtureMeta, fixtureChunk] of [
     const meta = (await storedRecords(page)).worlds.find(
       (w) => (w as { id: string }).id === fixtureMeta.id,
     ) as Record<string, unknown>;
-    expect(meta.formatVersion).toBe(5);
+    // Phase 8B3a AC4.2: written back as format 6, with book 1.
+    expect(meta.formatVersion).toBe(6);
     expect(meta.generatorVersion).toBe(1);
     // Generator 1 records carry no options.
     expect('options' in meta).toBe(false);
     expect(meta.guests).toEqual([]);
     // Phase 8 AC4.2: an old Gathering world is an Adventure world at the start of the book.
     expect(meta.player).toEqual({ ...fixtureMeta.player, xp: 0, found: [], crafted: [], track: 0 });
-    expect(meta.progress).toEqual({ done: [], counts: [] });
+    expect(meta.progress).toEqual({ done: [], counts: [], book: 1 });
     expect(state.progress).toMatchObject({ level: 1, xp: 0, chapter: 1, done: [] });
     expect(meta.createdMs).toBe(fixtureMeta.createdMs);
   });

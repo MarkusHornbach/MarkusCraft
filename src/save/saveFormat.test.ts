@@ -188,7 +188,7 @@ describe('save format', () => {
     });
     expect(decodeChunk(throughJson(record))).toEqual({
       ok: true,
-      value: { worldId: 'w1', cx: -3, cz: 12, edits },
+      value: { worldId: 'w1', cx: -3, cz: 12, edits, states: new Map() },
     });
     const bad: unknown[] = [
       null,
@@ -296,7 +296,7 @@ function migrated(text: string): string {
     formatVersion: SAVE_FORMAT_VERSION,
     player: { ...(old.player as object), xp: 0, found: [], crafted: [], track: 0 },
     guests: [],
-    progress: { done: [], counts: [] },
+    progress: { done: [], counts: [], book: 1 },
   });
 }
 
@@ -581,7 +581,7 @@ describe('format 3: the world options (Phase 7 part A)', () => {
 
 describe('generator 3 (Phase 8 part B2a)', () => {
   it('Phase 8B2a AC1.6: a generator 3 record round-trips; without options it is damaged', () => {
-    expect(SAVE_FORMAT_VERSION).toBe(5);
+    expect(SAVE_FORMAT_VERSION).toBe(6);
     const meta = sampleMeta({ generatorVersion: 3, options: { terrain: 'hilly', trees: 'few' } });
     const record = JSON.parse(JSON.stringify(encodeMeta(meta))) as Record<string, unknown>;
     expect(record.generatorVersion).toBe(3);

@@ -10,6 +10,8 @@ import {
   TRACK_HIDDEN,
 } from '../actions/playerRecord';
 import {
+  BOOK_VERSION,
+  CHEST_SLOTS,
   CHUNK_VOLUME,
   DEFAULT_WORLD_NAME,
   GUESTS_MAX,
@@ -22,7 +24,15 @@ import {
   WORLD_NAME_MAX,
 } from '../game/config';
 import type { MoveMode } from '../player/player';
+import { upgradeBook } from '../progress/book';
 import { EMPTY_PROGRESS, type TaskCount, type WorldProgress } from '../progress/progress';
+import {
+  type BlockState,
+  type StateKind,
+  type StateStack,
+  type WorldStates,
+  STATE_KINDS,
+} from '../world/blockState';
 import { chunkKey } from '../world/chunk';
 import {
   type WorldGen,
@@ -76,6 +86,8 @@ export interface WorldMeta {
   guests: GuestEntry[];
   /** The task book (format 4); empty in Creative and for older formats. */
   progress: WorldProgress;
+  /** The version of the task book (format 6, `progress.book`); `BOOK_VERSION` once decoded. */
+  book: number;
 }
 
 /** The generator of a decoded world. Decoding guarantees that version and options fit. */
@@ -88,7 +100,16 @@ export function metaGen(meta: WorldMeta): WorldGen {
 /** Edits of all chunks of a world: chunk key → (block index → block id), as in `World`. */
 export type WorldEdits = Map<string, Map<number, number>>;
 
-/** Stored form of one chunk's edits. `edits` holds pairs: block index, block id, … */
+/**
+ * Stored form of one block state (format 6): block index, kind, and the filled slots as
+ * triples (slot, item, count, …).
+ */
+export type StoredState = [index: number, kind: string, slots: number[]];
+
+/**
+ * Stored form of one chunk's edits and block states. `edits` holds pairs: block index,
+ * block id, … `states` is left out when the chunk has none (and in records of format 1–5).
+ */
 export interface ChunkRecord {
   /** Primary key: world id and chunk coordinates. */
   key: string;
@@ -96,6 +117,7 @@ export interface ChunkRecord {
   cx: number;
   cz: number;
   edits: number[];
+  states?: StoredState[];
 }
 
 export type DecodeError = 'damaged' | 'newer';
@@ -290,7 +312,7 @@ export function encodeMeta(meta: WorldMeta): Record<string, unknown> {
     moveMode: meta.moveMode,
     player: encodePlayer(meta.player),
     guests: limitGuests(meta.guests).map(encodeGuest),
-    progress: encodeProgress(meta.progress),
+    progress: { ...encodeProgress(meta.progress), book: meta.book },
   };
 }
 
@@ -375,6 +397,16 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
       if (!decoded) return damaged;
       progress = decoded;
     }
+    // Format 6 stores the book's version; older formats had book 1.
+    let book = 1;
+    if (value.formatVersion >= 6) {
+      const stored = isObject(value.progress) ? value.progress.book : undefined;
+      if (!isInt(stored, 1, 0xffff)) return damaged;
+      if (stored > BOOK_VERSION) return { ok: false, error: 'newer' };
+      book = stored;
+    }
+    // An older book is brought up to this build's (a task added to a finished chapter).
+    const upgraded = upgradeBook(progress, book);
     // Version 1 knew no guests. A guest entry that does not check out is dropped: it
     // never makes the world itself damaged.
     let guests: GuestEntry[] = [];
@@ -405,7 +437,8 @@ export function decodeMeta(value: unknown): Decoded<WorldMeta> {
         moveMode: value.moveMode,
         player,
         guests,
-        progress,
+        progress: upgraded.progress,
+        book: upgraded.book,
       },
     };
   } catch {
@@ -448,11 +481,53 @@ function decodeGuest(value: unknown, format: number): GuestEntry | null {
 
 // --- chunk records -----------------------------------------------------------------
 
+/** The filled slots of a state as triples: slot, item, count, … */
+export function encodeSlots(state: BlockState): number[] {
+  const out: number[] = [];
+  state.slots.forEach((stack, slot) => {
+    if (stack) out.push(slot, stack.item, stack.count);
+  });
+  return out;
+}
+
+/** The stored states of one chunk, by block index. */
+export function encodeStates(states: ReadonlyMap<number, BlockState>): StoredState[] {
+  const out: StoredState[] = [];
+  for (const [index, state] of states) out.push([index, state.kind, encodeSlots(state)]);
+  return out;
+}
+
+/** Slots per kind of state (the format's limits). */
+const SLOTS_OF_KIND: Record<StateKind, number> = { chest: CHEST_SLOTS };
+
+/**
+ * A state from its stored kind and slot triples; null if it does not check out: a kind
+ * the format does not know, a slot out of range or listed twice, an item id outside
+ * 1–65 535, a count outside 1–`STACK_SIZE`. Unknown item ids load ("Unknown item").
+ */
+export function decodeState(kind: unknown, slots: unknown): BlockState | null {
+  const known = STATE_KINDS.find((k) => k === kind);
+  if (!known || !Array.isArray(slots) || slots.length % 3 !== 0) return null;
+  const size = SLOTS_OF_KIND[known];
+  if (slots.length > size * 3) return null;
+  const out = new Array<StateStack | null>(size).fill(null);
+  for (let i = 0; i < slots.length; i += 3) {
+    const slot: unknown = slots[i];
+    const item: unknown = slots[i + 1];
+    const count: unknown = slots[i + 2];
+    if (!isInt(slot, 0, size - 1) || out[slot] !== null) return null;
+    if (!isInt(item, 1, 0xffff) || !isInt(count, 1, STACK_SIZE)) return null;
+    out[slot] = { item, count };
+  }
+  return { kind: known, slots: out };
+}
+
 export function encodeChunk(
   worldId: string,
   cx: number,
   cz: number,
   edits: ReadonlyMap<number, number>,
+  states?: ReadonlyMap<number, BlockState>,
 ): ChunkRecord {
   const pairs = new Array<number>(edits.size * 2);
   let i = 0;
@@ -460,7 +535,15 @@ export function encodeChunk(
     pairs[i++] = index;
     pairs[i++] = id;
   }
-  return { key: chunkRecordKey(worldId, cx, cz), worldId, cx, cz, edits: pairs };
+  const record: ChunkRecord = {
+    key: chunkRecordKey(worldId, cx, cz),
+    worldId,
+    cx,
+    cz,
+    edits: pairs,
+  };
+  if (states && states.size > 0) record.states = encodeStates(states);
+  return record;
 }
 
 export interface DecodedChunk {
@@ -468,6 +551,23 @@ export interface DecodedChunk {
   cx: number;
   cz: number;
   edits: Map<number, number>;
+  states: Map<number, BlockState>;
+}
+
+/** The states of a chunk record; null if one does not check out. Absent means none. */
+function decodeStates(value: unknown): Map<number, BlockState> | null {
+  const states = new Map<number, BlockState>();
+  if (value === undefined) return states;
+  if (!Array.isArray(value) || value.length > CHUNK_VOLUME) return null;
+  for (const entry of value as unknown[]) {
+    if (!Array.isArray(entry) || entry.length !== 3) return null;
+    const [index, kind, slots] = entry as unknown[];
+    if (!isInt(index, 0, CHUNK_VOLUME - 1) || states.has(index)) return null;
+    const state = decodeState(kind, slots);
+    if (!state) return null;
+    states.set(index, state);
+  }
+  return states;
 }
 
 const CHUNK_COORD_LIMIT = COORD_LIMIT >> 4;
@@ -491,7 +591,13 @@ export function decodeChunk(value: unknown): Decoded<DecodedChunk> {
     }
     // A block index listed twice was not written by the game.
     if (edits.size * 2 !== pairs.length) return damaged;
-    return { ok: true, value: { worldId: value.worldId, cx: value.cx, cz: value.cz, edits } };
+    // States may come without edits (a generated chest that was used, a later part).
+    const states = decodeStates(value.states);
+    if (!states) return damaged;
+    return {
+      ok: true,
+      value: { worldId: value.worldId, cx: value.cx, cz: value.cz, edits, states },
+    };
   } catch {
     return damaged;
   }
@@ -499,18 +605,24 @@ export function decodeChunk(value: unknown): Decoded<DecodedChunk> {
 
 // --- whole worlds ------------------------------------------------------------------
 
-/** Chunk records for the given chunks of `edits` (all chunks if `keys` is omitted). */
+/**
+ * Chunk records for the given chunks of `edits` and `states` (all chunks with either if
+ * `keys` is omitted).
+ */
 export function encodeChunks(
   worldId: string,
   edits: WorldEdits,
-  keys: Iterable<string> = edits.keys(),
+  keys?: Iterable<string>,
+  states: WorldStates = new Map(),
 ): ChunkRecord[] {
   const records: ChunkRecord[] = [];
-  for (const key of keys) {
+  for (const key of keys ?? new Set([...edits.keys(), ...states.keys()])) {
     const chunk = edits.get(key);
-    if (!chunk) continue;
+    const chunkStates = states.get(key);
+    // A chunk named on purpose is written even when empty: no stale state may survive.
+    if (!chunk && !chunkStates && !keys) continue;
     const [cx, cz] = key.split(',').map(Number);
-    records.push(encodeChunk(worldId, cx, cz, chunk));
+    records.push(encodeChunk(worldId, cx, cz, chunk ?? new Map(), chunkStates));
   }
   return records;
 }
@@ -518,6 +630,8 @@ export function encodeChunks(
 export interface LoadedWorld {
   meta: WorldMeta;
   edits: WorldEdits;
+  /** Block states (format 6); empty for older worlds. */
+  states: WorldStates;
 }
 
 /** Puts a stored world back together; one bad chunk record makes the world damaged. */
@@ -525,13 +639,16 @@ export function decodeWorld(meta: unknown, chunks: readonly unknown[]): Decoded<
   const decodedMeta = decodeMeta(meta);
   if (!decodedMeta.ok) return decodedMeta;
   const edits: WorldEdits = new Map();
+  const states: WorldStates = new Map();
   for (const record of chunks) {
     const chunk = decodeChunk(record);
     if (!chunk.ok) return chunk;
     if (chunk.value.worldId !== decodedMeta.value.id) return damaged;
-    edits.set(chunkKey(chunk.value.cx, chunk.value.cz), chunk.value.edits);
+    const key = chunkKey(chunk.value.cx, chunk.value.cz);
+    if (chunk.value.edits.size > 0) edits.set(key, chunk.value.edits);
+    if (chunk.value.states.size > 0) states.set(key, chunk.value.states);
   }
-  return { ok: true, value: { meta: decodedMeta.value, edits } };
+  return { ok: true, value: { meta: decodedMeta.value, edits, states } };
 }
 
 /** One line of the world list. Worlds that cannot be opened are still listed. */

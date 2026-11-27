@@ -41,7 +41,7 @@ function sourceFiles(dir: string): string[] {
  * the test API tools `give` and `clearInventory` in `Game.ts`.
  */
 const INVENTORY_CALL =
-  /\b(addItems|removeItems|takeItems|takeIngredients|moveStack|emptySlot|setSlot)\s*\(/g;
+  /\b(addItems|addItemsInOrder|removeItems|takeItems|takeIngredients|moveStack|transferStack|emptySlot|setSlot)\s*\(/g;
 const INVENTORY_ALLOWED: Record<string, number> = {
   // `give` adds items for tests.
   'src/game/Game.ts': 1,
@@ -146,6 +146,53 @@ describe('single pipeline for the tracked task (Polish 2)', () => {
     expect('{ ...r, track: action.task }'.match(RECORD_TRACK_FIELD)?.length).toBe(1);
     expect('{ ...r, track: -1 }'.match(RECORD_TRACK_FIELD)?.length).toBe(1);
     expect('readonly track: number;'.match(RECORD_TRACK_FIELD)).toBeNull();
+  });
+});
+
+/**
+ * Files that may call `setState` (Phase 8 part B3a), with their counts: the same doors as
+ * `setBlock`. The local session and the host apply an action's states, a guest the host's.
+ */
+const SET_STATE_ALLOWED: Record<string, number> = {
+  'src/actions/Session.ts': 1,
+  'src/net/HostSession.ts': 1,
+  'src/net/ClientSession.ts': 1,
+};
+
+/** A chest state built from slots: only actions, the state module, the save and a guest. */
+const CHEST_BUILT = /kind:\s*'chest',\s*slots\b/g;
+const CHEST_BUILT_ALLOWED: Record<string, number> = {
+  // The empty chest.
+  'src/world/blockState.ts': 1,
+  // A guest applies the slots the host reports.
+  'src/net/ClientSession.ts': 1,
+};
+
+describe('single pipeline for block state (Phase 8B3a 6.2, 6.3)', () => {
+  it('Phase 8B3a AC1.3: setState is called only by the sessions', () => {
+    const found = countCalls(
+      /\.setState\??\.?\s*\(/g,
+      (file) =>
+        file.startsWith('src/testing/') ||
+        // The signaling's own connection state, not a block's.
+        file === 'src/game/peerTransport.ts',
+    );
+    expect(found).toEqual(SET_STATE_ALLOWED);
+  });
+
+  it('Phase 8B3a AC1.3: chest slots change only in src/actions/ (and where states are read)', () => {
+    const found = countCalls(CHEST_BUILT, (file) => file.startsWith('src/actions/'));
+    expect(found).toEqual(CHEST_BUILT_ALLOWED);
+  });
+
+  it('Phase 8B3a AC1.3: the patterns find calls and built chests', () => {
+    expect(
+      'world.setState(1, 2, 3, s); w.setState?.(1, 2, 3, null)'.match(/\.setState\??\.?\s*\(/g)
+        ?.length,
+    ).toBe(2);
+    expect('  setState(x: number): boolean {'.match(/\.setState\??\.?\s*\(/g)).toBeNull();
+    expect("{ kind: 'chest', slots: next }".match(CHEST_BUILT)?.length).toBe(1);
+    expect('x = transferStack(a, 1, b, 2)'.match(INVENTORY_CALL)?.length).toBe(1);
   });
 });
 

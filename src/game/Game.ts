@@ -31,7 +31,7 @@ import {
 } from '../save/saveFormat';
 import { MemoryStore, type WorldStore } from '../save/WorldStore';
 import { BenchScreen } from '../ui/BenchScreen';
-import { DebugOverlay } from '../ui/DebugOverlay';
+import { DebugOverlay, chestsRow } from '../ui/DebugOverlay';
 import { FocusManager } from '../ui/FocusManager';
 import type { PadHint } from '../ui/PadHints';
 import { glyphSheet } from '../ui/padGlyphs';
@@ -60,6 +60,7 @@ import { PlayerSection } from '../ui/PlayerSection';
 import { lookForKey } from '../player/looks';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
+import { type StateChange, type WorldStates, summarizeStates } from '../world/blockState';
 import { ChunkManager } from '../world/ChunkManager';
 import { PerfStats } from './perfStats';
 import { chunkKey, toChunkCoord } from '../world/chunk';
@@ -99,6 +100,7 @@ import {
   PLAYER_EYE_HEIGHT,
   REACH,
   ROOM_LIST_REFRESH_MS,
+  BOOK_VERSION,
   SAVE_FORMAT_VERSION,
   SIM_DT,
   SIM_HZ,
@@ -212,6 +214,8 @@ const TEXT_NOT_OPENED = 'This world could not be opened.';
 const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.';
 const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 const TEXT_INVENTORY_FULL = 'Inventory full';
+const TEXT_CHEST_FULL = "No room for the chest's items";
+const TEXT_CHEST_NOT_EMPTY = 'Empty the chest first';
 const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
 const TEXT_NEEDS_SUPPORT = 'Needs a block underneath';
 const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
@@ -372,6 +376,10 @@ export class Game {
   private pickup: { item: number; count: number; untilMs: number } | null = null;
   /** "Inventory full" shows until this action time. */
   private fullUntilMs = -1;
+  /** What the "full" message says: the inventory, or a chest's items (Phase 8 part B3a). */
+  private fullText = TEXT_INVENTORY_FULL;
+  /** Until when "Empty the chest first" shows, after a refused Creative break. */
+  private notEmptyUntilMs = -1;
   /** Until when "Needs a block underneath" shows, after a refused torch. */
   private supportUntilMs = -1;
   /** The item in the furnace: its recipe and the action time the progress bar started. */
@@ -702,20 +710,21 @@ export class Game {
       player: createPlayerRecord(mode),
       guests: [],
       progress: EMPTY_PROGRESS,
+      book: BOOK_VERSION,
     };
   }
 
   /**
    * Opens a world in place: replaces world, chunk manager, chunk meshes, player and
    * session without reloading the page, and frees the GPU buffers of the old world.
-   * `edits` is taken over by the new world.
+   * `edits` and `states` are taken over by the new world.
    */
-  loadWorld(meta: WorldMeta, edits: WorldEdits): void {
+  loadWorld(meta: WorldMeta, edits: WorldEdits, states: WorldStates = new Map()): void {
     // A room belongs to its world: another world closes it.
     if (this.mp.role === 'host') this.mp.leave();
     this.renderer.clearChunkMeshes();
     const gen = metaGen(meta);
-    this.world = new World(meta.seed, gen, edits);
+    this.world = new World(meta.seed, gen, edits, states);
     this.movement = this.movementOf(this.world);
     this.chunkManager = this.createChunkManager(this.settings.renderDistance);
     this.spawn = findSpawn(getTerrain(meta.seed, gen));
@@ -733,6 +742,7 @@ export class Game {
     this.breakInFlight = false;
     this.pickup = null;
     this.fullUntilMs = -1;
+    this.notEmptyUntilMs = -1;
     this.supportUntilMs = -1;
     this.lockedUntilMs = -1;
     this.progressQueue = [];
@@ -783,7 +793,7 @@ export class Game {
       if (!meta || this.world !== world || this.bench || this.mp.role === 'guest') return;
       const start = performance.now();
       // Both calls take their snapshot at once, before anything is awaited.
-      const chunks = store.saveChunks(meta.id, world.edits, batch.chunks);
+      const chunks = store.saveChunks(meta.id, world.edits, batch.chunks, world.states);
       const saved = this.currentMeta(meta);
       const record = batch.meta ? store.saveMeta(saved) : Promise.resolve();
       await Promise.all([chunks, record]);
@@ -830,7 +840,7 @@ export class Game {
     } else {
       const loaded = await this.store.load(entry.id);
       if (!loaded || !loaded.ok) throw new Error(`World "${wanted}" cannot be opened`);
-      this.loadWorld(loaded.value.meta, loaded.value.edits);
+      this.loadWorld(loaded.value.meta, loaded.value.edits, loaded.value.states);
     }
     this.lastLoadMs = performance.now() - start;
   }
@@ -923,7 +933,7 @@ export class Game {
     }
     this.requestPersistence();
     this.releaseWorldLock = await acquireWorldLock(meta.id);
-    return { meta, edits: new Map() };
+    return { meta, edits: new Map(), states: new Map() };
   }
 
   /** Asks the browser once not to evict the stored worlds. The answer does not matter. */
@@ -955,7 +965,7 @@ export class Game {
     else if (!this.padActive) this.requestPointerLock();
     try {
       const loaded = await load();
-      this.loadWorld(loaded.meta, loaded.edits);
+      this.loadWorld(loaded.meta, loaded.edits, loaded.states);
       // Playing a world counts as "last played", also when nothing in it changes.
       this.markMetaDirty();
       if (this.mode === 'touch') {
@@ -1121,7 +1131,7 @@ export class Game {
       }),
       rttMs: this.mp.client?.rttMs ?? null,
       lastResult: this.mp.client?.lastResult ?? null,
-      worldHash: worldHash(this.world.edits),
+      worldHash: worldHash(this.world.edits, this.world.states),
       lastError: this.mp.lastError,
       notices: this.mp.currentNotices(),
       figures: this.renderer.remotePlayers.drawn,
@@ -1200,11 +1210,13 @@ export class Game {
       frozen: () => this.params.freeze,
       listener: {
         onBlocks: (changes) => this.onBlocksChanged(changes),
+        onStates: (changes) => this.onStatesChanged(changes),
         onPlayer: (record) => this.onPlayerChanged(record),
         onResult: (action, result) => this.onActionResult(action, result),
         onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
       },
-      openGuestWorld: (welcome, edits, rejoin) => this.openGuestWorld(welcome, edits, rejoin),
+      openGuestWorld: (welcome, edits, states, rejoin) =>
+        this.openGuestWorld(welcome, edits, states, rejoin),
       useSession: (session, record) => this.useSession(session, record),
       guestEnded: (text) => this.leaveGuestWorld(text),
       roleChanged: () => this.onNetRoleChanged(),
@@ -1228,7 +1240,12 @@ export class Game {
    * A guest's world arrived: it is opened like a stored world but never saved. After a
    * reconnect the player stays where it is.
    */
-  private openGuestWorld(welcome: Welcome, edits: WorldEdits, rejoin: boolean): World {
+  private openGuestWorld(
+    welcome: Welcome,
+    edits: WorldEdits,
+    states: WorldStates,
+    rejoin: boolean,
+  ): World {
     const p = this.player;
     const now = Date.now();
     const pose = rejoin ? { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch } : welcome.pose;
@@ -1251,8 +1268,10 @@ export class Game {
         guests: [],
         // The room's book; a guest's world is never saved.
         progress: welcome.progress,
+        book: BOOK_VERSION,
       },
       edits,
+      states,
     );
     this.mp.noteTeleport();
     return this.world;
@@ -1675,6 +1694,7 @@ export class Game {
       record,
       {
         onBlocks: (changes) => this.onBlocksChanged(changes),
+        onStates: (changes) => this.onStatesChanged(changes),
         onPlayer: (changed) => this.onPlayerChanged(changed),
         onResult: (action, result) => this.onActionResult(action, result),
         onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
@@ -1747,6 +1767,11 @@ export class Game {
     }
     // A station may have been placed or taken away.
     this.refreshRecipes();
+  }
+
+  /** The session set block states (a chest's slots): their chunks are saved. */
+  private onStatesChanged(changes: readonly StateChange[]): void {
+    for (const { x, z } of changes) this.markChunkDirty(x, z);
   }
 
   /** The session confirmed a new record of the player: show it and save it. */
@@ -1912,7 +1937,14 @@ export class Game {
     if (action.kind === 'startBreak') {
       // The break runs from now on, or it does not start at all.
       this.breakActive = result.ok;
-      if (!result.ok && result.reason === 'full') this.fullUntilMs = this.nowMs() + NOTICE_MS;
+    }
+    if ((action.kind === 'startBreak' || action.kind === 'break') && !result.ok) {
+      const chest = this.world.getBlock(action.x, action.y, action.z) === Block.CHEST;
+      if (result.reason === 'full') {
+        this.fullUntilMs = this.nowMs() + NOTICE_MS;
+        this.fullText = chest ? TEXT_CHEST_FULL : TEXT_INVENTORY_FULL;
+      }
+      if (result.reason === 'notEmpty') this.notEmptyUntilMs = this.nowMs() + NOTICE_MS;
     }
     if (action.kind === 'place' && !result.ok && result.reason === 'support') {
       this.supportUntilMs = this.nowMs() + NOTICE_MS;
@@ -2409,12 +2441,14 @@ export class Game {
     );
     this.hud.setMessage(
       now <= this.fullUntilMs
-        ? TEXT_INVENTORY_FULL
-        : now <= this.supportUntilMs
-          ? TEXT_NEEDS_SUPPORT
-          : now <= this.lockedUntilMs
-            ? this.lockedText
-            : this.toolHint(),
+        ? this.fullText
+        : now <= this.notEmptyUntilMs
+          ? TEXT_CHEST_NOT_EMPTY
+          : now <= this.supportUntilMs
+            ? TEXT_NEEDS_SUPPORT
+            : now <= this.lockedUntilMs
+              ? this.lockedText
+              : this.toolHint(),
     );
     // Over the HUD and the open inventory; not over the pause menu or the world menu.
     const playing =
@@ -2835,6 +2869,14 @@ export class Game {
     if (this.debug.visible) this.updateDebug();
   }
 
+  /** The F3 row "Chests", or null while the world has no block states (Phase 8 part B3a). */
+  private chestsDebug(): string | null {
+    const world = this.world;
+    if (world.states.size === 0 && world.droppedStates === 0) return null;
+    const { filled, bytes } = summarizeStates(world.states);
+    return chestsRow(filled, bytes, world.droppedStates);
+  }
+
   private updateDebug(): void {
     const p = this.player;
     const stats = this.renderer.getStats();
@@ -2860,6 +2902,7 @@ export class Game {
       progress:
         this.gameMode === 'gathering' ? progressRow(this.progress, this.session.record) : null,
       radar: this.radarUnlocked() ? (this.settings.radar ? this.radar.debugText() : 'off') : null,
+      chests: this.chestsDebug(),
       time: this.time,
       mode: p.mode,
       onGround: p.onGround,
@@ -3052,6 +3095,7 @@ export class Game {
             name: this.meta.name,
             generatorVersion: this.meta.generatorVersion,
             options: this.meta.options,
+            chests: summarizeStates(this.world.states).filled,
           }
         : null,
       save: {
@@ -3201,6 +3245,10 @@ export class Game {
         if (!this.inventoryOpen) this.applyLookPixels(dx, dy);
       },
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),
+      getChest: (x, y, z) => {
+        const state = this.world.getState(x, y, z);
+        return state ? state.slots.map((s) => (s ? { item: s.item, count: s.count } : null)) : null;
+      },
       setBlock: (x, y, z, id) => this.testSetBlock(x, y, z, id),
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),

@@ -32,6 +32,8 @@ export const Tile = {
   STONE_BRICKS: 20,
   IRON_BLOCK: 21,
   TORCH: 22,
+  CHEST_TOP: 23,
+  CHEST_SIDE: 24,
 } as const;
 export type TileId = (typeof Tile)[keyof typeof Tile];
 export const TILE_COUNT = Object.keys(Tile).length;
@@ -62,6 +64,7 @@ export const Block = {
   STONE_BRICKS: 17,
   IRON_BLOCK: 18,
   TORCH: 19,
+  CHEST: 20,
 } as const;
 export type BlockId = (typeof Block)[keyof typeof Block];
 
@@ -248,6 +251,14 @@ export const BLOCKS: readonly BlockDef[] = [
     opacity: 0,
     emission: TORCH_LIGHT,
   },
+  // The first block with state (Phase 8 part B3a): 27 slots, kept in `World.states`.
+  solidBlock(
+    Block.CHEST,
+    'chest',
+    'Chest',
+    { top: Tile.CHEST_TOP, side: Tile.CHEST_SIDE, bottom: Tile.CHEST_TOP },
+    null,
+  ),
 ];
 
 export const RENDER_NONE = 0;

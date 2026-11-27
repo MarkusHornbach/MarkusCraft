@@ -38,6 +38,8 @@ export interface GameState {
     generatorVersion: number;
     /** The world options of generator 2; null for generator 1 (Phase 7 part A). */
     options: WorldOptions | null;
+    /** Chests with at least one item (Phase 8 part B3a). */
+    chests: number;
   } | null;
   save: {
     /** True while a change of the world is not written yet. */
@@ -187,7 +189,7 @@ export interface GameState {
     rttMs: number | null;
     /** The host's last answer to this guest (also to raw messages), or null. */
     lastResult: { seq: number; ok: boolean; reason: string | null } | null;
-    /** Order-independent hash of the world's edits: equal on all players, equal worlds. */
+    /** Order-independent hash of the world's edits and block states (Phase 8 part B3a). */
     worldHash: number;
     lastError: string | null;
     /** The multiplayer notices on screen ("Anna joined"). */
@@ -287,6 +289,11 @@ export interface TestApi {
   /** Feed a look delta in pixels, as if the mouse moved. */
   look(dx: number, dy: number): void;
   getBlock(x: number, y: number, z: number): number;
+  /**
+   * The slots of the chest in a cell (Phase 8 part B3a), or null if no chest is there
+   * (also in a chunk that is not loaded).
+   */
+  getChest(x: number, y: number, z: number): (ItemStack | null)[] | null;
   /** Sets a block directly, past the action layer (test tool). */
   setBlock(x: number, y: number, z: number, id: number): void;
   /**

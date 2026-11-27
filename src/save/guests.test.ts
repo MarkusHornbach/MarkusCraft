@@ -41,8 +41,8 @@ describe('version 1 worlds (Phase 6 AC8.1)', () => {
       expect(decoded.ok).toBe(true);
       if (!decoded.ok) return;
       const { meta } = decoded.value;
-      expect(SAVE_FORMAT_VERSION).toBe(5);
-      expect(meta.formatVersion).toBe(5);
+      expect(SAVE_FORMAT_VERSION).toBe(6);
+      expect(meta.formatVersion).toBe(6);
       expect(meta.options).toBeNull();
       expect(meta.guests).toEqual([]);
       // Format 4 (Phase 8): a fresh book and level 1.

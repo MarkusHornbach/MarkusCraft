@@ -116,3 +116,80 @@ export function countItems(slots: Slots, item?: number): number {
   }
   return total;
 }
+
+export interface TransferResult {
+  source: Slots;
+  target: Slots;
+}
+
+/**
+ * `moveStack` across two slot lists (a chest and a player, Phase 8 part B3a): the stack
+ * of `source[from]` moves into an empty `target[to]`, merges onto the same item up to the
+ * stack size (the remainder stays behind), or swaps with another item. With `merge` false
+ * equal items swap as well (Creative).
+ */
+export function transferStack(
+  source: Slots,
+  from: number,
+  target: Slots,
+  to: number,
+  merge = true,
+): TransferResult {
+  const moving = source[from];
+  if (!moving || !(to in target)) return { source, target };
+  const there = target[to];
+  const nextSource = source.slice();
+  const nextTarget = target.slice();
+  if (merge && there && there.item === moving.item) {
+    const moved = Math.min(moving.count, Math.max(0, stackSizeOf(moving.item) - there.count));
+    nextTarget[to] = { item: there.item, count: there.count + moved };
+    nextSource[from] =
+      moved === moving.count ? null : { item: moving.item, count: moving.count - moved };
+    return { source: nextSource, target: nextTarget };
+  }
+  nextTarget[to] = moving;
+  nextSource[from] = there;
+  return { source: nextSource, target: nextTarget };
+}
+
+/**
+ * `addItems` over the slots named by `order`, in that order: stacks of the item first,
+ * then empty slots (the quick move of a chest screen). Other slots are not touched.
+ */
+export function addItemsInOrder(
+  slots: Slots,
+  item: number,
+  count: number,
+  order: readonly number[],
+): AddResult {
+  const size = stackSizeOf(item);
+  const next = slots.slice();
+  let left = count;
+  for (const i of order) {
+    if (left <= 0) break;
+    const stack = next[i];
+    if (!stack || stack.item !== item || stack.count >= size) continue;
+    const moved = Math.min(left, size - stack.count);
+    next[i] = { item, count: stack.count + moved };
+    left -= moved;
+  }
+  for (const i of order) {
+    if (left <= 0) break;
+    if (next[i] || !(i in next)) continue;
+    const moved = Math.min(left, size);
+    next[i] = { item, count: moved };
+    left -= moved;
+  }
+  return { slots: next, left };
+}
+
+/** Whether all the stacks fit together (one combined check, as breaking a chest needs). */
+export function fitsAll(slots: Slots, stacks: readonly ItemStack[]): boolean {
+  let next = slots;
+  for (const stack of stacks) {
+    const added = addItems(next, stack.item, stack.count);
+    if (added.left > 0) return false;
+    next = added.slots;
+  }
+  return true;
+}

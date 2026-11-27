@@ -3,6 +3,7 @@ import { STACK_SIZE } from '../game/config';
 import { BLOCKS, Block, isPlaceable } from '../world/blocks';
 import {
   BLOCK_ITEMS,
+  PALETTE_ITEMS,
   FIRST_ITEM_ID,
   ITEMS,
   Item,
@@ -35,6 +36,7 @@ describe('item table (Phase 3 AC6.4)', () => {
       stone_bricks: 17,
       iron_block: 18,
       torch: 19,
+      chest: 20,
       coal: 256,
       stick: 257,
       iron_ingot: 258,
@@ -81,6 +83,9 @@ describe('item table (Phase 3 AC6.4)', () => {
       });
     }
     expect(BLOCK_ITEMS).toEqual(BLOCKS.filter((b) => isPlaceable(b.id)).map((b) => b.id));
+    // Part B3a1: the chest is an item but not in the Creative palette yet.
+    expect(PALETTE_ITEMS).toEqual(BLOCK_ITEMS.filter((id) => id !== Block.CHEST));
+    expect(isItem(Block.CHEST)).toBe(true);
     expect(isItem(Block.AIR)).toBe(false);
     expect(isItem(Block.WATER)).toBe(false);
     expect(isItem(Block.BEDROCK)).toBe(false);
