@@ -44,6 +44,19 @@ function headerSlack(page: Page): Promise<number> {
   });
 }
 
+/**
+ * The Map tab's box in whole pixels of a fixed size: the centred panel puts it at a
+ * fractional height that differs with the font, and an element shot then rounds to 284 or
+ * 285 rows.
+ */
+async function tabClip(
+  page: Page,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  const box = await page.locator('.map-tab').boundingBox();
+  if (!box) throw new Error('the Map tab is not visible');
+  return { x: Math.round(box.x), y: Math.round(box.y), width: 524, height: Math.floor(box.height) };
+}
+
 /** The world behind is hidden for the references (the panel is translucent). */
 async function hideWorld(page: Page): Promise<void> {
   await page.locator('canvas.game-canvas').evaluate((node) => {
@@ -90,7 +103,8 @@ test('Phase 8B1 AC4.1 AC4.3 AC4.5: four tabs; the map with legend; it reopens on
   expect(await headerSlack(page)).toBeGreaterThanOrEqual(0);
   await hideWorld(page);
   // The tab alone (fixed size): the header's height follows the font, which differs in CI.
-  await expect(page.locator('.map-tab')).toHaveScreenshot('map-tab.png', {
+  await expect(page).toHaveScreenshot('map-tab.png', {
+    clip: await tabClip(page),
     maxDiffPixelRatio: 0.05,
   });
   // Moving while it is open changes the legend's distance.
@@ -190,7 +204,8 @@ test.describe('touch', () => {
       (node as HTMLElement).style.visibility = 'hidden';
     });
     await whenIdle(page);
-    await expect(page.locator('.map-tab')).toHaveScreenshot('map-tab-touch.png', {
+    await expect(page).toHaveScreenshot('map-tab-touch.png', {
+      clip: await tabClip(page),
       maxDiffPixelRatio: 0.05,
     });
   });
