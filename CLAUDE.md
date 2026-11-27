@@ -312,8 +312,9 @@ hold:
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
   planned. Phase 8: A, "Fix Adventure 1", B1 (radar), B2a (generator 3, caves) and B2b (places on
-  the radar, a larger map) are built; B3 on and C–E are not planned. At a
-  session's start look
+  the radar, a larger map) are built; B3a (chests as storage, `docs/phase-8b3a-plan.md`) is
+  planned as two parts, B3a1 (block state, save format 6, rooms) then B3a2 (chest screen,
+  task 21); B3b on and C–E are not planned. At a session's start look
   for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
   needed"). Numbers from software WebGL (cloud, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
