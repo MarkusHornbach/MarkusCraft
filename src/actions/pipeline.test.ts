@@ -155,13 +155,17 @@ describe('single pipeline for the tracked task (Polish 2)', () => {
  */
 const SET_STATE_ALLOWED: Record<string, number> = {
   'src/actions/Session.ts': 1,
+  'src/net/HostSession.ts': 1,
+  'src/net/ClientSession.ts': 1,
 };
 
 /** A chest state built from slots: only actions, the state module, the save and a guest. */
-const CHEST_BUILT = /kind:\s*'chest',\s*slots\s*:/g;
+const CHEST_BUILT = /kind:\s*'chest',\s*slots\b/g;
 const CHEST_BUILT_ALLOWED: Record<string, number> = {
   // The empty chest.
   'src/world/blockState.ts': 1,
+  // A guest applies the slots the host reports.
+  'src/net/ClientSession.ts': 1,
 };
 
 describe('single pipeline for block state (Phase 8B3a 6.2, 6.3)', () => {

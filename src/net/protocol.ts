@@ -4,6 +4,7 @@ import { type Action, COORD_LIMIT, decodeAction } from '../actions/actions';
 import type { Notice, RejectReason } from '../actions/apply';
 import { GAME_MODES, type GameMode, type PlayerRecord } from '../actions/playerRecord';
 import {
+  CHEST_SLOTS,
   CHUNK_VOLUME,
   MAX_MESSAGE_BYTES,
   MAX_PITCH,
@@ -12,13 +13,20 @@ import {
   POSE_LIMIT_XZ,
   POSE_MAX_Y,
   POSE_MIN_Y,
+  STACK_SIZE,
   WORLD_HEIGHT,
   WORLD_NAME_MAX,
 } from '../game/config';
 import { LOOK_COUNT } from '../player/looks';
 import type { MoveMode } from '../player/player';
 import type { WorldProgress } from '../progress/progress';
-import { decodePlayer, decodeProgress, encodePlayer } from '../save/saveFormat';
+import {
+  decodePlayer,
+  decodeProgress,
+  decodeState,
+  encodePlayer,
+  encodeSlots,
+} from '../save/saveFormat';
 import { type WorldOptions, decodeWorldOptions } from '../world/generation/worldOptions';
 import { isPlayerKey } from './roomCode';
 
@@ -49,6 +57,20 @@ export type LeftReason = 'leave' | 'lost';
 
 /** One chunk's edits in a snapshot part: chunk coordinates and pairs (index, id, …). */
 export type SnapshotChunk = [cx: number, cz: number, pairs: number[]];
+
+/**
+ * One block state in a snapshot part (Phase 8 part B3a): chunk coordinates, block index,
+ * kind and the filled slots as triples (slot, item, count, …), as in a chunk record.
+ */
+export type SnapshotState = [cx: number, cz: number, index: number, kind: string, slots: number[]];
+
+/**
+ * Changed slots of a chest (Phase 8 part B3a): triples (slot, item, count, …), count 0
+ * (item 0) empties the slot; `gone` is a chest whose state was removed (broken).
+ */
+export type ChestMessage =
+  | { t: 'chest'; x: number; y: number; z: number; slots: number[] }
+  | { t: 'chest'; x: number; y: number; z: number; gone: true };
 
 export interface RoomInfo {
   hostName: string;
@@ -120,13 +142,16 @@ export type HostMessage =
   | ({ t: 'info' } & RoomInfo)
   | { t: 'reject'; reason: JoinReject }
   | Welcome
-  | { t: 'snapshot'; part: number; chunks: SnapshotChunk[] }
+  | { t: 'snapshot'; part: number; chunks: SnapshotChunk[]; states: SnapshotState[] }
   | { t: 'ready' }
   | ResultMessage
   | { t: 'record'; record: PlayerRecord }
   /** The world's task book changed (Phase 8 part A2), with the tasks that change finished. */
   | { t: 'progress'; progress: WorldProgress; done: TaskDoneBy[] }
   | { t: 'blocks'; by: number; changes: number[] }
+  | ChestMessage
+  /** Who has a chest open (Phase 8 part B3a); `ids` empty: the chest was broken. */
+  | { t: 'viewers'; x: number; y: number; z: number; ids: number[] }
   | { t: 'poses'; poses: RelayedPose[] }
   | { t: 'joined'; id: number; name: string; slot: number; look: number }
   | { t: 'profile'; id: number; name: string; look: number }
@@ -335,6 +360,44 @@ const REJECT_REASONS: readonly RejectReason[] = [
   'invalid',
 ];
 
+/** A snapshot's state: the save format's checks, with chunk coordinates in front. */
+function snapshotState(value: unknown): SnapshotState {
+  if (!Array.isArray(value) || value.length !== 5) fail('state');
+  const [cx, cz, index, kind, slots] = value as unknown[];
+  const limit = COORD_LIMIT >> 4;
+  const c = { cx, cz, index };
+  const out: SnapshotState = [
+    int(c, 'cx', -limit - 1, limit),
+    int(c, 'cz', -limit - 1, limit),
+    int(c, 'index', 0, CHUNK_VOLUME - 1),
+    '',
+    [],
+  ];
+  const state = decodeState(kind, slots);
+  if (!state) fail('state');
+  out[3] = state.kind;
+  out[4] = encodeSlots(state);
+  return out;
+}
+
+/** The changed slots of a `chest` message: each slot once, count 0 only with item 0. */
+function chestSlots(m: Fields): number[] {
+  const slots = arr(m, 'slots', CHEST_SLOTS * 3);
+  if (slots.length % 3 !== 0) fail('slots');
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < slots.length; i += 3) {
+    const t = { slot: slots[i], item: slots[i + 1], count: slots[i + 2] };
+    const slot = int(t, 'slot', 0, CHEST_SLOTS - 1);
+    const count = int(t, 'count', 0, STACK_SIZE);
+    const item = int(t, 'item', count === 0 ? 0 : 1, count === 0 ? 0 : 0xffff);
+    if (seen.has(slot)) fail('slots');
+    seen.add(slot);
+    out.push(slot, item, count);
+  }
+  return out;
+}
+
 // --- decoders --------------------------------------------------------------------------
 
 /** A message that a guest sent to the host. */
@@ -445,7 +508,29 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
           }
           return out;
         });
-        return { t: 'snapshot', part: int(m, 'part', 0, ID_MAX), chunks };
+        const states = arr(m, 'states', MAX_MESSAGE_BYTES).map(snapshotState);
+        return { t: 'snapshot', part: int(m, 'part', 0, ID_MAX), chunks, states };
+      }
+      case 'chest': {
+        const x = int(m, 'x', -COORD_LIMIT, COORD_LIMIT);
+        const y = int(m, 'y', 0, WORLD_HEIGHT - 1);
+        const z = int(m, 'z', -COORD_LIMIT, COORD_LIMIT);
+        if (m.gone !== undefined) {
+          if (m.gone !== true || m.slots !== undefined) fail('gone');
+          return { t: 'chest', x, y, z, gone: true };
+        }
+        return { t: 'chest', x, y, z, slots: chestSlots(m) };
+      }
+      case 'viewers': {
+        const ids = arr(m, 'ids', NET_MAX_PLAYERS).map((id) => int({ id }, 'id', 0, ID_MAX));
+        if (new Set(ids).size !== ids.length) fail('ids');
+        return {
+          t: 'viewers',
+          x: int(m, 'x', -COORD_LIMIT, COORD_LIMIT),
+          y: int(m, 'y', 0, WORLD_HEIGHT - 1),
+          z: int(m, 'z', -COORD_LIMIT, COORD_LIMIT),
+          ids,
+        };
       }
       case 'ready':
         return { t: 'ready' };

@@ -20,7 +20,13 @@ import {
   RECONNECT_WINDOW_MS,
 } from '../game/config';
 import type { WorldEdits } from '../save/saveFormat';
-import type { WorldStates } from '../world/blockState';
+import {
+  type BlockState,
+  type StateChange,
+  type StateStack,
+  type WorldStates,
+  emptyChest,
+} from '../world/blockState';
 import { wrapTime } from '../world/dayNight';
 import { type WorldGen, worldGenOf } from '../world/generation/worldOptions';
 import { BreakClock } from './breakTiming';
@@ -32,12 +38,13 @@ import {
   type JoinReject,
   type NetPose,
   type SnapshotChunk,
+  type SnapshotState,
   type Welcome,
   decodeHostMessage,
   encodeMessage,
 } from './protocol';
 import { guestPeerId, roomOfAnyBuild, roomPeerId } from './roomCode';
-import { joinParts } from './snapshot';
+import { joinParts, joinStates } from './snapshot';
 import {
   type Connection,
   type Network,
@@ -69,9 +76,11 @@ export class JoinError extends Error {
 /** How a joined room ended: the host closed it, the host was lost, or this guest left. */
 export type EndReason = 'closed' | 'lost' | 'left';
 
-/** The world a guest plays in: blocks the host reports are set here. */
+/** The world a guest plays in: blocks and block states the host reports are set here. */
 export interface GuestWorld {
   setBlock(x: number, y: number, z: number, id: number): boolean;
+  storedState?(x: number, y: number, z: number): BlockState | null;
+  setState?(x: number, y: number, z: number, state: BlockState | null): boolean;
 }
 
 export interface ClientListener extends SessionListener {
@@ -111,6 +120,7 @@ interface Attempt {
   conn: Connection;
   welcome: Welcome | null;
   parts: SnapshotChunk[][];
+  states: SnapshotState[][];
   resolve: () => void;
   reject: (error: JoinError) => void;
 }
@@ -246,7 +256,7 @@ export class ClientSession implements Session {
   /** Sends `hello` on a new connection and waits for the world. */
   private hello(conn: Connection): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const attempt: Attempt = { conn, welcome: null, parts: [], resolve, reject };
+      const attempt: Attempt = { conn, welcome: null, parts: [], states: [], resolve, reject };
       this.attempt = attempt;
       this.conn = conn;
       conn.onMessage = (text) => this.receive(conn, text);
@@ -457,6 +467,16 @@ export class ClientSession implements Session {
         this.o.listener.onBlocks(changes);
         break;
       }
+      case 'chest': {
+        const state = 'gone' in m ? null : this.patchedChest(m.x, m.y, m.z, m.slots);
+        this.world?.setState?.(m.x, m.y, m.z, state);
+        const change: StateChange = { x: m.x, y: m.y, z: m.z, state };
+        this.o.listener.onStates?.([change]);
+        break;
+      }
+      case 'viewers':
+        this.o.listener.onViewers?.({ x: m.x, y: m.y, z: m.z, ids: m.ids });
+        break;
       case 'poses':
         for (const p of m.poses) {
           if (p.id === this.selfId) continue;
@@ -495,6 +515,17 @@ export class ClientSession implements Session {
     }
   }
 
+  /** The chest in a cell with the host's changed slots (count 0 empties a slot). */
+  private patchedChest(x: number, y: number, z: number, changed: readonly number[]): BlockState {
+    const base = this.world?.storedState?.(x, y, z) ?? emptyChest();
+    const slots: (StateStack | null)[] = base.slots.slice();
+    for (let i = 0; i < changed.length; i += 3) {
+      const count = changed[i + 2];
+      slots[changed[i]] = count > 0 ? { item: changed[i + 1], count } : null;
+    }
+    return { kind: 'chest', slots };
+  }
+
   private receiveJoining(attempt: Attempt, m: HostMessage, now: number): void {
     switch (m.t) {
       case 'reject':
@@ -512,7 +543,10 @@ export class ClientSession implements Session {
         return;
       }
       case 'snapshot':
-        if (attempt.welcome) attempt.parts.push(m.chunks);
+        if (attempt.welcome) {
+          attempt.parts.push(m.chunks);
+          attempt.states.push(m.states);
+        }
         return;
       case 'ready': {
         const welcome = attempt.welcome;
@@ -532,7 +566,12 @@ export class ClientSession implements Session {
         this.adoptTime(welcome.time, welcome.frozen, now);
         this.lastPose = null;
         this.lastPingMs = -Infinity;
-        this.world = this.o.listener.onWorld(welcome, joinParts(attempt.parts), new Map(), rejoin);
+        this.world = this.o.listener.onWorld(
+          welcome,
+          joinParts(attempt.parts),
+          joinStates(attempt.states),
+          rejoin,
+        );
         this.setStatus('online');
         attempt.resolve();
         return;

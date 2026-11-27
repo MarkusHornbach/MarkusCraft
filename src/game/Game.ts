@@ -1131,7 +1131,7 @@ export class Game {
       }),
       rttMs: this.mp.client?.rttMs ?? null,
       lastResult: this.mp.client?.lastResult ?? null,
-      worldHash: worldHash(this.world.edits),
+      worldHash: worldHash(this.world.edits, this.world.states),
       lastError: this.mp.lastError,
       notices: this.mp.currentNotices(),
       figures: this.renderer.remotePlayers.drawn,

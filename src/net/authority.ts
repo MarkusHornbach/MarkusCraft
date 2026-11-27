@@ -5,6 +5,7 @@ import { AUTHORITY_CACHE_CHUNKS, WORLD_HEIGHT } from '../game/config';
 import { Block } from '../world/blocks';
 import { blockIndex, chunkKey, toChunkCoord, toLocalCoord } from '../world/chunk';
 import { generateChunk } from '../world/generation/terrain';
+import type { BlockState } from '../world/blockState';
 import type { World } from '../world/World';
 
 export class FarReader {
@@ -32,6 +33,14 @@ export class FarReader {
     const loaded = this.world.getChunk(cx, cz);
     if (loaded) return loaded.blocks[index];
     return this.side(cx, cz)[index];
+  }
+
+  /**
+   * The state of a cell (a chest's slots) by the block this reader sees there: stored in
+   * the world, else the initial one; null for a block without state (Phase 8 part B3a).
+   */
+  getState(x: number, y: number, z: number): BlockState | null {
+    return this.world.stateFor(this.getBlock(x, y, z), x, y, z);
   }
 
   /** A block was set in the world: a cached copy of its chunk follows. */

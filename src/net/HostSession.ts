@@ -26,6 +26,7 @@ import {
   START_POSE_RADIUS,
 } from '../game/config';
 import { BLOCK_SOLID, Block } from '../world/blocks';
+import { type BlockState, type StateChange, emptyChest } from '../world/blockState';
 import { wrapTime } from '../world/dayNight';
 import { breakTimeMs } from '../items/hardness';
 import { lookForKey } from '../player/looks';
@@ -50,7 +51,7 @@ import {
   validPose,
 } from './protocol';
 import { normalizePlayerName, uniqueName } from './roomCode';
-import { splitEdits } from './snapshot';
+import { splitSnapshot } from './snapshot';
 import type { Connection } from './transport';
 
 const NO_EVENTS: readonly ProgressEvent[] = Object.freeze([]);
@@ -147,6 +148,33 @@ interface Member {
    * actions behind it (they keep their order).
    */
   held: { dueMs: number; queue: { action: Action; seq: number }[] } | null;
+  /** The chest this player has open (Phase 8 part B3a), or null. */
+  open: Cell | null;
+}
+
+/** A block's cell. */
+interface Cell {
+  x: number;
+  y: number;
+  z: number;
+}
+
+function sameCell(a: Cell | null, b: Cell | null): boolean {
+  return a !== null && b !== null && a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+/**
+ * The slots of a chest message: those that differ between two states, as triples (slot,
+ * item, count; count 0 empties).
+ */
+export function changedSlots(before: BlockState, after: BlockState): number[] {
+  const out: number[] = [];
+  after.slots.forEach((stack, slot) => {
+    const old = before.slots[slot] ?? null;
+    if (old?.item === stack?.item && old?.count === stack?.count) return;
+    out.push(slot, stack?.item ?? 0, stack?.count ?? 0);
+  });
+  return out;
 }
 
 /** A connection that has not said `hello` (yet): a room-list query or a joining guest. */
@@ -250,6 +278,7 @@ export class HostSession {
       rateCount: 0,
       rateStartMs: now,
       held: null,
+      open: null,
     };
     this.members.set(1, this.self);
     this.local = new HostLocalSession(this);
@@ -598,6 +627,7 @@ export class HostSession {
       rateCount: 0,
       rateStartMs: now,
       held: null,
+      open: null,
     };
     const others: PlayerInfo[] = [...this.members.values()].map((m) => ({
       id: m.id,
@@ -611,7 +641,7 @@ export class HostSession {
     for (const m of this.members.values()) member.sent.set(m.id, m.poseVersion);
     this.members.set(member.id, member);
     this.byConn.set(conn, member);
-    const parts = splitEdits(this.o.world.edits);
+    const parts = splitSnapshot(this.o.world.edits, this.o.world.states);
     // Welcome, parts and `ready` are queued in one go: no later `blocks` can overtake them.
     this.send(member, {
       t: 'welcome',
@@ -633,7 +663,9 @@ export class HostSession {
       parts: parts.length,
       progress: this.book,
     });
-    parts.forEach((chunks, part) => this.send(member, { t: 'snapshot', part, chunks }));
+    parts.forEach(({ chunks, states }, part) =>
+      this.send(member, { t: 'snapshot', part, chunks, states }),
+    );
     this.send(member, { t: 'ready' });
     for (const other of this.members.values()) {
       if (other !== member && other.conn)
@@ -646,7 +678,11 @@ export class HostSession {
 
   private remove(member: Member, reason: LeftReason): void {
     if (this.members.get(member.id) !== member || member === this.self) return;
+    // A player who leaves has nothing open any more; the others at its chest learn it.
+    const open = member.open;
+    member.open = null;
     this.members.delete(member.id);
+    if (open) this.sendViewers(open);
     if (member.conn) this.byConn.delete(member.conn);
     // A guest that comes back gets its items and its place again (saved with the world).
     this.departed.set(member.key, this.entryOf(member, this.wallNow()));
@@ -712,6 +748,7 @@ export class HostSession {
       record: member.record,
       players: poses,
       progress: this.book,
+      states: this.reader,
     };
     const result = applyAction(ctx, action, this.o.clock());
     // Events read the world before the action's blocks are set.
@@ -727,6 +764,11 @@ export class HostSession {
         this.sendBlocks(result.blocks, member.id);
         this.o.listener.onBlocks(result.blocks);
       }
+      // States after the blocks, and the guests learn them before any record.
+      if (result.states) this.applyStates(result.states);
+      if (action.kind === 'openChest')
+        this.setOpen(member, { x: action.x, y: action.y, z: action.z });
+      if (action.kind === 'closeChest') this.setOpen(member, null);
       if (result.player) {
         member.record = result.player;
         changed.add(member);
@@ -740,6 +782,69 @@ export class HostSession {
     } else {
       this.send(member, { t: 'result', seq, ok: false, reason: result.reason });
     }
+  }
+
+  // --- chests (Phase 8 part B3a) -------------------------------------------------------
+
+  /**
+   * Sets an action's states in the world and tells every guest the changed slots (`chest`)
+   * or that a chest is gone; the viewers of a gone chest have nothing open any more.
+   */
+  private applyStates(changes: readonly StateChange[]): void {
+    const messages: HostMessage[] = [];
+    for (const c of changes) {
+      // What the guests hold now: the stored state, or the initial (empty) one.
+      const before = this.o.world.storedState(c.x, c.y, c.z) ?? emptyChest();
+      this.o.world.setState(c.x, c.y, c.z, c.state);
+      messages.push(
+        c.state
+          ? { t: 'chest', x: c.x, y: c.y, z: c.z, slots: changedSlots(before, c.state) }
+          : { t: 'chest', x: c.x, y: c.y, z: c.z, gone: true },
+      );
+    }
+    for (const member of this.members.values()) {
+      if (!member.conn) continue;
+      for (const message of messages) this.send(member, message);
+    }
+    this.o.listener.onStates?.(changes);
+    for (const c of changes) if (c.state === null) this.closeChestAt(c);
+  }
+
+  /** The chest a player has open: the viewers of the old and the new chest learn it. */
+  private setOpen(member: Member, cell: Cell | null): void {
+    const old = member.open;
+    if (sameCell(old, cell) || (old === null && cell === null)) return;
+    member.open = cell;
+    if (old) this.sendViewers(old);
+    if (cell) this.sendViewers(cell);
+  }
+
+  /** A chest was broken: nobody has it open; its viewers get an empty list. */
+  private closeChestAt(cell: Cell): void {
+    const viewers = [...this.members.values()].filter((m) => sameCell(m.open, cell));
+    for (const member of viewers) {
+      member.open = null;
+      this.tellViewers(member, cell, []);
+    }
+  }
+
+  /** Every player who has the chest open learns who has it open. */
+  private sendViewers(cell: Cell): void {
+    const viewers = [...this.members.values()].filter((m) => sameCell(m.open, cell));
+    const ids = viewers.map((m) => m.id);
+    for (const member of viewers) this.tellViewers(member, cell, ids);
+  }
+
+  private tellViewers(member: Member, cell: Cell, ids: number[]): void {
+    const { x, y, z } = cell;
+    if (member === this.self) this.o.listener.onViewers?.({ x, y, z, ids });
+    else this.send(member, { t: 'viewers', x, y, z, ids });
+  }
+
+  /** Who has the chest in a cell open (tests and the F3 overlay). */
+  viewersOf(x: number, y: number, z: number): number[] {
+    const cell = { x, y, z };
+    return [...this.members.values()].filter((m) => sameCell(m.open, cell)).map((m) => m.id);
   }
 
   // --- progress (Phase 8 part A2) ------------------------------------------------------

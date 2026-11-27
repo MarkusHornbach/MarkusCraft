@@ -19,6 +19,29 @@ const GUEST: GuestMessage[] = [
   { t: 'info' },
   { t: 'hello', build: 'abc1234', key: KEY, name: 'Anna', look: 3 },
   { t: 'action', seq: 7, action: { kind: 'place', x: 1, y: 2, z: 3, slot: 4 } },
+  {
+    t: 'action',
+    seq: 8,
+    action: {
+      kind: 'chestMove',
+      x: 1,
+      y: 2,
+      z: 3,
+      from: 4,
+      fromChest: true,
+      to: 35,
+      toChest: false,
+      item: 3,
+    },
+  },
+  {
+    t: 'action',
+    seq: 9,
+    action: { kind: 'quickMove', x: 1, y: 2, z: 3, slot: 0, fromChest: false, item: 7 },
+  },
+  { t: 'action', seq: 10, action: { kind: 'takeAll', x: 1, y: 2, z: 3 } },
+  { t: 'action', seq: 11, action: { kind: 'openChest', x: 1, y: 2, z: 3 } },
+  { t: 'action', seq: 12, action: { kind: 'closeChest' } },
   { t: 'pose', ...POSE, tp: true, fly: false, busy: false },
   { t: 'pose', ...POSE, tp: false, fly: true, busy: true },
   { t: 'profile', name: 'Anna B', look: 8 },
@@ -50,7 +73,22 @@ const HOST: HostMessage[] = [
     parts: 3,
     progress: { done: [1, 2], counts: [{ task: 3, count: 7 }] },
   },
-  { t: 'snapshot', part: 0, chunks: [[-1, 2, [0, 1, 32767, 19]]] },
+  { t: 'snapshot', part: 0, chunks: [[-1, 2, [0, 1, 32767, 19]]], states: [] },
+  {
+    t: 'snapshot',
+    part: 1,
+    chunks: [],
+    states: [
+      [-1, 2, 300, 'chest', [0, 3, 64, 26, 9999, 1]],
+      [4, 4, 0, 'chest', []],
+    ],
+  },
+  { t: 'chest', x: -4, y: 70, z: 9, slots: [0, 3, 12, 5, 0, 0] },
+  { t: 'chest', x: -4, y: 70, z: 9, slots: [] },
+  { t: 'chest', x: -4, y: 70, z: 9, gone: true },
+  { t: 'viewers', x: -4, y: 70, z: 9, ids: [1, 3] },
+  { t: 'viewers', x: -4, y: 70, z: 9, ids: [] },
+  { t: 'result', seq: 9, ok: false, reason: 'notEmpty' },
   { t: 'ready' },
   { t: 'result', seq: 3, ok: true, notices: [{ item: 3, count: 1 }] },
   { t: 'result', seq: 4, ok: false, reason: 'reach' },
@@ -267,6 +305,94 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
     expect(bad(JSON.stringify({ t: 'record', record }), false)).toBe(true);
   });
 
+  it('Phase 8B3a AC3.4: refuses malformed chest messages', () => {
+    const chest = (fields: Record<string, unknown>): boolean =>
+      bad(JSON.stringify({ t: 'chest', x: 1, y: 70, z: 2, ...fields }), false);
+    expect(chest({ slots: [0, 3, 1] })).toBe(false);
+    expect(chest({})).toBe(true);
+    expect(chest({ slots: [0, 3] })).toBe(true);
+    expect(chest({ slots: [27, 3, 1] })).toBe(true);
+    expect(chest({ slots: [-1, 3, 1] })).toBe(true);
+    expect(chest({ slots: [0, 3, 1, 0, 4, 1] })).toBe(true);
+    expect(chest({ slots: [0, 0, 1] })).toBe(true);
+    expect(chest({ slots: [0, 3, 0] })).toBe(true);
+    expect(chest({ slots: [0, 3, 100] })).toBe(true);
+    expect(chest({ slots: [0, 65536, 1] })).toBe(true);
+    expect(chest({ slots: [0, 3, 1.5] })).toBe(true);
+    expect(chest({ slots: 'all' })).toBe(true);
+    expect(chest({ gone: false })).toBe(true);
+    expect(chest({ gone: true, slots: [] })).toBe(true);
+    expect(chest({ y: 128, slots: [] })).toBe(true);
+    expect(chest({ x: 2 ** 31, slots: [] })).toBe(true);
+    expect(chest({ slots: new Array(28 * 3).fill(1) })).toBe(true);
+  });
+
+  it('Phase 8B3a AC3.4: refuses malformed viewers messages', () => {
+    const viewers = (fields: Record<string, unknown>): boolean =>
+      bad(JSON.stringify({ t: 'viewers', x: 1, y: 70, z: 2, ids: [1], ...fields }), false);
+    expect(viewers({})).toBe(false);
+    expect(viewers({ ids: [1, 1] })).toBe(true);
+    expect(viewers({ ids: [1, 2, 3, 4, 5] })).toBe(true);
+    expect(viewers({ ids: [-1] })).toBe(true);
+    expect(viewers({ ids: [1.5] })).toBe(true);
+    expect(viewers({ ids: ['1'] })).toBe(true);
+    expect(viewers({ ids: null })).toBe(true);
+    expect(viewers({ ids: undefined })).toBe(true);
+    expect(viewers({ x: '1' })).toBe(true);
+    expect(viewers({ y: -1 })).toBe(true);
+    expect(viewers({ z: Number.NaN })).toBe(true);
+    expect(viewers({ y: 1.5 })).toBe(true);
+  });
+
+  it('Phase 8B3a AC3.4: refuses malformed snapshot states', () => {
+    const snapshot = (states: unknown): boolean =>
+      bad(JSON.stringify({ t: 'snapshot', part: 0, chunks: [], states }), false);
+    expect(snapshot([[0, 0, 5, 'chest', [0, 3, 1]]])).toBe(false);
+    expect(bad(JSON.stringify({ t: 'snapshot', part: 0, chunks: [] }), false)).toBe(true);
+    expect(snapshot('x')).toBe(true);
+    expect(snapshot([[0, 0, 5, 'chest']])).toBe(true);
+    expect(snapshot([[0, 0, -1, 'chest', []]])).toBe(true);
+    expect(snapshot([[0, 0, 32768, 'chest', []]])).toBe(true);
+    expect(snapshot([[0.5, 0, 5, 'chest', []]])).toBe(true);
+    expect(snapshot([[2 ** 30, 0, 5, 'chest', []]])).toBe(true);
+    expect(snapshot([[0, 0, 5, 'furnace', []]])).toBe(true);
+    expect(snapshot([[0, 0, 5, 'chest', [27, 3, 1]]])).toBe(true);
+    expect(snapshot([[0, 0, 5, 'chest', [0, 3, 0]]])).toBe(true);
+    expect(snapshot([[0, 0, 5, 'chest', [0, 3, 1, 0, 3, 1]]])).toBe(true);
+    expect(snapshot([[0, 0, 5, 'chest', [0, 0, 1]]])).toBe(true);
+  });
+
+  it('Phase 8B3a AC3.4: refuses malformed chest actions', () => {
+    const action = (a: Record<string, unknown>): boolean =>
+      bad(JSON.stringify({ t: 'action', seq: 1, action: a }));
+    const move = {
+      kind: 'chestMove',
+      x: 1,
+      y: 2,
+      z: 3,
+      from: 0,
+      fromChest: true,
+      to: 1,
+      toChest: false,
+      item: 3,
+    };
+    expect(action(move)).toBe(false);
+    expect(action({ ...move, fromChest: 'yes' })).toBe(true);
+    expect(action({ ...move, toChest: 0 })).toBe(true);
+    expect(action({ ...move, from: 36 })).toBe(true);
+    expect(action({ ...move, to: -1 })).toBe(true);
+    expect(action({ ...move, item: 0 })).toBe(true);
+    expect(action({ ...move, item: 65536 })).toBe(true);
+    expect(action({ ...move, extra: 1 })).toBe(true);
+    const quick = { kind: 'quickMove', x: 1, y: 2, z: 3, slot: 0, fromChest: true, item: 3 };
+    expect(action(quick)).toBe(false);
+    expect(action({ ...quick, slot: 1.5 })).toBe(true);
+    expect(action({ ...quick, fromChest: undefined })).toBe(true);
+    expect(action({ kind: 'takeAll', x: 1, y: 2 })).toBe(true);
+    expect(action({ kind: 'openChest', x: 1, y: 2, z: 'z' })).toBe(true);
+    expect(action({ kind: 'closeChest', slot: 1 })).toBe(true);
+  });
+
   it('10 000 seeded random strings are refused without throwing', () => {
     const rng = mulberry32(99);
     const pieces = [
@@ -294,6 +420,13 @@ describe('protocol decoder (Phase 6 AC3.2)', () => {
       '"progress"',
       '"done"',
       '"counts"',
+      '"chest"',
+      '"viewers"',
+      '"states"',
+      '"slots"',
+      '"gone"',
+      '"ids"',
+      '"snapshot"',
     ];
     for (let i = 0; i < 10_000; i++) {
       let text = '';
