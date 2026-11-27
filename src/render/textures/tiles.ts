@@ -747,6 +747,76 @@ function paintTorch(rng: Rng): Uint8ClampedArray {
 }
 
 /** Painters indexed by tile id. */
+const CHEST_FRAME: Rgb = [84, 56, 34];
+
+/** Darkens a frame of `width` pixels around the tile with a bevel on its inner edge. */
+function chestFrame(px: Uint8ClampedArray, rng: Rng, width: number): void {
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const edge = Math.min(x, y, S - 1 - x, S - 1 - y);
+      if (edge < width) {
+        const g = (rng() - 0.5) * 10 + (edge === 0 ? -16 : edge === width - 1 ? -6 : 6);
+        setPixel(px, x, y, [CHEST_FRAME[0] + g, CHEST_FRAME[1] + g, CHEST_FRAME[2] + g]);
+      } else if (edge === width) {
+        shadePixel(px, x, y, -28);
+      }
+    }
+  }
+}
+
+/** Chest lid: darker planks inside a frame, with a raised rim across the middle. */
+function paintChestTop(rng: Rng): Uint8ClampedArray {
+  const px = paintPlanks(rng);
+  for (let i = 0; i < px.length; i += 4) {
+    px[i] *= 0.86;
+    px[i + 1] *= 0.84;
+    px[i + 2] *= 0.8;
+  }
+  chestFrame(px, rng, 3);
+  // A rim across the lid where the two halves of the lid meet.
+  for (let x = 3; x < S - 3; x++) {
+    shadePixel(px, x, 15, -34);
+    shadePixel(px, x, 16, 18);
+  }
+  return px;
+}
+
+/**
+ * Chest side: framed planks, a dark band where the lid closes, and a metal latch in the
+ * middle of the band. The same on all four sides (blocks have no facing).
+ */
+function paintChestSide(rng: Rng): Uint8ClampedArray {
+  const px = paintPlanks(rng);
+  for (let i = 0; i < px.length; i += 4) {
+    px[i] *= 0.9;
+    px[i + 1] *= 0.88;
+    px[i + 2] *= 0.84;
+  }
+  chestFrame(px, rng, 2);
+  // The band under the lid.
+  for (let y = 10; y < 13; y++) {
+    for (let x = 2; x < S - 2; x++) {
+      const g = (rng() - 0.5) * 8 + (y === 10 ? 10 : y === 12 ? -14 : 0);
+      setPixel(px, x, y, [CHEST_FRAME[0] + g, CHEST_FRAME[1] + g, CHEST_FRAME[2] + g]);
+    }
+  }
+  // The latch: a small metal plate with a dark keyhole and a shadow below.
+  for (let y = 9; y < 16; y++) {
+    for (let x = 13; x < 19; x++) {
+      const edge = x === 13 || x === 18 || y === 9 || y === 15;
+      const v = edge ? 150 : 196;
+      setPixel(px, x, y, [v + 6, v + 4, v - 6]);
+    }
+    shadePixel(px, 19, y, -30);
+  }
+  for (let x = 14; x < 19; x++) shadePixel(px, x, 16, -30);
+  setPixel(px, 15, 12, [40, 34, 30]);
+  setPixel(px, 16, 12, [40, 34, 30]);
+  setPixel(px, 15, 13, [40, 34, 30]);
+  setPixel(px, 16, 13, [40, 34, 30]);
+  return px;
+}
+
 export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   const painters: TilePainter[] = [];
   painters[Tile.GRASS_TOP] = paintGrassTop;
@@ -772,6 +842,8 @@ export const TILE_PAINTERS: readonly TilePainter[] = (() => {
   painters[Tile.STONE_BRICKS] = paintStoneBricks;
   painters[Tile.IRON_BLOCK] = paintIronBlock;
   painters[Tile.TORCH] = paintTorch;
+  painters[Tile.CHEST_TOP] = paintChestTop;
+  painters[Tile.CHEST_SIDE] = paintChestSide;
   return painters;
 })();
 

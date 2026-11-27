@@ -23,6 +23,7 @@ describe('break times (Phase 3 AC7.1)', () => {
       stone_bricks: 3.0,
       iron_block: 5.0,
       torch: 0,
+      chest: 1.5,
     };
     const table = Object.fromEntries(
       BLOCKS.filter((def) => def.breakable).map((def) => [def.name, breakTimeMs(def.id)]),
@@ -92,6 +93,7 @@ describe('tools (Phase 3 AC11.1)', () => {
     iron_ore: 'pickaxe',
     iron_block: 'pickaxe',
     torch: null,
+    chest: 'axe',
   };
 
   it('every breakable block has the tool class of the plan', () => {
@@ -121,8 +123,8 @@ describe('tools (Phase 3 AC11.1)', () => {
         checked++;
       }
     }
-    // 17 breakable blocks × (hand + 29 items + an unknown id).
-    expect(checked).toBe(17 * 31);
+    // 18 breakable blocks × (hand + 30 items + an unknown id).
+    expect(checked).toBe(18 * 32);
     expect(breakTimeMs(Block.STONE, Item.STONE_PICKAXE)).toBe(750);
     expect(breakTimeMs(Block.IRON_BLOCK, Item.IRON_PICKAXE)).toBe(625);
     expect(breakTimeMs(Block.LOG, Item.WOODEN_AXE)).toBe(1000);

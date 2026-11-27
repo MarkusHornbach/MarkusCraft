@@ -26,6 +26,7 @@ describe('light rules', () => {
       stone_bricks: [15, 0],
       iron_block: [15, 0],
       torch: [0, 14],
+      chest: [15, 0],
     });
   });
 

@@ -3,7 +3,7 @@
 // activated; the game turns that into actions.
 import type { GameMode, ItemStack } from '../actions/playerRecord';
 import { HOTBAR_SLOTS, INVENTORY_SLOTS } from '../game/config';
-import { BLOCK_ITEMS, getItemDef, itemLabel } from '../items/items';
+import { PALETTE_ITEMS, getItemDef, itemLabel } from '../items/items';
 import type { RecipeStatus } from '../items/recipes';
 import { type InputMode, button, element, onActivate } from './activate';
 import { createItemIcon } from './itemIcon';
@@ -195,7 +195,7 @@ export class InventoryScreen {
 
     // Creative: every block that can be placed, once.
     this.palette = element('div', 'inventory-palette');
-    for (const item of BLOCK_ITEMS) {
+    for (const item of PALETTE_ITEMS) {
       const choice = button('inv-slot palette-slot', '');
       choice.dataset.item = getItemDef(item)?.name ?? '';
       choice.title = itemLabel(item);
