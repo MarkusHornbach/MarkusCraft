@@ -87,6 +87,19 @@ chapter), notice }` or `null` in Creative; `recipes[]` has `locked` and `unlock`
   `submit({ kind: 'track', task })` sets it. References `task-tracker` (PC, a clip of the
   top-left corner) and `task-tracker-touch` (640 × 360, the canvas hidden)
   (`e2e/taskTracker.spec.ts`, `e2e/progressTouch.spec.ts`).
+- Phase 8 part B1 (the radar): `getState().radar` (null in Creative) is `{ unlocked,
+setting, shown, focus, entries, beyond, scans, draws }`; `entries` are what the circle
+  drew last (`kind`, `dx`, `dy`, `dz`, `dist`, `hint`, `screen`: the spot relative to the
+  circle's centre in CSS pixels, y down), `scans` and `draws` count since the world was
+  loaded. `getState().map` exists only while the Map tab is open: `{ locked, entries (all
+kinds, 8 each), legend (texts), draws }`; `ui.tab` may be `map`; `settings.radar`.
+  `progress=all` unlocks the radar, `progress=fresh` does not; test mode ignores stored
+  settings, so the switch is tested from the menu. The test tool `setBlock` also tells the
+  radar. Mining a vein through actions: `e2e/radar.ts` (`mineCell`, `veinAt`); touch
+  layouts need the menu flow (`openTouchAdventure`), since test mode keeps 960 × 540.
+  References `radar-circle`, `radar-circle-touch`, `map-tab`, `map-tab-touch`
+  (`e2e/radar.spec.ts`, `e2e/radarTouch.spec.ts`, `e2e/radarMap.spec.ts`); rooms:
+  `e2e/mpRadar.spec.ts`. Bench scenario `radar`: `src/bench/CLAUDE.md`.
 
 ## Controller
 
@@ -137,7 +150,7 @@ figures }` (`figures`: most other players' figures drawn at once during the run)
 its own buttons (`.bench-start-button`, `.bench-cancel-button`, …). Tests of a run wait on
 `getState().bench`, give themselves four minutes and never assert on a measured time or a
 light; the rules that throw a run away apply once the progress line shows "scenario 1 of
-13" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by hand:
+15" (`untilMeasuring` in `e2e/bench.spec.ts`). To play a suite by hand:
 `node scripts/benchRun.mjs [1|quick] [folder]` against the preview server (the full suite
 takes about three minutes in a cloud session).
 

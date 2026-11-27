@@ -40,7 +40,12 @@ everyone in `present` and first finds and crafts to the actor, and reports outco
 (`taskDone`, `chapterDone`, `xp`, `firstFind`, `levelUp`, `unlocked`). It is called only by
 the sessions (`src/actions/CLAUDE.md`). A guest of a room never steps: it rebuilds what to
 show from the host's messages, `outcomesOfBook` (finished tasks with the player's name,
-task unlocks, chapters) and `outcomesOfRecord` (its own finds, XP and level-ups). **Extension points** for later parts: a new event
+task unlocks, chapters) and `outcomesOfRecord` (its own finds, XP and level-ups). **Feature unlocks** (Phase 8 part B1): `FEATURE_UNLOCKS` gives each `Feature` (only
+`radar`, task 8) one unlock; features are not saved. `featureUnlocked` reads the level from
+the record and the task from the world's book (in a room everyone has it); the outcomes
+`unlocked` and `levelUp` carry `features` only when there are some ("Unlocked: Torch,
+Radar"); `featureLockText` ("Task: Climb to height 64"); `checkTables` checks one unlock
+per feature and names a feature whose task is never done. **Extension points** for later parts: a new event
 kind is one union member in `events.ts`; a new task type one member of `TaskType` and one
 `case` in `advance` (`progress.ts`), one in `check.ts` and one skill in the bot.
 

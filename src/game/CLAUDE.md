@@ -7,7 +7,7 @@ every area: rules that span several are in `docs/architecture.md`.
 ## Files
 
 - `Game.ts` (loop, wiring, screens, world loading), `config.ts` (all constants),
-  `testApi.ts`, `urlParams.ts`
+  `testApi.ts`, `urlParams.ts`, `Radar.ts` (the radar in the shell: `src/radar/CLAUDE.md`)
 - `autosave.ts` (pure: when to write what), `idbStore.ts` (WorldStore on IndexedDB),
   `worldLock.ts` (one tab per world)
 - `perfStats.ts` (pure: frames and chunk work of the last ten seconds), `benchEnv.ts`

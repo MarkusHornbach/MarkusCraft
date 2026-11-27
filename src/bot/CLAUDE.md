@@ -27,6 +27,15 @@ from water) and `climbTo` (a hill nearby, else a pillar). Stations are placed wh
 needs one and taken back when the task is done. Junk (leaves, clay, grass, dirt, sand) is
 thrown away when the inventory is full; one stack of pillar blocks stays.
 
+## The radar (Phase 8 part B1)
+
+The bot ignores the radar. At the start of tasks 12 and 16 (`RADAR_CHECK_TASKS`) it
+generates every chunk within `RADAR_RADIUS` and records the radar's nearest vein of the
+task's kind and the nearest ore block of a brute-force scan (`BotRun.radar`); the slow test
+wants them equal, and `radarUnlocked` true at the end. `scripts/progressRun.ts` prints a
+"Radar" section (`formatRadar`): when the radar unlocks, the median distance and `dy` at
+those tasks, and whether every run agreed.
+
 ## Time model and the table
 
 Bot time: break times from `breakTimeMs` with the tool held, walking distance ×
