@@ -206,7 +206,7 @@ export const SAVE_DATABASE = 'markuscraft';
 // --- Performance test (Phase 4 part P) ---
 
 /** Raised when a scenario is added or the order of the suite changes. */
-export const BENCH_SUITE_VERSION = 3;
+export const BENCH_SUITE_VERSION = 4;
 /** Version of the result record and of the issue text built from it. */
 export const BENCH_FORMAT_VERSION = 1;
 export const BENCH_SEED = 1337;

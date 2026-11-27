@@ -54,7 +54,10 @@ itself. A changed scenario (script, steps, warm-up) gets a new version; adding a
 or changing the order raises `BENCH_SUITE_VERSION`. Results of different versions of a
 scenario are never compared (`compare.ts` keeps them in separate rows).
 `scenarios.test.ts` pins the table. Scenarios added by later parts: `torches` (Phase 4
-part B, suite version 2) and `players` (below, suite version 3).
+part B, suite version 2), `players` (below, suite version 3) and `radar` (Phase 8 part B1,
+suite version 4: the `walk` input with the view turning 1.5° per step, `Scenario.yaw`
+through `BenchHost.setYaw`, and the radar circle shown in the bench's Creative world,
+`Scenario.radar`).
 
 ## The scenario `players` (Phase 6 part E)
 

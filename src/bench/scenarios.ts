@@ -91,6 +91,8 @@ export const BENCH_SPAWN = { x: -0.5, y: 57, z: 4.5 };
 
 /** `walk`: found by a search over headings; 80 blocks of ground without water. */
 const WALK_YAW = 165 * DEG;
+/** `radar`: the view turns by this much per step (about 1.5°). */
+export const RADAR_TURN_PER_STEP = 1.5 * DEG;
 /** `fly`: north along -Z; the highest block on the route is at 86. */
 export const FLY_HEIGHT = 100;
 const FLY_PITCH = -15 * DEG;
@@ -409,6 +411,19 @@ export const SCENARIOS: readonly Scenario[] = [
     input: () => NO_INPUT,
     action: noAction,
     guests: PLAYERS_GUESTS,
+  },
+  {
+    // Phase 8 part B1: the walk with the radar circle shown and the view turning steadily,
+    // so the heading-up circle draws at its cap and scans as the feet move.
+    id: 'radar',
+    version: 1,
+    label: 'radar',
+    steps: 1200,
+    start: { ...BENCH_SPAWN, yaw: WALK_YAW, pitch: 0, mode: 'walk' },
+    input: () => WALK_INPUT,
+    action: noAction,
+    radar: true,
+    yaw: (step) => WALK_YAW + step * RADAR_TURN_PER_STEP,
   },
 ];
 
