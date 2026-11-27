@@ -20,16 +20,20 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
 - Debug overlay: F3 on the PC, the "Debug overlay" switch in the pause menu on touch
   devices.
 
-**How it is kept up to date** (for implementation sessions, see `CLAUDE.md`)
+**How it is kept up to date** (for sessions; the root `CLAUDE.md` points here)
 
-- Every phase part adds its new tests here, in the section they belong to, with the part
-  as origin (for example "4B").
+- Every phase part adds its new tests here, in the section they belong to, with an id
+  (`LIGHT-9`, `TOUCH-12`, …) and the part as origin (for example "4B"). Its report names
+  the ids it added. Ids are never reused.
 - This file lists open tests only. When the owner has ticked a test, the next session that
   touches this file moves it unchanged to "Passed" in `docs/device-tests-done.md`.
 - A test that a later change makes pointless is moved to "Obsolete" in
   `docs/device-tests-done.md` with one line of reason; it is not deleted silently.
-- Results the owner wrote down are never changed or removed by a session. A test whose
-  subject changed gets a new entry; the old one, with its result, moves to "Obsolete".
+- Results the owner wrote down (after "Result:" or into a table) are never changed or
+  removed by a session. A test whose subject changed gets a new entry; the old one, with
+  its result, moves to "Obsolete".
+- Read `docs/device-tests-done.md` when a test's history matters. Update "Last updated"
+  below whenever the open list changes.
 - Findings that led to a change are noted in the report of the part that made the change.
 
 Last updated: Polish 2 (section "Progression", PROG-8 to PROG-10; PROG-3 obsolete); 2026-11-24.

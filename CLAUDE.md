@@ -212,18 +212,10 @@ writing specs: `e2e/CLAUDE.md`. Always:
 
 `docs/device-tests.md` lists the open tests only a person with a real device can judge
 (frame rate, feel, readability, understanding); `docs/device-tests-done.md` holds the
-passed and the obsolete ones. The owner fills them out, for all phases.
-
-- A phase part adds its tests to `docs/device-tests.md`, in their section, with an id
-  (`LIGHT-9`, `TOUCH-12`, …) and its origin (`4B`); its report names the ids it added.
-- The next session that touches the file moves a ticked test unchanged to "Passed" in
-  `docs/device-tests-done.md`, and one a change made pointless to "Obsolete" there with
-  one line of reason. Ids are never reused.
-- Never change or remove what the owner wrote after "Result:" or into a table. If the
-  subject of a test changed, add a new test and move the old one, with its result, to
-  "Obsolete".
-- Read the open list at the start of a session (the owner's feedback), the done file when
-  a test's history matters. Update "Last updated" when you change the open list.
+passed and the obsolete ones. The owner fills them out. Read the open list at the start of
+a session (the owner's feedback). A phase part adds its tests there; how (ids, origins,
+moving ticked and pointless tests, results never changed): that file's header, "How it is
+kept up to date".
 
 ## Docs hygiene
 
@@ -314,8 +306,9 @@ hold:
 
 - **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
   prompt asks for it. The rest of Phase 7 (custom blocks, textures, characters, names,
-  effects) is not planned. Phase 8 ("Adventure"): part A is built (8A1, 8A2); parts B–E
-  are not planned. At the start of a session look for issues with the label `perf-run`;
+  effects) is not planned. Phase 8 ("Adventure"): part A is built (8A1, 8A2), its fix round
+  "Fix Adventure 1" is planned (`docs/fix-adventure-1-plan.md`); parts B–E are not
+  planned. At the start of a session look for issues with the label `perf-run`;
   the latest are all green (issue #37), the Web Workers line says "not needed". Numbers
   from software WebGL (cloud sessions, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
