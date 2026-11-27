@@ -8,6 +8,7 @@ import {
   initialState,
   isEmptyState,
   stateKindOf,
+  summarizeStates,
 } from './blockState';
 import { blockIndex, chunkKey } from './chunk';
 import { World } from './World';
@@ -127,5 +128,25 @@ describe('block state (Phase 8B3a 6.2)', () => {
     world.generate(2, 2);
     expect(world.getState(40, Y, 40)).toEqual(chestWith(Block.CLAY, 2));
     expect(world.droppedStates).toBe(0);
+  });
+});
+
+describe('state summary (Phase 8B3a 6.6)', () => {
+  it('counts chests with items and the JSON size of all states', () => {
+    const states = new Map([
+      [
+        '0,0',
+        new Map([
+          [1, chestWith(Block.STONE, 3)],
+          [2, emptyChest()],
+        ]),
+      ],
+      ['1,0', new Map([[3, chestWith(Block.LOG, 1, 26)]])],
+    ]);
+    const bytes = [chestWith(Block.STONE, 3), emptyChest(), chestWith(Block.LOG, 1, 26)]
+      .map((s) => JSON.stringify(s).length)
+      .reduce((a, b) => a + b, 0);
+    expect(summarizeStates(states)).toEqual({ filled: 2, bytes });
+    expect(summarizeStates(new Map())).toEqual({ filled: 0, bytes: 0 });
   });
 });

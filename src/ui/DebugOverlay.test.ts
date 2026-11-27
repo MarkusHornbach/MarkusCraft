@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { netRows } from './DebugOverlay';
+import { chestsRow, netRows } from './DebugOverlay';
 
 describe('the network lines of the debug overlay (Phase 6 AC14.1)', () => {
   const rates = { inMsgs: 41.5, outMsgs: 60, inBytes: 2150, outBytes: 5120 };
@@ -56,5 +56,13 @@ describe('the network lines of the debug overlay (Phase 6 AC14.1)', () => {
       link: 'direct (host → host), via STUN (srflx → host)',
     });
     expect(netRows(null).room).toBe('off');
+  });
+});
+
+describe('the chests row of the debug overlay (Phase 8B3a 6.6)', () => {
+  it('names the chests with items, the size of all states and dropped states', () => {
+    expect(chestsRow(3, 1229, 0)).toBe('3 chests · 1.2 kB');
+    expect(chestsRow(1, 120, 0)).toBe('1 chest · 120 B');
+    expect(chestsRow(0, 40, 2)).toBe('0 chests · 40 B · 2 dropped');
   });
 });

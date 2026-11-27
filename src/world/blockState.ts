@@ -78,6 +78,26 @@ export interface StateChange {
 /** States of every chunk: chunk key → (block index → state), as `World.states` keeps them. */
 export type WorldStates = Map<string, Map<number, BlockState>>;
 
+/** What the F3 row shows of a world's states: chests with items and the size of all. */
+export interface StateSummary {
+  /** States that hold at least one item. */
+  filled: number;
+  /** Characters of all states as JSON (the cost in saves and snapshots). */
+  bytes: number;
+}
+
+export function summarizeStates(states: WorldStates): StateSummary {
+  let filled = 0;
+  let bytes = 0;
+  for (const chunk of states.values()) {
+    for (const state of chunk.values()) {
+      if (!isEmptyState(state)) filled++;
+      bytes += JSON.stringify(state).length;
+    }
+  }
+  return { filled, bytes };
+}
+
 /** Reads the state of a cell: stored, else the initial one; null for a block without state. */
 export interface StateReader {
   getState(x: number, y: number, z: number): BlockState | null;

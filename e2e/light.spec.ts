@@ -231,6 +231,7 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
     name: 'Part C world',
     generatorVersion: 1,
     options: null,
+    chests: 0,
   });
   expect(state.mode).toBe('gathering');
   expect(state.inventory.slots.slice(0, 3)).toEqual(PART_C_META.player.slots.slice(0, 3));
@@ -265,12 +266,14 @@ test('a world stored by Phase 3 opens as it was, with light, and is written back
     string,
     unknown
   >;
-  // Saved again, the record is migrated to the current format (4; Phase 6 part C added
-  // the empty list of guests, Phase 8 the task book; a generator 1 world has no options).
+  // Saved again, the record is migrated to the current format (6; Phase 6 part C added
+  // the empty list of guests, Phase 8 the task book, B3a its version; a generator 1 world
+  // has no options).
   expect(Object.keys(meta).sort()).toEqual(
     [...Object.keys(PART_C_META), 'guests', 'progress'].sort(),
   );
-  expect(meta.formatVersion).toBe(5);
+  expect(meta.formatVersion).toBe(6);
+  expect(meta.progress).toEqual({ done: [], counts: [], book: 1 });
   expect(meta.guests).toEqual([]);
   expect(meta.generatorVersion).toBe(1);
   expect(meta.time).toBeCloseTo(0.3, 9);

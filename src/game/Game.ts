@@ -31,7 +31,7 @@ import {
 } from '../save/saveFormat';
 import { MemoryStore, type WorldStore } from '../save/WorldStore';
 import { BenchScreen } from '../ui/BenchScreen';
-import { DebugOverlay } from '../ui/DebugOverlay';
+import { DebugOverlay, chestsRow } from '../ui/DebugOverlay';
 import { FocusManager } from '../ui/FocusManager';
 import type { PadHint } from '../ui/PadHints';
 import { glyphSheet } from '../ui/padGlyphs';
@@ -60,7 +60,7 @@ import { PlayerSection } from '../ui/PlayerSection';
 import { lookForKey } from '../player/looks';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
-import type { StateChange, WorldStates } from '../world/blockState';
+import { type StateChange, type WorldStates, summarizeStates } from '../world/blockState';
 import { ChunkManager } from '../world/ChunkManager';
 import { PerfStats } from './perfStats';
 import { chunkKey, toChunkCoord } from '../world/chunk';
@@ -2869,6 +2869,14 @@ export class Game {
     if (this.debug.visible) this.updateDebug();
   }
 
+  /** The F3 row "Chests", or null while the world has no block states (Phase 8 part B3a). */
+  private chestsDebug(): string | null {
+    const world = this.world;
+    if (world.states.size === 0 && world.droppedStates === 0) return null;
+    const { filled, bytes } = summarizeStates(world.states);
+    return chestsRow(filled, bytes, world.droppedStates);
+  }
+
   private updateDebug(): void {
     const p = this.player;
     const stats = this.renderer.getStats();
@@ -2894,6 +2902,7 @@ export class Game {
       progress:
         this.gameMode === 'gathering' ? progressRow(this.progress, this.session.record) : null,
       radar: this.radarUnlocked() ? (this.settings.radar ? this.radar.debugText() : 'off') : null,
+      chests: this.chestsDebug(),
       time: this.time,
       mode: p.mode,
       onGround: p.onGround,
@@ -3086,6 +3095,7 @@ export class Game {
             name: this.meta.name,
             generatorVersion: this.meta.generatorVersion,
             options: this.meta.options,
+            chests: summarizeStates(this.world.states).filled,
           }
         : null,
       save: {
@@ -3235,6 +3245,10 @@ export class Game {
         if (!this.inventoryOpen) this.applyLookPixels(dx, dy);
       },
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),
+      getChest: (x, y, z) => {
+        const state = this.world.getState(x, y, z);
+        return state ? state.slots.map((s) => (s ? { item: s.item, count: s.count } : null)) : null;
+      },
       setBlock: (x, y, z, id) => this.testSetBlock(x, y, z, id),
       submit: (action) => this.testSubmit(action),
       surfaceY: (x, z) => this.world.surfaceY(x, z),

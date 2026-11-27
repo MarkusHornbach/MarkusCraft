@@ -30,6 +30,8 @@ export interface DebugInfo {
   progress: string | null;
   /** Adventure with the radar: "4 coal · 2 iron · scan 0.6 ms · draw 0.1 ms" or "off"; else null. */
   radar: string | null;
+  /** "3 chests · 1.2 kB" (· "1 dropped"); null while the world has no block states. */
+  chests: string | null;
   time: number;
   mode: string;
   onGround: boolean;
@@ -54,6 +56,7 @@ const ROWS = [
   'generator',
   'progress',
   'radar',
+  'chests',
   'time',
   'mode',
   'target',
@@ -82,6 +85,7 @@ const LABELS: Record<Row, string> = {
   generator: 'World',
   progress: 'Progress',
   radar: 'Radar',
+  chests: 'Chests',
   time: 'Time',
   mode: 'Mode',
   target: 'Target',
@@ -117,6 +121,13 @@ export function timeName(t: number): string {
   if (t < 0.46) return 'afternoon';
   if (t < 0.54) return 'sunset';
   return 'night';
+}
+
+/** The F3 row "Chests": chests with items, the size of all states, dropped states. */
+export function chestsRow(filled: number, bytes: number, dropped: number): string {
+  const size = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} kB`;
+  const count = `${filled} ${filled === 1 ? 'chest' : 'chests'}`;
+  return `${count} · ${size}${dropped > 0 ? ` · ${dropped} dropped` : ''}`;
 }
 
 /** The network rows of the overlay as text; single-player shows "off" in the first. */
@@ -166,7 +177,9 @@ export class DebugOverlay {
       this.element.appendChild(line);
       this.values.set(row, value);
       this.lines.set(row, line);
-      if (NET_ROWS.includes(row) || row === 'progress' || row === 'radar') line.hidden = true;
+      if (NET_ROWS.includes(row) || row === 'progress' || row === 'radar' || row === 'chests') {
+        line.hidden = true;
+      }
     }
     parent.appendChild(this.element);
   }
@@ -218,6 +231,11 @@ export class DebugOverlay {
     if (radarLine && radarLine.hidden !== (info.radar === null))
       radarLine.hidden = info.radar === null;
     this.set('radar', info.radar ?? '');
+    const chestsLine = this.lines.get('chests');
+    if (chestsLine && chestsLine.hidden !== (info.chests === null)) {
+      chestsLine.hidden = info.chests === null;
+    }
+    this.set('chests', info.chests ?? '');
     this.set('time', `${info.time.toFixed(3)} (${timeName(info.time)})`);
     const detail = info.inWater ? ', in water' : info.onGround ? ', on ground' : '';
     this.set('mode', `${info.mode}${detail}`);
