@@ -8,11 +8,17 @@ import {
   type WorldProgress,
   stepProgress,
 } from '../progress/progress';
+import type { BlockState, StateChange, StateReader } from '../world/blockState';
 import type { GameMode, PlayerRecord } from './playerRecord';
 
 export interface SessionListener {
   /** Blocks were set in the world (already applied when this is called). */
   onBlocks(changes: readonly BlockChange[]): void;
+  /**
+   * Block states were set (a chest's slots, Phase 8 part B3a), after the blocks of the
+   * same action; already applied when this is called.
+   */
+  onStates?(changes: readonly StateChange[]): void;
   /** The local player's confirmed record changed. */
   onPlayer(record: PlayerRecord): void;
   /** The answer to a submitted action. */
@@ -40,6 +46,9 @@ export interface LocalHost {
   world: {
     getBlock(x: number, y: number, z: number): number;
     setBlock(x: number, y: number, z: number, id: number): boolean;
+    /** Block states (Phase 8 part B3a); worlds of tests without chests may leave them out. */
+    getState?(x: number, y: number, z: number): BlockState | null;
+    setState?(x: number, y: number, z: number, state: BlockState | null): boolean;
   };
   mode: GameMode;
   /** Pose of the local player. */
@@ -113,6 +122,12 @@ export class LocalSession implements Session {
     this.listener.onPlayer(record);
   }
 
+  private stateReader(): StateReader | undefined {
+    const world = this.host.world;
+    const getState = world.getState?.bind(world);
+    return getState ? { getState } : undefined;
+  }
+
   submit(action: Action): void {
     // Decoding again costs little and gives every source of actions the same checks.
     const decoded = decodeAction(action);
@@ -128,6 +143,7 @@ export class LocalSession implements Session {
       record: this.current,
       players: [pose],
       progress: this.book,
+      states: this.stateReader(),
     };
     const result = applyAction(ctx, decoded.action, this.host.nowMs());
     // Events read the world before the action's blocks are set.
@@ -137,6 +153,13 @@ export class LocalSession implements Session {
         this.host.world.setBlock(change.x, change.y, change.z, change.id);
       }
       if (result.blocks.length > 0) this.listener.onBlocks(result.blocks);
+      // States after the blocks: a placed chest's cell must be a chest by now.
+      if (result.states) {
+        for (const change of result.states) {
+          this.host.world.setState?.(change.x, change.y, change.z, change.state);
+        }
+        this.listener.onStates?.(result.states);
+      }
       if (result.player) {
         this.current = result.player;
         this.listener.onPlayer(result.player);

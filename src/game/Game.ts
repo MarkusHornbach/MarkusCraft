@@ -212,6 +212,8 @@ const TEXT_NOT_OPENED = 'This world could not be opened.';
 const TEXT_NOT_CREATED = 'The world could not be created. Free up storage space.';
 const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 const TEXT_INVENTORY_FULL = 'Inventory full';
+const TEXT_CHEST_FULL = "No room for the chest's items";
+const TEXT_CHEST_NOT_EMPTY = 'Empty the chest first';
 const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
 const TEXT_NEEDS_SUPPORT = 'Needs a block underneath';
 const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
@@ -372,6 +374,10 @@ export class Game {
   private pickup: { item: number; count: number; untilMs: number } | null = null;
   /** "Inventory full" shows until this action time. */
   private fullUntilMs = -1;
+  /** What the "full" message says: the inventory, or a chest's items (Phase 8 part B3a). */
+  private fullText = TEXT_INVENTORY_FULL;
+  /** Until when "Empty the chest first" shows, after a refused Creative break. */
+  private notEmptyUntilMs = -1;
   /** Until when "Needs a block underneath" shows, after a refused torch. */
   private supportUntilMs = -1;
   /** The item in the furnace: its recipe and the action time the progress bar started. */
@@ -733,6 +739,7 @@ export class Game {
     this.breakInFlight = false;
     this.pickup = null;
     this.fullUntilMs = -1;
+    this.notEmptyUntilMs = -1;
     this.supportUntilMs = -1;
     this.lockedUntilMs = -1;
     this.progressQueue = [];
@@ -1912,7 +1919,14 @@ export class Game {
     if (action.kind === 'startBreak') {
       // The break runs from now on, or it does not start at all.
       this.breakActive = result.ok;
-      if (!result.ok && result.reason === 'full') this.fullUntilMs = this.nowMs() + NOTICE_MS;
+    }
+    if ((action.kind === 'startBreak' || action.kind === 'break') && !result.ok) {
+      const chest = this.world.getBlock(action.x, action.y, action.z) === Block.CHEST;
+      if (result.reason === 'full') {
+        this.fullUntilMs = this.nowMs() + NOTICE_MS;
+        this.fullText = chest ? TEXT_CHEST_FULL : TEXT_INVENTORY_FULL;
+      }
+      if (result.reason === 'notEmpty') this.notEmptyUntilMs = this.nowMs() + NOTICE_MS;
     }
     if (action.kind === 'place' && !result.ok && result.reason === 'support') {
       this.supportUntilMs = this.nowMs() + NOTICE_MS;
@@ -2409,12 +2423,14 @@ export class Game {
     );
     this.hud.setMessage(
       now <= this.fullUntilMs
-        ? TEXT_INVENTORY_FULL
-        : now <= this.supportUntilMs
-          ? TEXT_NEEDS_SUPPORT
-          : now <= this.lockedUntilMs
-            ? this.lockedText
-            : this.toolHint(),
+        ? this.fullText
+        : now <= this.notEmptyUntilMs
+          ? TEXT_CHEST_NOT_EMPTY
+          : now <= this.supportUntilMs
+            ? TEXT_NEEDS_SUPPORT
+            : now <= this.lockedUntilMs
+              ? this.lockedText
+              : this.toolHint(),
     );
     // Over the HUD and the open inventory; not over the pause menu or the world menu.
     const playing =

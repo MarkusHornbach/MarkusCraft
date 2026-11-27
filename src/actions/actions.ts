@@ -67,6 +67,55 @@ export interface TrackAction {
   task: number;
 }
 
+/**
+ * Moves the stack of one slot to another, inside a chest, inside the player's slots or
+ * between the two (Phase 8 part B3a). `item` is what the screen showed in `from`: if the
+ * slot holds something else by now, the answer is `missing`.
+ */
+export interface ChestMoveAction {
+  kind: 'chestMove';
+  x: number;
+  y: number;
+  z: number;
+  from: number;
+  fromChest: boolean;
+  to: number;
+  toChest: boolean;
+  item: number;
+}
+
+/** Moves a stack to the other side: onto stacks of its item first, then into free slots. */
+export interface QuickMoveAction {
+  kind: 'quickMove';
+  x: number;
+  y: number;
+  z: number;
+  slot: number;
+  fromChest: boolean;
+  item: number;
+}
+
+/** Moves every stack of a chest into the player's slots, by the quick move rule. */
+export interface TakeAllAction {
+  kind: 'takeAll';
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** The player opens the chest in a cell; changes nothing, the room learns who looks. */
+export interface OpenChestAction {
+  kind: 'openChest';
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** The player closes its chest. */
+export interface CloseChestAction {
+  kind: 'closeChest';
+}
+
 /** An action survives JSON unchanged. */
 export type Action =
   | SelectSlotAction
@@ -77,7 +126,12 @@ export type Action =
   | DiscardAction
   | SetBarSlotAction
   | CraftAction
-  | TrackAction;
+  | TrackAction
+  | ChestMoveAction
+  | QuickMoveAction
+  | TakeAllAction
+  | OpenChestAction
+  | CloseChestAction;
 export type ActionKind = Action['kind'];
 
 export type DecodeResult = { ok: true; action: Action } | { ok: false; error: string };
@@ -97,6 +151,8 @@ const isSlot: Check = (value) =>
 const isItemId: Check = (value) =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 0xffff;
 
+const isBool: Check = (value) => typeof value === 'boolean';
+
 /** Whether the id names a recipe is checked by `applyAction`. */
 const isRecipeId: Check = isItemId;
 
@@ -115,6 +171,28 @@ const FIELDS: Record<ActionKind, Record<string, Check>> = {
   setBarSlot: { slot: isBarSlot, item: isItemId },
   craft: { recipe: isRecipeId },
   track: { task: isTrackTask },
+  // Chest slots are 0–26; which side may use which slot is a rule of `applyAction`.
+  chestMove: {
+    x: isCoord,
+    y: isCoord,
+    z: isCoord,
+    from: isSlot,
+    fromChest: isBool,
+    to: isSlot,
+    toChest: isBool,
+    item: isItemId,
+  },
+  quickMove: {
+    x: isCoord,
+    y: isCoord,
+    z: isCoord,
+    slot: isSlot,
+    fromChest: isBool,
+    item: isItemId,
+  },
+  takeAll: { x: isCoord, y: isCoord, z: isCoord },
+  openChest: { x: isCoord, y: isCoord, z: isCoord },
+  closeChest: {},
 };
 
 function fail(error: string): DecodeResult {

@@ -293,6 +293,9 @@ function progress(value: unknown): WorldProgress {
   return decoded;
 }
 
+/** Notices of one result: a chest of 27 kinds, the chest and a torch on it, with room. */
+const NOTICES_MAX = 32;
+
 /** At most every task of a book (the save format's limit of a done list). */
 const TASKS_MAX = 1024;
 
@@ -328,6 +331,7 @@ const REJECT_REASONS: readonly RejectReason[] = [
   'mode',
   'rate',
   'locked',
+  'notEmpty',
   'invalid',
 ];
 
@@ -448,7 +452,8 @@ export function decodeHostMessage(text: unknown): Decoded<HostMessage> {
       case 'result': {
         const seq = int(m, 'seq', 0, ID_MAX);
         if (bool(m, 'ok')) {
-          const notices = arr(m, 'notices', 16).map((value) => {
+          // A broken chest reports one notice per item kind: up to its 27 slots and itself.
+          const notices = arr(m, 'notices', NOTICES_MAX).map((value) => {
             const n = obj(value, 'notice');
             return { item: int(n, 'item', 1, 0xffff), count: int(n, 'count', 1, 0xffff) };
           });
