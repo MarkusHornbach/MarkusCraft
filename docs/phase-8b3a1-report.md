@@ -113,8 +113,12 @@ it). B3a2 builds the screen, opening, recipe, task 21 and the palette entry.
 
 ## Known issues
 
-- None found in this part. The three-worker local browser runs still crash pages for lack
-  of memory (B2b's known issue); specs were run with one or two workers.
+- `e2e/mpMenus.spec.ts` "five players" (Phase 6 AC7.10) stays at "Connecting…" in this
+  container, in the full multiplayer run and alone, as the reports of 6E, 8A1, 8A2 and
+  Polish 2 found on their base commits (five software-rendered pages starve WebRTC here).
+  The other 34 tests of the seven older room specs passed; CI decides.
+- The three-worker local browser runs still crash pages for lack of memory (B2b's known
+  issue); specs were run with one or two workers.
 
 ## For the Pi side
 
