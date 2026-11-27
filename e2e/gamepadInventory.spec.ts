@@ -277,37 +277,61 @@ test('Phase 5 AC6.1: A on "Craft" makes the recipe once; held, it repeats after 
   expect(await have(page, PLANKS)).toBe(1);
 });
 
-test('Phase 5 AC6.2: a furnace recipe starts its bar with A; the bar fills; Y cancels it', async ({
+test('Phase 5 AC6.2 and Fix Adventure 1 AC3.2: A smelts coal three times in a row with the focus on "Craft Coal"; holding A keeps the furnace going; Y cancels it', async ({
   page,
 }) => {
   const pad = await padGame(page, 'gathering');
   const { px, pz } = await standOnPlatform(page);
   await setBlock(page, px, PLATFORM_Y + 1, pz - 2, FURNACE);
-  await give(page, LOG, 4);
+  await give(page, LOG, 6);
   await pad.tap(BUTTON.Y);
   await pad.tap(BUTTON.RB);
   await focusOn(page, pad, craft('coal'));
-  await pad.tap(BUTTON.A);
-  await step(page, 1);
-  expect((await getState(page)).smelting?.recipe).toBe(COAL_RECIPE);
-  // The button hides under the bar: the focus goes to the nearest one, on screen.
-  expect(await focusOf(page)).not.toBe('Craft Coal');
+  const onCoal = async (): Promise<void> => {
+    expect(await focusOf(page)).toBe('Craft Coal');
+    await whenIdle(page);
+    await expectFrameOnFocus(page);
+  };
+  // Fix Adventure 1: the button stays under its bar, so the focus stays on it throughout.
+  for (let n = 1; n <= 3; n++) {
+    await pad.tap(BUTTON.A);
+    await step(page, 1);
+    expect((await getState(page)).smelting?.recipe).toBe(COAL_RECIPE);
+    await onCoal();
+    await step(page, 60);
+    expect((await getState(page)).smelting?.progress).toBeCloseTo(61 / 120, 5);
+    await onCoal();
+    await step(page, 59);
+    expect(await have(page, COAL)).toBe(n);
+    expect((await getState(page)).smelting).toBeNull();
+    if (n < 3) await onCoal();
+  }
+  expect(await have(page, LOG)).toBe(0);
+  // The logs are used up: the button goes, the focus moves to the nearest one on screen.
+  await expect(page.locator(craft('coal'))).toBeHidden();
+  await expect.poll(() => focusOf(page)).not.toBe('Craft Coal');
+  await whenIdle(page);
   await expectFrameOnFocus(page);
-  await step(page, 119);
-  expect(await have(page, COAL)).toBe(1);
-  expect(await have(page, LOG)).toBe(2);
-  expect((await getState(page)).smelting).toBeNull();
 
+  // Held A: the first smelt after 30 steps, then each repeat after a delivery starts the
+  // next one, without letting go.
+  await give(page, LOG, 6);
   await focusOn(page, pad, craft('coal'));
-  await pad.tap(BUTTON.A);
-  await step(page, 60);
-  expect((await getState(page)).smelting?.progress).toBeCloseTo(0.5, 5);
+  await pad.press(BUTTON.A);
+  await step(page, 30);
+  expect((await getState(page)).smelting?.recipe).toBe(COAL_RECIPE);
+  await step(page, 250);
+  expect(await have(page, COAL)).toBeGreaterThanOrEqual(5);
+  await onCoal();
+  expect((await getState(page)).smelting?.recipe).toBe(COAL_RECIPE);
+  // Y closes and cancels the running smelt; nothing arrives later.
+  const coal = await have(page, COAL);
   await pad.tap(BUTTON.Y);
   expect((await getState(page)).ui.screen).toBe('play');
   expect((await getState(page)).smelting).toBeNull();
+  await pad.release(BUTTON.A);
   await step(page, 120);
-  expect(await have(page, COAL)).toBe(1);
-  expect(await have(page, LOG)).toBe(2);
+  expect(await have(page, COAL)).toBe(coal);
 });
 
 test('Phase 5 AC6.3: after a craft the focus stays on its button, or goes to the nearest; down skips rows without a button; the right stick scrolls', async ({

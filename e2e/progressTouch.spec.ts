@@ -207,3 +207,53 @@ test('Polish 2 AC3.3: at 640 × 360 the tracker lies below the menu button, insi
   await expect(page.locator('.progress-notice')).toBeVisible();
   await check();
 });
+
+test('Fix Adventure 1 AC3.3: at 640 × 360 two taps on "Craft Coal" at one point make 2 coal; the button stays inside the panel with its size while it smelts', async ({
+  page,
+}) => {
+  await phoneWorld(page);
+  await page.evaluate(() => {
+    const mc = window.__mc;
+    mc.setProgress({ xp: 160 });
+    const { player } = mc.getState();
+    // A furnace beside the player's head, within reach of its eye.
+    mc.setBlock(Math.floor(player.x), Math.floor(player.y) + 1, Math.floor(player.z) + 2, 16);
+    mc.give(5, 4);
+  });
+  await page.locator('.touch-bag').tap();
+  await page.locator('.inventory-tab[data-tab="crafting"]').tap();
+  const button = page.locator('.recipe-row[data-recipe="coal"] .recipe-craft');
+  await button.scrollIntoViewIfNeeded();
+  await expect(button).toBeVisible();
+  const box = await button.boundingBox();
+  if (!box) throw new Error('no "Craft Coal" button');
+  const panel = (await boxes(page, '.inventory-panel'))[0];
+  const inPanel = (b: { x: number; y: number; width: number; height: number }): void => {
+    expect(b.x).toBeGreaterThanOrEqual(panel.x);
+    expect(b.y).toBeGreaterThanOrEqual(panel.y);
+    expect(b.x + b.width).toBeLessThanOrEqual(panel.x + panel.width + 0.5);
+    expect(b.y + b.height).toBeLessThanOrEqual(panel.y + panel.height + 0.5);
+  };
+  inPanel(box);
+  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const coal = async (): Promise<number> =>
+    (await getState(page)).inventory.slots.reduce((n, s) => n + (s?.item === 256 ? s.count : 0), 0);
+
+  for (let n = 1; n <= 2; n++) {
+    await page.touchscreen.tap(at.x, at.y);
+    await expect.poll(async () => (await getState(page)).smelting?.recipe ?? null).toBe(11);
+    // While it smelts the button keeps its place and size, inside the panel.
+    await expect(button.locator('.recipe-progress')).toBeVisible();
+    const during = await button.boundingBox();
+    expect(during).not.toBeNull();
+    if (during) {
+      inPanel(during);
+      for (const key of ['x', 'y', 'width', 'height'] as const) {
+        expect(Math.abs(during[key] - box[key])).toBeLessThanOrEqual(1);
+      }
+    }
+    await expect.poll(coal, { timeout: 15_000 }).toBe(n);
+    await expect.poll(async () => (await getState(page)).smelting).toBeNull();
+  }
+  await whenIdle(page);
+});

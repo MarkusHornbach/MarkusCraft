@@ -114,11 +114,14 @@ export class RecipeList {
     // A long press on a button must not open the browser's menu.
     craft.addEventListener('contextmenu', (e) => e.preventDefault());
     const note = element('span', 'recipe-note', '');
+    // The furnace's bar lies inside the button, behind its label: the button stays where
+    // it is while its row smelts, so the controller's focus stays on it (Fix Adventure 1).
     const progress = element('span', 'recipe-progress');
     const fill = element('span', 'recipe-progress-fill');
     progress.appendChild(fill);
     progress.hidden = true;
-    action.append(craft, note, progress);
+    craft.prepend(progress);
+    action.append(craft, note);
 
     root.append(result, name, list, action);
     return { recipe, root, ingredients, craft, note, progress, fill, shown: '' };
@@ -169,11 +172,11 @@ export class RecipeList {
     this.showAction(row);
   }
 
-  /** Button, or the progress bar while this row's item is in the furnace. */
+  /** The button, with the furnace's bar inside it while this row's item smelts. */
   private showAction(row: Row): void {
     const smelting = this.smelting === row.recipe.id;
     row.progress.hidden = !smelting;
-    row.craft.hidden = smelting || row.craft.dataset.ready !== 'true';
+    row.craft.hidden = !smelting && row.craft.dataset.ready !== 'true';
     row.root.classList.toggle('smelting', smelting);
   }
 

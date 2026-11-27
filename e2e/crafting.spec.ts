@@ -452,7 +452,7 @@ test('Phase 3 AC12.2: short ingredients are marked; station recipes need a workb
   expect(await withButton(page)).toEqual([]);
 });
 
-test('Phase 3 AC12.3: a furnace recipe shows a progress bar and delivers after 120 steps; closing the screen cancels it', async ({
+test('Phase 3 AC12.3 and Fix Adventure 1 AC3.1: a furnace recipe fills its bar inside the "Craft" button, which stays in place; it delivers after 120 steps; closing the screen cancels it', async ({
   page,
 }) => {
   await openGame(page, { mode: 'gathering' });
@@ -460,36 +460,70 @@ test('Phase 3 AC12.3: a furnace recipe shows a progress bar and delivers after 1
   await setBlock(page, px, PLATFORM_Y + 1, pz - 2, FURNACE);
   await give(page, LOG, 4);
   await openCrafting(page);
+  const button = craftButton(page, 'coal');
   const progress = row(page, 'coal').locator('.recipe-progress');
   const fill = row(page, 'coal').locator('.recipe-progress-fill');
   const fillWidth = (): Promise<number> =>
     fill.evaluate((node) => parseFloat((node as HTMLElement).style.width));
   await expect(progress).toBeHidden();
   expect((await getState(page)).smelting).toBeNull();
+  await button.scrollIntoViewIfNeeded();
+  const box = await button.boundingBox();
+  if (!box) throw new Error('no "Craft Coal" button');
+  const sameBox = async (): Promise<void> => {
+    const now = await button.boundingBox();
+    expect(now).not.toBeNull();
+    for (const key of ['x', 'y', 'width', 'height'] as const) {
+      expect(Math.abs((now?.[key] ?? 0) - box[key])).toBeLessThanOrEqual(1);
+    }
+  };
+  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 
-  await craftButton(page, 'coal').click();
+  await page.mouse.click(at.x, at.y);
   await step(page, 1);
-  await expect(progress).toBeVisible();
-  await expect(craftButton(page, 'coal')).toBeHidden();
   expect((await getState(page)).smelting?.recipe).toBe(COAL_RECIPE);
-  // Nothing is taken while the bar runs, and a click on another furnace row starts nothing.
+  // Fix Adventure 1: the bar is drawn inside the button, which stays visible in its place.
+  await expect(progress).toBeVisible();
+  await expect(button).toBeVisible();
+  await expect(button).toHaveAttribute('aria-label', 'Craft Coal');
+  await expect(button).toHaveText('Craft');
+  await expect(row(page, 'coal')).toHaveClass(/smelting/);
+  await expect(button.locator('.recipe-progress')).toBeVisible();
+  await sameBox();
+  // Nothing is taken while the bar runs.
   await step(page, 59);
   expect((await getState(page)).smelting?.progress).toBeCloseTo(0.5, 5);
   expect(await fillWidth()).toBe(50);
   expect(await have(page, LOG)).toBe(4);
-  await step(page, 59);
+  await sameBox();
+  // A click during the smelt starts nothing and takes nothing.
+  await page.mouse.click(at.x, at.y);
+  await step(page, 1);
+  expect((await getState(page)).smelting?.progress).toBeCloseTo(61 / 120, 5);
+  expect(await have(page, LOG)).toBe(4);
+  await step(page, 58);
   expect(await have(page, LOG)).toBe(4);
   expect(await have(page, COAL)).toBe(0);
   expect((await getState(page)).smelting?.progress).toBeGreaterThan(0.98);
+  await sameBox();
   // The 120th step delivers.
   await step(page, 1);
   expect(await have(page, LOG)).toBe(2);
   expect(await have(page, COAL)).toBe(1);
   expect((await getState(page)).smelting).toBeNull();
   await expect(progress).toBeHidden();
-  await expect(craftButton(page, 'coal')).toBeVisible();
+  await expect(button).toBeVisible();
+  await sameBox();
+  // A second click at the same spot starts the next smelt.
+  await page.mouse.click(at.x, at.y);
+  await step(page, 120);
+  expect(await have(page, COAL)).toBe(2);
+  expect(await have(page, LOG)).toBe(0);
+  await expect(button).toBeHidden();
+  await give(page, LOG, 4);
 
   // Closing the screen while the bar runs: nothing was taken, and nothing arrives later.
+  await expect(button).toBeVisible();
   await craftButton(page, 'coal').click();
   await step(page, 60);
   await expect(progress).toBeVisible();

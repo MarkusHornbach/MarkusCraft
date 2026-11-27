@@ -62,10 +62,11 @@ function soak(page: Page, seed: number, weights: number[]): Promise<SoakReport> 
           op({ kind: 'stick', index: 0, offset: which, x, y });
         }
         await nextFrame();
+        // Every frame: a tab may be shown for only a few frames between two LB/RB.
+        const s = window.__mc.getState();
+        screens.add(s.ui.screen);
+        if (s.ui.tab) tabs.add(s.ui.tab);
         if (i % 10 === 0) {
-          const s = window.__mc.getState();
-          screens.add(s.ui.screen);
-          if (s.ui.tab) tabs.add(s.ui.tab);
           // A performance test run would only make the soak slow; it is left at once.
           if (s.bench && connected) {
             op({ kind: 'button', index: 0, button: 1, value: 1 });
@@ -128,7 +129,9 @@ test('Phase 5 AC4.1 (Part B): 2 000 random controller frames over the inventory 
   const report = await soak(
     page,
     SEED + 1,
-    [0, 0, 0, 0, 0, 1, 3, 3, 3, 4, 5, 5, 12, 13, 13, 14, 15, 15, 12, 13, 9],
+    // RB three times (Fix Adventure 1): with two, real-time frame pacing let some runs
+    // never get past "Crafting" to "Tasks".
+    [0, 0, 0, 0, 0, 1, 3, 3, 3, 4, 5, 5, 5, 12, 13, 13, 14, 15, 15, 12, 13, 9],
   );
   expect(report.screens).toContain('inventory');
   // Phase 8: the third tab, Tasks, is reached by RB as well.
