@@ -764,9 +764,9 @@ canvas {
     min-height: 24px;
   }
 
-  /* Two switches per line since "Radar circle" (Phase 8 part B1) joined them: the pause
-     menu still fits 360 px. */
-  .touch-mode .pause-section .switch-row {
+  /* "Collide with leaves" and "Radar circle" (Phase 8 part B1) share a line: the pause
+     menu still fits 360 px. The longer labels keep a whole row (one line each). */
+  .touch-mode .pause-section .switch-row.half-switch {
     display: inline-grid;
     grid-template-columns: 1fr 22px;
     width: calc(50% - 8px);

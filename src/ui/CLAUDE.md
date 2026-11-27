@@ -96,8 +96,8 @@ form scrolls on small screens; the menu comes back at the top when it is shown a
 row shows "Adventure · Balanced · Few trees", or "Creative · Classic" for generator 1. The
 F3 overlay has a row "World" ("Generator 2 · balanced · few", "Generator 1"). The settings
 page has the switch "Collide with leaves" below "Invert controller look", then "Radar
-circle" (`settings.radar`, default on), in every input mode; on phones the switch rows
-stand two per line.
+circle" (`settings.radar`, default on), in every input mode; on phones "Collide with leaves"
+and "Radar circle" share a line.
 
 ## "Your player" (Phase 6 part D)
 

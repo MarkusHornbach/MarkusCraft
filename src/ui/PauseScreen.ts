@@ -289,6 +289,8 @@ export class PauseScreen {
     // Phase 7 part A: movement only; leaves stay visible, targetable and breakable.
     const leaves = this.switchRow('setting-collide-leaves', 'Collide with leaves');
     this.leavesRow = leaves.row;
+    // On phones "Collide with leaves" and "Radar circle" share a line (CSS `.half-switch`).
+    this.leavesRow.classList.add('half-switch');
     this.leavesSwitch = leaves.input;
     this.leavesSwitch.checked = this.settings.collideLeaves;
     this.leavesSwitch.addEventListener('change', () => {
@@ -300,6 +302,7 @@ export class PauseScreen {
     // Phase 8 part B1: the circle only; the Map tab stays available when it is off.
     const radar = this.switchRow('setting-radar', 'Radar circle');
     this.radarRow = radar.row;
+    this.radarRow.classList.add('half-switch');
     this.radarSwitch = radar.input;
     this.radarSwitch.checked = this.settings.radar;
     this.radarSwitch.addEventListener('change', () => {
