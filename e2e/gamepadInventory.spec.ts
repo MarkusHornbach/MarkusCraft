@@ -199,8 +199,20 @@ test('Phase 5 AC5.3: the opening Y does not act inside; B cancels a pick first; 
   // Phase 8: the third tab, Tasks, follows; its focus starts on its tab as well.
   await pad.tap(BUTTON.RB);
   expect((await getState(page)).ui).toMatchObject({ tab: 'tasks', focus: 'Tasks' });
+  // Phase 8B1 AC4.1: the fourth tab, Map, follows; its focus is the tab itself, and RB
+  // stays there (no wrap-around).
   await pad.tap(BUTTON.RB);
-  expect((await getState(page)).ui.tab).toBe('tasks');
+  expect((await getState(page)).ui).toMatchObject({ tab: 'map', focus: 'Map' });
+  await pad.tap(BUTTON.RB);
+  expect((await getState(page)).ui).toMatchObject({ tab: 'map', focus: 'Map' });
+  // Nothing inside the Map tab takes the focus: D-pad down stays on the tab or leaves it.
+  await pad.tap(BUTTON.DOWN);
+  expect(
+    await page.evaluate(() => document.querySelector('.pad-focused')?.closest('.map-tab') ?? null),
+  ).toBeNull();
+  await focusOn(page, pad, '.inventory-tab[data-tab="map"]');
+  await pad.tap(BUTTON.LB);
+  expect((await getState(page)).ui).toMatchObject({ tab: 'tasks', focus: 'Tasks' });
   await pad.tap(BUTTON.LB);
   expect((await getState(page)).ui).toMatchObject({ tab: 'crafting', focus: 'Crafting' });
   await pad.tap(BUTTON.LB);

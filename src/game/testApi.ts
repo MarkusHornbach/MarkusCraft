@@ -55,7 +55,7 @@ export interface GameState {
   ui: {
     screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'bench' | 'nettest';
     /** The open page of the inventory screen, or null while it is closed. */
-    tab: 'items' | 'crafting' | 'tasks' | null;
+    tab: 'items' | 'crafting' | 'tasks' | 'map' | null;
     /**
      * The element the controller's focus is on (its `aria-label`, its text or its id).
      * Left out while there is none (the controller is not the active source, or no screen

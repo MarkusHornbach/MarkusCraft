@@ -547,9 +547,10 @@ for (const [device, view] of [
     await page.locator('.touch-bag').tap();
     await expect(page.locator('.inventory-screen')).toBeVisible();
 
-    // The three tabs (Tasks since Phase 8) and "Close" are finger-sized and on screen.
+    // The four tabs (Tasks since Phase 8, Map since Phase 8B1) and "Close" are
+    // finger-sized and on screen.
     const header = '.inventory-tab, .inventory-close';
-    expect(await boxes(page, header)).toHaveLength(4);
+    expect(await boxes(page, header)).toHaveLength(5);
     expectFingerSized(await boxes(page, header));
     await page.locator('.inventory-tab[data-tab="crafting"]').tap();
     const list = page.locator('.recipe-list');

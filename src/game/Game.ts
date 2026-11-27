@@ -128,11 +128,13 @@ import {
   unlockText,
 } from '../progress/progress';
 import { radarFocus } from '../radar/focus';
+import type { MapTab } from '../ui/MapTab';
 import type { RadarKind } from '../radar/kinds';
 import { Radar } from './Radar';
 import { type Task, unlockOf } from '../progress/tables';
 import {
   bookView,
+  featureLockText,
   lockedText,
   noticeTexts,
   progressRow,
@@ -255,6 +257,8 @@ export class Game {
   private radarFocusKind: RadarKind | null = null;
   /** The radar was unlocked and on at the last step (a change makes the scan stale). */
   private radarActive = false;
+  /** The Map tab while the radar draws on it (open and unlocked). */
+  private mapSurface: MapTab | null = null;
   private readonly debug: DebugOverlay;
   private readonly pauseScreen: PauseScreen | null = null;
   /** The start screen with the list of worlds; like the pause screen not in test mode. */
@@ -479,6 +483,7 @@ export class Game {
       onTab: () => {
         this.refreshRecipes();
         this.refreshBook();
+        this.syncMapTab();
       },
       onTrack: (task) => {
         // Choosing the row the tracker shows hides it; any other row (or any row while
@@ -1732,6 +1737,7 @@ export class Game {
   /** The session set blocks: rebuild the meshes they touch, outside the frame budget. */
   private onBlocksChanged(changes: readonly BlockChange[]): void {
     this.radar.noteBlocks(changes);
+    this.inventoryScreen.map.noteBlocks(changes);
     for (const { x, z } of changes) {
       this.markChunkDirty(x, z);
       this.remeshAround(x, z);
@@ -1850,6 +1856,7 @@ export class Game {
     this.inventoryScreen.setVisible(true);
     this.refreshRecipes();
     this.refreshBook();
+    this.syncMapTab();
     // The screen has its own bar; the controls of the game would only shine through.
     this.hud.setVisible(false);
     this.updateTouchCover();
@@ -1878,6 +1885,7 @@ export class Game {
     this.inventoryOpen = false;
     this.updateTouchCover();
     this.inventoryScreen.setVisible(false);
+    this.syncMapTab();
     // Closing cancels what is in the furnace: its ingredients were never taken.
     this.stopCrafting();
     this.syncFocus();
@@ -2238,7 +2246,28 @@ export class Game {
     );
   }
 
+  /**
+   * The Map tab (Phase 8 part B1): while it is open its locked text or, unlocked, the
+   * radar draws on it; its background cache goes when it closes.
+   */
+  private syncMapTab(): void {
+    const map = this.inventoryScreen.map;
+    const open =
+      this.inventoryOpen &&
+      this.gameMode === 'gathering' &&
+      this.inventoryScreen.currentTab === 'map';
+    const unlocked = this.radarUnlocked();
+    if (open) map.setLocked(!unlocked, featureLockText('radar'));
+    const surface = open && unlocked ? map : null;
+    if (surface) map.setWorld(this.world);
+    if (surface === this.mapSurface) return;
+    this.mapSurface = surface;
+    if (!surface) map.clear();
+    this.radar.setMap(surface);
+  }
+
   private stepRadar(): void {
+    this.syncMapTab();
     const active = this.radarUnlocked() && this.settings.radar;
     if (active !== this.radarActive) {
       this.radarActive = active;
@@ -2839,6 +2868,7 @@ export class Game {
     this.markChunkDirty(x, z);
     this.remeshAround(x, z);
     this.radar.noteBlocks([{ x, y, z, id }]);
+    this.inventoryScreen.map.noteBlocks([{ x, z }]);
     this.mp.host?.broadcastBlocks([{ x, y, z, id }]);
   }
 
@@ -2955,6 +2985,22 @@ export class Game {
     };
   }
 
+  /** The Map tab while it is open, for the test API; undefined otherwise. */
+  private mapState(): GameState['map'] {
+    const open =
+      this.inventoryOpen &&
+      this.gameMode === 'gathering' &&
+      this.inventoryScreen.currentTab === 'map';
+    if (!open) return undefined;
+    const map = this.inventoryScreen.map;
+    return {
+      locked: map.isLocked,
+      entries: map.isLocked ? [] : map.entries,
+      legend: map.isLocked ? [] : map.legendTexts,
+      draws: this.radar.mapDrawCount,
+    };
+  }
+
   /** The progress notice shown now, or null. */
   private progressNoticeText(): string | null {
     return this.progressShown?.text ?? null;
@@ -3005,6 +3051,7 @@ export class Game {
       })),
       progress: this.progressState(),
       radar: this.radarState(),
+      ...(this.mapState() ? { map: this.mapState() } : {}),
       smelting: this.smeltView(),
       bench: this.benchState(),
       net: this.netState(),

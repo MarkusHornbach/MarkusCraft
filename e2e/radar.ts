@@ -78,3 +78,29 @@ export async function mineCell(page: Page, [x, y, z]: [number, number, number]):
     pitch: player.pitch,
   });
 }
+
+/**
+ * Opens the game as a touch player at the page's viewport (no test mode, so the layout is
+ * the device's): an Adventure world from the menu, task 8 done, the circle shown.
+ */
+export async function openTouchAdventure(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(Element.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: undefined,
+    });
+    try {
+      window.localStorage.setItem('markuscraft.settings.v1', JSON.stringify({ renderDistance: 2 }));
+    } catch {
+      // No storage: the defaults.
+    }
+  });
+  await page.goto('/?seed=1337&time=0.25');
+  await page.waitForFunction(() => window.__mc !== undefined);
+  await page.locator('.world-menu[data-ready]').waitFor();
+  await page.locator('.world-mode-button[data-mode="gathering"]').tap();
+  await page.locator('.world-create-button').tap();
+  await page.waitForFunction(() => !window.__mc.getState().paused);
+  await page.evaluate(() => window.__mc.setProgress({ done: [1, 2, 3, 4, 5, 6, 7, 8] }));
+  await page.waitForFunction(() => window.__mc.getState().radar?.shown === true);
+}

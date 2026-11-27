@@ -114,6 +114,7 @@ export class PauseScreen {
   private readonly leavesRow: HTMLElement;
   private readonly leavesSwitch: HTMLInputElement;
   private readonly radarSwitch: HTMLInputElement;
+  private readonly radarRow: HTMLElement;
   private readonly invertSwitch: HTMLInputElement;
   /** A controller was used during this visit: its two settings rows are shown. */
   private padSeen = false;
@@ -298,13 +299,14 @@ export class PauseScreen {
 
     // Phase 8 part B1: the circle only; the Map tab stays available when it is off.
     const radar = this.switchRow('setting-radar', 'Radar circle');
+    this.radarRow = radar.row;
     this.radarSwitch = radar.input;
     this.radarSwitch.checked = this.settings.radar;
     this.radarSwitch.addEventListener('change', () => {
       this.settings.radar = this.radarSwitch.checked;
       change();
     });
-    settings.appendChild(radar.row);
+    settings.appendChild(this.radarRow);
 
     // Touch devices have no F3 key; this switch replaces it.
     const debug = this.switchRow('setting-debug', 'Debug overlay');
@@ -506,6 +508,7 @@ export class PauseScreen {
       place(this.invertRow, settings, null, this.padSeen);
       // Below "Invert controller look", in every input mode.
       place(this.leavesRow, settings, null, true);
+      place(this.radarRow, settings, null, true);
       for (const node of this.touchOnly) place(node, settings, null, touch);
     }
     this.placeFullscreenButton();

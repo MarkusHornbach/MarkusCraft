@@ -3,7 +3,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { getState, step, whenIdle } from './game';
-import { radarOf } from './radar';
+import { openTouchAdventure, radarOf } from './radar';
 import { TOUCH_DEVICE, centerOf, openTouchGame, swipe } from './touch';
 
 test.use(TOUCH_DEVICE);
@@ -41,9 +41,7 @@ for (const size of [
     page,
   }) => {
     await page.setViewportSize(size);
-    await openTouchGame(page, { mode: 'gathering', terrain: 'balanced', trees: 'few' });
-    await step(page, 20);
-    await whenIdle(page);
+    await openTouchAdventure(page);
     expect((await radarOf(page)).shown).toBe(true);
     const box = await page.locator(circle).boundingBox();
     const bag = await page.locator('.touch-bag').boundingBox();
@@ -62,7 +60,6 @@ for (const size of [
       await page.locator('canvas.game-canvas').evaluate((node) => {
         (node as HTMLElement).style.visibility = 'hidden';
       });
-      await whenIdle(page);
       await expect(page.locator(circle)).toHaveScreenshot('radar-circle-touch.png', {
         maxDiffPixelRatio: 0.05,
       });
