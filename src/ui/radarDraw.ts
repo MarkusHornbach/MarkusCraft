@@ -5,7 +5,10 @@ export function css(colour: number): string {
   return `#${colour.toString(16).padStart(6, '0')}`;
 }
 
-/** A kind's symbol centred at (x, y): a dot or a diamond, filled, with a rim. */
+/**
+ * A kind's symbol centred at (x, y): a dot, a diamond, a hollow square (shaft) or a
+ * downward triangle (cave), each with a rim, so the shape alone tells them apart.
+ */
 export function drawSymbol(
   ctx: CanvasRenderingContext2D,
   kind: RadarKind,
@@ -14,8 +17,27 @@ export function drawSymbol(
   r: number,
 ): void {
   ctx.beginPath();
+  if (kind.shape === 'square') {
+    // Hollow: a thick frame in the kind's colour between two thin rims.
+    const d = r * 1.05;
+    const w = Math.max(2, r * 0.55);
+    ctx.rect(x - d, y - d, 2 * d, 2 * d);
+    ctx.lineWidth = w + 2.5;
+    ctx.strokeStyle = css(kind.rim);
+    ctx.stroke();
+    ctx.lineWidth = w;
+    ctx.strokeStyle = css(kind.colour);
+    ctx.stroke();
+    return;
+  }
   if (kind.shape === 'dot') {
     ctx.arc(x, y, r, 0, Math.PI * 2);
+  } else if (kind.shape === 'triangle') {
+    const d = r * 1.35;
+    ctx.moveTo(x - d, y - d * 0.7);
+    ctx.lineTo(x + d, y - d * 0.7);
+    ctx.lineTo(x, y + d);
+    ctx.closePath();
   } else {
     const d = r * 1.3;
     ctx.moveTo(x, y - d);

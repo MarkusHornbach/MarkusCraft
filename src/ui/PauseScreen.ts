@@ -7,6 +7,7 @@ import {
   MOUSE_SENSITIVITY_MIN,
   PAD_SENSITIVITY_MAX,
   PAD_SENSITIVITY_MIN,
+  RADAR_SIZE_MAX,
   RENDER_DISTANCE_MAX,
   RENDER_DISTANCE_MIN,
   TOUCH_SENSITIVITY_MAX,
@@ -16,6 +17,9 @@ import type { GameMode } from '../actions/playerRecord';
 import { type InputMode, button, element, onActivate } from './activate';
 import { type GlyphName, drawGlyph } from './padGlyphs';
 import type { NumberSetting, Settings } from './settings';
+
+/** The names of "Radar circle size" by value. */
+const RADAR_SIZE_NAMES = ['Small', 'Medium', 'Large'];
 
 export type { InputMode } from './activate';
 
@@ -115,6 +119,7 @@ export class PauseScreen {
   private readonly leavesSwitch: HTMLInputElement;
   private readonly radarSwitch: HTMLInputElement;
   private readonly radarRow: HTMLElement;
+  private readonly radarSizeRow: HTMLElement;
   private readonly invertSwitch: HTMLInputElement;
   /** A controller was used during this visit: its two settings rows are shown. */
   private padSeen = false;
@@ -261,7 +266,22 @@ export class PauseScreen {
         change();
       },
     });
+    // After Phase 8 part B2b (the owner's finding: the radar was too small).
+    const radarSize = this.slider({
+      id: 'setting-radar-size',
+      label: 'Radar circle size',
+      min: 0,
+      max: RADAR_SIZE_MAX,
+      step: 1,
+      value: this.settings.radarSize,
+      format: (v) => RADAR_SIZE_NAMES[v] ?? '',
+      apply: (v) => {
+        this.settings.radarSize = v;
+        change();
+      },
+    });
     this.sliders = {
+      radarSize,
       renderDistance,
       mouseSensitivity,
       touchSensitivity,
@@ -310,6 +330,9 @@ export class PauseScreen {
       change();
     });
     settings.appendChild(this.radarRow);
+
+    this.radarSizeRow = radarSize.row;
+    settings.appendChild(this.radarSizeRow);
 
     // Touch devices have no F3 key; this switch replaces it.
     const debug = this.switchRow('setting-debug', 'Debug overlay');
@@ -512,6 +535,7 @@ export class PauseScreen {
       // Below "Invert controller look", in every input mode.
       place(this.leavesRow, settings, null, true);
       place(this.radarRow, settings, null, true);
+      place(this.radarSizeRow, settings, null, true);
       for (const node of this.touchOnly) place(node, settings, null, touch);
     }
     this.placeFullscreenButton();

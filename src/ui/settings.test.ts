@@ -33,6 +33,7 @@ describe('settings', () => {
       padInvertY: false,
       collideLeaves: false,
       radar: true,
+      radarSize: 1,
     });
     expect(SETTINGS_STORAGE_KEY).toBe('markuscraft.settings.v1');
   });
@@ -48,6 +49,7 @@ describe('settings', () => {
       padInvertY: false,
       collideLeaves: false,
       radar: true,
+      radarSize: 1,
     });
     expect(validateSettings({ renderDistance: 99, mouseSensitivity: 0, fov: 10 })).toEqual({
       renderDistance: 16,
@@ -59,6 +61,7 @@ describe('settings', () => {
       padInvertY: false,
       collideLeaves: false,
       radar: true,
+      radarSize: 1,
     });
     expect(validateSettings({ touchSensitivity: 2 }).touchSensitivity).toBe(2);
     expect(validateSettings({ touchSensitivity: 9 }).touchSensitivity).toBe(3);
@@ -90,6 +93,7 @@ describe('settings', () => {
       padInvertY: false,
       collideLeaves: false,
       radar: true,
+      radarSize: 1,
     };
     saveSettings(storage, chosen);
     expect(hasStoredSettings(storage)).toBe(true);
@@ -135,6 +139,7 @@ describe('settings', () => {
       padInvertY: false,
       collideLeaves: false,
       radar: true,
+      radarSize: 1,
     });
     // Writing them back without a change of Brightness gives the same text.
     saveSettings(storage, loadSettings(storage));
@@ -227,5 +232,29 @@ describe('the radar setting (Phase 8B1 AC3.5)', () => {
     expect(JSON.parse(stored.get(SETTINGS_STORAGE_KEY) ?? '{}')).not.toHaveProperty('radar');
     saveSettings(storage, { ...DEFAULT_SETTINGS, radar: false });
     expect(loadSettings(storage).radar).toBe(false);
+  });
+});
+
+describe('the radar circle size (after Phase 8B2b, the owner finding)', () => {
+  it('is Medium by default, clamped to Small–Large, and stored only when changed', () => {
+    expect(DEFAULT_SETTINGS.radarSize).toBe(1);
+    expect(validateSettings({}).radarSize).toBe(1);
+    for (const bad of ['big', null, NaN, true]) {
+      expect(validateSettings({ radarSize: bad }).radarSize).toBe(1);
+    }
+    expect(validateSettings({ radarSize: 0 }).radarSize).toBe(0);
+    expect(validateSettings({ radarSize: 2 }).radarSize).toBe(2);
+    expect(validateSettings({ radarSize: 7 }).radarSize).toBe(2);
+    expect(validateSettings({ radarSize: -1 }).radarSize).toBe(0);
+    expect(validateSettings({ radarSize: 1.4 }).radarSize).toBe(1);
+    const stored = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => stored.get(k) ?? null,
+      setItem: (k: string, v: string) => void stored.set(k, v),
+    };
+    saveSettings(storage, { ...DEFAULT_SETTINGS });
+    expect(JSON.parse(stored.get(SETTINGS_STORAGE_KEY) ?? '{}')).not.toHaveProperty('radarSize');
+    saveSettings(storage, { ...DEFAULT_SETTINGS, radarSize: 2 });
+    expect(loadSettings(storage).radarSize).toBe(2);
   });
 });

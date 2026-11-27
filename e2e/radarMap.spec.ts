@@ -45,16 +45,21 @@ function headerSlack(page: Page): Promise<number> {
 }
 
 /**
- * The Map tab's box in whole pixels of a fixed size: the centred panel puts it at a
- * fractional height that differs with the font, and an element shot then rounds to 284 or
- * 285 rows.
+ * The Map tab's box in whole pixels: the header's height follows the font (it differs in
+ * CI), so the tab's top may be fractional and an element shot would round it either way.
+ * The tab fills the panel since the owner's finding after B2b.
  */
 async function tabClip(
   page: Page,
 ): Promise<{ x: number; y: number; width: number; height: number }> {
   const box = await page.locator('.map-tab').boundingBox();
   if (!box) throw new Error('the Map tab is not visible');
-  return { x: Math.round(box.x), y: Math.round(box.y), width: 524, height: Math.floor(box.height) };
+  return {
+    x: Math.round(box.x),
+    y: Math.ceil(box.y),
+    width: Math.floor(box.width),
+    height: Math.floor(box.y + box.height) - Math.ceil(box.y),
+  };
 }
 
 /** The world behind is hidden for the references (the panel is translucent). */
@@ -82,7 +87,8 @@ test('Phase 8B1 AC4.1 AC4.3 AC4.5: four tabs; the map with legend; it reopens on
   expect(map.legend).toHaveLength(2);
   expect(map.legend[0]).toMatch(/^Coal · \d+ blocks? · (\d+ (below|above)|level|below|above|far)$/);
   expect(map.legend[1]).toMatch(/^Iron · /);
-  await expect(page.locator('.map-legend-text')).toHaveText(map.legend);
+  // Generator 1: the place rows are hidden (Phase 8B2b).
+  await expect(page.locator('.map-legend-row:visible .map-legend-text')).toHaveText(map.legend);
   for (const kind of ['coal', 'iron']) {
     const n = map.entries.filter((e) => e.kind === kind).length;
     expect(n).toBeGreaterThan(0);
@@ -169,7 +175,7 @@ test('Phase 8B1 AC4.4: mining every cell of the nearest coal vein moves the near
 test.describe('touch', () => {
   test.use(TOUCH_DEVICE);
 
-  test('Phase 8B1 AC4.1 AC4.5: a tap reaches Map; it fits 640 × 360 without scrolling; reference', async ({
+  test('Phase 8B1 AC4.1 AC4.5: a tap reaches Map; it fits 640 × 360 without scrolling', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 640, height: 360 });
@@ -199,14 +205,7 @@ test.describe('touch', () => {
       expect(box.y + box.height).toBeLessThanOrEqual(panel.y + panel.height + 0.5);
       expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width + 0.5);
     }
-    expect(await headerSlack(page)).toBeGreaterThanOrEqual(0);
-    await page.locator('canvas.game-canvas').evaluate((node) => {
-      (node as HTMLElement).style.visibility = 'hidden';
-    });
-    await whenIdle(page);
-    await expect(page).toHaveScreenshot('map-tab-touch.png', {
-      clip: await tabClip(page),
-      maxDiffPixelRatio: 0.05,
-    });
+    // Since the owner's finding after B2b the header lies beside the map on a phone, its
+    // tabs in two rows; its layout and the reference: `e2e/radarPlaces.spec.ts`.
   });
 });

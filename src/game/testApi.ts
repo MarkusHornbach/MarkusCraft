@@ -239,6 +239,8 @@ export interface GameState {
     collideLeaves: boolean;
     /** "Radar circle" (Phase 8 part B1). */
     radar: boolean;
+    /** "Radar circle size": 0 Small, 1 Medium, 2 Large. */
+    radarSize: number;
   };
   /**
    * The controller: pads the browser reports, whether one is the active source, how often
