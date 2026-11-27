@@ -2,6 +2,7 @@
 // the generator 2 run instead of after it.
 import { describe, expect, it } from 'vitest';
 import { TASKS } from '../progress/tables';
+import { Block } from '../world/blocks';
 import { runBot } from './Bot';
 
 describe('goal bot on generator 3', () => {
@@ -15,5 +16,17 @@ describe('goal bot on generator 3', () => {
     expect(run.darkBreaks.filter((d) => d.task > 11)).toEqual([]);
     expect(run.radarUnlocked).toBe(true);
     for (const check of run.radar) expect(check.radar).toEqual(check.bruteForce);
+    // Phase 8B2b AC5.3: at the start of task 16 the radar's nearest shaft and cave equal a
+    // brute-force search of `placesIn` over the far radius; the shaft's top is a frame log.
+    expect(run.places.map((c) => [c.task, c.kind])).toEqual([
+      [16, 'shaft'],
+      [16, 'cave'],
+    ]);
+    for (const check of run.places) {
+      expect(check.bruteForce, check.kind).not.toBeNull();
+      expect(check.radar, check.kind).toEqual(check.bruteForce);
+    }
+    expect([Block.PLANKS, Block.LOG]).toContain(run.places[0].block);
+    expect(run.places[1].block).toBe(Block.AIR);
   });
 });

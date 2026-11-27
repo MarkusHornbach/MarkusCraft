@@ -7,6 +7,7 @@ import { LocalSession } from '../actions/Session';
 import {
   PLAYER_EYE_HEIGHT,
   RADAR_FAR_RADIUS,
+  RADAR_PLACE_FAR_RADIUS,
   RADAR_RADIUS,
   REACH,
   WORLD_HEIGHT,
@@ -25,11 +26,13 @@ import {
 } from '../progress/progress';
 import { BOT_TIME, FEATURE_UNLOCKS, NATURAL_BLOCKS, TASKS, type Task } from '../progress/tables';
 import { radarFocus } from '../radar/focus';
+import { PLACE_RADAR_KINDS } from '../radar/kinds';
+import { PlaceIndex } from '../radar/places';
 import { scanRadar, worldProbe } from '../radar/scan';
 import { VeinIndex } from '../radar/veins';
 import { BLOCK_SOLID, Block, isSupport } from '../world/blocks';
 import { findSpawn } from '../world/generation/spawn';
-import { getTerrain } from '../world/generation/terrain';
+import { type Place, getTerrain } from '../world/generation/terrain';
 import type { WorldGen } from '../world/generation/worldOptions';
 import { blockOf, skyOf } from '../world/light/lightRules';
 import { World } from '../world/World';
@@ -73,7 +76,29 @@ export interface BotRun {
   radarUnlocked: boolean;
   /** At the start of tasks 12 and 16: the radar's nearest vein against the brute force. */
   radar: RadarCheck[];
+  /** At the start of task 16 (generator 3): the nearest place per kind (Phase 8 part B2b). */
+  places: PlaceCheck[];
 }
+
+/** A nearest place: in range (`dy` known) or beyond it (`dy` null), relative to the feet. */
+export interface NearestPlace {
+  dx: number;
+  dy: number | null;
+  dz: number;
+  dist: number;
+}
+
+export interface PlaceCheck {
+  task: number;
+  kind: string;
+  radar: NearestPlace | null;
+  bruteForce: NearestPlace | null;
+  /** The block of the generated world at the brute force's place cell (a shaft's top). */
+  block: number | null;
+}
+
+/** The task at whose start the places are checked: "Mine 20 iron ore". */
+export const PLACE_CHECK_TASK = 16;
 
 /** A nearest ore cell, relative to the feet cell. */
 export interface NearestOre {
@@ -145,7 +170,9 @@ export class Bot {
   /** Dark breaks by `task:block`, in the order they first happened. */
   private readonly dark = new Map<string, DarkBreaks>();
   readonly radarChecks: RadarCheck[] = [];
+  readonly placeChecks: PlaceCheck[] = [];
   private readonly veins: VeinIndex;
+  private readonly places: PlaceIndex;
 
   constructor(
     readonly seed: number,
@@ -153,6 +180,7 @@ export class Bot {
   ) {
     this.world = new World(seed, gen);
     this.veins = new VeinIndex(seed, gen);
+    this.places = new PlaceIndex(seed, gen);
     const spawn = findSpawn(getTerrain(seed, gen));
     const cx = Math.floor(spawn.x / 16);
     const cz = Math.floor(spawn.z / 16);
@@ -861,6 +889,7 @@ export class Bot {
       if (!task) return;
       this.currentTask = task.id;
       if (RADAR_CHECK_TASKS.includes(task.id)) this.checkRadar(task);
+      if (task.id === PLACE_CHECK_TASK && this.places.hasPlaces) this.checkPlaces(task);
       try {
         this.runTask(task);
       } catch (e) {
@@ -917,6 +946,83 @@ export class Bot {
     this.radarChecks.push({ task: task.id, kind: kind.key, radar, bruteForce: best });
   }
 
+  /**
+   * Per place kind the radar's nearest place (in range, else beyond up to the far radius)
+   * against a brute-force search of `placesIn` over the far radius with the same rule.
+   */
+  checkPlaces(task: Task): void {
+    const fx = Math.floor(this.pose.x);
+    const fy = Math.floor(this.pose.y);
+    const fz = Math.floor(this.pose.z);
+    const terrain = getTerrain(this.seed, this.gen);
+    const far = RADAR_PLACE_FAR_RADIUS;
+    const all: Place[] = [];
+    terrain.placesIn?.(fx - far, fz - far, fx + far, fz + far, all);
+    for (const kind of PLACE_RADAR_KINDS) {
+      const scan = scanRadar({
+        index: this.veins,
+        x: fx,
+        y: fy,
+        z: fz,
+        probe: worldProbe(this.world),
+        kinds: [kind],
+        perKind: 1,
+        radius: RADAR_RADIUS,
+        farRadius: RADAR_FAR_RADIUS,
+        places: this.places,
+        placesPerKind: 1,
+        placeFarRadius: far,
+      });
+      const entry = scan.entries[0];
+      const beyond = scan.beyond[0];
+      const radar: NearestPlace | null = entry
+        ? { dx: entry.dx, dy: entry.dy, dz: entry.dz, dist: entry.dist }
+        : beyond
+          ? { dx: beyond.dx, dy: null, dz: beyond.dz, dist: beyond.dist }
+          : null;
+      let inRange: { place: Place; d2: number } | null = null;
+      let anywhere: { place: Place; d2: number } | null = null;
+      for (const place of all) {
+        if (place.kind !== kind.key) continue;
+        const dx = place.x - fx;
+        const dy = place.y - fy;
+        const dz = place.z - fz;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        const better = (than: { place: Place; d2: number } | null): boolean =>
+          than === null ||
+          closerOre(d2, dx, dy, dz, {
+            dx: than.place.x - fx,
+            dy: than.place.y - fy,
+            dz: than.place.z - fz,
+            dist: 0,
+          });
+        if (dx * dx + dz * dz <= RADAR_RADIUS * RADAR_RADIUS) {
+          if (better(inRange)) inRange = { place, d2 };
+        } else if (d2 <= far * far && better(anywhere)) {
+          anywhere = { place, d2 };
+        }
+      }
+      const pick = inRange ?? anywhere;
+      let bruteForce: NearestPlace | null = null;
+      let block: number | null = null;
+      if (pick) {
+        const { place, d2 } = pick;
+        bruteForce = {
+          dx: place.x - fx,
+          dy: inRange ? place.y - fy : null,
+          dz: place.z - fz,
+          dist: Math.sqrt(d2),
+        };
+        // From the generator, so the bot's world (and its later choices) stay as they were.
+        const cx = Math.floor(place.x / 16);
+        const cz = Math.floor(place.z / 16);
+        const blocks = terrain.generateChunk(cx, cz);
+        block = blocks[place.x - cx * 16 + (place.z - cz * 16) * 16 + place.y * 256];
+      }
+      this.placeChecks.push({ task: task.id, kind: kind.key, radar, bruteForce, block });
+    }
+  }
+
   /** Every recipe can be crafted by the player now. */
   allUnlocked(): boolean {
     const record = this.session.record;
@@ -958,6 +1064,7 @@ export function runBot(seed: number, gen: WorldGen): BotRun {
     radarAtMs: bot.tasks.find((t) => t.id === radarTask())?.atMs ?? null,
     radarUnlocked: featureUnlocked('radar', bot.session.record, bot.session.progress),
     radar: bot.radarChecks,
+    places: bot.placeChecks,
   };
 }
 

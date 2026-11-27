@@ -726,6 +726,13 @@ canvas {
     text-shadow: 0 2px 0 #2f7d3a;
   }
 
+  /* The title stands left of the play buttons, so the settings keep one more row ("Radar
+     circle size", after Phase 8 part B2b) and the menu still fits 360 px. */
+  .touch-mode .pause-screen .pause-title {
+    float: left;
+    margin: 10px 0 0 4px;
+  }
+
   .touch-mode .play-button {
     padding: 0 34px;
   }

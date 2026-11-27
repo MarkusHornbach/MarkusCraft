@@ -27,6 +27,7 @@
       "crafting.spec.ts",
       "gathering.spec.ts",
       "inventory.spec.ts",
+      "radarPlaces.spec.ts",
       "radarTouch.spec.ts",
       "sky.spec.ts",
       "taskTracker.spec.ts",

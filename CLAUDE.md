@@ -307,11 +307,12 @@ hold:
 | Fix Adv 1 | `docs/fix-adventure-1-plan.md` | `docs/fix-adventure-1-report.md` | torch unlock, dark rule, smelting row      |
 | 8B1       | `docs/phase-8b1-plan.md`       | `docs/phase-8b1-report.md`       | radar, ores, feature unlocks, Map tab      |
 | 8B2a      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2a-report.md`      | generator 3, caves, walk check, `caves`    |
+| 8B2b      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2b-report.md`      | radar places, map and circle size          |
 
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
-  planned. Phase 8: A, "Fix Adventure 1", B1 (radar) and B2a (generator 3, caves) are built; B2b
-  (places on the radar) is planned in `docs/phase-8b2-plan.md`; B3 on and C–E are not planned. At a
+  planned. Phase 8: A, "Fix Adventure 1", B1 (radar), B2a (generator 3, caves) and B2b (places on
+  the radar, a larger map) are built; B3 on and C–E are not planned. At a
   session's start look
   for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
   needed"). Numbers from software WebGL (cloud, CI) are never evidence.

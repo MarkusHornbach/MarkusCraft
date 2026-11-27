@@ -1,6 +1,9 @@
 // The goal bot's table: estimated player minutes per task, chapter and level-up over many
 // runs, and the balance targets of plan 5.10. Pure.
 import { CHAPTERS, DARK_BLOCKS, TASKS } from '../progress/tables';
+import { findSpawn } from '../world/generation/spawn';
+import { type Place, getTerrain } from '../world/generation/terrain';
+import type { WorldGen } from '../world/generation/worldOptions';
 import { type BotRun, RADAR_CHECK_TASKS, playerMinutes } from './Bot';
 
 /** Balance targets (plan 5.10), in estimated player minutes (median over the runs). */
@@ -228,6 +231,60 @@ export function formatRadar(runs: readonly BotRun[]): string {
     const agree = checks.every((c) => JSON.stringify(c.radar) === JSON.stringify(c.bruteForce));
     lines.push(
       `| ${task} ${label} | ${checks[0]?.kind ?? '–'} | ${checks.length} | ${round(median(found.map((c) => c.radar?.dist ?? 0)))} | ${median(found.map((c) => c.radar?.dy ?? 0))} | ${agree ? 'yes' : 'NO'} |`,
+    );
+  }
+  return lines.join('\n');
+}
+
+/** The horizontal distance from a world's spawn to its nearest place of each kind. */
+export interface SpawnPlaces {
+  shaft: number | null;
+  cave: number | null;
+}
+
+/** Nearest shaft and cave entrance from the spawn, up to `radius` (Phase 8 part B2b). */
+export function spawnPlaces(seed: number, gen: WorldGen, radius: number): SpawnPlaces {
+  const terrain = getTerrain(seed, gen);
+  const spawn = findSpawn(terrain);
+  const places: Place[] = [];
+  terrain.placesIn?.(
+    spawn.x - radius,
+    spawn.z - radius,
+    spawn.x + radius,
+    spawn.z + radius,
+    places,
+  );
+  const nearest = (kind: Place['kind']): number | null => {
+    let best: number | null = null;
+    for (const p of places) {
+      if (p.kind !== kind) continue;
+      const d = Math.hypot(p.x - spawn.x, p.z - spawn.z);
+      if (d <= radius && (best === null || d < best)) best = d;
+    }
+    return best;
+  };
+  return { shaft: nearest('shaft'), cave: nearest('cave') };
+}
+
+/**
+ * The places part of the "Radar" section: the median horizontal distance from the spawn to
+ * the nearest shaft and cave entrance, and whether the radar agreed with the brute force at
+ * the start of task 16.
+ */
+export function formatPlaces(runs: readonly BotRun[], spawns: readonly SpawnPlaces[]): string {
+  const round = (n: number) => Math.round(n * 10) / 10;
+  const lines = [
+    `Places (${spawns.length} worlds)`,
+    '',
+    '| Kind | Worlds with one within 192 | From the spawn: median | max | Task 16: radar = brute force |',
+    '| --- | ---: | ---: | ---: | --- |',
+  ];
+  for (const kind of ['shaft', 'cave'] as const) {
+    const found = spawns.map((s) => s[kind]).filter((d): d is number => d !== null);
+    const checks = runs.flatMap((r) => r.places.filter((c) => c.kind === kind));
+    const agree = checks.every((c) => JSON.stringify(c.radar) === JSON.stringify(c.bruteForce));
+    lines.push(
+      `| ${kind} | ${found.length} | ${round(median(found))} | ${round(found.length > 0 ? Math.max(...found) : 0)} | ${checks.length === 0 ? '–' : agree ? `yes (${checks.length})` : 'NO'} |`,
     );
   }
   return lines.join('\n');

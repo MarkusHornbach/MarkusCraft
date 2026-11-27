@@ -1,7 +1,8 @@
 // Dev tool: runs the goal bot through the task book on 4 seeds × 3 terrain shapes (trees
 // "Few", generator 3 as new worlds get it) and prints the estimated player minutes per
 // task, chapter and level, the dark breaks before a light source (a report, never a
-// failure), the radar and, on generator 3, the walk checks of entrances and the spawn shaft.
+// failure), the radar (on generator 3 with its places) and, on generator 3, the walk checks of
+// entrances and the spawn shaft.
 // Run: npx vite-node scripts/progressRun.ts [--quick] [--gen 2]
 // (quick: seed 1337 balanced only; --gen 2: generator 2, for the comparison)
 import { runBot } from '../src/bot/Bot';
@@ -10,9 +11,13 @@ import {
   buildReport,
   darkBreakRows,
   formatDarkBreaks,
+  formatPlaces,
   formatRadar,
   formatReport,
+  type SpawnPlaces,
+  spawnPlaces,
 } from '../src/bot/report';
+import { RADAR_PLACE_FAR_RADIUS } from '../src/game/config';
 import { generatedWalkWorld } from '../src/testing/walkWorld';
 import { findSpawn } from '../src/world/generation/spawn';
 import { getTerrain } from '../src/world/generation/terrain';
@@ -28,6 +33,7 @@ const shapes = quick ? (['balanced'] as const) : TERRAIN_SHAPES;
 console.log(`Generator ${version}`);
 const runs = [];
 const caves: CaveCheck[] = [];
+const places: SpawnPlaces[] = [];
 for (const seed of seeds) {
   for (const terrain of shapes) {
     const gen: WorldGen = { version, options: { terrain, trees: 'few' } };
@@ -42,6 +48,7 @@ for (const seed of seeds) {
     runs.push(run);
     const terrainSource = getTerrain(seed, gen);
     if (terrainSource instanceof TerrainV3) {
+      places.push(spawnPlaces(seed, gen, RADAR_PLACE_FAR_RADIUS));
       const spawn = findSpawn(terrainSource);
       const r = 96;
       const entrances = terrainSource.caves
@@ -62,6 +69,10 @@ console.log('');
 console.log(formatDarkBreaks(darkBreakRows(runs), runs.length));
 console.log('');
 console.log(formatRadar(runs));
+if (places.length > 0) {
+  console.log('');
+  console.log(formatPlaces(runs, places));
+}
 if (caves.length > 0) {
   console.log('');
   console.log(formatCaveChecks(caves));
