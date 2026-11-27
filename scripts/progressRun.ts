@@ -1,9 +1,15 @@
 // Dev tool: runs the goal bot through the task book on 4 seeds × 3 terrain shapes (trees
 // "Few", generator 2) and prints the estimated player minutes per task, chapter and level,
-// then the dark breaks before a light source (a report, never a failure).
+// then the dark breaks before a light source (a report, never a failure) and the radar.
 // Run: npx vite-node scripts/progressRun.ts [--quick] (quick: seed 1337 balanced only)
 import { runBot } from '../src/bot/Bot';
-import { buildReport, darkBreakRows, formatDarkBreaks, formatReport } from '../src/bot/report';
+import {
+  buildReport,
+  darkBreakRows,
+  formatDarkBreaks,
+  formatRadar,
+  formatReport,
+} from '../src/bot/report';
 import { TERRAIN_SHAPES } from '../src/world/generation/worldOptions';
 
 const quick = process.argv.includes('--quick');
@@ -28,3 +34,5 @@ console.log('');
 console.log(formatReport(buildReport(runs)));
 console.log('');
 console.log(formatDarkBreaks(darkBreakRows(runs), runs.length));
+console.log('');
+console.log(formatRadar(runs));

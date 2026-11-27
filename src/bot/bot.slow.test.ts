@@ -16,5 +16,17 @@ describe('goal bot (Phase 8 AC6.2)', () => {
     // Fix Adventure 1 AC2.3: dark breaks are reported until the torch is unlocked (task 11),
     // never after it. How many there are before it is a report, not a failure.
     expect(run.darkBreaks.filter((d) => d.task > 11)).toEqual([]);
+    // Phase 8B1 AC2.4: the radar is unlocked at the end; at the start of tasks 12 and 16
+    // its nearest vein is the nearest ore block of a brute-force scan (same cell).
+    expect(run.radarUnlocked).toBe(true);
+    expect(run.radarAtMs).not.toBeNull();
+    expect(run.radar.map((c) => [c.task, c.kind])).toEqual([
+      [12, 'coal'],
+      [16, 'iron'],
+    ]);
+    for (const check of run.radar) {
+      expect(check.bruteForce).not.toBeNull();
+      expect(check.radar).toEqual(check.bruteForce);
+    }
   });
 });

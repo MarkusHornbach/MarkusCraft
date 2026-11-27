@@ -1,7 +1,7 @@
 // The goal bot's table: estimated player minutes per task, chapter and level-up over many
 // runs, and the balance targets of plan 5.10. Pure.
 import { CHAPTERS, DARK_BLOCKS, TASKS } from '../progress/tables';
-import { type BotRun, playerMinutes } from './Bot';
+import { type BotRun, RADAR_CHECK_TASKS, playerMinutes } from './Bot';
 
 /** Balance targets (plan 5.10), in estimated player minutes (median over the runs). */
 export const TARGETS = {
@@ -200,4 +200,35 @@ export function formatDarkBreaks(rows: readonly DarkRow[], runs: number): string
     ),
     ...(rows.length === 0 ? ['| (none) | | | | |'] : []),
   ].join('\n');
+}
+
+/**
+ * The radar section (Phase 8 part B1): when the radar unlocks (estimated player minutes,
+ * median and maximum) and, at the start of each checked task, the median distance and
+ * height difference to the nearest vein of its kind; and whether the radar agreed with the
+ * brute force in every run.
+ */
+export function formatRadar(runs: readonly BotRun[]): string {
+  const minutes = runs
+    .filter((r) => r.radarAtMs !== null)
+    .map((r) => playerMinutes(r.radarAtMs ?? 0));
+  const round = (n: number) => Math.round(n * 10) / 10;
+  const lines = [
+    `Radar (${runs.length} runs)`,
+    '',
+    `Unlocked in ${minutes.length} runs: median ${round(median(minutes))} min, max ${round(minutes.length > 0 ? Math.max(...minutes) : 0)} min`,
+    '',
+    '| At the start of | Kind | Runs | Distance: median | dy: median | Agrees with brute force |',
+    '| --- | --- | ---: | ---: | ---: | --- |',
+  ];
+  for (const task of RADAR_CHECK_TASKS) {
+    const checks = runs.flatMap((r) => r.radar.filter((c) => c.task === task));
+    const found = checks.filter((c) => c.radar !== null);
+    const label = TASKS.find((t) => t.id === task)?.label ?? `#${task}`;
+    const agree = checks.every((c) => JSON.stringify(c.radar) === JSON.stringify(c.bruteForce));
+    lines.push(
+      `| ${task} ${label} | ${checks[0]?.kind ?? '–'} | ${checks.length} | ${round(median(found.map((c) => c.radar?.dist ?? 0)))} | ${median(found.map((c) => c.radar?.dy ?? 0))} | ${agree ? 'yes' : 'NO'} |`,
+    );
+  }
+  return lines.join('\n');
 }
