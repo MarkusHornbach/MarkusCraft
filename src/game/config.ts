@@ -23,7 +23,7 @@ export const UNDERWATER_FOG_FAR = 24;
  * Version of the terrain generator that worlds of the "New world" form get (stored per
  * world). The automatic world of `?test=1` stays version 1 (Phase 7 part A).
  */
-export const GENERATOR_VERSION = 2;
+export const GENERATOR_VERSION = 3;
 /** Generator 2 spawn: at least this many trunks within `SPAWN_WOOD_RADIUS` (Chebyshev). */
 export const SPAWN_MIN_TREES = 8;
 export const SPAWN_WOOD_RADIUS = 40;

@@ -169,7 +169,7 @@ describe('save format', () => {
       ok: false,
       error: 'newer',
     });
-    expect(decodeMeta({ ...good, generatorVersion: 3 })).toEqual({ ok: false, error: 'newer' });
+    expect(decodeMeta({ ...good, generatorVersion: 4 })).toEqual({ ok: false, error: 'newer' });
   });
 
   it('validates chunk records (Phase 3 AC3.2)', () => {
@@ -576,5 +576,27 @@ describe('format 3: the world options (Phase 7 part A)', () => {
         expect(['damaged', 'newer']).toContain(result.error);
       }
     }
+  });
+});
+
+describe('generator 3 (Phase 8 part B2a)', () => {
+  it('Phase 8B2a AC1.6: a generator 3 record round-trips; without options it is damaged', () => {
+    expect(SAVE_FORMAT_VERSION).toBe(5);
+    const meta = sampleMeta({ generatorVersion: 3, options: { terrain: 'hilly', trees: 'few' } });
+    const record = JSON.parse(JSON.stringify(encodeMeta(meta))) as Record<string, unknown>;
+    expect(record.generatorVersion).toBe(3);
+    expect(record.options).toEqual({ terrain: 'hilly', trees: 'few' });
+    expect(decodeMeta(record)).toEqual({ ok: true, value: meta });
+    expect(metaGen(meta)).toEqual({ version: 3, options: { terrain: 'hilly', trees: 'few' } });
+    const { options: _o, ...withoutOptions } = record;
+    expect(decodeMeta(withoutOptions)).toEqual({ ok: false, error: 'damaged' });
+    expect(decodeMeta({ ...record, options: null })).toEqual({ ok: false, error: 'damaged' });
+    expect(decodeMeta({ ...record, options: { terrain: 'islands', trees: 'few' } })).toEqual({
+      ok: false,
+      error: 'newer',
+    });
+    // An older format never had generator 3; a later generator is "newer".
+    expect(decodeMeta({ ...record, formatVersion: 2 })).toEqual({ ok: false, error: 'damaged' });
+    expect(decodeMeta({ ...record, generatorVersion: 4 })).toEqual({ ok: false, error: 'newer' });
   });
 });

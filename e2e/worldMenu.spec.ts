@@ -97,7 +97,9 @@ test('a first visit creates a world; after a reload it is listed and continues (
   await expect(page.locator('.world-form')).toBeHidden();
   await expect(rows(page).first()).toHaveClass(/selected/);
   await expect(page.locator('.world-row-name')).toHaveText('My world');
-  await expect(page.locator('.world-row-mode')).toHaveText('Creative · Balanced · Few trees');
+  await expect(page.locator('.world-row-mode')).toHaveText(
+    'Creative · Balanced · Few trees · Caves',
+  );
   await expect(page.locator('.world-row-date')).toHaveText(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
   await expect(page.locator('.world-play-button')).toHaveText('Click to play');
 

@@ -30,6 +30,7 @@ import {
   SALT_ROCK,
 } from './terrainRules';
 import { TerrainV2 } from './terrainV2';
+import { TerrainV3 } from './terrainV3';
 import { CLASSIC_GEN, type WorldGen, isKnownGeneratorVersion, worldGenKey } from './worldOptions';
 
 export { isKnownGeneratorVersion } from './worldOptions';
@@ -415,7 +416,12 @@ export function getTerrain(seed: number, gen: WorldGen = CLASSIC_GEN): TerrainSo
         break;
       }
     }
-    terrain = gen.version === 1 ? new Terrain(seed) : new TerrainV2(seed, gen.options);
+    terrain =
+      gen.version === 1
+        ? new Terrain(seed)
+        : gen.version === 2
+          ? new TerrainV2(seed, gen.options)
+          : new TerrainV3(seed, gen.options);
     terrains.set(key, terrain);
   }
   return terrain;

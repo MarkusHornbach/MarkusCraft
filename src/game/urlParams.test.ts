@@ -75,6 +75,25 @@ describe('parseParams', () => {
     });
     expect(parseParams('?terrain=Flat&trees=', random).testGen).toEqual({ version: 1 });
   });
+  it('Phase 8B2a AC4.2: gen=3 gives generator 3, gen=2 generator 2, nothing generator 1', () => {
+    expect(parseParams('?test=1&gen=3&seed=1337', random).testGen).toEqual({
+      version: 3,
+      options: { terrain: 'balanced', trees: 'few' },
+    });
+    expect(parseParams('?test=1&gen=3&terrain=hilly&trees=none', random).testGen).toEqual({
+      version: 3,
+      options: { terrain: 'hilly', trees: 'none' },
+    });
+    expect(parseParams('?test=1&gen=2', random).testGen).toEqual({
+      version: 2,
+      options: { terrain: 'balanced', trees: 'few' },
+    });
+    expect(parseParams('?test=1&gen=4', random).testGen).toEqual({ version: 1 });
+    expect(parseParams('?test=1&gen=1&terrain=flat', random).testGen).toEqual({
+      version: 2,
+      options: { terrain: 'flat', trees: 'few' },
+    });
+  });
   it('Phase 6 AC7.3: an invalid join code counts as none', () => {
     expect(parseParams('?join=ABC', random).join).toBeNull();
     expect(parseParams('?join=abcdef', random).join).toBe('ABCDEF');
