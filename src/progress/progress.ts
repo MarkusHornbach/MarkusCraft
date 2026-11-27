@@ -5,6 +5,7 @@ import type { ProgressEvent } from './events';
 import {
   PROGRESS_TABLES,
   type Chapter,
+  type Feature,
   type ProgressTables,
   type Task,
   type Unlock,
@@ -57,8 +58,10 @@ export type ProgressOutcome =
   | { kind: 'chapterDone'; chapter: number }
   | { kind: 'xp'; player: string; amount: number }
   | { kind: 'firstFind'; player: string; block: number }
-  | { kind: 'levelUp'; player: string; level: number; recipes: number[] }
-  | { kind: 'unlocked'; recipes: number[] };
+  /** `features`: only present when the level unlocks one. */
+  | { kind: 'levelUp'; player: string; level: number; recipes: number[]; features?: Feature[] }
+  /** `features`: only present when the task unlocks one (Phase 8 part B1). */
+  | { kind: 'unlocked'; recipes: number[]; features?: Feature[] };
 
 export interface ProgressStep {
   progress: WorldProgress;
@@ -116,6 +119,59 @@ export function unlockText(recipe: number, tables: ProgressTables = PROGRESS_TAB
   if ('level' in unlock) return `Level ${unlock.level}`;
   const task = tables.tasks.find((t) => t.id === unlock.task);
   return `Task: ${task?.label ?? `#${unlock.task}`}`;
+}
+
+/**
+ * Whether a feature is open to a player: its level reached (the player's record) or its
+ * task done (the world's book, so in a room everyone has it). A feature without an unlock
+ * in the tables is closed.
+ */
+export function featureUnlocked(
+  feature: Feature,
+  record: PlayerRecord,
+  progress: WorldProgress,
+  tables: ProgressTables = PROGRESS_TABLES,
+): boolean {
+  const unlock = tables.featureUnlocks.find((u) => u.feature === feature)?.unlock;
+  if (!unlock) return false;
+  if ('level' in unlock) return levelOf(record.xp, tables) >= unlock.level;
+  return progress.done.includes(unlock.task);
+}
+
+/** The features a finished task unlocks, in table order. */
+export function featuresOfTask(task: number, tables: ProgressTables = PROGRESS_TABLES): Feature[] {
+  return tables.featureUnlocks
+    .filter((u) => 'task' in u.unlock && u.unlock.task === task)
+    .map((u) => u.feature);
+}
+
+/** The features a level unlocks, in table order. */
+export function featuresOfLevel(
+  level: number,
+  tables: ProgressTables = PROGRESS_TABLES,
+): Feature[] {
+  return tables.featureUnlocks
+    .filter((u) => 'level' in u.unlock && u.unlock.level === level)
+    .map((u) => u.feature);
+}
+
+/** The `unlocked` outcome of a finished task, or null if it unlocks nothing. */
+function unlockedByTask(task: number, tables: ProgressTables): ProgressOutcome | null {
+  const recipes = recipesOfTask(task, tables);
+  const features = featuresOfTask(task, tables);
+  if (recipes.length === 0 && features.length === 0) return null;
+  return features.length > 0
+    ? { kind: 'unlocked', recipes, features }
+    : { kind: 'unlocked', recipes };
+}
+
+/** The `levelUp` outcome of reaching `level`. */
+function levelUpOutcome(player: string, level: number, tables: ProgressTables): ProgressOutcome {
+  const recipes = recipesOfLevel(level, tables);
+  const features = featuresOfLevel(level, tables);
+  return features.length > 0
+    ? { kind: 'levelUp', player, level, recipes, features }
+    : { kind: 'levelUp', player, level, recipes };
 }
 
 /** The recipes a level unlocks, in table order. */
@@ -235,8 +291,8 @@ export function stepProgress(
       for (const task of finished) {
         outcomes.push({ kind: 'taskDone', task: task.id, actor: actor.id });
         for (const player of present) gain(player.id, task.xp);
-        const recipes = recipesOfTask(task.id, tables);
-        if (recipes.length > 0) outcomes.push({ kind: 'unlocked', recipes });
+        const unlocked = unlockedByTask(task.id, tables);
+        if (unlocked) outcomes.push(unlocked);
       }
       const chapterDone = open.every((t) => done.includes(t.id));
       if (chapterDone) {
@@ -282,7 +338,7 @@ export function stepProgress(
     const before = levelOf(record.xp, tables);
     const after = levelOf(xp, tables);
     for (let level = before + 1; level <= after; level++) {
-      levelUps.push({ kind: 'levelUp', player: id, level, recipes: recipesOfLevel(level, tables) });
+      levelUps.push(levelUpOutcome(id, level, tables));
     }
   }
   outcomes.push(...levelUps);
@@ -307,8 +363,8 @@ export function outcomesOfBook(
   for (const { task, by } of done) {
     if (!tables.tasks.some((t) => t.id === task)) continue;
     outcomes.push({ kind: 'taskDone', task, actor: by, by });
-    const recipes = recipesOfTask(task, tables);
-    if (recipes.length > 0) outcomes.push({ kind: 'unlocked', recipes });
+    const unlocked = unlockedByTask(task, tables);
+    if (unlocked) outcomes.push(unlocked);
   }
   for (const chapter of tables.chapters) {
     const tasks = tasksOf(chapter.id, tables);
@@ -341,7 +397,7 @@ export function outcomesOfRecord(
   const from = levelOf(before.xp, tables);
   const to = levelOf(after.xp, tables);
   for (let level = from + 1; level <= to; level++) {
-    outcomes.push({ kind: 'levelUp', player, level, recipes: recipesOfLevel(level, tables) });
+    outcomes.push(levelUpOutcome(player, level, tables));
   }
   return outcomes;
 }

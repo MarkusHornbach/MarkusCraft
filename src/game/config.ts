@@ -206,7 +206,7 @@ export const SAVE_DATABASE = 'markuscraft';
 // --- Performance test (Phase 4 part P) ---
 
 /** Raised when a scenario is added or the order of the suite changes. */
-export const BENCH_SUITE_VERSION = 3;
+export const BENCH_SUITE_VERSION = 4;
 /** Version of the result record and of the issue text built from it. */
 export const BENCH_FORMAT_VERSION = 1;
 export const BENCH_SEED = 1337;
@@ -424,3 +424,25 @@ export const FIGURE_SWING_MS = 300;
 export const FIGURE_SWING_ANGLE = 1.1;
 /** A longer gap between two frames (a hidden tab) counts as this long for a figure. */
 export const FIGURE_MAX_FRAME_MS = 1_000;
+
+// The radar (Phase 8 part B1): `src/radar/CLAUDE.md`.
+/** Horizontal distance of the radar's veins (the circle's rim, the map's edge). */
+export const RADAR_RADIUS = 48;
+/** A kind with no vein in range points to its nearest one up to this far. */
+export const RADAR_FAR_RADIUS = 96;
+export const RADAR_CIRCLE_PER_KIND = 4;
+export const RADAR_MAP_PER_KIND = 8;
+/** Over this 3D distance a vein shows no depth hint. */
+export const RADAR_COARSE_DIST = 24;
+/** Up to this 3D distance the hint is the exact height difference. */
+export const RADAR_EXACT_DIST = 12;
+/** In the coarse range a height difference within ± this is "level". */
+export const RADAR_LEVEL_DY = 3;
+/** At most one scan per this many simulation steps (only if something changed). */
+export const RADAR_SCAN_STEPS = 15;
+/** At most one draw per this many simulation steps. */
+export const RADAR_DRAW_STEPS = 4;
+/** The heading-up circle redraws after the view turned by this many degrees. */
+export const RADAR_TURN_DEG = 2;
+export const RADAR_CIRCLE_PX = 112;
+export const RADAR_CIRCLE_TOUCH_PX = 88;

@@ -113,6 +113,8 @@ export class PauseScreen {
   private readonly invertRow: HTMLElement;
   private readonly leavesRow: HTMLElement;
   private readonly leavesSwitch: HTMLInputElement;
+  private readonly radarSwitch: HTMLInputElement;
+  private readonly radarRow: HTMLElement;
   private readonly invertSwitch: HTMLInputElement;
   /** A controller was used during this visit: its two settings rows are shown. */
   private padSeen = false;
@@ -287,6 +289,8 @@ export class PauseScreen {
     // Phase 7 part A: movement only; leaves stay visible, targetable and breakable.
     const leaves = this.switchRow('setting-collide-leaves', 'Collide with leaves');
     this.leavesRow = leaves.row;
+    // On phones "Collide with leaves" and "Radar circle" share a line (CSS `.half-switch`).
+    this.leavesRow.classList.add('half-switch');
     this.leavesSwitch = leaves.input;
     this.leavesSwitch.checked = this.settings.collideLeaves;
     this.leavesSwitch.addEventListener('change', () => {
@@ -294,6 +298,18 @@ export class PauseScreen {
       change();
     });
     settings.appendChild(this.leavesRow);
+
+    // Phase 8 part B1: the circle only; the Map tab stays available when it is off.
+    const radar = this.switchRow('setting-radar', 'Radar circle');
+    this.radarRow = radar.row;
+    this.radarRow.classList.add('half-switch');
+    this.radarSwitch = radar.input;
+    this.radarSwitch.checked = this.settings.radar;
+    this.radarSwitch.addEventListener('change', () => {
+      this.settings.radar = this.radarSwitch.checked;
+      change();
+    });
+    settings.appendChild(this.radarRow);
 
     // Touch devices have no F3 key; this switch replaces it.
     const debug = this.switchRow('setting-debug', 'Debug overlay');
@@ -495,6 +511,7 @@ export class PauseScreen {
       place(this.invertRow, settings, null, this.padSeen);
       // Below "Invert controller look", in every input mode.
       place(this.leavesRow, settings, null, true);
+      place(this.radarRow, settings, null, true);
       for (const node of this.touchOnly) place(node, settings, null, touch);
     }
     this.placeFullscreenButton();
@@ -515,6 +532,7 @@ export class PauseScreen {
     }
     this.invertSwitch.checked = settings.padInvertY;
     this.leavesSwitch.checked = settings.collideLeaves;
+    this.radarSwitch.checked = settings.radar;
   }
 
   setDebugChecked(checked: boolean): void {

@@ -4,14 +4,29 @@ import type { Action } from '../actions/actions';
 import type { ActionResult } from '../actions/apply';
 import { createPlayerRecord } from '../actions/playerRecord';
 import { LocalSession } from '../actions/Session';
-import { PLAYER_EYE_HEIGHT, REACH, WORLD_HEIGHT } from '../game/config';
+import {
+  PLAYER_EYE_HEIGHT,
+  RADAR_FAR_RADIUS,
+  RADAR_RADIUS,
+  REACH,
+  WORLD_HEIGHT,
+} from '../game/config';
 import { breakTimeMs, dropOf, toolClassOf } from '../items/hardness';
 import { countItems, fits } from '../items/inventory';
 import { Item, getItemDef, itemLabel, toolOf } from '../items/items';
 import { RECIPES, type Recipe, STATION_BLOCKS, stationsNear } from '../items/recipes';
 import { isLightSource } from '../progress/check';
-import { type ProgressOutcome, levelOf, openChapter, recipeUnlocked } from '../progress/progress';
-import { BOT_TIME, NATURAL_BLOCKS, TASKS, type Task } from '../progress/tables';
+import {
+  type ProgressOutcome,
+  featureUnlocked,
+  levelOf,
+  openChapter,
+  recipeUnlocked,
+} from '../progress/progress';
+import { BOT_TIME, FEATURE_UNLOCKS, NATURAL_BLOCKS, TASKS, type Task } from '../progress/tables';
+import { radarFocus } from '../radar/focus';
+import { scanRadar, worldProbe } from '../radar/scan';
+import { VeinIndex } from '../radar/veins';
 import { BLOCK_SOLID, Block, isSupport } from '../world/blocks';
 import { findSpawn } from '../world/generation/spawn';
 import { getTerrain } from '../world/generation/terrain';
@@ -52,7 +67,31 @@ export interface BotRun {
    * (Fix Adventure 1). A report, never a failure.
    */
   darkBreaks: DarkBreaks[];
+  /** Bot time when the radar unlocked (task 8 done), or null (Phase 8 part B1). */
+  radarAtMs: number | null;
+  /** The radar is unlocked at the end. */
+  radarUnlocked: boolean;
+  /** At the start of tasks 12 and 16: the radar's nearest vein against the brute force. */
+  radar: RadarCheck[];
 }
+
+/** A nearest ore cell, relative to the feet cell. */
+export interface NearestOre {
+  dx: number;
+  dy: number;
+  dz: number;
+  dist: number;
+}
+
+export interface RadarCheck {
+  task: number;
+  kind: string;
+  radar: NearestOre | null;
+  bruteForce: NearestOre | null;
+}
+
+/** Tasks at whose start the radar is checked: "Mine 32 coal", "Mine 20 iron ore". */
+export const RADAR_CHECK_TASKS: readonly number[] = [12, 16];
 
 export interface DarkBreaks {
   task: number;
@@ -105,12 +144,15 @@ export class Bot {
   private currentTask = 0;
   /** Dark breaks by `task:block`, in the order they first happened. */
   private readonly dark = new Map<string, DarkBreaks>();
+  readonly radarChecks: RadarCheck[] = [];
+  private readonly veins: VeinIndex;
 
   constructor(
     readonly seed: number,
     readonly gen: WorldGen,
   ) {
     this.world = new World(seed, gen);
+    this.veins = new VeinIndex(seed, gen);
     const spawn = findSpawn(getTerrain(seed, gen));
     const cx = Math.floor(spawn.x / 16);
     const cz = Math.floor(spawn.z / 16);
@@ -815,6 +857,7 @@ export class Bot {
       const task = TASKS.find((t) => t.chapter === chapter.id && !this.taskDone(t));
       if (!task) return;
       this.currentTask = task.id;
+      if (RADAR_CHECK_TASKS.includes(task.id)) this.checkRadar(task);
       try {
         this.runTask(task);
       } catch (e) {
@@ -822,6 +865,53 @@ export class Bot {
         throw e;
       }
     }
+  }
+
+  /**
+   * The radar's nearest vein of the task's kind, with every chunk within its radius
+   * generated, against the nearest ore block of a brute-force scan of those chunks.
+   */
+  checkRadar(task: Task): void {
+    const kind = radarFocus(task);
+    if (!kind) return;
+    const fx = Math.floor(this.pose.x);
+    const fy = Math.floor(this.pose.y);
+    const fz = Math.floor(this.pose.z);
+    const reach = RADAR_RADIUS + 2;
+    for (let cz = Math.floor((fz - reach) / 16); cz <= Math.floor((fz + reach) / 16); cz++) {
+      for (let cx = Math.floor((fx - reach) / 16); cx <= Math.floor((fx + reach) / 16); cx++) {
+        if (!this.world.hasChunk(cx, cz)) this.world.generate(cx, cz);
+      }
+    }
+    const scan = scanRadar({
+      index: this.veins,
+      x: fx,
+      y: fy,
+      z: fz,
+      probe: worldProbe(this.world),
+      kinds: [kind],
+      perKind: 1,
+      radius: RADAR_RADIUS,
+      farRadius: RADAR_FAR_RADIUS,
+    });
+    const first = scan.entries[0];
+    const radar = first ? { dx: first.dx, dy: first.dy, dz: first.dz, dist: first.dist } : null;
+    let best: NearestOre | null = null;
+    const r2 = RADAR_RADIUS * RADAR_RADIUS;
+    for (let dz = -RADAR_RADIUS; dz <= RADAR_RADIUS; dz++) {
+      for (let dx = -RADAR_RADIUS; dx <= RADAR_RADIUS; dx++) {
+        if (dx * dx + dz * dz > r2) continue;
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+          if (this.world.getBlock(fx + dx, y, fz + dz) !== kind.block) continue;
+          const dy = y - fy;
+          const d2 = dx * dx + dy * dy + dz * dz;
+          if (best === null || closerOre(d2, dx, dy, dz, best)) {
+            best = { dx, dy, dz, dist: Math.sqrt(d2) };
+          }
+        }
+      }
+    }
+    this.radarChecks.push({ task: task.id, kind: kind.key, radar, bruteForce: best });
   }
 
   /** Every recipe can be crafted by the player now. */
@@ -862,7 +952,25 @@ export function runBot(seed: number, gen: WorldGen): BotRun {
     allUnlocked: bot.allUnlocked(),
     lightErrors: bot.world.verifyLight(),
     darkBreaks: bot.darkBreaks,
+    radarAtMs: bot.tasks.find((t) => t.id === radarTask())?.atMs ?? null,
+    radarUnlocked: featureUnlocked('radar', bot.session.record, bot.session.progress),
+    radar: bot.radarChecks,
   };
+}
+
+/** The radar's order: (d², dy, dx, dz) lexicographically. */
+function closerOre(d2: number, dx: number, dy: number, dz: number, than: NearestOre): boolean {
+  const t2 = than.dx * than.dx + than.dy * than.dy + than.dz * than.dz;
+  if (d2 !== t2) return d2 < t2;
+  if (dy !== than.dy) return dy < than.dy;
+  if (dx !== than.dx) return dx < than.dx;
+  return dz < than.dz;
+}
+
+/** The task that unlocks the radar (null if it is on a level). */
+function radarTask(): number | null {
+  const unlock = FEATURE_UNLOCKS.find((u) => u.feature === 'radar')?.unlock;
+  return unlock && 'task' in unlock ? unlock.task : null;
 }
 
 /** Estimated player minutes for a bot time (plan 5.10). */

@@ -9,14 +9,16 @@ import { type InputMode, button, element, onActivate } from './activate';
 import { createItemIcon } from './itemIcon';
 import type { BookView } from '../progress/view';
 import { RecipeList } from './RecipeList';
+import { MapTab } from './MapTab';
 import { TasksTab } from './TasksTab';
 
 /** The pages of the screen in a Gathering world. Creative has the first one only. */
-export type InventoryTab = 'items' | 'crafting' | 'tasks';
+export type InventoryTab = 'items' | 'crafting' | 'tasks' | 'map';
 const TABS: readonly { tab: InventoryTab; label: string }[] = [
   { tab: 'items', label: 'Items' },
   { tab: 'crafting', label: 'Crafting' },
   { tab: 'tasks', label: 'Tasks' },
+  { tab: 'map', label: 'Map' },
 ];
 
 export interface InventoryScreenOptions {
@@ -95,6 +97,8 @@ export class InventoryScreen {
   private readonly itemsPage: HTMLElement;
   private readonly recipes: RecipeList;
   private readonly tasks: TasksTab;
+  /** The "Map" tab (Phase 8 part B1); `Game` hands it to the radar while it is open. */
+  readonly map: MapTab;
   private tab: InventoryTab = 'items';
   private gameMode: GameMode = 'creative';
   /** The slot chosen first; the next activation says where its items go. */
@@ -233,6 +237,7 @@ export class InventoryScreen {
       onCraftClick: options.onCraftClick,
     });
     this.tasks = new TasksTab(panel, options.onTrack);
+    this.map = new MapTab(panel);
     parent.appendChild(this.element);
     this.setGameMode(this.gameMode);
   }
@@ -268,9 +273,12 @@ export class InventoryScreen {
     this.tabButtons.get('crafting')?.toggleAttribute('data-pad-default', this.tab === 'crafting');
     // The focus starts on the Tasks tab itself, as on Crafting; D-pad down reaches the rows.
     this.tabButtons.get('tasks')?.toggleAttribute('data-pad-default', this.tab === 'tasks');
+    // The Map tab too: nothing inside it takes the focus.
+    this.tabButtons.get('map')?.toggleAttribute('data-pad-default', this.tab === 'map');
     this.itemsPage.hidden = this.tab !== 'items';
     this.recipes.element.hidden = this.tab !== 'crafting';
     this.tasks.element.hidden = this.tab !== 'tasks';
+    this.map.element.hidden = this.tab !== 'map';
     // The list keeps its scroll position while a world is open.
     if (this.tab === 'crafting' && this.visible) this.recipes.restoreScroll();
     this.setPicked(null);

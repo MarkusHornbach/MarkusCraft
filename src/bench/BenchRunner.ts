@@ -40,6 +40,8 @@ export interface BenchHost {
   /** The scripted input of the next simulation steps. */
   setInput(input: MoveInput): void;
   submit(action: Action): void;
+  /** Sets the view direction (yaw, radians) of the next step (the scenario `radar`). */
+  setYaw(yaw: number): void;
   /** Nothing left to load and no mesh waiting for changed light. */
   chunksIdle(): boolean;
   pendingChunks(): number;
@@ -128,6 +130,12 @@ export class BenchRunner {
     return this.entries.length;
   }
 
+  /** The scenario being run shows the radar circle (the scenario `radar`). */
+  get showsRadar(): boolean {
+    const entry = this.entries[this.index] as (typeof this.entries)[number] | undefined;
+    return this.running && entry?.scenario.radar === true;
+  }
+
   /** True while the run is going on. */
   get running(): boolean {
     return this.phase !== 'done' && this.phase !== 'stopped';
@@ -165,6 +173,7 @@ export class BenchRunner {
     }
     const step = this.stepIndex;
     this.host.setInput(entry.scenario.input(step, entry.steps));
+    if (entry.scenario.yaw) this.host.setYaw(entry.scenario.yaw(step, entry.steps));
     if (step >= 0) {
       const action = entry.scenario.action(step, entry.steps);
       if (action) this.host.submit(action);

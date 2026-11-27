@@ -47,6 +47,6 @@ describe('repository hygiene (AC12.4)', () => {
     // `gen2-flat-many` and `gen2-hilly-normal`. Phase 8 part A1 added `tasks-tab`,
     // `tasks-tab-touch`, `recipe-list-locked` and `progress-notice`. Polish 2 added
     // `task-tracker` and `task-tracker-touch`.
-    expect(assets.length).toBe(48);
+    expect(assets.length).toBe(52);
   });
 });

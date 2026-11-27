@@ -69,6 +69,101 @@ for (let v = 0; v < BOX_CELLS; v++) {
 const stamps = new Uint16Array(BOX_CELLS);
 let generation = 0;
 const STEP = 0x9e3779b9;
+/** Most cells a vein can have; an `out` buffer of `veinCells` holds three numbers per cell. */
+export const VEIN_CELLS_MAX = VEIN_MAX_BLOCKS;
+
+/** Hash of an ore cell column; `cellHash` turns it into the hash of one cell. */
+function columnHashOf(kindSeed: number, cellX: number, cellZ: number): number {
+  return hash2(kindSeed, cellX, cellZ);
+}
+
+function cellHash(columnHash: number, cellY: number): number {
+  return hash32(columnHash ^ Math.imul(cellY, 0x2545f491));
+}
+
+/**
+ * The radar's copy of the vein walk (`placeKind` has its own, inline, for speed) from its
+ * cell hash `s` (which already passed the chance test):
+ * writes the offsets of its box cells from the origin into `out` as (x, y, z) triples and
+ * returns the count. The vein is one connected group of exactly `size` cells, walked
+ * randomly inside the box around its origin by a linear congruential generator (integer
+ * arithmetic only; tables instead of branches on random data).
+ */
+function walkVein(s: number, out: Int32Array): number {
+  const size = VEIN_MIN_BLOCKS + ((s >>> 25) % (VEIN_MAX_BLOCKS - VEIN_MIN_BLOCKS + 1));
+  generation = (generation + 1) & 0xffff;
+  if (generation === 0) {
+    stamps.fill(0);
+    generation = 1;
+  }
+  let v = BOX_CENTRE;
+  let placed = 0;
+  for (;;) {
+    if (stamps[v] !== generation) {
+      stamps[v] = generation;
+      const o = placed * 3;
+      out[o] = BOX_X[v];
+      out[o + 1] = BOX_Y[v];
+      out[o + 2] = BOX_Z[v];
+      if (++placed === size) break;
+    }
+    s = (Math.imul(s, 1664525) + 1013904223) | 0;
+    // The high bits of such a generator are the good ones.
+    v = BOX_STEP[v * 6 + ((s >>> 20) % 6)];
+  }
+  return size;
+}
+
+/** Hashes are compared and reduced as 31-bit integers, which engines keep fast. */
+function thresholdOf(kind: OreKind): number {
+  return Math.floor(kind.chance * 0x80000000);
+}
+
+/** The seed of a kind's veins in a world; pass it to `veinCells`. */
+export function oreKindSeed(seed: number, kind: OreKind): number {
+  return hash32(seed ^ kind.salt);
+}
+
+/**
+ * The vein of `kind` in ore cell (cellX, cellY, cellZ), if the cell holds one: writes the
+ * world coordinates of its cells within the kind's height range into `out` as (x, y, z)
+ * triples (room for `VEIN_CELLS_MAX` cells) and returns their count (0: no vein). Whether a
+ * cell becomes ore also needs stone there before the ores (`TerrainSource.oreHost`) and no
+ * earlier kind's vein in it (kinds are placed in `ORE_KINDS` order).
+ */
+export function veinCells(
+  kind: OreKind,
+  kindSeed: number,
+  cellX: number,
+  cellY: number,
+  cellZ: number,
+  out: Int32Array,
+): number {
+  const s = cellHash(columnHashOf(kindSeed, cellX, cellZ), cellY);
+  if (s >>> 1 >= thresholdOf(kind)) return 0;
+  const ox = cellX * ORE_CELL + ((s >>> 1) % ORE_CELL);
+  const oy = cellY * ORE_CELL + ((s >>> 9) % ORE_CELL);
+  const oz = cellZ * ORE_CELL + ((s >>> 17) % ORE_CELL);
+  const size = walkVein(s, out);
+  let n = 0;
+  for (let c = 0; c < size; c++) {
+    const y = oy + out[c * 3 + 1];
+    if (y < kind.minY || y > kind.maxY) continue;
+    out[n * 3] = ox + out[c * 3];
+    out[n * 3 + 1] = y;
+    out[n * 3 + 2] = oz + out[c * 3 + 2];
+    n++;
+  }
+  return n;
+}
+
+/** The ore cell rows (cellY) a kind's veins can come from. */
+export function oreCellRows(kind: OreKind): { from: number; to: number } {
+  return {
+    from: Math.floor((kind.minY - VEIN_REACH) / ORE_CELL),
+    to: Math.floor((kind.maxY + VEIN_REACH) / ORE_CELL),
+  };
+}
 
 function placeKind(
   kind: OreKind,
@@ -78,7 +173,7 @@ function placeKind(
   z0: number,
   maxHeight: number,
 ): void {
-  const kindSeed = hash32(seed ^ kind.salt);
+  const kindSeed = oreKindSeed(seed, kind);
   const cellX0 = Math.floor((x0 - VEIN_REACH) / ORE_CELL);
   const cellX1 = Math.floor((x0 + CHUNK_SIZE - 1 + VEIN_REACH) / ORE_CELL);
   const cellZ0 = Math.floor((z0 - VEIN_REACH) / ORE_CELL);
@@ -87,20 +182,18 @@ function placeKind(
   // Veins that lie completely above the highest column of the chunk are skipped.
   const top = Math.min(kind.maxY, maxHeight);
   const cellY1 = Math.floor((top + VEIN_REACH) / ORE_CELL);
-  // Hashes are compared and reduced as 31-bit integers, which engines keep fast.
-  const threshold = Math.floor(kind.chance * 0x80000000);
+  const threshold = thresholdOf(kind);
 
   for (let cellZ = cellZ0; cellZ <= cellZ1; cellZ++) {
     for (let cellX = cellX0; cellX <= cellX1; cellX++) {
-      const columnHash = hash2(kindSeed, cellX, cellZ);
+      const columnHash = columnHashOf(kindSeed, cellX, cellZ);
       for (let cellY = cellY0; cellY <= cellY1; cellY++) {
-        let s = hash32(columnHash ^ Math.imul(cellY, 0x2545f491));
+        const s = cellHash(columnHash, cellY);
         if (s >>> 1 >= threshold) continue;
         // The bits of one hash give the origin and the size of the vein.
         const ox = cellX * ORE_CELL + ((s >>> 1) % ORE_CELL);
         const oy = cellY * ORE_CELL + ((s >>> 9) % ORE_CELL);
         const oz = cellZ * ORE_CELL + ((s >>> 17) % ORE_CELL);
-        const size = VEIN_MIN_BLOCKS + ((s >>> 25) % (VEIN_MAX_BLOCKS - VEIN_MIN_BLOCKS + 1));
         if (oy - VEIN_REACH > top) continue;
         // The vein stays in the box around its origin: skip it if the box misses the chunk.
         const bx = ox - x0;
@@ -108,9 +201,11 @@ function placeKind(
         if (bx < -VEIN_REACH || bx >= CHUNK_SIZE + VEIN_REACH) continue;
         if (bz < -VEIN_REACH || bz >= CHUNK_SIZE + VEIN_REACH) continue;
 
-        // Random walk inside the box around the origin; every new cell joins the vein,
-        // so the vein is one connected group of exactly `size` blocks. The walk is
-        // driven by a linear congruential generator (integer arithmetic only).
+        // Random walk inside the box around its origin; every new cell joins the vein,
+        // so the vein is one connected group of exactly `size` blocks. Kept inline here
+        // (not `walkVein`): generation's own copy is measurably faster, and the agreement
+        // test of the radar proves both walks give the same cells.
+        const size = VEIN_MIN_BLOCKS + ((s >>> 25) % (VEIN_MAX_BLOCKS - VEIN_MIN_BLOCKS + 1));
         generation = (generation + 1) & 0xffff;
         if (generation === 0) {
           stamps.fill(0);
@@ -118,6 +213,7 @@ function placeKind(
         }
         let v = BOX_CENTRE;
         let placed = 0;
+        let w = s;
         for (;;) {
           if (stamps[v] !== generation) {
             stamps[v] = generation;
@@ -137,9 +233,9 @@ function placeKind(
             }
             if (++placed === size) break;
           }
-          s = (Math.imul(s, 1664525) + 1013904223) | 0;
+          w = (Math.imul(w, 1664525) + 1013904223) | 0;
           // The high bits of such a generator are the good ones.
-          v = BOX_STEP[v * 6 + ((s >>> 20) % 6)];
+          v = BOX_STEP[v * 6 + ((w >>> 20) % 6)];
         }
       }
     }

@@ -38,6 +38,7 @@ export default tseslint.config(
       'src/items/**',
       'src/progress/**',
       'src/bot/**',
+      'src/radar/**',
       'src/save/**',
       'src/bench/**',
       'src/net/**',

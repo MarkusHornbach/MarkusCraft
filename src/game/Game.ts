@@ -121,14 +121,20 @@ import {
   levelOf,
   maxLevelXp,
   nextLevelXp,
+  featureUnlocked,
   openChapter,
   recipeUnlocked,
   tasksOf,
   unlockText,
 } from '../progress/progress';
+import { radarFocus } from '../radar/focus';
+import type { MapTab } from '../ui/MapTab';
+import type { RadarKind } from '../radar/kinds';
+import { Radar } from './Radar';
 import { type Task, unlockOf } from '../progress/tables';
 import {
   bookView,
+  featureLockText,
   lockedText,
   noticeTexts,
   progressRow,
@@ -245,6 +251,14 @@ export class Game {
   private lastSaveMs = 0;
   private readonly input: Input;
   private readonly hud: Hud;
+  /** The radar circle and the scans behind it and the Map tab (Phase 8 part B1). */
+  private readonly radar: Radar;
+  /** The circle's task focus, set with the tracker. */
+  private radarFocusKind: RadarKind | null = null;
+  /** The radar was unlocked and on at the last step (a change makes the scan stale). */
+  private radarActive = false;
+  /** The Map tab while the radar draws on it (open and unlocked). */
+  private mapSurface: MapTab | null = null;
   private readonly debug: DebugOverlay;
   private readonly pauseScreen: PauseScreen | null = null;
   /** The start screen with the list of worlds; like the pause screen not in test mode. */
@@ -439,6 +453,7 @@ export class Game {
     this.session = this.createSession(createPlayerRecord(this.gameMode));
     this.hud = new Hud(this.root, this.renderer.atlas.tiles, params.test);
     this.hud.setSelected(this.selectedSlot, false);
+    this.radar = new Radar(this.hud.element);
     this.debug = new DebugOverlay(this.root);
     this.inventoryScreen = new InventoryScreen(this.root, {
       tiles: this.renderer.atlas.tiles,
@@ -468,6 +483,7 @@ export class Game {
       onTab: () => {
         this.refreshRecipes();
         this.refreshBook();
+        this.syncMapTab();
       },
       onTrack: (task) => {
         // Choosing the row the tracker shows hides it; any other row (or any row while
@@ -707,6 +723,7 @@ export class Game {
     this.time = meta.time;
     this.gameMode = meta.mode;
     this.simSteps = 0;
+    this.radar.reset();
     this.repeatTimer = 0;
     this.breakActive = false;
     this.breakInFlight = false;
@@ -1540,6 +1557,9 @@ export class Game {
       },
       setInput: (input) => this.input.setScript(input),
       submit: (action) => this.session.submit(action),
+      setYaw: (yaw) => {
+        applyLook(this.player, yaw - this.player.yaw, 0);
+      },
       chunksIdle: () => this.chunksIdle(),
       pendingChunks: () => this.chunkManager.pending,
       missingMeshDistance: () => this.chunkManager.missingMeshDistance(),
@@ -1685,6 +1705,7 @@ export class Game {
   /** The HUD's task tracker; it hides with the HUD by itself. */
   private refreshTracker(): void {
     const task = this.trackedNow();
+    this.radarFocusKind = radarFocus(task);
     this.hud.setTracker(
       task ? { id: task.id, label: task.label, count: trackerCount(task, this.progress) } : null,
     );
@@ -1715,6 +1736,8 @@ export class Game {
 
   /** The session set blocks: rebuild the meshes they touch, outside the frame budget. */
   private onBlocksChanged(changes: readonly BlockChange[]): void {
+    this.radar.noteBlocks(changes);
+    this.inventoryScreen.map.noteBlocks(changes);
     for (const { x, z } of changes) {
       this.markChunkDirty(x, z);
       this.remeshAround(x, z);
@@ -1833,6 +1856,7 @@ export class Game {
     this.inventoryScreen.setVisible(true);
     this.refreshRecipes();
     this.refreshBook();
+    this.syncMapTab();
     // The screen has its own bar; the controls of the game would only shine through.
     this.hud.setVisible(false);
     this.updateTouchCover();
@@ -1861,6 +1885,7 @@ export class Game {
     this.inventoryOpen = false;
     this.updateTouchCover();
     this.inventoryScreen.setVisible(false);
+    this.syncMapTab();
     // Closing cancels what is in the furnace: its ingredients were never taken.
     this.stopCrafting();
     this.syncFocus();
@@ -1925,6 +1950,7 @@ export class Game {
   private setMode(mode: InputMode): void {
     this.mode = mode;
     const touch = mode === 'touch';
+    this.radar.circle.setTouch(touch);
     this.root.classList.toggle('touch-mode', touch);
     this.input.setMouseEnabled(!touch);
     if (touch && !this.touch) {
@@ -2202,6 +2228,62 @@ export class Game {
     this.markMetaDirty();
     // The clock of a performance test stands still.
     this.time = advanceTime(this.time, SIM_DT, this.params.freeze || this.bench !== null);
+    this.stepRadar();
+  }
+
+  /** The radar is open to the player: Adventure, its task done (Phase 8 part B1). */
+  private radarUnlocked(): boolean {
+    return (
+      this.gameMode === 'gathering' && featureUnlocked('radar', this.session.record, this.progress)
+    );
+  }
+
+  /** The circle shows: playing an Adventure world with the radar unlocked and switched on. */
+  private radarCircleWanted(): boolean {
+    if (this.bench) return this.bench.runner.showsRadar;
+    return (
+      this.isPlaying() && this.screen === 'play' && this.settings.radar && this.radarUnlocked()
+    );
+  }
+
+  /**
+   * The Map tab (Phase 8 part B1): while it is open its locked text or, unlocked, the
+   * radar draws on it; its background cache goes when it closes.
+   */
+  private syncMapTab(): void {
+    const map = this.inventoryScreen.map;
+    const open =
+      this.inventoryOpen &&
+      this.gameMode === 'gathering' &&
+      this.inventoryScreen.currentTab === 'map';
+    const unlocked = this.radarUnlocked();
+    if (open) map.setLocked(!unlocked, featureLockText('radar'));
+    const surface = open && unlocked ? map : null;
+    if (surface) map.setWorld(this.world);
+    if (surface === this.mapSurface) return;
+    this.mapSurface = surface;
+    if (!surface) map.clear();
+    this.radar.setMap(surface);
+  }
+
+  private stepRadar(): void {
+    this.syncMapTab();
+    const active = this.radarUnlocked() && this.settings.radar;
+    if (active !== this.radarActive) {
+      this.radarActive = active;
+      this.radar.invalidate();
+    }
+    const p = this.player;
+    this.radar.step({
+      world: this.world,
+      x: p.x,
+      y: p.y,
+      z: p.z,
+      yaw: p.yaw,
+      step: this.simSteps,
+      circle: this.radarCircleWanted(),
+      focus: this.radarFocusKind,
+    });
   }
 
   /**
@@ -2746,6 +2828,7 @@ export class Game {
       generator: debugWorldGen(this.world.gen),
       progress:
         this.gameMode === 'gathering' ? progressRow(this.progress, this.session.record) : null,
+      radar: this.radarUnlocked() ? (this.settings.radar ? this.radar.debugText() : 'off') : null,
       time: this.time,
       mode: p.mode,
       onGround: p.onGround,
@@ -2784,6 +2867,8 @@ export class Game {
     if (!this.world.setBlock(x, y, z, id)) return;
     this.markChunkDirty(x, z);
     this.remeshAround(x, z);
+    this.radar.noteBlocks([{ x, y, z, id }]);
+    this.inventoryScreen.map.noteBlocks([{ x, z }]);
     this.mp.host?.broadcastBlocks([{ x, y, z, id }]);
   }
 
@@ -2884,6 +2969,38 @@ export class Game {
     };
   }
 
+  /** The radar for the test API (Phase 8 part B1); null in Creative. */
+  private radarState(): GameState['radar'] {
+    if (this.gameMode !== 'gathering') return null;
+    const circle = this.radar.circleState();
+    return {
+      unlocked: this.radarUnlocked(),
+      setting: this.settings.radar,
+      shown: this.radar.circle.shown && this.radarCircleWanted(),
+      focus: this.radarFocusKind?.key ?? null,
+      entries: circle.entries,
+      beyond: circle.beyond,
+      scans: this.radar.scanCount,
+      draws: this.radar.drawCount,
+    };
+  }
+
+  /** The Map tab while it is open, for the test API; undefined otherwise. */
+  private mapState(): GameState['map'] {
+    const open =
+      this.inventoryOpen &&
+      this.gameMode === 'gathering' &&
+      this.inventoryScreen.currentTab === 'map';
+    if (!open) return undefined;
+    const map = this.inventoryScreen.map;
+    return {
+      locked: map.isLocked,
+      entries: map.isLocked ? [] : map.entries,
+      legend: map.isLocked ? [] : map.legendTexts,
+      draws: this.radar.mapDrawCount,
+    };
+  }
+
   /** The progress notice shown now, or null. */
   private progressNoticeText(): string | null {
     return this.progressShown?.text ?? null;
@@ -2933,6 +3050,8 @@ export class Game {
         unlock: unlockOf(status.id),
       })),
       progress: this.progressState(),
+      radar: this.radarState(),
+      ...(this.mapState() ? { map: this.mapState() } : {}),
       smelting: this.smeltView(),
       bench: this.benchState(),
       net: this.netState(),
@@ -2963,6 +3082,7 @@ export class Game {
         padSensitivity: this.settings.padSensitivity,
         padInvertY: this.settings.padInvertY,
         collideLeaves: this.settings.collideLeaves,
+        radar: this.settings.radar,
       },
       pad: this.gamepad.state(this.padActive),
       render: {

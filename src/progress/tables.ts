@@ -38,6 +38,20 @@ export interface Task {
 /** A recipe is unlocked by a level, or by a finished task: exactly one of them. */
 export type Unlock = { readonly level: number } | { readonly task: number };
 
+/**
+ * A feature of the game that a level or task unlocks (Phase 8 part B1). Features are not
+ * saved, but the table is append-only all the same.
+ */
+export type Feature = 'radar';
+export const FEATURES: readonly Feature[] = ['radar'];
+/** The feature's name on screen ("Unlocked: Radar"). */
+export const FEATURE_LABELS: Readonly<Record<Feature, string>> = { radar: 'Radar' };
+
+export interface FeatureUnlock {
+  readonly feature: Feature;
+  readonly unlock: Unlock;
+}
+
 export interface RecipeUnlock {
   readonly recipe: number;
   readonly unlock: Unlock;
@@ -86,6 +100,8 @@ export interface ProgressTables {
   /** Total XP each level starts at; index 0 is level 1 (at 0 XP). */
   readonly levels: readonly number[];
   readonly recipeUnlocks: readonly RecipeUnlock[];
+  /** One unlock per feature. */
+  readonly featureUnlocks: readonly FeatureUnlock[];
   /** Block id → XP for the first block of that kind a player mines with a yield. */
   readonly firstFindXp: ReadonlyMap<number, number>;
   /** XP for the first craft of each recipe by a player. */
@@ -167,6 +183,11 @@ export const RECIPE_UNLOCKS: readonly RecipeUnlock[] = [
   { recipe: 20, unlock: { task: 11 } },
 ];
 
+/** One unlock per feature. The radar comes with task 8 "Climb to height 64". */
+export const FEATURE_UNLOCKS: readonly FeatureUnlock[] = [
+  { feature: 'radar', unlock: { task: 8 } },
+];
+
 export const FIRST_FIND_XP: ReadonlyMap<number, number> = new Map([
   [Block.COAL_ORE, 20],
   [Block.IRON_ORE, 40],
@@ -181,6 +202,7 @@ export const PROGRESS_TABLES: ProgressTables = {
   tasks: TASKS,
   levels: LEVELS,
   recipeUnlocks: RECIPE_UNLOCKS,
+  featureUnlocks: FEATURE_UNLOCKS,
   firstFindXp: FIRST_FIND_XP,
   firstCraftXp: FIRST_CRAFT_XP,
   firstCraftOverrides: FIRST_CRAFT_OVERRIDES,

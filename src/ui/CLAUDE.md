@@ -9,7 +9,8 @@ Shell (DOM). Screens change the world and items only through actions
   task, part of the HUD), `blockIcon.ts`, `itemIcon.ts`,
   `DebugOverlay.ts`, `settings.ts`, `ui.css`, `activate.ts` (button helpers)
 - `InventoryScreen.ts` (27 slots or the Creative palette, bar, bin, tabs), `RecipeList.ts`
-  (the "Crafting" tab: one row per recipe), `TasksTab.ts` (the "Tasks" tab),
+  (the "Crafting" tab: one row per recipe), `TasksTab.ts` (the "Tasks" tab), `MapTab.ts`,
+  `RadarCircle.ts`, `radarDraw.ts` (the radar: `src/radar/CLAUDE.md`),
   `ProgressNotice.ts` (the progress notice)
 - `WorldMenu.ts` (start screen: list of worlds, new world, delete), `PauseScreen.ts` (pause
   menu of a world; also the settings page), `TouchHud.ts` (stick, buttons, rotate hint),
@@ -31,8 +32,8 @@ The inventory screen (`E`, `Esc`, touch button `bag`, the pad's Y) lies over the
 game and does not pause it; `Game` listens for its keys itself and `Input` ignores keys
 while it is open. The HUD is hidden and the touch controls are made invisible
 (`covered`), not removed. Closing requests the pointer lock again; if the browser refuses,
-the pause menu shows. In an Adventure world the screen has three tabs, "Items",
-"Crafting" (the recipe list) and "Tasks"; it always opens on the tab it was closed with,
+the pause menu shows. In an Adventure world the screen has four tabs, "Items",
+"Crafting" (the recipe list), "Tasks" and "Map" (locked until the radar is); it always opens on the tab it was closed with,
 and on "Items" after a world was loaded.
 
 ## The task book on screen (Phase 8 part A)
@@ -94,8 +95,9 @@ Adventure needs wood."; switching to Adventure while `None` is chosen selects `F
 form scrolls on small screens; the menu comes back at the top when it is shown again. A list
 row shows "Adventure · Balanced · Few trees", or "Creative · Classic" for generator 1. The
 F3 overlay has a row "World" ("Generator 2 · balanced · few", "Generator 1"). The settings
-page has the switch "Collide with leaves" below "Invert controller look", in every input
-mode (`src/player/CLAUDE.md`).
+page has the switch "Collide with leaves" below "Invert controller look", then "Radar
+circle" (`settings.radar`, default on), in every input mode; on phones "Collide with leaves"
+and "Radar circle" share a line.
 
 ## "Your player" (Phase 6 part D)
 

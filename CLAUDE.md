@@ -69,7 +69,7 @@ a later session, update the pin to match and regenerate the reference screenshot
 
 - `index.html`, `src/main.ts` (entry point)
 - pure: `src/world/`, `src/actions/`, `src/items/`, `src/save/`, `src/net/`,
-  `src/player/`, `src/bench/`, `src/util/`, `src/progress/`, `src/bot/`
+  `src/player/`, `src/bench/`, `src/util/`, `src/progress/`, `src/bot/`, `src/radar/`
 - shell: `src/game/` (`Game.ts`, `config.ts`), `src/input/`, `src/render/` (with
   `textures/`), `src/ui/`; `src/testing/` (test helpers)
 - `e2e/` (Playwright, `e2e/screenshots/`), `scripts/` (dev tools), `scripts/ci/` (CI
@@ -88,7 +88,7 @@ many rounds, the two sides in turn.
 ## Architecture invariants
 
 - **Pure core, thin shell.** `world/`, `player/`, `util/`, `actions/`, `save/`, `items/`,
-  `bench/`, `net/`, `progress/` and `bot/` must not import `three` or `peerjs`, touch the DOM or use
+  `bench/`, `net/`, `progress/`, `bot/` and `radar/` must not import `three` or `peerjs`, touch the DOM or use
   `Math.random` / `Date.now` (enforced by ESLint rules). They are tested in Node. Only
   `render/`, `ui/`, `input/` and `game/` may use Three.js and browser APIs. The same rule
   covers `render/textures/tiles.ts`, `itemIcons.ts`, `cracks.ts` and `figureTexture.ts`.
@@ -146,6 +146,7 @@ deviations" of the reports whose status row names it:
 - `src/items/CLAUDE.md`: items, tools, gating, recipes
 - `src/progress/CLAUDE.md`: task book, XP, levels, recipe unlocks, the progress step
 - `src/bot/CLAUDE.md`: the goal bot, its time model, `scripts/progressRun.ts`
+- `src/radar/CLAUDE.md`: the radar, its scan and draw rules, the Map tab
 - `src/save/CLAUDE.md`: the save format, stores
 - `src/net/CLAUDE.md`: rooms, protocol, breaking together, network test
 - `src/input/CLAUDE.md`: input modes, controller, focus, back guard
@@ -303,13 +304,14 @@ hold:
 | 8A2       | `docs/phase-8a-plan.md`        | `docs/phase-8a2-report.md`       | shared progress, protocol, mp specs        |
 | Polish 2  | `docs/polish-2-plan.md`        | `docs/polish-2-report.md`        | tracker, `track`, save format 5, Tasks tab |
 | Fix Adv 1 | `docs/fix-adventure-1-plan.md` | `docs/fix-adventure-1-report.md` | torch unlock, dark rule, smelting row      |
+| 8B1       | `docs/phase-8b1-plan.md`       | `docs/phase-8b1-report.md`       | radar, ores, feature unlocks, Map tab      |
 
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
-  planned. Phase 8 ("Adventure"): part A and its fix "Fix Adventure 1" are built; parts
-  B–E are not planned. At a session's start look for issues labelled `perf-run`; the
-  latest are all green (#37, Web Workers "not needed"). Numbers from software WebGL
-  (cloud, CI) are never evidence.
+  planned. Phase 8: A, "Fix Adventure 1" and B1 (radar) are built; B2 on
+  and C–E are not planned. At a session's start look
+  for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
+  needed"). Numbers from software WebGL (cloud, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
   2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
   (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;

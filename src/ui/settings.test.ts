@@ -32,6 +32,7 @@ describe('settings', () => {
       padSensitivity: 1,
       padInvertY: false,
       collideLeaves: false,
+      radar: true,
     });
     expect(SETTINGS_STORAGE_KEY).toBe('markuscraft.settings.v1');
   });
@@ -46,6 +47,7 @@ describe('settings', () => {
       padSensitivity: 1,
       padInvertY: false,
       collideLeaves: false,
+      radar: true,
     });
     expect(validateSettings({ renderDistance: 99, mouseSensitivity: 0, fov: 10 })).toEqual({
       renderDistance: 16,
@@ -56,6 +58,7 @@ describe('settings', () => {
       padSensitivity: 1,
       padInvertY: false,
       collideLeaves: false,
+      radar: true,
     });
     expect(validateSettings({ touchSensitivity: 2 }).touchSensitivity).toBe(2);
     expect(validateSettings({ touchSensitivity: 9 }).touchSensitivity).toBe(3);
@@ -86,6 +89,7 @@ describe('settings', () => {
       padSensitivity: 1,
       padInvertY: false,
       collideLeaves: false,
+      radar: true,
     };
     saveSettings(storage, chosen);
     expect(hasStoredSettings(storage)).toBe(true);
@@ -130,6 +134,7 @@ describe('settings', () => {
       padSensitivity: 1,
       padInvertY: false,
       collideLeaves: false,
+      radar: true,
     });
     // Writing them back without a change of Brightness gives the same text.
     saveSettings(storage, loadSettings(storage));
@@ -204,5 +209,23 @@ describe('settings', () => {
     );
     saveSettings(storage, { ...DEFAULT_SETTINGS, collideLeaves: true });
     expect(loadSettings(storage).collideLeaves).toBe(true);
+  });
+});
+
+describe('the radar setting (Phase 8B1 AC3.5)', () => {
+  it('is on by default, a missing field reads as on, and it is stored only when off', () => {
+    expect(DEFAULT_SETTINGS.radar).toBe(true);
+    expect(validateSettings({}).radar).toBe(true);
+    for (const bad of [1, 'no', null]) expect(validateSettings({ radar: bad }).radar).toBe(true);
+    expect(validateSettings({ radar: false }).radar).toBe(false);
+    const stored = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => stored.get(k) ?? null,
+      setItem: (k: string, v: string) => void stored.set(k, v),
+    };
+    saveSettings(storage, { ...DEFAULT_SETTINGS });
+    expect(JSON.parse(stored.get(SETTINGS_STORAGE_KEY) ?? '{}')).not.toHaveProperty('radar');
+    saveSettings(storage, { ...DEFAULT_SETTINGS, radar: false });
+    expect(loadSettings(storage).radar).toBe(false);
   });
 });

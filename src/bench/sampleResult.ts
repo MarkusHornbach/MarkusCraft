@@ -1,12 +1,7 @@
 // A built-in result of the performance test with fixed, invented numbers: what
 // `bench=sample` shows, so layout tests and the reference screenshot have a stable
 // picture. Pure.
-import {
-  BENCH_CHUNK_EDGES,
-  BENCH_FORMAT_VERSION,
-  BENCH_FRAME_EDGES,
-  BENCH_SUITE_VERSION,
-} from '../game/config';
+import { BENCH_CHUNK_EDGES, BENCH_FORMAT_VERSION, BENCH_FRAME_EDGES } from '../game/config';
 import type { BenchResult, ScenarioResult } from './benchReport';
 
 function row(
@@ -52,7 +47,8 @@ function row(
 
 export const SAMPLE_RESULT: BenchResult = {
   format: BENCH_FORMAT_VERSION,
-  suite: BENCH_SUITE_VERSION,
+  // Its rows are those of suite 3 (no `radar`, Phase 8 part B1): it says so.
+  suite: 3,
   quick: false,
   commit: 'sample',
   date: '2026-01-01T12:00:00.000Z',

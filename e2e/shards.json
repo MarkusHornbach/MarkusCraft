@@ -5,6 +5,7 @@
       "gamepadInventory.spec.ts",
       "padSoak.spec.ts",
       "player.spec.ts",
+      "radarMap.spec.ts",
       "smoke.spec.ts",
       "soak.spec.ts",
       "worldMenu.spec.ts"
@@ -25,6 +26,7 @@
       "crafting.spec.ts",
       "gathering.spec.ts",
       "inventory.spec.ts",
+      "radarTouch.spec.ts",
       "sky.spec.ts",
       "taskTracker.spec.ts",
       "terrain.spec.ts",
@@ -38,6 +40,7 @@
       "netTest.spec.ts",
       "playerSection.spec.ts",
       "progress.spec.ts",
+      "radar.spec.ts",
       "save.spec.ts",
       "torchSoak.spec.ts",
       "world.spec.ts"
@@ -45,7 +48,7 @@
   ],
   "multiplayer": [
     ["mpMenus.spec.ts", "mpPlayers.spec.ts", "mpProgress.spec.ts"],
-    ["mpFigure.spec.ts", "mpGathering.spec.ts"],
+    ["mpFigure.spec.ts", "mpGathering.spec.ts", "mpRadar.spec.ts"],
     ["mpHarden.spec.ts", "mpRooms.spec.ts"]
   ]
 }

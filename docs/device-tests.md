@@ -36,7 +36,7 @@ It holds the open tests; passed and obsolete ones are in `docs/device-tests-done
   below whenever the open list changes.
 - Findings that led to a change are noted in the report of the part that made the change.
 
-Last updated: Fix Adventure 1 (CRAFT-14, PAD-17, PROG-11, PROG-12; PROG-5 obsolete); 2026-11-27.
+Last updated: Phase 8 part B1 (RADAR-1 to RADAR-7); 2026-11-27.
 
 ---
 
@@ -288,3 +288,30 @@ finished task, chapter and level.
 - [ ] **PROG-12** (FA1) A locked recipe row ("Level 3" or "Task: Make 16 coal" instead of
       "Craft"): is it clear why it cannot be made and what to do about it? (Replaces
       PROG-5.) _PC._ Result:
+
+## 11. Radar (Phase 8 part B1)
+
+An Adventure player who has finished task 8 "Climb to height 64" gets the radar: a circle
+at the top right (on the phone below the bag button) and a fourth inventory tab "Map". It
+shows the nearest coal veins (dark dots) and iron veins (tan diamonds) and how far up or
+down they are ("5↓", "↑", "="). The settings page switches the circle ("Radar circle").
+
+- [ ] **RADAR-1** (8B1) Performance test on the phone: compare the new `radar` row with the
+      `walk` row (frame time and lights). _Phone._ Result:
+- [ ] **RADAR-2** (8B1) On the phone in an Adventure world with the radar: the F3 row "Radar"
+      while walking and turning (scan and draw times). Does the game feel as smooth with the
+      circle on as with it off? _Phone._ Result:
+- [ ] **RADAR-3** (8B1) The circle: are coal and iron told apart at a glance, are the hints
+      readable, is it in the way anywhere (PC top right; phone below the bag)? _PC, Phone._
+      Result:
+- [ ] **RADAR-4** (8B1) Finding ore with the radar (seed 1337, the form's defaults, from
+      task 12 on): do the hints lead to coal and iron without making it trivial? How long
+      did "Mine 20 iron ore" take compared with before? _PC._ Result:
+- [ ] **RADAR-5** (8B1) The Map tab with mouse, touch and controller: readable on the
+      phone, the terrain recognisable (lake, hills), the legend clear? _PC, Phone,
+      controller._ Result:
+- [ ] **RADAR-6** (8B1) Tracking "Mine 20 iron ore" makes the circle show iron only: is that
+      understandable, or confusing? _PC._ Result:
+- [ ] **RADAR-7** (8B1) Walk on the surface away from the start point until the circle shows
+      an arrow on its rim for a kind (no vein of it within 48 blocks): is it clear where to
+      go? _PC._ Result:

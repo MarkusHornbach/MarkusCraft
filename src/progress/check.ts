@@ -4,7 +4,15 @@ import { dropOf } from '../items/hardness';
 import { getItemDef, toolOf } from '../items/items';
 import { RECIPES, type Recipe, STATION_BLOCKS } from '../items/recipes';
 import { BLOCK_EMISSION, getBlockDef } from '../world/blocks';
-import { NATURAL_BLOCKS, type ProgressTables, type Task, type Unlock, levelIn } from './tables';
+import {
+  FEATURES,
+  NATURAL_BLOCKS,
+  type Feature,
+  type ProgressTables,
+  type Task,
+  type Unlock,
+  levelIn,
+} from './tables';
 
 /** XP and level at the end of one chapter, as the fixed point reaches them. */
 export interface ChapterXp {
@@ -88,6 +96,26 @@ function checkStructure(tables: ProgressTables, recipes: readonly Recipe[]): str
     } else if (!taskIds.has(unlock.task)) {
       errors.push(`recipe ${recipe}: unknown task ${unlock.task}`);
     }
+  }
+  const featureUnlocks = new Map<Feature, number>();
+  for (const { feature, unlock } of tables.featureUnlocks) {
+    featureUnlocks.set(feature, (featureUnlocks.get(feature) ?? 0) + 1);
+    if ('level' in unlock) {
+      if (
+        !Number.isInteger(unlock.level) ||
+        unlock.level < 1 ||
+        unlock.level > tables.levels.length
+      ) {
+        errors.push(`feature ${feature}: unknown level ${unlock.level}`);
+      }
+    } else if (!taskIds.has(unlock.task)) {
+      errors.push(`feature ${feature}: unknown task ${unlock.task}`);
+    }
+  }
+  for (const feature of FEATURES) {
+    const n = featureUnlocks.get(feature) ?? 0;
+    if (n === 0) errors.push(`feature ${feature} has no unlock`);
+    if (n > 1) errors.push(`feature ${feature} has ${n} unlocks`);
   }
   for (const recipe of recipes) {
     const n = unlocks.get(recipe.id) ?? 0;
@@ -270,6 +298,18 @@ function checkReachability(
 
   const errors: string[] = [];
   const chapters: ChapterXp[] = [];
+  // Features: nothing needs one yet, so they only have to be reached at all.
+  // On a stuck chapter only features of its own stuck tasks are named (`only`).
+  const featureErrors = (out: string[], only?: readonly Task[]): void => {
+    for (const { feature, unlock } of tables.featureUnlocks) {
+      if (only && !('task' in unlock && only.some((t) => t.id === unlock.task))) continue;
+      if ('task' in unlock && !state.done.has(unlock.task)) {
+        out.push(`feature ${feature}: task ${unlock.task} is never done`);
+      } else if ('level' in unlock && levelIn(tables.levels, state.xp) < unlock.level) {
+        out.push(`feature ${feature}: level ${unlock.level} is never reached`);
+      }
+    }
+  };
   for (const chapter of tables.chapters) {
     const tasks = tables.tasks.filter((t) => t.chapter === chapter.id);
     for (let progress = true; progress;) {
@@ -291,10 +331,12 @@ function checkReachability(
           `chapter ${chapter.id} "${chapter.title}" cannot be finished: task ${task.id} "${task.label}"${why}`,
         );
       }
+      featureErrors(errors, stuck);
       return { errors, chapters };
     }
     chapters.push({ chapter: chapter.id, xp: state.xp, level: levelIn(tables.levels, state.xp) });
   }
+  featureErrors(errors);
   for (const recipe of recipes) {
     if (!unlocked(recipe)) {
       errors.push(`recipe ${recipe.id} (${recipe.name}) is never unlocked`);

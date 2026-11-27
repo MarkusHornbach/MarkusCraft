@@ -10,7 +10,7 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`): no `three`, n
 - `generation/`: `worldOptions.ts` (options, `WorldGen`, labels, validation), `terrain.ts`
   (version 1: heights, rock, layers; dispatch, checksum), `terrainV2.ts` (version 2: shapes,
   forests), `terrainRules.ts` (constants of both), `ores.ts` (veins, clay), `trees.ts`,
-  `spawn.ts`
+  `spawn.ts`, `columnCache.ts`
 - `light/`: `lightRules.ts` (levels, packing, the step rule), `lightChunk.ts` (light of a
   chunk from scratch), `lightUpdate.ts` (after an edit), `lightCheck.ts` (slow reference;
   tests and `verifyLight`)
@@ -92,6 +92,12 @@ base below c = 0 (the water share) and flatten only the land. Trees: a forest no
 `TREE_LEVELS` (`meadow`, `forest`, `lo`, `hi`) turns it into a candidate chance; version 1's
 spacing rule (3, highest hash wins) and tree shape follow; `none` has no trees. The chance
 is cached per column of the chunk and its rim while a chunk is generated.
+
+**For the radar** (Phase 8 part B1): `veinCells` is the radar's copy of the vein walk
+(`placeKind` keeps its own inline one for speed; the radar's agreement test proves they
+agree), and `TerrainSource.oreHost(x, y, z)` says where generation leaves stone
+before the ores (rock columns 1…h, others 1…h − `DIRT_DEPTH` − 1; the rock rule is
+`rockOf`, shared with the chunk loop; cached per column).
 
 **Spawn:** version 1 (and `none`) as before: the grass column nearest the origin with no
 trunk within `SPAWN_TREE_CLEARANCE`. With trees, version 2 also wants `SPAWN_MIN_TREES` (8)

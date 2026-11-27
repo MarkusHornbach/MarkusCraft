@@ -764,6 +764,16 @@ canvas {
     min-height: 24px;
   }
 
+  /* "Collide with leaves" and "Radar circle" (Phase 8 part B1) share a line: the pause
+     menu still fits 360 px. The longer labels keep a whole row (one line each). */
+  .touch-mode .pause-section .switch-row.half-switch {
+    display: inline-grid;
+    grid-template-columns: 1fr 22px;
+    width: calc(50% - 8px);
+    margin-right: 8px;
+    vertical-align: top;
+  }
+
   /* The link field needs a keyboard to be of use; the copy button does the job. */
   .touch-mode .seed-link {
     display: none;
@@ -1072,7 +1082,7 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .inventory-title {
@@ -1194,11 +1204,15 @@ canvas {
 
 .inventory-tabs {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   margin-right: auto;
 }
 
+/* Four tabs since Phase 8 part B1: narrower than other menu buttons, so the header keeps
+   room for fonts a little wider than this container's (the panel never grows). */
 .inventory-tab {
+  padding-left: 12px;
+  padding-right: 12px;
   background: transparent;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
   color: #a9c4e6;
@@ -1211,7 +1225,7 @@ canvas {
 }
 
 .touch-mode .inventory-tab {
-  min-width: 72px;
+  min-width: 64px;
 }
 
 /* The number of recipes that can be made now, after "Crafting". */
@@ -2387,4 +2401,102 @@ button.task-row:hover {
 
 .room-player .head-icon {
   border-radius: 2px;
+}
+
+/* The radar circle (Phase 8 part B1): top-right; on touch below the bag button. */
+.radar-circle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 112px;
+  height: 112px;
+  pointer-events: none;
+}
+
+.radar-circle[hidden] {
+  display: none;
+}
+
+.touch-mode .radar-circle {
+  top: calc(var(--touch-size) + 2 * var(--touch-gap));
+  right: var(--touch-gap);
+  width: 88px;
+  height: 88px;
+}
+
+/* The Map tab (Phase 8 part B1): as large as the other tabs; the square map at the panel's
+   height, the legend beside it. */
+.map-tab {
+  width: 524px;
+  height: 284px;
+  box-sizing: border-box;
+  display: flex;
+}
+
+.map-tab[hidden],
+.map-locked[hidden],
+.map-body[hidden] {
+  display: none;
+}
+
+.touch-mode .map-tab {
+  height: 300px;
+}
+
+.map-locked {
+  margin: auto;
+  text-align: center;
+  color: #c8d2e0;
+}
+
+.map-locked-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.map-body {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+}
+
+.map-canvas {
+  flex: none;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+}
+
+.map-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.map-legend-symbol {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-height: 480px) {
+  .map-tab {
+    height: 278px;
+  }
+
+  .touch-mode .map-tab {
+    height: 288px;
+  }
 }

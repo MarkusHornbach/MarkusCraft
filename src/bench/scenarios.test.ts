@@ -281,8 +281,17 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       ['edit', 1, 900, 'building'],
       ['torches', 1, 1200, 'torches at night'],
       ['players', 1, 1200, 'four players'],
+      ['radar', 1, 1200, 'radar'],
     ]);
-    expect(SCENARIOS.map((s) => s.time ?? null)).toEqual([null, null, null, null, 0.75, null]);
+    expect(SCENARIOS.map((s) => s.time ?? null)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      0.75,
+      null,
+      null,
+    ]);
     // Only `players` has simulated guests (Phase 6 AC15.1), three of them in looks 2, 5, 8.
     expect(SCENARIOS.map((s) => s.guests?.looks ?? null)).toEqual([
       null,
@@ -291,13 +300,31 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       null,
       null,
       [2, 5, 8],
+      null,
     ]);
     expect(getScenario('players')?.start).toMatchObject({
       ...BENCH_SPAWN,
       yaw: PLAYERS_YAW,
       mode: 'walk',
     });
-    expect(BENCH_SUITE_VERSION).toBe(3);
+    expect(BENCH_SUITE_VERSION).toBe(4);
+    // Phase 8B1 AC6.1: only `radar` shows the circle and turns the view (1.5° per step).
+    expect(SCENARIOS.map((s) => s.radar === true)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+    ]);
+    const radar = getScenario('radar');
+    expect(radar?.start).toMatchObject({ ...BENCH_SPAWN, mode: 'walk' });
+    expect(SCENARIOS.filter((s) => s.yaw).map((s) => s.id)).toEqual(['radar']);
+    expect((radar?.yaw?.(10, 1200) ?? 0) - (radar?.yaw?.(9, 1200) ?? 0)).toBeCloseTo(
+      (1.5 * Math.PI) / 180,
+      9,
+    );
   });
 
   it('the full suite: both render distances, then standing once more', () => {
@@ -309,16 +336,18 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       'edit@5',
       'torches@5',
       'players@5',
+      'radar@5',
       'stand@8',
       'walk@8',
       'fly@8',
       'edit@8',
       'torches@8',
       'players@8',
+      'radar@8',
       'stand@5',
     ]);
     expect(full.map((e) => e.steps)).toEqual([
-      600, 1200, 1200, 900, 1200, 1200, 600, 1200, 1200, 900, 1200, 1200, 600,
+      600, 1200, 1200, 900, 1200, 1200, 1200, 600, 1200, 1200, 900, 1200, 1200, 1200, 600,
     ]);
     expect(full.every((e) => e.warmup === 120)).toBe(true);
     // A fresh world per block.
@@ -329,7 +358,9 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
       false,
       false,
       false,
+      false,
       true,
+      false,
       false,
       false,
       false,
@@ -344,8 +375,12 @@ describe('the scenario table (Phase 4P AC1.5)', () => {
     const quick = buildSuite('quick');
     expect(quick.map((e) => e.scenario.id)).toEqual(full.map((e) => e.scenario.id));
     expect(quick.map((e) => e.fresh)).toEqual(full.map((e) => e.fresh));
-    expect(quick.map((e) => e.renderDistance)).toEqual([2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 2]);
-    expect(quick.map((e) => e.steps)).toEqual([30, 60, 60, 45, 60, 60, 30, 60, 60, 45, 60, 60, 30]);
+    expect(quick.map((e) => e.renderDistance)).toEqual([
+      2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2,
+    ]);
+    expect(quick.map((e) => e.steps)).toEqual([
+      30, 60, 60, 45, 60, 60, 60, 30, 60, 60, 45, 60, 60, 60, 30,
+    ]);
     expect(quick.every((e) => e.warmup === 6)).toBe(true);
   });
 });

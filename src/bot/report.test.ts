@@ -2,7 +2,14 @@
 import { describe, expect, it } from 'vitest';
 import { TASKS } from '../progress/tables';
 import type { BotRun } from './Bot';
-import { buildReport, darkBreakRows, formatDarkBreaks, formatReport, median } from './report';
+import {
+  buildReport,
+  darkBreakRows,
+  formatDarkBreaks,
+  formatRadar,
+  formatReport,
+  median,
+} from './report';
 import { Block } from '../world/blocks';
 
 /** A run whose tasks each took `minutes` of estimated player time (bot time / 2.5). */
@@ -27,6 +34,22 @@ function run(minutes: number, completed = true): BotRun {
     allUnlocked: completed,
     lightErrors: 0,
     darkBreaks: [],
+    radarAtMs: ms * 8,
+    radarUnlocked: completed,
+    radar: [
+      {
+        task: 12,
+        kind: 'coal',
+        radar: { dx: 3, dy: -2, dz: 1, dist: 3.74 },
+        bruteForce: { dx: 3, dy: -2, dz: 1, dist: 3.74 },
+      },
+      {
+        task: 16,
+        kind: 'iron',
+        radar: { dx: 9, dy: -6, dz: 2, dist: 11 },
+        bruteForce: { dx: 9, dy: -6, dz: 2, dist: 11 },
+      },
+    ],
   };
 }
 
@@ -90,5 +113,16 @@ describe('dark-break report (Fix Adventure 1 AC2.4)', () => {
     const text = formatDarkBreaks(rows, 3);
     expect(text).toContain('| 6 Mine 64 stone | 10 | 52 | 0 | 2 |');
     expect(formatDarkBreaks([], 3)).toContain('(none)');
+  });
+
+  it('Phase 8B1 AC2.5 the radar section', () => {
+    const text = formatRadar([run(2), run(3)]);
+    expect(text).toContain('Radar (2 runs)');
+    expect(text).toContain('Unlocked in 2 runs: median 20 min, max 24 min');
+    expect(text).toContain('| 12 Mine 32 coal | coal | 2 | 3.7 | -2 | yes |');
+    expect(text).toContain('| 16 Mine 20 iron ore | iron | 2 | 11 | -6 | yes |');
+    const off = run(2);
+    off.radar = [{ ...off.radar[0], radar: null }];
+    expect(formatRadar([off])).toContain('| NO |');
   });
 });
