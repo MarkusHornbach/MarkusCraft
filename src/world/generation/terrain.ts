@@ -31,6 +31,7 @@ import {
 } from './terrainRules';
 import { TerrainV2 } from './terrainV2';
 import { TerrainV3 } from './terrainV3';
+import type { SpawnPoint } from './spawn';
 import { CLASSIC_GEN, type WorldGen, isKnownGeneratorVersion, worldGenKey } from './worldOptions';
 
 export { isKnownGeneratorVersion } from './worldOptions';
@@ -393,6 +394,11 @@ export interface TerrainSource {
    */
   oreHost(x: number, y: number, z: number): boolean;
   generateChunk(cx: number, cz: number): Uint8Array;
+  /**
+   * A generator whose spawn has rules of its own (version 3: no cave below it, shafts
+   * placed from it) works it out here, through `findSpawn`; `findSpawn` returns it.
+   */
+  spawnPoint?(): SpawnPoint;
 }
 
 const terrains = new Map<string, TerrainSource>();

@@ -24,6 +24,36 @@ export const UNDERWATER_FOG_FAR = 24;
  * world). The automatic world of `?test=1` stays version 1 (Phase 7 part A).
  */
 export const GENERATOR_VERSION = 3;
+// --- Generator 3: caves (Phase 8 part B2a). Tuned to the face budget; never change a value
+// after the merge (generator 3 is then frozen; a change is a generator 4).
+
+/** Carving never reaches below this cell (the bedrock and the cell above it stay). */
+export const BEDROCK_SAFE_Y = 3;
+/** Edge length of a cave region in columns; its hash decides its tunnels. */
+export const CAVE_REGION = 64;
+/** A tunnel stays within this many blocks of its region on every side. */
+export const CAVE_REACH = 32;
+/** Tunnel radius range (blocks): 3 to 5 blocks wide. */
+export const CAVE_RADIUS_MIN = 1.8;
+export const CAVE_RADIUS_MAX = 2.4;
+/** Tunnels per region: 0 to this many, decided by the region's hash. */
+export const CAVE_TUNNELS_MAX = 6;
+/** Share of tunnels that are entrances (open at the surface). */
+export const CAVE_ENTRANCE_SHARE = 0.6;
+/** Entrances start only on dry land up to this surface height. */
+export const CAVE_ENTRANCE_MAX_Y = 84;
+/** Entrances descend to a hashed height in this range. */
+export const CAVE_TARGET_MIN_Y = 16;
+export const CAVE_TARGET_MAX_Y = 30;
+/** Edge length of a ravine region in columns and the chance that one holds a ravine. */
+export const RAVINE_REGION = 256;
+export const RAVINE_CHANCE = 0.5;
+/** Mine shafts: a jittered grid of cells of this size, a chance per cell. */
+export const SHAFT_GRID = 160;
+export const SHAFT_CHANCE = 0.7;
+/** A shaft's footprint columns differ in height by at most this much. */
+export const SHAFT_MAX_HEIGHT_DIFF = 4;
+
 /** Generator 2 spawn: at least this many trunks within `SPAWN_WOOD_RADIUS` (Chebyshev). */
 export const SPAWN_MIN_TREES = 8;
 export const SPAWN_WOOD_RADIUS = 40;
