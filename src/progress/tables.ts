@@ -155,8 +155,8 @@ export const RECIPE_UNLOCKS: readonly RecipeUnlock[] = [
   ...byLevel(6, [13, 14, 15]),
   // iron block
   ...byLevel(7, [19]),
-  // The torch comes with "Mine 3 coal".
-  { recipe: 20, unlock: { task: 12 } },
+  // The torch comes with "Make 16 coal": coal from logs, without light.
+  { recipe: 20, unlock: { task: 11 } },
 ];
 
 export const FIRST_FIND_XP: ReadonlyMap<number, number> = new Map([

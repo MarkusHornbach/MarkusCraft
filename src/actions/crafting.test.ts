@@ -242,7 +242,31 @@ describe('locked recipes (Phase 8 AC3.1)', () => {
     expect(reasonOf(craft(at({ ...fresh(), xp: LEVELS[1] - 1 }), 'stone_pickaxe'))).toBe('locked');
     expect(reasonOf(craft(at({ ...fresh(), xp: LEVELS[1] }), 'stone_pickaxe'))).toBe('station');
     const torch = fresh([Item.STICK, 1], [Item.COAL, 1]);
-    expect(reasonOf(craft(at(torch, { done: [12], counts: [] }), 'torch'))).toBe('ok');
+    // Fix Adventure 1: the torch comes with task 11 "Make 16 coal", no longer with task 12.
+    expect(reasonOf(craft(at(torch, { done: [12], counts: [] }), 'torch'))).toBe('locked');
+    expect(reasonOf(craft(at(torch, { done: [11], counts: [] }), 'torch'))).toBe('ok');
+  });
+
+  it('a recipe crafted once stays unlocked, on frozen inputs (Fix Adventure 1 AC1.2)', () => {
+    const deepFreeze = <T>(value: T): T => {
+      if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
+        Object.freeze(value);
+        for (const v of Object.values(value)) deepFreeze(v);
+      }
+      return value;
+    };
+    const torchId = recipe('torch').id;
+    const maker = deepFreeze({ ...fresh([Item.STICK, 1], [Item.COAL, 1]), crafted: [torchId] });
+    const ctx = deepFreeze(at(maker, { done: [12], counts: [] }));
+    const result = craft(ctx, 'torch');
+    expect(reasonOf(result)).toBe('ok');
+    expect(result.ok && result.player ? countItems(result.player.slots, Block.TORCH) : 0).toBe(4);
+    expect(reasonOf(craft(at(fresh([Item.STICK, 1], [Item.COAL, 1])), 'torch'))).toBe('locked');
+    // A level recipe crafted once survives XP below its level: no lock, the station decides.
+    const ingot = recipe('iron_ingot').id;
+    const below = deepFreeze({ ...fresh([Block.IRON_ORE, 1], [Item.COAL, 1]), crafted: [ingot] });
+    expect(reasonOf(craft(at(below), 'iron_ingot'))).toBe('station');
+    expect(reasonOf(craft(at(fresh([Block.IRON_ORE, 1])), 'iron_ingot'))).toBe('locked');
   });
 
   it('the session reports the first craft and a level-up through onProgress', () => {
