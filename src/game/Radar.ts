@@ -3,12 +3,15 @@
 import type { BlockChange } from '../actions/apply';
 import {
   CHUNK_SIZE,
-  RADAR_CIRCLE_PER_KIND,
   RADAR_FAR_RADIUS,
   RADAR_MAP_PER_KIND,
+  RADAR_MAP_PLACES,
+  RADAR_PLACE_FAR_RADIUS,
   RADAR_RADIUS,
 } from './config';
-import { RADAR_KINDS, type RadarKind } from '../radar/kinds';
+import { circleKinds, circleScan, mapKinds } from '../radar/focus';
+import type { RadarKind } from '../radar/kinds';
+import { PlaceIndex } from '../radar/places';
 import {
   scanRadar,
   worldProbe,
@@ -37,8 +40,13 @@ export interface RadarStep {
 
 /** A surface that shows the scan besides the circle (the Map tab). */
 export interface RadarSurface {
-  /** Draws the whole scan for the view direction `yaw`. */
-  draw(scan: RadarScan, yaw: number, feet: { x: number; y: number; z: number }): void;
+  /** Draws the whole scan of `kinds` for the view direction `yaw`. */
+  draw(
+    scan: RadarScan,
+    yaw: number,
+    feet: { x: number; y: number; z: number },
+    kinds: readonly RadarKind[],
+  ): void;
 }
 
 export interface RadarCircleEntry extends RadarEntry {
@@ -52,6 +60,7 @@ const WATCH_CHUNKS = Math.ceil((RADAR_FAR_RADIUS + 2) / CHUNK_SIZE);
 export class Radar {
   readonly circle: RadarCircle;
   private index: VeinIndex | null = null;
+  private places: PlaceIndex | null = null;
   private readonly scans = new ScanPacer();
   private readonly circleDraws = new DrawPacer();
   private readonly mapDraws = new DrawPacer();
@@ -126,7 +135,7 @@ export class Radar {
       this.circleDraws.done(s.step, s.yaw);
     }
     if (this.map && this.mapDraws.due(s.step, s.yaw)) {
-      this.map.draw(scan, s.yaw, this.feet);
+      this.map.draw(scan, s.yaw, this.feet, this.kinds());
       this.mapDraws.done(s.step, s.yaw);
     }
   }
@@ -154,6 +163,7 @@ export class Radar {
         JSON.stringify(this.index.gen) !== JSON.stringify(s.world.gen)
       ) {
         this.index = new VeinIndex(s.world.seed, s.world.gen);
+        this.places = new PlaceIndex(s.world.seed, s.world.gen);
       }
       this.chunkCount = -1;
       this.scans.invalidate();
@@ -192,10 +202,13 @@ export class Radar {
       y: this.feet.y,
       z: this.feet.z,
       probe: worldProbe(s.world),
-      kinds: RADAR_KINDS,
+      kinds: this.kinds(),
       perKind: RADAR_MAP_PER_KIND,
       radius: RADAR_RADIUS,
       farRadius: RADAR_FAR_RADIUS,
+      places: this.places,
+      placesPerKind: RADAR_MAP_PLACES,
+      placeFarRadius: RADAR_PLACE_FAR_RADIUS,
     });
     this.scanMs = performance.now() - start;
     this.scans.done(s.step);
@@ -206,19 +219,21 @@ export class Radar {
   }
 
   private drawCircle(scan: RadarScan, s: RadarStep): void {
-    const kinds = s.focus ? [s.focus] : RADAR_KINDS;
-    const keys = new Set(kinds.map((k) => k.key));
-    const perKind = new Map<string, number>();
-    const entries = scan.entries.filter((e) => {
-      if (!keys.has(e.kind)) return false;
-      const n = perKind.get(e.kind) ?? 0;
-      perKind.set(e.kind, n + 1);
-      return n < RADAR_CIRCLE_PER_KIND;
-    });
-    const shown: RadarScan = { entries, beyond: scan.beyond.filter((b) => keys.has(b.kind)) };
+    const kinds = circleKinds(s.focus, this.hasPlaces);
+    const shown = circleScan(scan, kinds);
     const spots = this.circle.draw(shown, s.yaw, kinds);
-    this.circleEntries = entries.map((e, i) => ({ ...e, screen: spots[i] }));
+    this.circleEntries = shown.entries.map((e, i) => ({ ...e, screen: spots[i] }));
     this.circleBeyond = shown.beyond;
+  }
+
+  /** The world's generator has places (version 3). */
+  get hasPlaces(): boolean {
+    return this.places?.hasPlaces ?? false;
+  }
+
+  /** The kinds of the scan, the Map tab and the F3 row. */
+  kinds(): readonly RadarKind[] {
+    return mapKinds(this.hasPlaces);
   }
 
   /** The last full scan (the Map tab's), or null. */
@@ -248,7 +263,7 @@ export class Radar {
     const circle = { entries: this.circleEntries, beyond: this.circleBeyond };
     return radarDebugText(
       circle,
-      RADAR_KINDS.map((k) => k.key),
+      this.kinds().map((k) => k.key),
       this.scanMs,
       this.drawMs,
     );

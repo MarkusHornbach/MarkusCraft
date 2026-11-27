@@ -1,7 +1,7 @@
 // The radar's agreement check (Phase 8 part B1 AC1.1, B2a AC3.4): predicted ore cells of
 // `VeinIndex` against `generateChunk`'s ores in the 3 × 3 chunks around a chunk.
 import { CHUNK_SIZE } from '../game/config';
-import { RADAR_KINDS } from '../radar/kinds';
+import { ORE_RADAR_KINDS } from '../radar/kinds';
 import { VeinIndex } from '../radar/veins';
 import { generateChunk } from '../world/generation/terrain';
 import type { WorldGen } from '../world/generation/worldOptions';
@@ -37,7 +37,7 @@ export function radarAgreement(
     for (let cx = scx - 1; cx <= scx + 1; cx++)
       chunks.push([cx, cz, generateChunk(seed, cx, cz, gen)]);
   }
-  return RADAR_KINDS.map((kind) => {
+  return ORE_RADAR_KINDS.map((kind) => {
     const actual = new Set<string>();
     for (const [cx, cz, blocks] of chunks) {
       for (let i = 0; i < blocks.length; i++) {

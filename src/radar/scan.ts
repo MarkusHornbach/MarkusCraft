@@ -1,8 +1,10 @@
-// The radar scan: the nearest veins per kind around the feet, corrected by the loaded blocks.
+// The radar scan: the nearest veins per ore kind around the feet, corrected by the loaded
+// blocks, and the nearest places per place kind (Phase 8 part B2b).
 import { CHUNK_SIZE, RADAR_COARSE_DIST, RADAR_EXACT_DIST, RADAR_LEVEL_DY } from '../game/config';
 import type { World } from '../world/World';
 import { ORE_CELL, VEIN_REACH } from '../world/generation/ores';
 import type { RadarKind } from './kinds';
+import type { PlaceIndex } from './places';
 import { VeinIndex } from './veins';
 
 /** The depth hint of a vein, relative to the player's feet (plan section 3). */
@@ -49,6 +51,14 @@ export interface ScanInput {
   perKind: number;
   radius: number;
   farRadius: number;
+  /**
+   * The places of the world; place kinds in `kinds` give nothing without it, or where the
+   * generator has none (versions 1 and 2).
+   */
+  places?: PlaceIndex | null;
+  /** Places per place kind (default `perKind`) and their far radius (default `farRadius`). */
+  placesPerKind?: number;
+  placeFarRadius?: number;
 }
 
 /** The hint of a vein at 3D distance `dist` and height difference `dy`. */
@@ -208,6 +218,10 @@ export function scanRadar(input: ScanInput): RadarScan {
   const r2 = input.radius * input.radius;
   const far2 = input.farRadius * input.farRadius;
   for (const kind of input.kinds) {
+    if (kind.category === 'place') {
+      scanPlaces(input, kind, entries, beyond);
+      continue;
+    }
     const top = new TopList(input.perKind);
     eachVein(input, kind.block, input.radius, (h2) => {
       if (h2 <= r2) top.offer(bestD2, bestDx, bestDy, bestDz);
@@ -238,6 +252,54 @@ export function scanRadar(input: ScanInput): RadarScan {
     }
   }
   return { entries, beyond };
+}
+
+/**
+ * One place kind: the nearest places whose horizontal distance is at most the radius, by
+ * 3D distance from the feet cell (the same order as veins); with none in range, `beyond`
+ * for the nearest up to the place far radius. Places are permanent: no probe.
+ */
+function scanPlaces(
+  input: ScanInput,
+  kind: RadarKind,
+  entries: RadarEntry[],
+  beyond: RadarBeyond[],
+): void {
+  const places = input.places;
+  if (!places?.hasPlaces) return;
+  const r2 = input.radius * input.radius;
+  const farRadius = input.placeFarRadius ?? input.farRadius;
+  const far2 = farRadius * farRadius;
+  const top = new TopList(input.placesPerKind ?? input.perKind);
+  const nearest = new TopList(1);
+  places.near(input.x, input.z, farRadius, (place) => {
+    if (place.kind !== kind.key) return;
+    const dx = place.x - input.x;
+    const dy = place.y - input.y;
+    const dz = place.z - input.z;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (dx * dx + dz * dz <= r2) top.offer(d2, dx, dy, dz);
+    else if (d2 <= far2) nearest.offer(d2, dx, dy, dz);
+  });
+  for (let i = 0; i < top.size; i++) {
+    const dist = Math.sqrt(top.d2[i]);
+    entries.push({
+      kind: kind.key,
+      dx: top.dx[i],
+      dy: top.dy[i],
+      dz: top.dz[i],
+      dist,
+      hint: hintOf(dist, top.dy[i]),
+    });
+  }
+  if (top.size === 0 && nearest.size > 0) {
+    beyond.push({
+      kind: kind.key,
+      dx: nearest.dx[0],
+      dz: nearest.dz[0],
+      dist: Math.sqrt(nearest.d2[0]),
+    });
+  }
 }
 
 /** The probe of a world: its block where the chunk is loaded, else null (the seed decides). */
