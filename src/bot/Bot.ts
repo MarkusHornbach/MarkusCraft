@@ -9,12 +9,14 @@ import { breakTimeMs, dropOf, toolClassOf } from '../items/hardness';
 import { countItems, fits } from '../items/inventory';
 import { Item, getItemDef, itemLabel, toolOf } from '../items/items';
 import { RECIPES, type Recipe, STATION_BLOCKS, stationsNear } from '../items/recipes';
+import { isLightSource } from '../progress/check';
 import { type ProgressOutcome, levelOf, openChapter, recipeUnlocked } from '../progress/progress';
 import { BOT_TIME, NATURAL_BLOCKS, TASKS, type Task } from '../progress/tables';
 import { BLOCK_SOLID, Block, isSupport } from '../world/blocks';
 import { findSpawn } from '../world/generation/spawn';
 import { getTerrain } from '../world/generation/terrain';
 import type { WorldGen } from '../world/generation/worldOptions';
+import { blockOf, skyOf } from '../world/light/lightRules';
 import { World } from '../world/World';
 
 export type Cell = readonly [number, number, number];
@@ -45,7 +47,22 @@ export interface BotRun {
   allUnlocked: boolean;
   /** Cells whose stored light differs from the reference at the end (must be 0). */
   lightErrors: number;
+  /**
+   * Breaks in the dark before a light source was unlocked, per open task and block kind
+   * (Fix Adventure 1). A report, never a failure.
+   */
+  darkBreaks: DarkBreaks[];
 }
+
+export interface DarkBreaks {
+  task: number;
+  block: number;
+  count: number;
+}
+
+/** A face this dim or dimmer (max of sky and block light) is practically black on screen. */
+export const DARK_LIGHT = 4;
+const LIGHT_SOURCES = RECIPES.filter(isLightSource);
 
 /** Blocks a pillar is built of, in the order the bot uses them. */
 const PILLAR_BLOCKS: readonly number[] = [Block.DIRT, Block.GRASS, Block.STONE, Block.SAND];
@@ -84,6 +101,10 @@ export class Bot {
   private lastResult: ActionResult | null = null;
   /** Stations the bot placed and has not taken back yet. */
   private readonly placedStations: Cell[] = [];
+  /** The task being played (0 before the first). */
+  private currentTask = 0;
+  /** Dark breaks by `task:block`, in the order they first happened. */
+  private readonly dark = new Map<string, DarkBreaks>();
 
   constructor(
     readonly seed: number,
@@ -287,11 +308,70 @@ export class Bot {
     if (drop) this.makeRoom(drop.item, drop.count);
     const above = this.block([cell[0], cell[1] + 1, cell[2]]);
     if (above === Block.TORCH) this.makeRoom(Block.TORCH);
+    this.noteDarkBreak(cell, block);
     const [x, y, z] = cell;
     this.submit({ kind: 'startBreak', x, y, z });
     this.clockMs += breakTimeMs(block, held) ?? 0;
     this.submit({ kind: 'break', x, y, z });
     this.broken++;
+  }
+
+  /** Whether a light source is unlocked for the bot's player. */
+  lightSourceUnlocked(): boolean {
+    const record = this.session.record;
+    return LIGHT_SOURCES.some((r) => recipeUnlocked(r.id, record, this.session.progress));
+  }
+
+  /**
+   * The light (max of sky and block) of the brightest of the six faces of a block. Lights
+   * the 3 × 3 chunks around it first, so later edits there keep their light up to date.
+   */
+  brightestFace([x, y, z]: Cell): number {
+    const cx = Math.floor(x / 16);
+    const cz = Math.floor(z / 16);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (this.world.getChunk(cx + dx, cz + dz)?.light) continue;
+        for (let gz = -1; gz <= 1; gz++) {
+          for (let gx = -1; gx <= 1; gx++) {
+            if (!this.world.hasChunk(cx + dx + gx, cz + dz + gz)) {
+              this.world.generate(cx + dx + gx, cz + dz + gz);
+            }
+          }
+        }
+        this.world.light(cx + dx, cz + dz);
+      }
+    }
+    let best = 0;
+    for (const [fx, fy, fz] of [
+      [x + 1, y, z],
+      [x - 1, y, z],
+      [x, y + 1, z],
+      [x, y - 1, z],
+      [x, y, z + 1],
+      [x, y, z - 1],
+    ] as const) {
+      const light = this.world.getLight(fx, fy, fz) ?? 0;
+      best = Math.max(best, skyOf(light), blockOf(light));
+    }
+    return best;
+  }
+
+  /** A break the player would do in the dark: no light source yet and every face dim. */
+  isDarkBreak(cell: Cell): boolean {
+    return !this.lightSourceUnlocked() && this.brightestFace(cell) <= DARK_LIGHT;
+  }
+
+  get darkBreaks(): DarkBreaks[] {
+    return [...this.dark.values()].map((d) => ({ ...d }));
+  }
+
+  private noteDarkBreak(cell: Cell, block: number): void {
+    if (!this.isDarkBreak(cell)) return;
+    const key = `${this.currentTask}:${block}`;
+    const entry = this.dark.get(key);
+    if (entry) entry.count++;
+    else this.dark.set(key, { task: this.currentTask, block, count: 1 });
   }
 
   private clear(cell: Cell): void {
@@ -734,6 +814,7 @@ export class Bot {
       if (!chapter) return;
       const task = TASKS.find((t) => t.chapter === chapter.id && !this.taskDone(t));
       if (!task) return;
+      this.currentTask = task.id;
       try {
         this.runTask(task);
       } catch (e) {
@@ -780,6 +861,7 @@ export function runBot(seed: number, gen: WorldGen): BotRun {
     broken: bot.broken,
     allUnlocked: bot.allUnlocked(),
     lightErrors: bot.world.verifyLight(),
+    darkBreaks: bot.darkBreaks,
   };
 }
 

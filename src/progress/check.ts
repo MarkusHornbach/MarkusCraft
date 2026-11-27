@@ -97,6 +97,12 @@ function checkStructure(tables: ProgressTables, recipes: readonly Recipe[]): str
   return errors;
 }
 
+/** A light source: a recipe whose result is a block that emits light (the torch). */
+export function isLightSource(recipe: Recipe): boolean {
+  const block = getItemDef(recipe.result.item)?.block ?? null;
+  return block !== null && BLOCK_EMISSION[block] > 0;
+}
+
 /** What the player has reached in the fixed point. */
 interface State {
   xp: number;
@@ -123,11 +129,7 @@ function checkReachability(
     return state.done.has(unlock.task);
   };
 
-  /** Recipes whose result is a block that emits light (the torch). */
-  const lightSources = recipes.filter((r) => {
-    const block = getItemDef(r.result.item)?.block ?? null;
-    return block !== null && BLOCK_EMISSION[block] > 0;
-  });
+  const lightSources = recipes.filter(isLightSource);
   const dark = new Set(tables.darkBlocks);
   /** Whether a light source is unlocked and can be made: then dark blocks count. */
   let lit = false;

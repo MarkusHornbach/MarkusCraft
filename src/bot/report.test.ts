@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { TASKS } from '../progress/tables';
 import type { BotRun } from './Bot';
-import { buildReport, formatReport, median } from './report';
+import { buildReport, darkBreakRows, formatDarkBreaks, formatReport, median } from './report';
+import { Block } from '../world/blocks';
 
 /** A run whose tasks each took `minutes` of estimated player time (bot time / 2.5). */
 function run(minutes: number, completed = true): BotRun {
@@ -25,6 +26,7 @@ function run(minutes: number, completed = true): BotRun {
     broken: 120,
     allUnlocked: completed,
     lightErrors: 0,
+    darkBreaks: [],
   };
 }
 
@@ -62,5 +64,31 @@ describe('bot report', () => {
     expect(failing.some((t) => t.startsWith('largest level gap'))).toBe(true);
     expect(failing.some((t) => t.startsWith('all 2 runs'))).toBe(true);
     expect(formatReport(report)).toContain('- [ ] all 2 runs complete');
+  });
+});
+
+describe('dark-break report (Fix Adventure 1 AC2.4)', () => {
+  it('median and maximum per task, all blocks and ores; tasks without any are left out', () => {
+    const a = {
+      ...run(2),
+      darkBreaks: [
+        { task: 6, block: Block.STONE, count: 50 },
+        { task: 6, block: Block.COAL_ORE, count: 2 },
+      ],
+    };
+    const b = { ...run(2), darkBreaks: [{ task: 6, block: Block.STONE, count: 10 }] };
+    const c = run(2);
+    const rows = darkBreakRows([a, b, c]);
+    expect(rows).toEqual([
+      {
+        task: 6,
+        label: '6 Mine 64 stone',
+        all: { median: 10, max: 52 },
+        ores: { median: 0, max: 2 },
+      },
+    ]);
+    const text = formatDarkBreaks(rows, 3);
+    expect(text).toContain('| 6 Mine 64 stone | 10 | 52 | 0 | 2 |');
+    expect(formatDarkBreaks([], 3)).toContain('(none)');
   });
 });
