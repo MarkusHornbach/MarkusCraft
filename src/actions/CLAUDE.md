@@ -46,7 +46,7 @@ time 0: `Game` submits `break` in the step in which the `startBreak` was accepte
 ## Progress (Phase 8 part A)
 
 `ActionContext.progress` is the world's task book: `craft` answers `mode`, `invalid`,
-`locked` (the recipe's level or task not reached, `recipeUnlocked`), `station`, `missing`,
+`locked` (the recipe's level or task not reached and never crafted, `recipeUnlocked`), `station`, `missing`,
 `full`. `LocalSession` holds the book next to the record: after an accepted action in an
 Adventure world it runs `eventsOf` and `stepProgress` (`src/progress/CLAUDE.md`);
 `notePose(y)` (once per simulation step from `Game`) runs the pose step; records changed by

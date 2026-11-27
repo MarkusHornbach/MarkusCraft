@@ -61,6 +61,13 @@ or a name typed: single-player leaves no trace. `markuscraft.player.v1` holds
 `{ key, name, look }`; a record without a valid look loads as 0, and `saveIdentity`
 leaves a stored record that says the same untouched.
 
+"Your player" (pause screen, after "Settings"; `src/ui/PlayerSection.ts`): the name (the
+same value as the field of "Join a world"; sent to the room on `change`), a preview
+(`FigurePreview`, its own WebGL2 context, created when the section is shown and in view,
+at most 30 pictures a second, disposed with `forceContextLoss` when the page closes;
+without WebGL the head icon) and nine look buttons (`aria-label` "Look: Fern", "Look:
+Automatic (Fern)"). A new look is sent at once.
+
 Before changing how `Game` switches screens or loads worlds read the "Decisions and
 deviations" of `docs/phase-3a-report.md` and `docs/phase-4p-report.md`; for rooms
 `docs/phase-6b-report.md`.

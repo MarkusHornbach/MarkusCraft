@@ -16,7 +16,11 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`): no `three`, D
 Plain data; tuning never touches logic. Chapter and task ids are written into saves:
 append-only, never reused or renumbered (pinned by `tables.test.ts`, like recipe ids). A
 saved task id this build does not know is ignored. Every recipe has exactly one unlock,
-`{ level }` or `{ task }`; level 1 recipes are open from the start. Task types: `mine`
+`{ level }` or `{ task }`; level 1 recipes are open from the start. The torch (recipe 20)
+comes with task 11 "Make 16 coal" (coal from logs, no light needed; Fix Adventure 1).
+`recipeUnlocked` also returns true for a recipe in the player's `crafted`: a recipe made
+once is never locked again, whatever a later table says (in a room, each player's own
+record decides). The static check does not use that rule. Task types: `mine`
 (items received from breaking, target an item id), `craft` (items made, the result count),
 `place` (a block id), `reachBelow` / `reachAbove` (a feet Y, count 1). Counts, XP and the
 level thresholds are tuned with the goal bot (`src/bot/CLAUDE.md`); the tuning rounds are
@@ -58,3 +62,9 @@ produced from `NATURAL_BLOCKS` with the gating of `hardness.ts` and the recipes 
 far, adding the task's XP and the first crafts and finds the task cannot avoid (an item
 with one recipe and no natural source, an ore that is the only source). It returns the
 guaranteed XP after each chapter; failures name the task or recipe.
+
+**The light rule** (Fix Adventure 1): `DARK_BLOCKS` (`darkBlocks` in the tables: coal and
+iron ore) are found only in the dark. A light source is a recipe whose result block emits
+light (`isLightSource`; the torch). Until one is unlocked and can be made, dark blocks are
+no source and a `reachBelow` task cannot be done; a stuck task then says `needs light
+(coal ore), no light source before it`. So no unlock may need the thing it unlocks.

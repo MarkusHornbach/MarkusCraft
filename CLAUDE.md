@@ -211,11 +211,10 @@ writing specs: `e2e/CLAUDE.md`. Always:
 ## Tests on real devices
 
 `docs/device-tests.md` lists the open tests only a person with a real device can judge
-(frame rate, feel, readability, understanding); `docs/device-tests-done.md` holds the
-passed and the obsolete ones. The owner fills them out. Read the open list at the start of
-a session (the owner's feedback). A phase part adds its tests there; how (ids, origins,
-moving ticked and pointless tests, results never changed): that file's header, "How it is
-kept up to date".
+(feel, readability, frame rate); `docs/device-tests-done.md` holds the passed and obsolete
+ones. The owner fills them out. Read the open list at a session's start (the owner's
+feedback). A part adds its tests there; how (ids, origins, moving ticked and pointless
+tests, results never changed): that file's header, "How it is kept up to date".
 
 ## Docs hygiene
 
@@ -276,41 +275,41 @@ hold:
 
 ## Status
 
-| Part     | Plan                    | Report                         | Before changing                            |
-| -------- | ----------------------- | ------------------------------ | ------------------------------------------ |
-| 1        | `docs/phase-1-plan.md`  | `docs/phase-1-report.md`       | world, meshing, physics, the test API      |
-| 2A       | `docs/phase-2-plan.md`  | `docs/phase-2a-report.md`      | input, the menu, the touch tests           |
-| 3A       | `docs/phase-3-plan.md`  | `docs/phase-3a-report.md`      | generation, actions, saves, menus, start   |
-| 3B       | `docs/phase-3-plan.md`  | `docs/phase-3b-report.md`      | items, inventory, break rules              |
-| 3C       | `docs/phase-3-plan.md`  | `docs/phase-3c-report.md`      | recipes, tools, break rules, recipe list   |
-| 4A       | `docs/phase-4-plan.md`  | `docs/phase-4a-report.md`      | light, chunks, mesher, shader, references  |
-| 4P       | `docs/phase-4p-plan.md` | `docs/phase-4p-report.md`      | performance test, `Input`, screens         |
-| 4E       | `docs/phase-4e-plan.md` | `docs/phase-4e-report.md`      | remeshing after edits, chunk budget        |
-| 4B       | `docs/phase-4-plan.md`  | `docs/phase-4b-report.md`      | torch, block flags, night, Brightness      |
-| 5A       | `docs/phase-5-plan.md`  | `docs/phase-5a-report.md`      | `Input`, controller, focus, menus, back    |
-| Polish 1 | `docs/polish-1-plan.md` | `docs/polish-1-report.md`      | the recipe list, the hold                  |
-| 5B       | `docs/phase-5-plan.md`  | `docs/phase-5b-report.md`      | inventory screen, recipe list, focus       |
-| 6A       | `docs/phase-6-plan.md`  | `docs/phase-6a-report.md`      | network layer, network test, mp specs      |
-| 6B       | `docs/phase-6-plan.md`  | `docs/phase-6b-report.md`      | sessions, protocol, room menus, mp specs   |
-| 6C       | `docs/phase-6-plan.md`  | `docs/phase-6c-report.md`      | save format, timed breaking in rooms       |
-| 6D       | `docs/phase-6-plan.md`  | `docs/phase-6d-report.md`      | figure, looks, identity, "Your player"     |
-| 6E       | `docs/phase-6-plan.md`  | `docs/phase-6e-report.md`      | overlay, relayed poses, `players`          |
-| CI 1     | `docs/ci-1-plan.md`     | `docs/ci-1-report.md`          | `ci.yml`, `scripts/ci/`                    |
-| Fix pad  | –                       | `docs/fix-pad-flaky-report.md` | pad test timing, back pairing              |
-| Fix CI   | –                       | `docs/fix-ci-flaky-report.md`  | back guard window, net test waits          |
-| Docs 1   | `docs/docs-1-plan.md`   | `docs/docs-1-report.md`        | `CLAUDE.md` layout, docs budget            |
-| 7A       | `docs/phase-7a-plan.md` | `docs/phase-7a-report.md`      | generator 2, save format 3, leaves         |
-| 8A1      | `docs/phase-8a-plan.md` | `docs/phase-8a1-report.md`     | progress, save format 4, Tasks tab, bot    |
-| 8A2      | `docs/phase-8a-plan.md` | `docs/phase-8a2-report.md`     | shared progress, protocol, mp specs        |
-| Polish 2 | `docs/polish-2-plan.md` | `docs/polish-2-report.md`      | tracker, `track`, save format 5, Tasks tab |
+| Part      | Plan                           | Report                           | Before changing                            |
+| --------- | ------------------------------ | -------------------------------- | ------------------------------------------ |
+| 1         | `docs/phase-1-plan.md`         | `docs/phase-1-report.md`         | world, meshing, physics, the test API      |
+| 2A        | `docs/phase-2-plan.md`         | `docs/phase-2a-report.md`        | input, the menu, the touch tests           |
+| 3A        | `docs/phase-3-plan.md`         | `docs/phase-3a-report.md`        | generation, actions, saves, menus, start   |
+| 3B        | `docs/phase-3-plan.md`         | `docs/phase-3b-report.md`        | items, inventory, break rules              |
+| 3C        | `docs/phase-3-plan.md`         | `docs/phase-3c-report.md`        | recipes, tools, break rules, recipe list   |
+| 4A        | `docs/phase-4-plan.md`         | `docs/phase-4a-report.md`        | light, chunks, mesher, shader, references  |
+| 4P        | `docs/phase-4p-plan.md`        | `docs/phase-4p-report.md`        | performance test, `Input`, screens         |
+| 4E        | `docs/phase-4e-plan.md`        | `docs/phase-4e-report.md`        | remeshing after edits, chunk budget        |
+| 4B        | `docs/phase-4-plan.md`         | `docs/phase-4b-report.md`        | torch, block flags, night, Brightness      |
+| 5A        | `docs/phase-5-plan.md`         | `docs/phase-5a-report.md`        | `Input`, controller, focus, menus, back    |
+| Polish 1  | `docs/polish-1-plan.md`        | `docs/polish-1-report.md`        | the recipe list, the hold                  |
+| 5B        | `docs/phase-5-plan.md`         | `docs/phase-5b-report.md`        | inventory screen, recipe list, focus       |
+| 6A        | `docs/phase-6-plan.md`         | `docs/phase-6a-report.md`        | network layer, network test, mp specs      |
+| 6B        | `docs/phase-6-plan.md`         | `docs/phase-6b-report.md`        | sessions, protocol, room menus, mp specs   |
+| 6C        | `docs/phase-6-plan.md`         | `docs/phase-6c-report.md`        | save format, timed breaking in rooms       |
+| 6D        | `docs/phase-6-plan.md`         | `docs/phase-6d-report.md`        | figure, looks, identity, "Your player"     |
+| 6E        | `docs/phase-6-plan.md`         | `docs/phase-6e-report.md`        | overlay, relayed poses, `players`          |
+| CI 1      | `docs/ci-1-plan.md`            | `docs/ci-1-report.md`            | `ci.yml`, `scripts/ci/`                    |
+| Fix pad   | –                              | `docs/fix-pad-flaky-report.md`   | pad test timing, back pairing              |
+| Fix CI    | –                              | `docs/fix-ci-flaky-report.md`    | back guard window, net test waits          |
+| Docs 1    | `docs/docs-1-plan.md`          | `docs/docs-1-report.md`          | `CLAUDE.md` layout, docs budget            |
+| 7A        | `docs/phase-7a-plan.md`        | `docs/phase-7a-report.md`        | generator 2, save format 3, leaves         |
+| 8A1       | `docs/phase-8a-plan.md`        | `docs/phase-8a1-report.md`       | progress, save format 4, Tasks tab, bot    |
+| 8A2       | `docs/phase-8a-plan.md`        | `docs/phase-8a2-report.md`       | shared progress, protocol, mp specs        |
+| Polish 2  | `docs/polish-2-plan.md`        | `docs/polish-2-report.md`        | tracker, `track`, save format 5, Tasks tab |
+| Fix Adv 1 | `docs/fix-adventure-1-plan.md` | `docs/fix-adventure-1-report.md` | torch unlock, dark rule, smelting row      |
 
-- **Open:** Phase 4 part C (Web Workers) is optional, built only if the owner's starting
-  prompt asks for it. The rest of Phase 7 (custom blocks, textures, characters, names,
-  effects) is not planned. Phase 8 ("Adventure"): part A is built (8A1, 8A2), its fix round
-  "Fix Adventure 1" is planned (`docs/fix-adventure-1-plan.md`); parts B–E are not
-  planned. At the start of a session look for issues with the label `perf-run`;
-  the latest are all green (issue #37), the Web Workers line says "not needed". Numbers
-  from software WebGL (cloud sessions, CI) are never evidence.
+- **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
+  The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
+  planned. Phase 8 ("Adventure"): part A and its fix "Fix Adventure 1" are built; parts
+  B–E are not planned. At a session's start look for issues labelled `perf-run`; the
+  latest are all green (#37, Web Workers "not needed"). Numbers from software WebGL
+  (cloud, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
   2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
   (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;

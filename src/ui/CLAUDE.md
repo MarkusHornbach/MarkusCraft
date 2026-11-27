@@ -46,7 +46,7 @@ highlighted border, "Tracked" next to the count); done rows stay plain. Rows kee
 element, height and order while counts and the mark change. The controller's default
 focus is its tab; the right stick and a finger scroll it; it is as large as the recipe
 list. **Locked recipe rows** keep their place, are dimmed (class
-`locked`, dashed) and show "Level 3" or "Task: Mine 32 coal" instead of "Craft"; the tab
+`locked`, dashed) and show "Level 3" or "Task: Make 16 coal" instead of "Craft"; the tab
 count counts unlocked craftable rows only; a refused craft shows "Locked: Level 3" in the
 HUD. **The progress notice** (top centre, above the HUD and the open inventory, after the
 inventory in the document, never over the pause or world menu, no pointer, no focus): one
@@ -78,7 +78,10 @@ found by their highlight and by the count on the "Crafting" tab (`.tab-count`, h
 world is open (`RecipeList.restoreScroll`); `setGameMode` (a loaded world) puts it back to
 the top. Holding "Craft" makes its first item after `CRAFT_HOLD_DELAY_MS` (500) of
 simulation time, then one every `CRAFT_REPEAT_MS` (250); a quick press crafts once on
-release. The recipe table itself: `src/items/CLAUDE.md`. The label column of the settings
+release. While a furnace row smelts its "Craft" button stays in place, visible and
+focusable, with the bar filling it behind the label (Fix Adventure 1); a press then starts
+nothing, a held one starts the next smelt after the delivery. The recipe table itself:
+`src/items/CLAUDE.md`. The label column of the settings
 rows is 136 px wide, so the controller labels fit on one line.
 
 ## The "New world" form and the world list (Phase 7 part A)
@@ -96,13 +99,8 @@ mode (`src/player/CLAUDE.md`).
 
 ## "Your player" (Phase 6 part D)
 
-A section of the pause screen after "Settings" (settings page and pause menu): the name
-(the same value as the field of "Join a world"; sent to the room on `change`), a preview
-(`FigurePreview`, its own WebGL2 context, created when the section is shown and in view,
-at most 30 pictures a second, disposed with `forceContextLoss` when the page closes;
-without WebGL the head icon) and nine look buttons (`aria-label` "Look: Fern", "Look:
-Automatic (Fern)"). A new look is sent at once. Where it is stored:
-`src/game/CLAUDE.md`, "Player identity".
+A section of the pause screen after "Settings": name, figure preview and nine look buttons;
+details and where it is stored: `src/game/CLAUDE.md`, "Player identity".
 
 Before changing the inventory screen or the recipe list read the "Decisions and
 deviations" of `docs/phase-3b-report.md`, `docs/polish-1-report.md` and
