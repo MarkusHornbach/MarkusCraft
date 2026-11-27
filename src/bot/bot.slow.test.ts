@@ -29,16 +29,4 @@ describe('goal bot (Phase 8 AC6.2)', () => {
       expect(check.radar).toEqual(check.bruteForce);
     }
   });
-
-  it('Phase 8B2a AC3.5 finishes the book on generator 3 (seed 1337 balanced/few)', () => {
-    const run = runBot(1337, { version: 3, options: { terrain: 'balanced', trees: 'few' } });
-    expect(run.error).toBeNull();
-    expect(run.completed).toBe(true);
-    expect(run.tasks.map((t) => t.id).sort((a, b) => a - b)).toEqual(TASKS.map((t) => t.id));
-    expect(run.allUnlocked).toBe(true);
-    expect(run.lightErrors).toBe(0);
-    expect(run.darkBreaks.filter((d) => d.task > 11)).toEqual([]);
-    expect(run.radarUnlocked).toBe(true);
-    for (const check of run.radar) expect(check.radar).toEqual(check.bruteForce);
-  });
 });

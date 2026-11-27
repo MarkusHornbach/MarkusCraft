@@ -5,7 +5,7 @@ import { findSpawn } from '../world/generation/spawn';
 import { getTerrain } from '../world/generation/terrain';
 import { World } from '../world/World';
 import type { WorldGen } from '../world/generation/worldOptions';
-import { expectFasterThan } from '../testing/timing';
+import { TIMING_ENFORCED, expectFasterThan } from '../testing/timing';
 import { RADAR_KINDS } from './kinds';
 import { scanRadar, worldProbe, type ScanInput } from './scan';
 import { VeinIndex } from './veins';
@@ -84,11 +84,11 @@ function scanTimes(gen: WorldGen): { warm: number; cold: number } {
   const warmIndex = new VeinIndex(1337, gen);
   let warm = Infinity;
   let cold = Infinity;
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < (TIMING_ENFORCED ? 10 : 0); i++) {
     scan(warmIndex);
     scan(new VeinIndex(1337, gen));
   }
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < (TIMING_ENFORCED ? 30 : 1); i++) {
     warm = Math.min(warm, scan(warmIndex));
     cold = Math.min(cold, scan(new VeinIndex(1337, gen)));
   }
@@ -101,7 +101,7 @@ describe('radar scan cost on generator 3', () => {
     // Each side measured twice, in turn; the best of each counts.
     let two = { warm: Infinity, cold: Infinity };
     let three = { warm: Infinity, cold: Infinity };
-    for (let round = 0; round < 2; round++) {
+    for (let round = 0; round < (TIMING_ENFORCED ? 2 : 1); round++) {
       const a = scanTimes({ version: 2, options });
       const b = scanTimes({ version: 3, options });
       two = { warm: Math.min(two.warm, a.warm), cold: Math.min(two.cold, a.cold) };

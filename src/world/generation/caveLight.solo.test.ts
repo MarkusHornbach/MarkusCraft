@@ -1,7 +1,7 @@
 // Phase 8B2a AC2.3: light and meshing per chunk of generator 3 against generator 2. A solo
 // file: two times with a tight ratio, both warmed up, the best of many rounds in turn.
 import { describe, it } from 'vitest';
-import { expectFasterThan } from '../../testing/timing';
+import { TIMING_ENFORCED, expectFasterThan } from '../../testing/timing';
 import { lightChunk } from '../light/lightChunk';
 import { meshChunk } from '../meshing/mesher';
 import { World } from '../World';
@@ -9,6 +9,9 @@ import type { WorldGen } from './worldOptions';
 
 const SEEDS = [1, 42, 1337, 2024];
 const OPTIONS = { terrain: 'balanced', trees: 'few' } as const;
+/** Under coverage the limits are not checked: one round runs the code. */
+const WARMUP = TIMING_ENFORCED ? 5 : 0;
+const ROUNDS = TIMING_ENFORCED ? 20 : 1;
 
 /** Chunks -3..4 generated, -2..3 lit, around the origin. */
 function worldOf(seed: number, gen: WorldGen): World {
@@ -34,13 +37,13 @@ function compare(label: string, work: (world: World, cx: number, cz: number) => 
   };
   const a = all(twos);
   const b = all(threes);
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < WARMUP; i++) {
     a();
     b();
   }
   let two = Infinity;
   let three = Infinity;
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < ROUNDS; i++) {
     two = Math.min(two, time(a));
     three = Math.min(three, time(b));
   }

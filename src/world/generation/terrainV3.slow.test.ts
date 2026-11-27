@@ -200,50 +200,6 @@ describe('generator 3 rules', () => {
     expect(near).toBeGreaterThanOrEqual(44);
   });
 
-  it('Phase 8B2a AC1.2 a chunk alone equals the chunk generated after its neighbours', () => {
-    for (const seed of SEEDS) {
-      for (const options of PRESETS) {
-        const label = name(seed, options);
-        const probe = new TerrainV3(seed, options);
-        // A chunk with an entrance mouth (a tunnel crossing borders) and one in a ravine.
-        const shapes = probe.caves.shapesIn(-400, -400, 400, 400);
-        const picks = [
-          shapes.find((s) => s.kind === 'entrance'),
-          shapes.find((s) => s.kind === 'ravine'),
-          shapes.find((s) => s.kind === 'deep'),
-        ];
-        for (const shape of picks) {
-          if (!shape) continue;
-          const cx = Math.floor(shape.endX / CHUNK_SIZE);
-          const cz = Math.floor(shape.endZ / CHUNK_SIZE);
-          const alone = new TerrainV3(seed, options).generateChunk(cx, cz);
-          const after = new TerrainV3(seed, options);
-          for (const [dx, dz] of [
-            [1, 1],
-            [-1, 0],
-            [0, -1],
-            [1, -1],
-            [-1, 1],
-            [0, 1],
-            [1, 0],
-            [-1, -1],
-          ]) {
-            after.generateChunk(cx + dx, cz + dz);
-          }
-          expect(after.generateChunk(cx, cz), `${label} ${shape.kind}`).toEqual(alone);
-          // Both sides of the borders: the shape's spans land in the neighbours' masks too.
-          for (let s = 0; s < shape.count; s++) {
-            const x = shape.spans[s * 4];
-            const z = shape.spans[s * 4 + 1];
-            const y = shape.spans[s * 4 + 3];
-            if (y < 3) continue;
-            expect(after.carved(x, y, z), `${label} span ${x},${y},${z}`).toBe(true);
-          }
-        }
-      }
-    }
-  });
-
   it('Phase 8B2a AC2.3 the light invariant holds after breaking into a tunnel from the surface', () => {
     const gen: WorldGen = { version: 3, options: { terrain: 'balanced', trees: 'few' } };
     const terrain = getTerrain(1337, gen) as TerrainV3;

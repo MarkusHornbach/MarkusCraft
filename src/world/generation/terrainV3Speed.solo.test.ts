@@ -1,7 +1,10 @@
 // Generator 3 speed against generator 2 (Phase 8 part B2a, AC2.2). A solo file: the two
 // times differ by little and a busy machine shifts them.
 import { describe, it } from 'vitest';
-import { expectFasterThan } from '../../testing/timing';
+import { TIMING_ENFORCED, expectFasterThan } from '../../testing/timing';
+
+/** Rounds of each side; under coverage the limits are not checked, one round runs the code. */
+const ROUNDS = TIMING_ENFORCED ? 12 : 1;
 import { findSpawn } from './spawn';
 import { TerrainV2 } from './terrainV2';
 import { TerrainV3 } from './terrainV3';
@@ -33,7 +36,7 @@ describe('generator 3 speed', () => {
     const v3 = (seed: number): TerrainV3 => new TerrainV3(seed, OPTIONS);
     const two = SEEDS.map(() => Infinity);
     const three = SEEDS.map(() => Infinity);
-    for (let round = 0; round < 12; round++) {
+    for (let round = 0; round < ROUNDS; round++) {
       SEEDS.forEach((seed, i) => {
         two[i] = Math.min(two[i], run(v2, seed));
         three[i] = Math.min(three[i], run(v3, seed));
@@ -48,7 +51,7 @@ describe('generator 3 speed', () => {
 
   it('Phase 8B2a AC2.2 the first chunk of a world (spawn and spawn shaft) is measured and limited', () => {
     const first: number[] = [];
-    for (let round = 0; round < 3; round++) {
+    for (let round = 0; round < Math.min(ROUNDS, 3); round++) {
       for (const seed of SEEDS) {
         const terrain = new TerrainV3(seed, OPTIONS);
         const start = performance.now();
