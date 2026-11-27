@@ -19,8 +19,8 @@ purity rules and the coverage scope). Adventure worlds only, from task 8 "Climb 
 
 ## Data source and the world correction
 
-The veins are a pure function of the seed: `veinCells` (`world/generation/ores.ts`, the
-same walk `placeOres` uses) gives a vein's cells; a cell becomes ore only where the
+The veins are a pure function of the seed: `veinCells` (`world/generation/ores.ts`, a
+copy of the walk `placeOres` uses inline) gives a vein's cells; a cell becomes ore only where the
 generator leaves stone before the ores (`TerrainSource.oreHost`) and no earlier kind's vein
 took it (kinds are placed in `ORE_KINDS` order, coal before iron). `VeinIndex(seed, gen)`
 holds per ore cell column (6 × 6 blocks) the veins whose origin lies in it, only their ore

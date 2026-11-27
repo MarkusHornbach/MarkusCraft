@@ -93,8 +93,9 @@ base below c = 0 (the water share) and flatten only the land. Trees: a forest no
 spacing rule (3, highest hash wins) and tree shape follow; `none` has no trees. The chance
 is cached per column of the chunk and its rim while a chunk is generated.
 
-**For the radar** (Phase 8 part B1): `veinCells` is the one vein walk `placeOres` and
-`src/radar/` share, and `TerrainSource.oreHost(x, y, z)` says where generation leaves stone
+**For the radar** (Phase 8 part B1): `veinCells` is the radar's copy of the vein walk
+(`placeKind` keeps its own inline one for speed; the radar's agreement test proves they
+agree), and `TerrainSource.oreHost(x, y, z)` says where generation leaves stone
 before the ores (rock columns 1…h, others 1…h − `DIRT_DEPTH` − 1; the rock rule is
 `rockOf`, shared with the chunk loop; cached per column).
 
