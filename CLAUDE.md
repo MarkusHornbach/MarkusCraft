@@ -306,10 +306,10 @@ hold:
 
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
-  planned. Phase 8 ("Adventure"): part A and its fix "Fix Adventure 1" are built; parts
-  B–E are not planned. At a session's start look for issues labelled `perf-run`; the
-  latest are all green (#37, Web Workers "not needed"). Numbers from software WebGL
-  (cloud, CI) are never evidence.
+  planned. Phase 8: A and "Fix Adventure 1" are built; B1 (radar,
+  `docs/phase-8b1-plan.md`) is planned; B2 on and C–E are not. At a session's start look
+  for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
+  needed"). Numbers from software WebGL (cloud, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase
   2, Part B" in `docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D
   (Web Workers) is now Phase 4 part C (never implement 3D); personalization was Phase 5;
