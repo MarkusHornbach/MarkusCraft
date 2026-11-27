@@ -45,6 +45,10 @@ class FakeHost implements BenchHost {
   submit(action: Action): void {
     this.actions.push(action);
   }
+  yaws: number[] = [];
+  setYaw(yaw: number): void {
+    this.yaws.push(yaw);
+  }
   chunksIdle(): boolean {
     return this.busy <= 0;
   }

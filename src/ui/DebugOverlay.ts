@@ -28,6 +28,8 @@ export interface DebugInfo {
   generator: string;
   /** Adventure: "Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP"; null in Creative. */
   progress: string | null;
+  /** Adventure with the radar: "4 coal · 2 iron · scan 0.6 ms · draw 0.1 ms" or "off"; else null. */
+  radar: string | null;
   time: number;
   mode: string;
   onGround: boolean;
@@ -51,6 +53,7 @@ const ROWS = [
   'seed',
   'generator',
   'progress',
+  'radar',
   'time',
   'mode',
   'target',
@@ -78,6 +81,7 @@ const LABELS: Record<Row, string> = {
   seed: 'Seed',
   generator: 'World',
   progress: 'Progress',
+  radar: 'Radar',
   time: 'Time',
   mode: 'Mode',
   target: 'Target',
@@ -162,7 +166,7 @@ export class DebugOverlay {
       this.element.appendChild(line);
       this.values.set(row, value);
       this.lines.set(row, line);
-      if (NET_ROWS.includes(row) || row === 'progress') line.hidden = true;
+      if (NET_ROWS.includes(row) || row === 'progress' || row === 'radar') line.hidden = true;
     }
     parent.appendChild(this.element);
   }
@@ -210,6 +214,10 @@ export class DebugOverlay {
       progressLine.hidden = info.progress === null;
     }
     this.set('progress', info.progress ?? '');
+    const radarLine = this.lines.get('radar');
+    if (radarLine && radarLine.hidden !== (info.radar === null))
+      radarLine.hidden = info.radar === null;
+    this.set('radar', info.radar ?? '');
     this.set('time', `${info.time.toFixed(3)} (${timeName(info.time)})`);
     const detail = info.inWater ? ', in water' : info.onGround ? ', on ground' : '';
     this.set('mode', `${info.mode}${detail}`);

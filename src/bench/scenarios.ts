@@ -58,6 +58,10 @@ export interface Scenario {
   action(step: number, steps: number): Action | null;
   /** Simulated guests in a room the page hosts while the scenario runs (Phase 6 part E). */
   guests?: GuestScript;
+  /** The radar circle shows while it runs, in the bench's Creative world (Phase 8 part B1). */
+  radar?: boolean;
+  /** The view direction (yaw, radians) to set before this step, if the script turns. */
+  yaw?(step: number, steps: number): number;
 }
 
 /** Where a simulated guest is before a step, and whether it holds break. */

@@ -2388,3 +2388,24 @@ button.task-row:hover {
 .room-player .head-icon {
   border-radius: 2px;
 }
+
+/* The radar circle (Phase 8 part B1): top-right; on touch below the bag button. */
+.radar-circle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 112px;
+  height: 112px;
+  pointer-events: none;
+}
+
+.radar-circle[hidden] {
+  display: none;
+}
+
+.touch-mode .radar-circle {
+  top: calc(var(--touch-size) + 2 * var(--touch-gap));
+  right: var(--touch-gap);
+  width: 88px;
+  height: 88px;
+}

@@ -102,6 +102,28 @@ export interface GameState {
     /** The record's choice: 0 automatic, -1 hidden, or a task id. */
     track: number;
   } | null;
+  /**
+   * The radar (Phase 8 part B1); null in Creative. `entries` and `beyond` are what the
+   * circle drew last (`screen`: the spot relative to its centre in CSS pixels, y down);
+   * `scans` and `draws` (of the circle) count since the world was loaded.
+   */
+  radar: {
+    unlocked: boolean;
+    setting: boolean;
+    shown: boolean;
+    focus: string | null;
+    entries: RadarStateEntry[];
+    beyond: { kind: string; dx: number; dz: number; dist: number }[];
+    scans: number;
+    draws: number;
+  } | null;
+  /** The Map tab while it is open (Phase 8 part B1); left out otherwise. */
+  map?: {
+    locked: boolean;
+    entries: RadarStateEntry[];
+    legend: string[];
+    draws: number;
+  };
   /** The furnace recipe whose progress bar runs (0..1), or null. */
   smelting: { recipe: number; progress: number } | null;
   /**
@@ -214,6 +236,8 @@ export interface GameState {
     padInvertY: boolean;
     /** "Collide with leaves" (Phase 7 part A). */
     collideLeaves: boolean;
+    /** "Radar circle" (Phase 8 part B1). */
+    radar: boolean;
   };
   /**
    * The controller: pads the browser reports, whether one is the active source, how often
@@ -350,4 +374,15 @@ declare global {
 
 export function installTestApi(api: TestApi): void {
   window.__mc = api;
+}
+
+/** A vein the radar shows (Phase 8 part B1). */
+export interface RadarStateEntry {
+  kind: string;
+  dx: number;
+  dy: number;
+  dz: number;
+  dist: number;
+  hint: 'none' | { coarse: 'up' | 'level' | 'down' } | { exact: number };
+  screen?: { x: number; y: number } | null;
 }

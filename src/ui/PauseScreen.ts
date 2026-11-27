@@ -113,6 +113,7 @@ export class PauseScreen {
   private readonly invertRow: HTMLElement;
   private readonly leavesRow: HTMLElement;
   private readonly leavesSwitch: HTMLInputElement;
+  private readonly radarSwitch: HTMLInputElement;
   private readonly invertSwitch: HTMLInputElement;
   /** A controller was used during this visit: its two settings rows are shown. */
   private padSeen = false;
@@ -294,6 +295,16 @@ export class PauseScreen {
       change();
     });
     settings.appendChild(this.leavesRow);
+
+    // Phase 8 part B1: the circle only; the Map tab stays available when it is off.
+    const radar = this.switchRow('setting-radar', 'Radar circle');
+    this.radarSwitch = radar.input;
+    this.radarSwitch.checked = this.settings.radar;
+    this.radarSwitch.addEventListener('change', () => {
+      this.settings.radar = this.radarSwitch.checked;
+      change();
+    });
+    settings.appendChild(radar.row);
 
     // Touch devices have no F3 key; this switch replaces it.
     const debug = this.switchRow('setting-debug', 'Debug overlay');
@@ -515,6 +526,7 @@ export class PauseScreen {
     }
     this.invertSwitch.checked = settings.padInvertY;
     this.leavesSwitch.checked = settings.collideLeaves;
+    this.radarSwitch.checked = settings.radar;
   }
 
   setDebugChecked(checked: boolean): void {
