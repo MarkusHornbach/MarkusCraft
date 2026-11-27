@@ -32,7 +32,7 @@ Plan: `docs/phase-8b2-plan.md` (sections 6.1–6.9, AC1–AC4). Branch
   standing cells with an optional torch-light floor; checks entrances, ravines and the
   spawn shaft (slow test, and a "Generator 3" section of `scripts/progressRun.ts`).
 - **Bot**: `scripts/progressRun.ts` runs generator 3 by default, `--gen 2` for comparison;
-  `bot.slow.test.ts` adds a generator 3 run.
+  `botV3.slow.test.ts` is a generator 3 run.
 - **Bench**: scenario `caves` (version 1), suite version 5.
 - **Browser**: `e2e/caves.spec.ts` (form, F3, world list, `gen=3`, checksum, light after
   breaking into a tunnel through actions, three references), `e2e/mpCaves.spec.ts` (room).
@@ -179,6 +179,7 @@ spawn shaft's chamber takes a median of 69 steps.
 
 - `src/save/saveFormat.test.ts`, `src/world/generation/terrainV1.test.ts`,
   `worldOptions.test.ts`: generator 3 is known now; the "newer"/"unknown" cases use 4.
+- `src/util/repoHygiene.test.ts`: 55 reference screenshots (three new ones).
 - `src/radar/agreement.slow.test.ts`: the comparison moved to
   `src/testing/radarAgreement.ts` (same checks).
 - `src/bench/scenarios.test.ts`, `BenchRunner.test.ts`, `e2e/bench.spec.ts`: the table, the

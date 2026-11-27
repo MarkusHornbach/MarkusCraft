@@ -7,8 +7,8 @@ scope). The seed of the bot and balancing tool later parts extend.
 
 - `Bot.ts` (`Bot`, `runBot`, `playerMinutes`), `report.ts` (median and maximum per task,
   chapter and level-up, the balance targets, Markdown), `bot.slow.test.ts` (seed 1337,
-  balanced, few trees, generators 2 and 3: the book completes, every recipe unlocked,
-  light invariant holds), `darkBreak.test.ts`
+  balanced, few trees: the book completes, every recipe unlocked, light invariant holds),
+  `botV3.slow.test.ts` (the same on generator 3), `darkBreak.test.ts`
 - `walk.ts` (the walk check), `caveWalks.ts` (entrances, ravines, shafts; the report
   section), `caveWalks.slow.test.ts` (Phase 8 part B2a AC3.1–AC3.3)
 - `scripts/progressRun.ts` runs it: `npx vite-node scripts/progressRun.ts` (12 runs: seeds
