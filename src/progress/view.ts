@@ -14,7 +14,13 @@ import {
   recipesOfLevel,
   tasksOf,
 } from './progress';
-import { PROGRESS_TABLES, type ProgressTables, type Task } from './tables';
+import {
+  FEATURE_LABELS,
+  PROGRESS_TABLES,
+  type Feature,
+  type ProgressTables,
+  type Task,
+} from './tables';
 
 /** One row of the open chapter on the Tasks tab. */
 export interface TaskRowView {
@@ -178,13 +184,13 @@ export function noticeTexts(
       case 'levelUp':
         if (outcome.player !== self) break;
         texts.push(
-          outcome.recipes.length > 0
-            ? `Level ${outcome.level} · Unlocked: ${recipeNames(outcome.recipes)}`
+          outcome.recipes.length > 0 || (outcome.features?.length ?? 0) > 0
+            ? `Level ${outcome.level} · Unlocked: ${unlockNames(outcome.recipes, outcome.features)}`
             : `Level ${outcome.level}`,
         );
         break;
       case 'unlocked':
-        texts.push(`Unlocked: ${recipeNames(outcome.recipes)}`);
+        texts.push(`Unlocked: ${unlockNames(outcome.recipes, outcome.features)}`);
         break;
       case 'firstFind': {
         if (outcome.player !== self) break;
@@ -197,6 +203,25 @@ export function noticeTexts(
     }
   }
   return texts;
+}
+
+/** Recipes, then features: "Torch, Radar". */
+function unlockNames(recipes: readonly number[], features: readonly Feature[] = []): string {
+  const names = recipes.length > 0 ? [recipeNames(recipes)] : [];
+  for (const feature of features) names.push(FEATURE_LABELS[feature]);
+  return names.join(', ');
+}
+
+/** What opens a feature, as its locked screen says it: "Task: Climb to height 64", "Level 3". */
+export function featureLockText(
+  feature: Feature,
+  tables: ProgressTables = PROGRESS_TABLES,
+): string {
+  const unlock = tables.featureUnlocks.find((u) => u.feature === feature)?.unlock;
+  if (!unlock) return 'Locked';
+  if ('level' in unlock) return `Level ${unlock.level}`;
+  const task = tables.tasks.find((t) => t.id === unlock.task);
+  return `Task: ${task?.label ?? `#${unlock.task}`}`;
 }
 
 /** The HUD text of a `locked` refusal: "Locked: Level 3", "Locked: Make 2 coal". */

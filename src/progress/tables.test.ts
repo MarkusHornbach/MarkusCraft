@@ -4,6 +4,7 @@ import { RECIPES } from '../items/recipes';
 import { checkTables } from './check';
 import {
   CHAPTERS,
+  FEATURE_UNLOCKS,
   LEVELS,
   PROGRESS_TABLES,
   RECIPE_UNLOCKS,
@@ -108,6 +109,10 @@ describe('progress tables (Phase 8 AC1.1)', () => {
       t.id === 2 ? { ...t, id: 3 } : t.id === 3 ? { ...t, id: 2 } : t,
     );
     expect(covers(renumbered)).toBe(false);
+  });
+
+  it('pins the feature unlocks (Phase 8B1 AC2.1)', () => {
+    expect(FEATURE_UNLOCKS).toEqual([{ feature: 'radar', unlock: { task: 8 } }]);
   });
 
   it('levels and lookups', () => {
