@@ -706,7 +706,7 @@ for (const [device, view] of [
     // The tap that opens the screen does not also close it, although "Close" now lies
     // under the finger.
     await expect(page.locator('.inventory-screen')).toBeVisible();
-    await expect(page.locator('.palette-slot')).toHaveCount(17);
+    await expect(page.locator('.palette-slot')).toHaveCount(18);
     const torch = page.locator('.palette-slot[data-item="torch"]');
     await torch.scrollIntoViewIfNeeded();
     const slot = await boxes(page, '.palette-slot[data-item="torch"]');
