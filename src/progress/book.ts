@@ -13,8 +13,14 @@ export interface BookUpgrade {
   readonly markDone: readonly number[];
 }
 
-/** The upgrade rules of this build, one per version step (none yet: book 1 is the first). */
-export const BOOK_UPGRADES: readonly BookUpgrade[] = [];
+/**
+ * The upgrade rules of this build, one per version step. Book 2 (Phase 8 part B3a2) adds
+ * task 21 "Store 32 stone in a chest" to chapter 3: a world past the chapter's tasks 9–12
+ * gets it done, so it stays in its chapter.
+ */
+export const BOOK_UPGRADES: readonly BookUpgrade[] = [
+  { from: 1, ifDone: [9, 10, 11, 12], markDone: [21] },
+];
 
 export interface UpgradedBook {
   progress: WorldProgress;

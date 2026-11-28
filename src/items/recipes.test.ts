@@ -65,6 +65,7 @@ describe('recipe table (Phase 3 AC10.1)', () => {
         'furnace: 2 clay + 1 coal -> 2 bricks',
         'furnace: 2 log -> 1 coal',
         '-: 1 stick + 1 coal -> 4 torch',
+        'workbench: 8 planks -> 1 chest',
       ].sort(),
     );
   });
@@ -91,6 +92,7 @@ describe('recipe table (Phase 3 AC10.1)', () => {
       bricks: 18,
       iron_block: 19,
       torch: 20,
+      chest: 21,
     });
     for (const recipe of RECIPES) expect(getRecipe(recipe.id)).toBe(recipe);
     expect(getRecipe(0)).toBeUndefined();
@@ -218,7 +220,7 @@ describe('recipe status', () => {
 
   it('Polish 1 AC1.1: lists the recipes in table order, whatever can be made', () => {
     const ids = RECIPES.map((r) => r.id);
-    expect(ids).toEqual(Array.from({ length: 20 }, (_, index) => index + 1));
+    expect(ids).toEqual(Array.from({ length: 21 }, (_, index) => index + 1));
     // Every ingredient there is, 99 of each: with both stations everything can be made.
     const ingredients = [...new Set(RECIPES.flatMap((r) => r.ingredients.map((i) => i.item)))];
     const everything = slotsWith(...ingredients.map((item): [number, number] => [item, 99]));

@@ -10,7 +10,9 @@ describe('goal bot on generator 3', () => {
     const run = runBot(1337, { version: 3, options: { terrain: 'balanced', trees: 'few' } });
     expect(run.error).toBeNull();
     expect(run.completed).toBe(true);
-    expect(run.tasks.map((t) => t.id).sort((a, b) => a - b)).toEqual(TASKS.map((t) => t.id));
+    expect(run.tasks.map((t) => t.id).sort((a, b) => a - b)).toEqual(
+      TASKS.map((t) => t.id).sort((a, b) => a - b),
+    );
     expect(run.allUnlocked).toBe(true);
     expect(run.lightErrors).toBe(0);
     expect(run.darkBreaks.filter((d) => d.task > 11)).toEqual([]);

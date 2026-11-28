@@ -145,7 +145,7 @@ test('Polish 2 AC3.2: the tracker moves on when its task is done, to the next ch
 
   // A complete book shows nothing.
   await page.evaluate(() =>
-    window.__mc.setProgress({ done: Array.from({ length: 20 }, (_, i) => i + 1) }),
+    window.__mc.setProgress({ done: Array.from({ length: 21 }, (_, i) => i + 1) }),
   );
   expect(await tracked(page)).toBeNull();
   await expect(page.locator('.task-tracker')).toBeHidden();

@@ -48,7 +48,7 @@ test('Phase 8 plan 5.8: progress=all is the default of an Adventure test world; 
   await openGame(page, { mode: 'gathering' });
   const all = await progress(page);
   expect(all).toMatchObject({ level: 7, xp: 460, nextLevelXp: null, chapter: null, tasks: [] });
-  expect(all?.done).toHaveLength(20);
+  expect(all?.done).toHaveLength(21);
   expect((await getState(page)).recipes.every((r) => !r.locked)).toBe(true);
   await openGame(page, { mode: 'gathering', progress: 'fresh' });
   const fresh = await getState(page);
@@ -221,7 +221,7 @@ test('Phase 8 AC5.2: the Tasks tab shows level, XP bar, next unlocks, chapters a
 
   // The end of the book.
   await page.evaluate(() =>
-    window.__mc.setProgress({ xp: 600, done: Array.from({ length: 20 }, (_, i) => i + 1) }),
+    window.__mc.setProgress({ xp: 600, done: Array.from({ length: 21 }, (_, i) => i + 1) }),
   );
   await expect(tab.locator('.tasks-xp-text')).toHaveText('Max level');
   await expect(tab.locator('.tasks-next')).toBeHidden();
@@ -281,7 +281,7 @@ test('Phase 8 AC5.6: the F3 overlay shows the Progress row in Adventure only', a
   await page.keyboard.press('F3');
   await whenIdle(page);
   await expect(page.locator('[data-debug="progress"]')).toHaveText(
-    'Chapter 3 · Task 2/4 done · Level 3 · 160/190 XP',
+    'Chapter 3 · Task 2/5 done · Level 3 · 160/190 XP',
   );
   await openGame(page);
   await page.keyboard.press('F3');

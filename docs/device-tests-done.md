@@ -1,6 +1,6 @@
 # Tests on real devices: done
 
-Tests from `docs/device-tests.md` that the owner has ticked ("Passed") or that no longer
+Tests from `docs/device-tests.md` and `docs/device-tests-2.md` that the owner has ticked ("Passed") or that no longer
 need doing ("Obsolete"). Every entry was moved here unchanged, with what the owner wrote
 after "Result:". Ids are never reused. The open tests, and how both files are kept up to
 date, are in `docs/device-tests.md`.

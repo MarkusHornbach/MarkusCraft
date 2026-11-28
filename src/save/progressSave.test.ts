@@ -1,6 +1,6 @@
 // Save format 4: the task book and the record's progress fields (Phase 8 AC4.1–AC4.3).
 import { describe, expect, it } from 'vitest';
-import { SAVE_FORMAT_VERSION } from '../game/config';
+import { BOOK_VERSION, SAVE_FORMAT_VERSION } from '../game/config';
 import { sampleMeta } from '../testing/sampleWorld';
 import { mulberry32, randInt } from '../util/rng';
 import { type WorldMeta, decodeMeta, encodeMeta } from './saveFormat';
@@ -44,7 +44,7 @@ describe('format 4 (Phase 8 AC4.1)', () => {
 
   it('a Creative world stores an empty book', () => {
     const record = encodeMeta(sampleMeta());
-    expect(record.progress).toEqual({ done: [], counts: [], book: 1 });
+    expect(record.progress).toEqual({ done: [], counts: [], book: BOOK_VERSION });
     expect(record.formatVersion).toBe(SAVE_FORMAT_VERSION);
   });
 });

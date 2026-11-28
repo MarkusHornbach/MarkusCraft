@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Action } from '../actions/actions';
 import { type ActionContext, applyAction } from '../actions/apply';
 import { type ItemStack, createPlayerRecord } from '../actions/playerRecord';
+import { STACK_SIZE } from '../game/config';
 import { breakTimeMs } from '../items/hardness';
 import { Item } from '../items/items';
 import { Block } from '../world/blocks';
@@ -91,5 +92,98 @@ describe('eventsOf (Phase 8 AC2.1)', () => {
     const ctx = { ...context(), mode: 'creative' as const };
     const action: Action = { kind: 'break', x: 0, y: 9, z: 2 };
     expect(eventsOf(action, applyAction(ctx, action, 0), ctx)).toEqual([]);
+  });
+});
+
+describe('store events (Phase 8B3a AC6.2)', () => {
+  const at = { x: 2, y: 10, z: 0 };
+
+  /** A context with a chest at `at` holding `chest`, the player holding `held` in slot 9. */
+  function chestContext(
+    chest: (ItemStack | null)[],
+    held: ItemStack | null,
+    mode: 'gathering' | 'creative' = 'gathering',
+  ): ActionContext {
+    const ctx = context();
+    (ctx.world as Cells).setBlock(at.x, at.y, at.z, Block.CHEST);
+    const slots = [...ctx.record.slots];
+    slots[9] = held;
+    const state = {
+      kind: 'chest' as const,
+      slots: Array.from({ length: 27 }, (_, i) => chest[i] ?? null),
+    };
+    return {
+      ...ctx,
+      mode,
+      record: { ...ctx.record, slots },
+      states: { getState: (x, y, z) => (x === at.x && y === at.y && z === at.z ? state : null) },
+    };
+  }
+
+  function eventsFor(ctx: ActionContext, action: Action): unknown[] {
+    return [...eventsOf(action, applyAction(ctx, action, 0), ctx)];
+  }
+
+  const stone = (count: number): ItemStack => ({ item: Block.STONE, count });
+
+  it('a move or quick move from the player into the chest counts what the chest gained', () => {
+    const ctx = chestContext([stone(STACK_SIZE - 4)], stone(10));
+    const into: Action = {
+      kind: 'chestMove',
+      ...at,
+      from: 9,
+      fromChest: false,
+      to: 0,
+      toChest: true,
+      item: Block.STONE,
+    };
+    // Four fit onto the chest's stack, six stay with the player.
+    expect(eventsFor(ctx, into)).toEqual([{ kind: 'store', item: Block.STONE, count: 4 }]);
+    const quick: Action = {
+      kind: 'quickMove',
+      ...at,
+      slot: 9,
+      fromChest: false,
+      item: Block.STONE,
+    };
+    expect(eventsFor(ctx, quick)).toEqual([{ kind: 'store', item: Block.STONE, count: 10 }]);
+  });
+
+  it('taking out, moves inside the chest, take all, Creative and refusals give none', () => {
+    const ctx = chestContext([stone(5)], stone(10));
+    const out: Action[] = [
+      { kind: 'chestMove', ...at, from: 0, fromChest: true, to: 12, toChest: false, item: 1 },
+      { kind: 'chestMove', ...at, from: 0, fromChest: true, to: 3, toChest: true, item: 1 },
+      { kind: 'quickMove', ...at, slot: 0, fromChest: true, item: Block.STONE },
+      { kind: 'takeAll', ...at },
+      // Refused: the slot holds stone, not planks.
+      { kind: 'quickMove', ...at, slot: 9, fromChest: false, item: Block.PLANKS },
+    ];
+    for (const action of out) {
+      const fixed =
+        action.kind === 'chestMove' ? { ...action, item: Block.STONE } : (action as Action);
+      expect(eventsFor(ctx, fixed), JSON.stringify(fixed)).toEqual([]);
+    }
+    const creative = chestContext([], stone(10), 'creative');
+    const slots = [...creative.record.slots];
+    slots[0] = stone(10);
+    const bar = { ...creative, record: { ...creative.record, slots } };
+    expect(
+      eventsFor(bar, { kind: 'quickMove', ...at, slot: 0, fromChest: false, item: Block.STONE }),
+    ).toEqual([]);
+  });
+
+  it('a swap into the chest counts the stack that went in', () => {
+    const ctx = chestContext([{ item: Block.PLANKS, count: 3 }], stone(10));
+    const swap: Action = {
+      kind: 'chestMove',
+      ...at,
+      from: 9,
+      fromChest: false,
+      to: 0,
+      toChest: true,
+      item: Block.STONE,
+    };
+    expect(eventsFor(ctx, swap)).toEqual([{ kind: 'store', item: Block.STONE, count: 10 }]);
   });
 });

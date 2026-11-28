@@ -64,7 +64,7 @@ async function pressCraft(page: Page, recipe: string): Promise<void> {
  */
 export async function expectRowsNeverMove(page: Page): Promise<number> {
   const first = await measure(page);
-  expect(first.rows).toHaveLength(20);
+  expect(first.rows).toHaveLength(21);
   const height = first.rows[0].height;
   for (const row of first.rows) expect(row.height, row.name).toBeCloseTo(height, 0);
 

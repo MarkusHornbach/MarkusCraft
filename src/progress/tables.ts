@@ -4,13 +4,14 @@ import { Item } from '../items/items';
 import { Block } from '../world/blocks';
 
 /** What a task counts (plan 5.1). A new type is one union member and one `case` in the step. */
-export type TaskType = 'mine' | 'craft' | 'place' | 'reachBelow' | 'reachAbove';
+export type TaskType = 'mine' | 'craft' | 'place' | 'reachBelow' | 'reachAbove' | 'store';
 export const TASK_TYPES: readonly TaskType[] = [
   'mine',
   'craft',
   'place',
   'reachBelow',
   'reachAbove',
+  'store',
 ];
 
 export interface Chapter {
@@ -27,7 +28,8 @@ export interface Task {
   readonly label: string;
   readonly type: TaskType;
   /**
-   * `mine`, `craft`: an item id; `place`: a block id; `reachBelow` / `reachAbove`: a feet Y.
+   * `mine`, `craft`, `store`: an item id; `place`: a block id; `reachBelow` / `reachAbove`:
+   * a feet Y.
    */
   readonly target: number;
   /** How many items or blocks; 1 for the reach tasks. */
@@ -146,6 +148,8 @@ export const TASKS: readonly Task[] = [
   task(10, 3, 'Place a furnace', 'place', Block.FURNACE, 1, 20),
   task(11, 3, 'Make 16 coal', 'craft', Item.COAL, 16, 20),
   task(12, 3, 'Mine 32 coal', 'mine', Item.COAL, 32, 20),
+  // Phase 8 part B3a2; book 2 marks it done in worlds that had finished tasks 9–12.
+  task(21, 3, 'Store 32 stone in a chest', 'store', Block.STONE, 32, 20),
   task(13, 4, 'Make 32 torches', 'craft', Block.TORCH, 32, 25),
   task(14, 4, 'Reach depth 30', 'reachBelow', 30, 1, 25),
   task(15, 4, 'Place 32 torches', 'place', Block.TORCH, 32, 25),
@@ -181,6 +185,8 @@ export const RECIPE_UNLOCKS: readonly RecipeUnlock[] = [
   ...byLevel(7, [19]),
   // The torch comes with "Make 16 coal": coal from logs, without light.
   { recipe: 20, unlock: { task: 11 } },
+  // The chest comes with "Mine 64 stone", when the inventory starts filling up.
+  { recipe: 21, unlock: { task: 6 } },
 ];
 
 /** One unlock per feature. The radar comes with task 8 "Climb to height 64". */

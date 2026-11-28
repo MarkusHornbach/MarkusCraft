@@ -15,6 +15,7 @@ const STARTING_COUNTS: Record<number, [string, number]> = {
   17: ['Make 3 iron ingots', 3],
   19: ['Make 4 glass', 4],
   20: ['Place 8 stone bricks', 8],
+  21: ['Store 4 stone in a chest', 4],
 };
 
 export const STARTING_TABLES: ProgressTables = {

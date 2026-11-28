@@ -1,5 +1,6 @@
-// Docs budget: sizes of the root and nested CLAUDE.md files and of the device test list,
-// and every repository path written in backticks in a CLAUDE.md must exist.
+// Docs budget: sizes of the root and nested CLAUDE.md files and of the device test lists,
+// and every repository path written in backticks in a CLAUDE.md or a device test list must
+// exist.
 // @ts-check
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
@@ -11,8 +12,11 @@ export const ROOT_WARN = 22500;
 /** Every nested CLAUDE.md fails above this many bytes and warns above `NESTED_WARN`. */
 export const NESTED_LIMIT = 8000;
 export const NESTED_WARN = 7200;
-/** The device test list is not loaded by itself: it only warns. */
-export const DEVICE_TESTS = 'docs/device-tests.md';
+/**
+ * The device test lists (the second from Phase 8 part B3 on) are not loaded by themselves:
+ * they only warn.
+ */
+export const DEVICE_TESTS = ['docs/device-tests.md', 'docs/device-tests-2.md'];
 export const DEVICE_WARN = 25000;
 
 /** Directories never searched for nested CLAUDE.md files. */
@@ -60,7 +64,7 @@ export const PLACEHOLDERS = ['phase-N-', '-Na-'];
 export function limitsFor(path) {
   if (path === 'CLAUDE.md') return { fail: ROOT_LIMIT, warn: ROOT_WARN };
   if (path.endsWith('/CLAUDE.md')) return { fail: NESTED_LIMIT, warn: NESTED_WARN };
-  if (path === DEVICE_TESTS) return { fail: null, warn: DEVICE_WARN };
+  if (DEVICE_TESTS.includes(path)) return { fail: null, warn: DEVICE_WARN };
   return null;
 }
 
@@ -203,11 +207,12 @@ function main() {
       dir: entry.isDirectory(),
     }));
   const claudeFiles = findClaudeFiles(readDir);
-  const sized = [...claudeFiles, DEVICE_TESTS]
+  const sized = [...claudeFiles, ...DEVICE_TESTS]
     .filter((path) => existsSync(join(root, path)))
     .map((path) => ({ path, bytes: statSync(join(root, path)).size }));
+  const linked = [...claudeFiles, ...DEVICE_TESTS.filter((path) => existsSync(join(root, path)))];
   /** @type {PathRef[]} */
-  const refs = claudeFiles.flatMap((file) =>
+  const refs = linked.flatMap((file) =>
     findPathRefs(readFileSync(join(root, file), 'utf8')).map((path) => ({ file, path })),
   );
   const findings = [

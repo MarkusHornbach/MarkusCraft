@@ -31,7 +31,7 @@ describe('static check (Phase 8 AC1.2)', () => {
   it('passes on the starting tables with the planned XP per chapter', () => {
     const result = checkTables(PROGRESS_TABLES);
     expect(result.ok).toBe(true);
-    expect(result.chapters.map((c) => c.xp)).toEqual([50, 125, 235, 380, 520]);
+    expect(result.chapters.map((c) => c.xp)).toEqual([50, 125, 260, 405, 545]);
   });
 
   it('a recipe without unlock', () => {
@@ -122,7 +122,25 @@ describe('the light rule (Fix Adventure 1 AC2.1)', () => {
     expect(SHIPPED.darkBlocks).toEqual([Block.COAL_ORE, Block.IRON_ORE]);
     const result = checkTables(SHIPPED);
     expect(result.errors).toEqual([]);
-    expect(result.chapters.map((c) => c.xp)).toEqual([50, 125, 235, 380, 520]);
+    expect(result.chapters.map((c) => c.xp)).toEqual([50, 125, 260, 405, 545]);
+  });
+
+  it('Phase 8B3a AC6.4: the chest recipe is unlocked before chapter 3, where task 21 needs it', () => {
+    const result = checkTables(SHIPPED);
+    const [first, second] = result.chapters;
+    expect(first.recipes).not.toContain(21);
+    expect(second.recipes).toContain(21);
+    // Without the chest recipe task 21 cannot be done.
+    const errors = errorsOf(variant(unlocks((l) => l.filter((u) => u.recipe !== 21))));
+    expect(errors).toContain('recipe 21 (chest) has no unlock');
+    const late = errorsOf(
+      variant(
+        unlocks((l) => l.map((u) => (u.recipe === 21 ? { recipe: 21, unlock: { task: 13 } } : u))),
+      ),
+    );
+    expect(late).toEqual([
+      'chapter 3 "Stone and fire" cannot be finished: task 21 "Store 4 stone in a chest"',
+    ]);
   });
 
   it('Fix Adventure 1 AC2.1: the torch on task 12 (the tables before) fails: task 12 needs light', () => {

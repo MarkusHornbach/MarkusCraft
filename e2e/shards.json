@@ -24,6 +24,8 @@
     ],
     [
       "actions.spec.ts",
+      "chestScreen.spec.ts",
+      "chestTouch.spec.ts",
       "crafting.spec.ts",
       "gathering.spec.ts",
       "inventory.spec.ts",
@@ -38,6 +40,7 @@
     [
       "bench.spec.ts",
       "chest.spec.ts",
+      "chestPad.spec.ts",
       "gamepadMenus.spec.ts",
       "interaction.spec.ts",
       "netTest.spec.ts",
@@ -51,7 +54,7 @@
   ],
   "multiplayer": [
     ["mpCaves.spec.ts", "mpMenus.spec.ts", "mpPlayers.spec.ts", "mpProgress.spec.ts"],
-    ["mpFigure.spec.ts", "mpGathering.spec.ts", "mpRadar.spec.ts"],
+    ["mpChestScreen.spec.ts", "mpFigure.spec.ts", "mpGathering.spec.ts", "mpRadar.spec.ts"],
     ["mpChest.spec.ts", "mpHarden.spec.ts", "mpRooms.spec.ts"]
   ]
 }

@@ -5,6 +5,7 @@ import { type ChestState, type WorldStates, emptyChest } from '../world/blockSta
 import { blockIndex, chunkKey } from '../world/chunk';
 import { World } from '../world/World';
 import { sampleMeta } from '../testing/sampleWorld';
+import { openChapter } from '../progress/progress';
 import { MemoryStore } from './WorldStore';
 import {
   type ChunkRecord,
@@ -160,11 +161,12 @@ describe('format 6: the book version (Phase 8B3a AC4.2, AC4.3)', () => {
       const loaded = decodeWorld(throughJson(old), [chunk]);
       expect(loaded.ok, String(formatVersion)).toBe(true);
       if (!loaded.ok) continue;
-      expect(loaded.value.meta.book).toBe(1);
+      // Book 1 on disk, upgraded to the build's book when decoded (Phase 8 part B3a2).
+      expect(loaded.value.meta.book).toBe(BOOK_VERSION);
       expect(loaded.value.states.size).toBe(0);
       const written = encodeMeta(loaded.value.meta);
       expect(written.formatVersion).toBe(6);
-      expect((written.progress as { book: number }).book).toBe(1);
+      expect((written.progress as { book: number }).book).toBe(BOOK_VERSION);
     }
   });
 });
@@ -195,5 +197,38 @@ describe('a world with chests through the store (Phase 8B3a AC4.1)', () => {
     await store.saveChunks(meta.id, again.edits, [chunkKey(0, 0)], again.states);
     const record = store.chunks.get('w1|0,0') as ChunkRecord;
     expect(record.states).toBeUndefined();
+  });
+});
+
+describe('book 2 on loading (Phase 8B3a AC6.3)', () => {
+  /** A format 5 Adventure record (no book) with the given progress. */
+  function format5(done: number[], counts: { task: number; count: number }[] = []): unknown {
+    const current = encodeMeta(sampleMeta({ mode: 'gathering' })) as Record<string, unknown>;
+    return throughJson({ ...current, formatVersion: 5, progress: { done, counts } });
+  }
+
+  it('a format 5 world past chapter 3 gets task 21 done and opens in its chapter', () => {
+    const decoded = decodeMeta(format5([...Array(14).keys()].map((i) => i + 1)));
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.book).toBe(2);
+    expect(decoded.value.progress.done).toContain(21);
+    expect(openChapter(decoded.value.progress)?.id).toBe(4);
+    // XP is the record's: the upgrade gives none.
+    expect(decoded.value.player.xp).toBe(sampleMeta({ mode: 'gathering' }).player.xp);
+  });
+
+  it('a format 5 world in chapter 3 keeps task 21 open; book 2 records are not upgraded', () => {
+    const decoded = decodeMeta(format5([1, 2, 3, 4, 5, 6, 7, 8, 9], [{ task: 11, count: 4 }]));
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.progress.done).not.toContain(21);
+    expect(openChapter(decoded.value.progress)?.id).toBe(3);
+    const current = encodeMeta({
+      ...decoded.value,
+      progress: { done: [9, 10, 11, 12], counts: [] },
+    });
+    const again = decodeMeta(throughJson(current));
+    expect(again.ok && again.value.progress.done).toEqual([9, 10, 11, 12]);
   });
 });

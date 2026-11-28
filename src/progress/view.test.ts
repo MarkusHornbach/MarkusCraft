@@ -35,7 +35,7 @@ describe('bookView', () => {
     );
     expect(view.finished).toEqual(['First wood', 'Tools']);
     expect(view.chapterTitle).toBe('Chapter 3 · Stone and fire');
-    expect(view.tasks.map((t) => t.status)).toEqual(['✓', '0 / 1', '1 / 2', '0 / 3']);
+    expect(view.tasks.map((t) => t.status)).toEqual(['✓', '0 / 1', '1 / 2', '0 / 3', '0 / 4']);
     expect(view.xpText).toBe('120 / 150 XP');
     expect(view.xpFraction).toBeCloseTo(40 / 70, 6);
     expect(view.nextText).toBe('Next level: Stone bricks, Bricks');
@@ -51,7 +51,7 @@ describe('bookView', () => {
 
   it('the last chapter and the complete book at the maximum level', () => {
     const last = bookView(
-      { done: [...Array(16).keys()].map((i) => i + 1), counts: [] },
+      { done: [...[...Array(16).keys()].map((i) => i + 1), 21], counts: [] },
       record(400),
       T,
     );
@@ -73,7 +73,7 @@ describe('bookView', () => {
 describe('texts', () => {
   it('the F3 row', () => {
     expect(progressRow({ done: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], counts: [] }, record(160), T)).toBe(
-      'Chapter 3 · Task 2/4 done · Level 4 · 160/240 XP',
+      'Chapter 3 · Task 2/5 done · Level 4 · 160/240 XP',
     );
     expect(progressRow(completeProgress(T), record(480), T)).toBe('Book complete · Level 7 · Max');
   });
@@ -87,7 +87,7 @@ describe('texts', () => {
     const me = { id: 'me', record: record(140) };
     const other = { id: 'other', record: record(0) };
     const world = {
-      done: [...Array(15).keys()].map((i) => i + 1),
+      done: [...[...Array(15).keys()].map((i) => i + 1), 21],
       counts: [{ task: 16, count: 2 }],
     };
     const step = stepProgress(

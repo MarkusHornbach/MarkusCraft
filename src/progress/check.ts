@@ -3,7 +3,7 @@ import { WORLD_HEIGHT } from '../game/config';
 import { dropOf } from '../items/hardness';
 import { getItemDef, toolOf } from '../items/items';
 import { RECIPES, type Recipe, STATION_BLOCKS } from '../items/recipes';
-import { BLOCK_EMISSION, getBlockDef } from '../world/blocks';
+import { BLOCK_EMISSION, Block, getBlockDef } from '../world/blocks';
 import {
   FEATURES,
   NATURAL_BLOCKS,
@@ -19,6 +19,8 @@ export interface ChapterXp {
   chapter: number;
   xp: number;
   level: number;
+  /** Recipe ids unlocked at the end of the chapter, in table order. */
+  recipes: number[];
 }
 
 export interface CheckResult {
@@ -52,6 +54,7 @@ function checkStructure(tables: ProgressTables, recipes: readonly Recipe[]): str
     switch (task.type) {
       case 'mine':
       case 'craft':
+      case 'store':
         if (!getItemDef(task.target)) errors.push(`${name}: unknown item ${task.target}`);
         break;
       case 'place':
@@ -252,6 +255,9 @@ function checkReachability(
         return lit;
       case 'reachAbove':
         return true;
+      case 'store':
+        // The item, and a chest to put it in (its recipe unlocked and makeable).
+        return have.has(task.target) && have.has(Block.CHEST);
     }
   };
 
@@ -280,6 +286,9 @@ function checkReachability(
       force(task.target, have, out, new Set(), true);
     } else if (task.type === 'place') {
       force(task.target, have, out, new Set(), false);
+    } else if (task.type === 'store') {
+      force(task.target, have, out, new Set(), false);
+      force(Block.CHEST, have, out, new Set(), false);
     }
     let gain = task.xp;
     for (const recipe of out.crafts) {
@@ -334,7 +343,12 @@ function checkReachability(
       featureErrors(errors, stuck);
       return { errors, chapters };
     }
-    chapters.push({ chapter: chapter.id, xp: state.xp, level: levelIn(tables.levels, state.xp) });
+    chapters.push({
+      chapter: chapter.id,
+      xp: state.xp,
+      level: levelIn(tables.levels, state.xp),
+      recipes: recipes.filter(unlocked).map((r) => r.id),
+    });
   }
   featureErrors(errors);
   for (const recipe of recipes) {

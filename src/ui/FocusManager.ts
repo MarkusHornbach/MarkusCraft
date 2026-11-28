@@ -117,6 +117,11 @@ export class FocusManager {
     }
   }
 
+  /** The focused element of the open screen, or null (the chest screen's X reads it). */
+  get focusedElement(): HTMLElement | null {
+    return this.root ? this.focused : null;
+  }
+
   /** A short description of the focused element (test API), or null. */
   get description(): string | null {
     const element = this.root ? this.focused : null;

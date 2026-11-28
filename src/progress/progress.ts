@@ -226,6 +226,8 @@ function advance(task: Task, event: ProgressEvent): number {
       return event.kind === 'pose' && event.y <= task.target ? 1 : 0;
     case 'reachAbove':
       return event.kind === 'pose' && event.y >= task.target ? 1 : 0;
+    case 'store':
+      return event.kind === 'store' && event.item === task.target ? event.count : 0;
   }
 }
 

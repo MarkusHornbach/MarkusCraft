@@ -104,6 +104,20 @@ describe('task types (Phase 8 AC2.1)', () => {
     expect(r.world.done).toContain(14);
   });
 
+  it('Phase 8B3a AC6.2: store counts stone moved into a chest, done at its count with its XP', () => {
+    const store = (item: number, count: number): ProgressEvent => ({ kind: 'store', item, count });
+    // Stored in chapter 2: chapter 3's task does not count yet.
+    let r = run([store(Block.STONE, 3)], atChapter(2));
+    expect(r.world.counts).toEqual([]);
+    r = run([store(Block.PLANKS, 9), store(Block.STONE, 3)], atChapter(3));
+    expect(r.world.counts).toEqual([{ task: 21, count: 3 }]);
+    const xp = r.record.xp;
+    r = run([store(Block.STONE, 2)], r.world, r.record);
+    expect(r.world.done).toContain(21);
+    expect(r.record.xp - xp).toBe(getTask(21)?.xp);
+    expect(r.outcomes).toContainEqual({ kind: 'taskDone', task: 21, actor: 'me' });
+  });
+
   it('surplus is not carried over', () => {
     const r = run([mine(Block.LOG, Block.LOG, 9)]);
     expect(r.world.done).toEqual([1]);

@@ -25,7 +25,9 @@ blocks. It plays the open chapter's tasks in table order, one generic skill per 
 `mineOne` (the nearest block that yields the item, never under water, after making the
 tool the gating needs), `craftOnce` through `obtain` (mined if a natural block yields it,
 otherwise crafted through the recipe graph), `placeOne`, `digTo` (a staircase down, away
-from water) and `climbTo` (a hill nearby, else a pillar). Stations are placed when a recipe
+from water), `climbTo` (a hill nearby, else a pillar) and `storeOne` (Phase 8 part B3a2:
+a chest through `obtain`, placed beside it, `openChest`, a `quickMove` per stack of the
+item, `closeChest`, then the chest broken again with its contents). Stations are placed when a recipe
 needs one and taken back when the task is done. Junk (leaves, clay, grass, dirt, sand) is
 thrown away when the inventory is full; one stack of pillar blocks stays.
 

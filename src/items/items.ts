@@ -1,6 +1,6 @@
 // Item table: everything a player can hold. A block is the item with the same id.
 import { STACK_SIZE } from '../game/config';
-import { BLOCKS, Block, isPlaceable } from '../world/blocks';
+import { BLOCKS, isPlaceable } from '../world/blocks';
 
 /** Items that are not blocks start here; block ids stay below. */
 export const FIRST_ITEM_ID = 256;
@@ -95,11 +95,8 @@ export const BLOCK_ITEMS: readonly number[] = ITEMS.filter((item) => item.block 
   (item) => item.id,
 );
 
-/**
- * The blocks of the Creative palette. Part B3a1 keeps the chest out of it: on `main` the
- * chest exists only through the test API until its screen arrives (B3a2).
- */
-export const PALETTE_ITEMS: readonly number[] = BLOCK_ITEMS.filter((id) => id !== Block.CHEST);
+/** The blocks of the Creative palette: every block item, in id order (the chest is last). */
+export const PALETTE_ITEMS: readonly number[] = BLOCK_ITEMS;
 
 export function getItemDef(id: number): ItemDef | undefined {
   return TABLE.get(id);

@@ -8,7 +8,8 @@ Shell (DOM). Screens change the world and items only through actions
 - `Hud.ts` (bar with counts, break progress, notices), `TaskTracker.ts` (the tracked
   task, part of the HUD), `blockIcon.ts`, `itemIcon.ts`,
   `DebugOverlay.ts`, `settings.ts`, `ui.css`, `activate.ts` (button helpers)
-- `InventoryScreen.ts` (27 slots or the Creative palette, bar, bin, tabs), `RecipeList.ts`
+- `InventoryScreen.ts` (27 slots or the Creative palette, bar, bin, tabs), `ChestScreen.ts`
+  (a chest's slots, the inventory and the bar), `RecipeList.ts`
   (the "Crafting" tab: one row per recipe), `TasksTab.ts` (the "Tasks" tab), `MapTab.ts`,
   `RadarCircle.ts`, `radarDraw.ts` (the radar: `src/radar/CLAUDE.md`),
   `ProgressNotice.ts` (the progress notice)
@@ -23,8 +24,8 @@ Shell (DOM). Screens change the world and items only through actions
   look picker), `figureIcons.ts` (head icons and the figure sheet on canvases)
 
 **The focus system and the controller on the inventory** are described in
-`src/input/CLAUDE.md` (`FocusManager.ts` lives here, the rules there). **Screens** and the
-order between them: `src/game/CLAUDE.md`.
+`src/input/CLAUDE.md` (`FocusManager.ts` lives here, the rules there). **Screens**, the order between them and the "New world" form:
+`src/game/CLAUDE.md`.
 
 ## The inventory screen
 
@@ -85,20 +86,21 @@ nothing, a held one starts the next smelt after the delivery. The recipe table i
 `src/items/CLAUDE.md`. The label column of the settings
 rows is 136 px wide, so the controller labels fit on one line.
 
-## The "New world" form and the world list (Phase 7 part A)
+## The chest screen (Phase 8 part B3a2)
 
-Under the Mode row and its hint: "Terrain" (Flat, Balanced, Hilly) and "Trees" (None, Few,
-Normal, Many), radio groups built like the Mode row (`choiceRow`, `data-terrain`,
-`data-trees`); `showForm` preselects Balanced and Few. **The `None` rule:** in Adventure
-`None` is disabled (not focusable) and the hint under Trees says "No trees only in Creative:
-Adventure needs wood."; switching to Adventure while `None` is chosen selects `Few`. The
-form scrolls on small screens; the menu comes back at the top when it is shown again. A list
-row shows "Adventure · Balanced · Few trees", or "Creative · Classic" for generator 1. The
-F3 overlay has a row "World" ("Generator 2 · balanced · few", "Generator 1"). The settings
-page has the switch "Collide with leaves" below "Invert controller look", then "Radar
-circle" (`settings.radar`, default on), in every input mode; on phones "Collide with leaves"
-and "Radar circle" share a line. The slider "Radar circle size" (Small, Medium, Large)
-follows (B2b; sizes and the full-screen Map tab: `src/radar/CLAUDE.md`).
+`ChestScreen.ts`: header ("Chest", the "Also open: Anna, Ben" line in a room, "Take all",
+"Close"), the chest's 27 slots (`data-side="chest"`), the 27 inventory slots (Adventure
+only) and the bar (`data-side="player"`; class `chest-slot`, never `inv-slot`). Pick then
+place across both sides is one `chestMove` with the shown item; a second activation of the
+picked slot within `QUICK_MOVE_MS` (350, simulation time) is a `quickMove`, later it puts
+the slot down; "Take all" is `takeAll`. A picked slot whose stack changes (another player)
+is put down. `Game` opens it on an accepted `openChest` (the place input on a chest submits
+one; so may the test API) and closes it with E, Esc, "Close", a pause, a new session, a cell
+that is no chest or an eye beyond `REACH + REACH_TOLERANCE` (each step); every close
+submits `closeChest`. Like the inventory it does not pause, hides the HUD and covers the
+touch controls (so `bag` cannot close it: "Close" does). The room's `viewers` news is kept,
+as it reaches a guest before the answer to its `openChest`. Slots are 48 px, on screens up
+to 480 px high 38 px (icons 28, the hint line hidden): 640 × 360 needs no scrolling.
 
 ## "Your player" (Phase 6 part D)
 

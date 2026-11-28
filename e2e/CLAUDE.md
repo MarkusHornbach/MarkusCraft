@@ -9,7 +9,8 @@ references and the performance test are in `docs/testing.md`.
   (opens the game and wraps the test API), `e2e/helpers.ts` (measures pixels), `touch.ts`,
   `gamepad.ts` (the fake controller), `sites.ts` (tree, beach and rock near the start
   point), `lightScenes.ts` (tunnel, room with a window, roof over a chunk corner),
-  `recipeRows.ts` (recipe rows that never move), `screenshots/`
+  `recipeRows.ts` (recipe rows that never move), `chests.ts` (a chest ahead, the chest
+  screen's slots), `screenshots/`
 - `multiplayer.ts` (several players in their own contexts, `netQuery`, `openNetTest`,
   `openTestPlayer`, `hostRoom`, `joinRoom`, `untilNet`), `mp*.spec.ts` (tests with several
   game pages; project `multiplayer`; `mpHarden.spec.ts`: overlay, host without frames,

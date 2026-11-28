@@ -82,6 +82,16 @@ D-pad down from the tab reaches the open task rows (buttons with the task's labe
 keeps its element when the mark or count changes, so the focus stays on it after A. The
 fourth tab, Map (Phase 8 part B1), follows Tasks; nothing inside it is focusable.
 
+## The controller on the chest screen (Phase 8 part B3a2)
+
+Marks only: `data-pad-default` on the chest's first slot, `data-pad-back` on "Close"; the
+D-pad walks both grids, the bar and "Take all" with `nextFocus` unchanged.
+`Game.onChestPadFrame`: Start closes and pauses, Y closes, B puts a picked slot down or
+else closes (also the browser's Back), X quick moves the focused slot
+(`FocusManager.focusedElement`); the rest goes to `FocusManager` without B, Start and X.
+Hints: "A Move · X Quick move · Y Close"; the screen's text line hides while the pad is
+active. The place trigger opens a chest under the crosshair, like right click.
+
 ## Back guard
 
 Outside test mode, while anything but the world list is shown, the page holds one history

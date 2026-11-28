@@ -112,6 +112,7 @@ export const RECIPES: readonly Recipe[] = [
     ],
     [Block.TORCH, 4],
   ),
+  recipe(21, 'chest', 'workbench', [[Block.PLANKS, 8]], [Block.CHEST, 1]),
 ];
 
 const BY_ID = new Map(RECIPES.map((r) => [r.id, r]));

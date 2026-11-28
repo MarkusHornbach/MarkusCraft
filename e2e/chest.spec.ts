@@ -127,3 +127,30 @@ test('Phase 8B3a AC2.3: Creative refuses to break a filled chest and says why', 
   expect(await getBlock(page, cell.x, cell.y, cell.z)).toBe(AIR);
   expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
 });
+
+test('Phase 8B3a AC5.8: the chest block in the world matches the chest-block reference', async ({
+  page,
+}) => {
+  await openGame(page);
+  const { px, pz } = await standOnPlatform(page);
+  // Three chests in a row and one on top, seen from above at an angle: sides and lid.
+  await page.evaluate(
+    async ([x0, y0, z0, id]) => {
+      for (let dx = -1; dx <= 1; dx++) window.__mc.setBlock(x0 + dx, y0, z0, id);
+      window.__mc.setBlock(x0, y0 + 1, z0, id);
+      await window.__mc.whenIdle();
+    },
+    [px, PLATFORM_Y + 1, pz - 3, CHEST],
+  );
+  await page.evaluate((p) => window.__mc.setPlayer(p), {
+    x: px + 1.8,
+    y: PLATFORM_Y + 1.5,
+    z: pz + 0.2,
+    yaw: 0.35,
+    pitch: -0.35,
+  });
+  await step(page, 2);
+  await whenIdle(page);
+  await expect(page).toHaveScreenshot('chest-block.png');
+  expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
+});

@@ -181,6 +181,11 @@ export const INVENTORY_SLOTS = 36;
 export const STACK_SIZE = 99;
 /** Slots of a chest (Phase 8 part B3a): three rows of nine. */
 export const CHEST_SLOTS = 27;
+/**
+ * Two activations of one slot of the chest screen within this many milliseconds of
+ * simulation time, with nothing picked before the first, move its stack to the other side.
+ */
+export const QUICK_MOVE_MS = 350;
 export const HOTBAR_SLOTS = 9;
 /** A `break` may arrive this much before its time is up (Gathering). */
 export const BREAK_TOLERANCE_MS = 100;
@@ -231,9 +236,10 @@ export const SAVE_FORMAT_VERSION = 6;
 /**
  * Version of the task book (`progress.book` in the save, format 6). A world with a higher
  * book is "newer"; a lower one is upgraded on loading (`upgradeBook`). 1 = the 20 tasks
- * of Phase 8 part A and Fix Adventure 1.
+ * of Phase 8 part A and Fix Adventure 1; 2 = task 21 "Store 32 stone in a chest" in
+ * chapter 3 (Phase 8 part B3a2).
  */
-export const BOOK_VERSION = 1;
+export const BOOK_VERSION = 2;
 /** Guests a world keeps (items and place); beyond this the one seen longest ago goes. */
 export const GUESTS_MAX = 32;
 export const WORLD_NAME_MAX = 24;

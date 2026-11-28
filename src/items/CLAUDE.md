@@ -4,8 +4,7 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`).
 
 ## Files
 
-- `items.ts` (item table, tools, `PALETTE_ITEMS`: the Creative palette, without the chest
-  until B3a2), `inventory.ts` (functions on the 36 slots; `transferStack`,
+- `items.ts` (item table, tools, `PALETTE_ITEMS`: the Creative palette, the chest last), `inventory.ts` (functions on the 36 slots; `transferStack`,
   `addItemsInOrder` and `fitsAll` for a chest's 27),
   `hardness.ts` (break times, tool speed, gating, drop table), `recipes.ts` (recipe table,
   stations near a player, recipe status)
@@ -25,7 +24,7 @@ pickaxe". Tools have stack size 1 and cannot be placed.
 
 ## Crafting
 
-`items/recipes.ts` is the one recipe table (ids 1–20, append-only like item ids, pinned by
+`items/recipes.ts` is the one recipe table (ids 1–21, append-only like item ids, pinned by
 `recipes.test.ts`). A recipe has ingredients, one result and optionally a station
 (`workbench`, `furnace`): a placed block whose centre lies within `STATION_REACH` (5) of
 the eye. `craft` answers `invalid` (unknown recipe), then `station`, `missing`, `full`;
