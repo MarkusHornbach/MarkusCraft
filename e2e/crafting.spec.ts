@@ -37,7 +37,7 @@ const IRON_SHOVEL = 267;
 const LOG = 5;
 const COAL = 256;
 const STICK = 257;
-const RECIPE_COUNT = 20;
+const RECIPE_COUNT = 21;
 const COAL_RECIPE = 11;
 /** The recipe ids in table order, as the list shows them (polishing session 1). */
 const TABLE_IDS = Array.from({ length: RECIPE_COUNT }, (_, index) => index + 1);

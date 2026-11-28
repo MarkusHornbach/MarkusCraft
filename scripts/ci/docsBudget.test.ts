@@ -42,6 +42,9 @@ describe('checkSizes', () => {
     expect(one('docs/device-tests.md', 25000)).toEqual([]);
     expect(one('docs/device-tests.md', 25001).map((f) => f.level)).toEqual(['warning']);
     expect(one('docs/device-tests.md', 500000).map((f) => f.level)).toEqual(['warning']);
+    // The second list (Phase 8 part B3a2) has the same limit.
+    expect(one('docs/device-tests-2.md', 25000)).toEqual([]);
+    expect(one('docs/device-tests-2.md', 25001).map((f) => f.level)).toEqual(['warning']);
   });
 
   it('ignores files the budget does not cover', () => {

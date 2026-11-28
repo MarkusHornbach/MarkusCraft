@@ -31,6 +31,21 @@ over the running game (`src/ui/CLAUDE.md`). Play buttons request the pointer loc
 or fullscreen (touch) synchronously inside the click. `Game.loadWorld` and the stores:
 `src/save/CLAUDE.md`.
 
+## The "New world" form and the world list (Phase 7 part A)
+
+Under the Mode row and its hint: "Terrain" (Flat, Balanced, Hilly) and "Trees" (None, Few,
+Normal, Many), radio groups built like the Mode row (`choiceRow`, `data-terrain`,
+`data-trees`); `showForm` preselects Balanced and Few. **The `None` rule:** in Adventure
+`None` is disabled (not focusable) and the hint under Trees says "No trees only in Creative:
+Adventure needs wood."; switching to Adventure while `None` is chosen selects `Few`. The
+form scrolls on small screens; the menu comes back at the top when it is shown again. A list
+row shows "Adventure · Balanced · Few trees", or "Creative · Classic" for generator 1. The
+F3 overlay has a row "World" ("Generator 2 · balanced · few", "Generator 1"). The settings
+page has the switch "Collide with leaves" below "Invert controller look", then "Radar
+circle" (`settings.radar`, default on), in every input mode; on phones "Collide with leaves"
+and "Radar circle" share a line. The slider "Radar circle size" (Small, Medium, Large)
+follows (B2b; sizes and the full-screen Map tab: `src/radar/CLAUDE.md`).
+
 ## Multiplayer configuration (Phase 6)
 
 The signaling and STUN addresses reach the game only through the build variables

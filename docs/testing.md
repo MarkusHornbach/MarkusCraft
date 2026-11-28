@@ -124,6 +124,14 @@ kinds, 8 each), legend (texts), draws }`; `ui.tab` may be `map`; `settings.radar
   `getState().net.worldHash` covers block states. The F3 row "Chests" ("3 chests · 1.2 kB",
   "· 1 dropped") shows while the world has block states. `e2e/chest.spec.ts` (single
   player, `save=1`), `e2e/mpChest.spec.ts` (a room, a late guest).
+- Phase 8 part B3a2 (the chest screen): an accepted `openChest` opens the screen, also one
+  submitted through `submit`; `ui.screen` is then `chest` and `ui.chest` is `{ x, y, z,
+viewers }` (the names of the "Also open" line; left out while closed, like `focus`).
+  Specs: `e2e/chestScreen.spec.ts` (mouse, Creative, the play-through of task 21),
+  `e2e/chestTouch.spec.ts` (touch, layouts at 640 × 360, 915 × 412, 1280 × 800),
+  `e2e/chestPad.spec.ts` (controller), `e2e/mpChestScreen.spec.ts` (a room), with the set-up
+  helpers in `e2e/chests.ts`. References `chest-screen`, `chest-screen-touch`,
+  `pad-chest-screen` and `chest-block` (in `e2e/chest.spec.ts`).
 
 ## Controller
 

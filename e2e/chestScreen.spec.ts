@@ -6,6 +6,8 @@ import { chestAhead, chestSlot as slot, count, getChest, screen } from './chests
 import {
   DEG,
   clickCenter,
+  give,
+  standOnPlatform,
   getBlock,
   getState,
   inventory,
@@ -190,4 +192,40 @@ test('Phase 8B3a AC5.8: matches the chest-screen reference (Adventure, mouse)', 
   const box = await slot(page, 'chest', 0).boundingBox();
   expect(box?.width).toBeCloseTo(48, 0);
   await expect(page).toHaveScreenshot('chest-screen.png');
+});
+
+test('Phase 8B3a AC6.5: from "task 20 of 21 done", real input: place the chest, open it, move 32 stone in; the task notice shows', async ({
+  page,
+}) => {
+  await openGame(page, { mode: 'gathering', progress: 'fresh' });
+  // Every task done but task 21: chapter 3 is open with it alone.
+  await page.evaluate(() =>
+    window.__mc.setProgress({ xp: 200, done: Array.from({ length: 20 }, (_, i) => i + 1) }),
+  );
+  expect((await getState(page)).progress).toMatchObject({ chapter: 3 });
+  await standOnPlatform(page);
+  await page.evaluate(() => window.__mc.clearInventory());
+  await give(page, CHEST, 1);
+  await give(page, STONE, 32);
+  // Slot 1 holds the chest: look down at the platform ahead and right click.
+  await page.keyboard.press('Digit1');
+  await setPlayer(page, { pitch: -50 * DEG });
+  await step(page, 2);
+  await whenIdle(page);
+  await clickCenter(page, 'right');
+  await step(page, 1);
+  expect(count(await inventory(page), CHEST)).toBe(0);
+  // The crosshair is on the chest now: a right click opens it.
+  await whenIdle(page);
+  await clickCenter(page, 'right');
+  await step(page, 1);
+  expect(await screen(page)).toBe('chest');
+  await page.locator('.chest-slot[data-side="player"][data-item="stone"]').first().click();
+  await slot(page, 'chest', 0).click();
+  await whenIdle(page);
+  expect(count(await inventory(page), STONE)).toBe(0);
+  await expect(page.locator('.progress-notice')).toHaveText(
+    'Task done: Store 32 stone in a chest · +20 XP',
+  );
+  expect((await getState(page)).progress?.done).toContain(21);
 });

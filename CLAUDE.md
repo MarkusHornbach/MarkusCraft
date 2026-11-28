@@ -215,10 +215,11 @@ writing specs: `e2e/CLAUDE.md`. Always:
 
 ## Tests on real devices
 
-`docs/device-tests.md` lists the open tests only a person with a real device can judge
-(feel, readability, frame rate); `docs/device-tests-done.md` holds the passed and obsolete
-ones. The owner fills them out. Read the open list at a session's start (the owner's
-feedback). A part adds its tests there; how (ids, origins, moving ticked and pointless
+`docs/device-tests.md` and, from Phase 8 part B3 on, `docs/device-tests-2.md` list the
+open tests only a person with a real device can judge (feel, readability, frame rate);
+`docs/device-tests-done.md` holds the passed and obsolete ones. The owner fills them out.
+Read both open lists at a session's start (the owner's feedback). A part adds its tests to
+the second; how (ids, origins, moving ticked and pointless
 tests, results never changed): that file's header, "How it is kept up to date".
 
 ## Docs hygiene
@@ -312,13 +313,14 @@ hold:
 | 8B2a      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2a-report.md`      | generator 3, caves, walk check, `caves`    |
 | 8B2b      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2b-report.md`      | radar places, map and circle size          |
 | 8B3a1     | `docs/phase-8b3a-plan.md`      | `docs/phase-8b3a1-report.md`     | block state, chest, save format 6, rooms   |
+| 8B3a2     | `docs/phase-8b3a-plan.md`      | `docs/phase-8b3a2-report.md`     | chest screen, task 21, book 2, `store`     |
 
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
   planned. Phase 8: A, "Fix Adventure 1", B1 (radar), B2a (generator 3, caves) and B2b (places on
-  the radar, a larger map) are built; of B3a (chests as storage, `docs/phase-8b3a-plan.md`)
-  B3a1 (block state, save format 6, rooms; the chest only through the test API) is built,
-  B3a2 (chest screen, task 21) is next; B3b on and C–E are not planned. At a session's start look
+  the radar, a larger map) and B3a (chests as storage, `docs/phase-8b3a-plan.md`: B3a1
+  block state and save format 6, B3a2 the chest screen and task 21) are built; B3b on and
+  C–E are not planned. At a session's start look
   for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
   needed"). Numbers from software WebGL (cloud, CI) are never evidence.
 - **Reading older docs:** multiplayer was "Phase 4" in the Phase 3 documents and "Phase

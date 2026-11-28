@@ -4,6 +4,7 @@ The one list of everything only a person with a real device can judge. It replac
 "For the owner to try" lists that were spread over the phase reports (the reports keep
 their lists as a record of what was asked at the time; this file is the one to fill out).
 It holds the open tests; passed and obsolete ones are in `docs/device-tests-done.md`.
+New tests from Phase 8 part B3 on go into `docs/device-tests-2.md` (this file is full).
 
 **How to use it**
 

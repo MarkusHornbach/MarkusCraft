@@ -349,7 +349,7 @@ for (const [label, fixtureMeta, fixtureChunk] of [
     const meta = (await storedRecords(page)).worlds.find(
       (w) => (w as { id: string }).id === fixtureMeta.id,
     ) as Record<string, unknown>;
-    // Phase 8B3a AC4.2: written back as format 6, with book 1.
+    // Phase 8B3a AC4.2: written back as format 6, with the build's book (B3a2: 2).
     expect(meta.formatVersion).toBe(6);
     expect(meta.generatorVersion).toBe(1);
     // Generator 1 records carry no options.
@@ -357,8 +357,65 @@ for (const [label, fixtureMeta, fixtureChunk] of [
     expect(meta.guests).toEqual([]);
     // Phase 8 AC4.2: an old Gathering world is an Adventure world at the start of the book.
     expect(meta.player).toEqual({ ...fixtureMeta.player, xp: 0, found: [], crafted: [], track: 0 });
-    expect(meta.progress).toEqual({ done: [], counts: [], book: 1 });
+    expect(meta.progress).toEqual({ done: [], counts: [], book: 2 });
     expect(state.progress).toMatchObject({ level: 1, xp: 0, chapter: 1, done: [] });
     expect(meta.createdMs).toBe(fixtureMeta.createdMs);
   });
 }
+
+// A world of the build before Phase 8 part B3a (format 5) whose book is past chapter 3.
+const POLISH_2_META = {
+  ...PHASE_5_META,
+  id: 'wpol2-fixture1',
+  name: 'Polish 2 world',
+  formatVersion: 5,
+  player: { ...PHASE_5_META.player, xp: 300, found: [], crafted: [], track: 0 },
+  guests: [],
+  progress: {
+    done: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+    counts: [{ task: 15, count: 4 }],
+  },
+};
+const POLISH_2_CHUNK = { ...PHASE_5_CHUNK, key: 'wpol2-fixture1|0,0', worldId: 'wpol2-fixture1' };
+
+test('Phase 8B3a AC6.3: a format 5 world past chapter 3 opens in its chapter, task 21 done without XP', async ({
+  page,
+}) => {
+  await openGame(page, { save: true, world: 'Other' });
+  await page.evaluate(
+    ([meta, chunk]) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('markuscraft');
+        open.onerror = () => reject(new Error('open failed'));
+        open.onsuccess = () => {
+          const tx = open.result.transaction(['worlds', 'chunks'], 'readwrite');
+          tx.objectStore('worlds').put(meta);
+          tx.objectStore('chunks').put(chunk);
+          tx.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+          tx.onerror = () => reject(new Error('write failed'));
+        };
+      }),
+    [POLISH_2_META, POLISH_2_CHUNK] as const,
+  );
+  await openGame(page, { save: true, world: POLISH_2_META.name });
+  const state = await getState(page);
+  expect(state.world?.id).toBe(POLISH_2_META.id);
+  expect(state.progress).toMatchObject({ chapter: 4, xp: 300 });
+  expect(state.progress?.done).toContain(21);
+  await page.evaluate(async () => {
+    window.__mc.setTime(0.3);
+    await window.__mc.save();
+  });
+  const meta = (await storedRecords(page)).worlds.find(
+    (w) => (w as { id: string }).id === POLISH_2_META.id,
+  ) as Record<string, unknown>;
+  expect(meta.formatVersion).toBe(6);
+  expect(meta.progress).toEqual({
+    done: [...POLISH_2_META.progress.done, 21],
+    counts: [{ task: 15, count: 4 }],
+    book: 2,
+  });
+});

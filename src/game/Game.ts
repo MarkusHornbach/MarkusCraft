@@ -311,6 +311,8 @@ export class Game {
   private chestOpen: { x: number; y: number; z: number } | null = null;
   /** An `openChest` was submitted for this cell; the screen opens on its answer. */
   private chestPending: { x: number; y: number; z: number } | null = null;
+  /** The room's last `viewers` news: it reaches a guest before the answer to its `openChest`. */
+  private chestViewers: ChestViewers | null = null;
   /** True while a world is being opened, created or deleted from the menu. */
   private menuBusy = false;
   /** Releases the tab lock of the open world. */
@@ -1843,8 +1845,14 @@ export class Game {
 
   /** In a room: who else has the open chest open, by name. */
   private onViewers(viewers: ChestViewers): void {
+    this.chestViewers = viewers;
+    this.showChestViewers();
+  }
+
+  private showChestViewers(): void {
     const c = this.chestOpen;
-    if (!c || viewers.x !== c.x || viewers.y !== c.y || viewers.z !== c.z) return;
+    const viewers = this.chestViewers;
+    if (!c || !viewers || viewers.x !== c.x || viewers.y !== c.y || viewers.z !== c.z) return;
     const others = this.mp
       .players({ x: 0, y: 0, z: 0, yaw: 0, pitch: 0 })
       .filter((p) => !p.self && viewers.ids.includes(p.id));
@@ -2020,6 +2028,7 @@ export class Game {
     this.chestScreen.setSlots(record.slots, record.selectedSlot);
     this.showChestSlots();
     this.chestScreen.setVisible(true);
+    this.showChestViewers();
     this.hud.setVisible(false);
     this.updateTouchCover();
     this.syncFocus();
@@ -2049,6 +2058,7 @@ export class Game {
     this.chestPending = null;
     if (!this.chestOpen) return;
     this.chestOpen = null;
+    this.chestViewers = null;
     if (tell) this.session.submit({ kind: 'closeChest' });
     if (!this.paused) this.hud.setVisible(true);
     this.updateTouchCover();

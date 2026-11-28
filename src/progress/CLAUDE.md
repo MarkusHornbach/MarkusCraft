@@ -10,7 +10,7 @@ Pure core (see "Architecture invariants" in the root `CLAUDE.md`): no `three`, D
   `progress.ts` (`WorldProgress`, levels, unlocks, `stepProgress`), `events.ts`
   (`eventsOf`), `view.ts` (what the screens show: Tasks tab, tracker, notices, F3 row, lock
   texts), `book.ts` (book versions: `upgradeBook` brings an older world's book, saved as
-  `progress.book`, up to `BOOK_VERSION`, now 1 without rules; Phase 8 part B3a)
+  `progress.book`, up to `BOOK_VERSION`, now 2; Phase 8 part B3a)
 
 ## Tables
 
@@ -23,7 +23,11 @@ comes with task 11 "Make 16 coal" (coal from logs, no light needed; Fix Adventur
 once is never locked again, whatever a later table says (in a room, each player's own
 record decides). The static check does not use that rule. Task types: `mine`
 (items received from breaking, target an item id), `craft` (items made, the result count),
-`place` (a block id), `reachBelow` / `reachAbove` (a feet Y, count 1). Counts, XP and the
+`place` (a block id), `reachBelow` / `reachAbove` (a feet Y, count 1), `store` (Phase 8
+part B3a2: items a player moves from its own slots into a chest by `chestMove` or
+`quickMove`, what the chest gained of the target item; not `takeAll`, not moves inside the
+chest; event `{ kind: 'store', item, count }`). The chest (recipe 21) comes with task 6.
+Counts, XP and the
 level thresholds are tuned with the goal bot (`src/bot/CLAUDE.md`); the tuning rounds are
 in `docs/phase-8a1-report.md`. Engine tests use the plan's starting values
 (`src/testing/startingTables.ts`) so that tuning does not touch them.
@@ -50,6 +54,15 @@ per feature and names a feature whose task is never done. **Extension points** f
 kind is one union member in `events.ts`; a new task type one member of `TaskType` and one
 `case` in `advance` (`progress.ts`), one in `check.ts` and one skill in the bot.
 
+## Book versions and later task additions (Phase 8 part B3a)
+
+Task 21 "Store 32 stone in a chest" joined chapter 3 after task 12 (book order is the
+table's order, not id order). Book 2's rule (`BOOK_UPGRADES`): a book 1 with tasks 9–12
+done gets task 21 done, without XP or notice; otherwise nothing changes. `decodeMeta` runs
+it, so a host's room always opens upgraded. **The rule for later additions:** a task added
+to an existing chapter raises `BOOK_VERSION` and adds one rule (the chapter's other tasks
+done → the new one done); no save format change.
+
 ## The tracked task (Polish 2)
 
 `trackedTask(record, progress)` is what the HUD tracker shows: null if `record.track` is
@@ -67,7 +80,8 @@ the book abstractly: per open chapter it completes every task whose requirement 
 produced from `NATURAL_BLOCKS` with the gating of `hardness.ts` and the recipes unlocked so
 far, adding the task's XP and the first crafts and finds the task cannot avoid (an item
 with one recipe and no natural source, an ore that is the only source). It returns the
-guaranteed XP after each chapter; failures name the task or recipe.
+guaranteed XP and the unlocked recipes after each chapter; failures name the task or
+recipe. A `store` task needs its item and a chest.
 
 **The light rule** (Fix Adventure 1): `DARK_BLOCKS` (`darkBlocks` in the tables: coal and
 iron ore) are found only in the dark. A light source is a recipe whose result block emits
