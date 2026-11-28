@@ -113,3 +113,12 @@ per shard, `game-N.json` / `mp-N.json`, the merged `merged.json` and `summary.md
   `docs-1-plan.md` and `docs-1-report.md` (Docs round 1), `device-tests.md` (the open
   tests on real devices, filled out by the owner) and `device-tests-done.md`,
   `architecture.md` (this file), `testing.md` (the test API).
+
+## Reading older docs
+
+Multiplayer was "Phase 4" in the Phase 3 documents and "Phase 2, Part B" in
+`docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D (Web Workers) is
+now Phase 4 part C (never implement 3D); personalization was Phase 5; "Part D" and
+"AC11.x" in the reports of 6B and 6C mean Part E and AC14.x (Part D, the figure, was
+inserted later); Polish 1 and 2 name their criteria "Polish 1 AC1.1", "Polish 2 AC1.1"
+and their device tests' origins "P1", "P2".
