@@ -3,7 +3,7 @@ import type { Action } from '../actions/actions';
 import { type ActionResult, type BlockChange, heldItem } from '../actions/apply';
 import { type GameMode, TRACK_HIDDEN, createPlayerRecord } from '../actions/playerRecord';
 import { type PlayerRecord } from '../actions/playerRecord';
-import { LOCAL_PLAYER_ID, LocalSession, type Session } from '../actions/Session';
+import { type ChestViewers, LOCAL_PLAYER_ID, LocalSession, type Session } from '../actions/Session';
 import { type BenchResult, issueText, parseIssueBody } from '../bench/benchReport';
 import { type BenchHost, BenchRunner } from '../bench/BenchRunner';
 import { SAMPLE_RESULT } from '../bench/sampleResult';
@@ -37,6 +37,7 @@ import type { PadHint } from '../ui/PadHints';
 import { glyphSheet } from '../ui/padGlyphs';
 import { figureSheet } from '../ui/figureIcons';
 import { Hud } from '../ui/Hud';
+import { ChestScreen } from '../ui/ChestScreen';
 import { InventoryScreen } from '../ui/InventoryScreen';
 import { type InputMode, PauseScreen, SAVE_FAILED_TEXT } from '../ui/PauseScreen';
 import {
@@ -60,7 +61,12 @@ import { PlayerSection } from '../ui/PlayerSection';
 import { lookForKey } from '../player/looks';
 import { CRACK_STAGES } from '../render/textures/cracks';
 import { Block, getBlockDef } from '../world/blocks';
-import { type StateChange, type WorldStates, summarizeStates } from '../world/blockState';
+import {
+  type StateChange,
+  type WorldStates,
+  emptyChest,
+  summarizeStates,
+} from '../world/blockState';
 import { ChunkManager } from '../world/ChunkManager';
 import { PerfStats } from './perfStats';
 import { chunkKey, toChunkCoord } from '../world/chunk';
@@ -99,6 +105,7 @@ import {
   PIXEL_RATIO_MAX,
   PLAYER_EYE_HEIGHT,
   REACH,
+  REACH_TOLERANCE,
   ROOM_LIST_REFRESH_MS,
   BOOK_VERSION,
   SAVE_FORMAT_VERSION,
@@ -216,6 +223,12 @@ const TEXT_NO_STORAGE = 'Worlds cannot be saved in this browser window.';
 const TEXT_INVENTORY_FULL = 'Inventory full';
 const TEXT_CHEST_FULL = "No room for the chest's items";
 const TEXT_CHEST_NOT_EMPTY = 'Empty the chest first';
+/** The hint bar of the chest screen (Phase 8 part B3a2). */
+const CHEST_HINTS: PadHint[] = [
+  { glyphs: ['A'], text: 'Move' },
+  { glyphs: ['X'], text: 'Quick move' },
+  { glyphs: ['Y'], text: 'Close' },
+];
 const TEXT_NEEDS_PICKAXE = 'Needs a pickaxe';
 const TEXT_NEEDS_SUPPORT = 'Needs a block underneath';
 const TEXT_NEEDS_STONE_PICKAXE = 'Needs a stone pickaxe';
@@ -293,6 +306,11 @@ export class Game {
   private netTestLoading = false;
   /** The inventory covers the view. Unlike the menus it does not pause the world. */
   private inventoryOpen = false;
+  /** The chest screen (Phase 8 part B3a2), and the chest it shows while it is open. */
+  private readonly chestScreen: ChestScreen;
+  private chestOpen: { x: number; y: number; z: number } | null = null;
+  /** An `openChest` was submitted for this cell; the screen opens on its answer. */
+  private chestPending: { x: number; y: number; z: number } | null = null;
   /** True while a world is being opened, created or deleted from the menu. */
   private menuBusy = false;
   /** Releases the tab lock of the open world. */
@@ -435,7 +453,7 @@ export class Game {
 
     this.input = new Input({
       element: canvas,
-      isActive: () => !this.paused && !this.inventoryOpen,
+      isActive: () => !this.paused && !this.overlayOpen,
       onPress: (action) => this.handlePress(action),
     });
 
@@ -457,7 +475,11 @@ export class Game {
       screen: () => this.focusScreen(),
       onStart: () => this.onPadStart(),
       hintsFor: (root, element) =>
-        root === this.inventoryScreen.element ? this.inventoryHints(element) : null,
+        root === this.inventoryScreen.element
+          ? this.inventoryHints(element)
+          : root === this.chestScreen.element
+            ? [...CHEST_HINTS]
+            : null,
     });
 
     this.session = this.createSession(createPlayerRecord(this.gameMode));
@@ -504,7 +526,41 @@ export class Game {
         this.session.submit({ kind: 'track', task: shown?.id === task ? TRACK_HIDDEN : task });
       },
     });
-    // Above the inventory screen (it comes later in the document), below the menus.
+    this.chestScreen = new ChestScreen(this.root, {
+      tiles: this.renderer.atlas.tiles,
+      onMove: (from, to, item) => {
+        const c = this.chestOpen;
+        if (!c) return;
+        this.session.submit({
+          kind: 'chestMove',
+          ...c,
+          from: from.slot,
+          fromChest: from.chest,
+          to: to.slot,
+          toChest: to.chest,
+          item,
+        });
+      },
+      onQuickMove: (from, item) => {
+        const c = this.chestOpen;
+        if (c) {
+          this.session.submit({
+            kind: 'quickMove',
+            ...c,
+            slot: from.slot,
+            fromChest: from.chest,
+            item,
+          });
+        }
+      },
+      onTakeAll: () => {
+        const c = this.chestOpen;
+        if (c) this.session.submit({ kind: 'takeAll', ...c });
+      },
+      onClose: () => this.closeChest(),
+      nowMs: () => this.nowMs(),
+    });
+    // Above the inventory and chest screens (it comes later in the document), below the menus.
     this.progressNotice = new ProgressNotice(this.root);
     // E opens and closes the inventory, Esc closes it. Not while a text field is typed in.
     window.addEventListener('keydown', (e) => {
@@ -515,8 +571,11 @@ export class Game {
         return;
       }
       if (e.code === 'KeyE') {
-        if (this.inventoryOpen) this.closeInventory();
+        if (this.chestOpen) this.closeChest();
+        else if (this.inventoryOpen) this.closeInventory();
         else this.openInventory();
+      } else if (e.code === 'Escape' && this.chestOpen) {
+        this.closeChest();
       } else if (e.code === 'Escape' && this.inventoryOpen) {
         this.closeInventory();
       } else if (e.code === 'Escape' && this.padActive && this.isPlaying()) {
@@ -756,6 +815,8 @@ export class Game {
     this.hud.setSlots(meta.player.slots);
     this.hud.setSelected(this.selectedSlot, false);
     this.hideInventory();
+    this.hideChest();
+    this.chestScreen.setGameMode(meta.mode);
     this.inventoryScreen.setGameMode(meta.mode);
     this.inventoryScreen.setSlots(meta.player.slots, meta.player.selectedSlot);
     this.pauseScreen?.setWorld(meta.seed);
@@ -1211,6 +1272,7 @@ export class Game {
       listener: {
         onBlocks: (changes) => this.onBlocksChanged(changes),
         onStates: (changes) => this.onStatesChanged(changes),
+        onViewers: (viewers) => this.onViewers(viewers),
         onPlayer: (record) => this.onPlayerChanged(record),
         onResult: (action, result) => this.onActionResult(action, result),
         onProgress: (progress, outcomes) => this.onProgressChanged(progress, outcomes),
@@ -1228,6 +1290,8 @@ export class Game {
 
   /** The session `Game` hands its actions to; null: a local one with this record. */
   private useSession(session: Session | null, record: PlayerRecord): void {
+    // The chest screen belongs to the session before (a room opened, joined or left).
+    this.hideChest(false);
     this.session = session ?? this.createSession(record);
     this.breakActive = false;
     // An answer of the session before will not come.
@@ -1298,6 +1362,7 @@ export class Game {
     }
     if (document.pointerLockElement) document.exitPointerLock();
     this.hideInventory();
+    this.hideChest();
     this.paused = true;
     this.closeWorld();
     this.showScreen('worlds');
@@ -1772,12 +1837,25 @@ export class Game {
   /** The session set block states (a chest's slots): their chunks are saved. */
   private onStatesChanged(changes: readonly StateChange[]): void {
     for (const { x, z } of changes) this.markChunkDirty(x, z);
+    const c = this.chestOpen;
+    if (c && changes.some((s) => s.x === c.x && s.y === c.y && s.z === c.z)) this.showChestSlots();
+  }
+
+  /** In a room: who else has the open chest open, by name. */
+  private onViewers(viewers: ChestViewers): void {
+    const c = this.chestOpen;
+    if (!c || viewers.x !== c.x || viewers.y !== c.y || viewers.z !== c.z) return;
+    const others = this.mp
+      .players({ x: 0, y: 0, z: 0, yaw: 0, pitch: 0 })
+      .filter((p) => !p.self && viewers.ids.includes(p.id));
+    this.chestScreen.setViewers(others.map((p) => p.name));
   }
 
   /** The session confirmed a new record of the player: show it and save it. */
   private onPlayerChanged(record: PlayerRecord): void {
     this.hud.setSlots(record.slots);
     this.inventoryScreen.setSlots(record.slots, record.selectedSlot);
+    this.chestScreen.setSlots(record.slots, record.selectedSlot);
     this.refreshRecipes();
     this.refreshBook();
     this.refreshTracker();
@@ -1875,7 +1953,7 @@ export class Game {
    * while it is open; in mouse mode the mouse is set free for it.
    */
   private openInventory(): void {
-    if (!this.meta || this.paused || this.inventoryOpen || this.bench) return;
+    if (!this.meta || this.paused || this.overlayOpen || this.bench) return;
     this.inventoryOpen = true;
     this.touch?.tracker.reset();
     this.input.reset();
@@ -1919,9 +1997,112 @@ export class Game {
     this.syncFocus();
   }
 
+  // --- chest screen (Phase 8 part B3a2) -------------------------------------------------
+
+  /** The inventory or the chest screen lies over the running game. */
+  private get overlayOpen(): boolean {
+    return this.inventoryOpen || this.chestOpen !== null;
+  }
+
+  /**
+   * The session accepted `openChest`: the screen opens over the running game, like the
+   * inventory. Not if something else has opened meanwhile (then the chest is closed again).
+   */
+  private openChestScreen(cell: { x: number; y: number; z: number }): void {
+    if (!this.meta || this.paused || this.overlayOpen || this.bench) {
+      this.session.submit({ kind: 'closeChest' });
+      return;
+    }
+    this.chestOpen = cell;
+    this.touch?.tracker.reset();
+    this.input.reset();
+    const record = this.session.record;
+    this.chestScreen.setSlots(record.slots, record.selectedSlot);
+    this.showChestSlots();
+    this.chestScreen.setVisible(true);
+    this.hud.setVisible(false);
+    this.updateTouchCover();
+    this.syncFocus();
+    if (this.pauseScreen && this.mode === 'mouse' && document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  }
+
+  /** The open chest's slots, as the world holds them (a chest without state is empty). */
+  private showChestSlots(): void {
+    const c = this.chestOpen;
+    if (!c) return;
+    this.chestScreen.setChest(this.world.getState(c.x, c.y, c.z)?.slots ?? emptyChest().slots);
+  }
+
+  /** Closes the chest screen and goes on playing (the mouse as after the inventory). */
+  private closeChest(): void {
+    if (!this.chestOpen) return;
+    this.hideChest();
+    if (!this.pauseScreen || this.mode !== 'mouse' || this.padActive) return;
+    this.requestPointerLock();
+    window.setTimeout(() => this.pauseWithoutPointerLock(), POINTER_LOCK_WAIT_MS);
+  }
+
+  /** Hides the chest screen; `tell` submits `closeChest` (not to a session that is gone). */
+  private hideChest(tell = true): void {
+    this.chestPending = null;
+    if (!this.chestOpen) return;
+    this.chestOpen = null;
+    if (tell) this.session.submit({ kind: 'closeChest' });
+    if (!this.paused) this.hud.setVisible(true);
+    this.updateTouchCover();
+    this.chestScreen.setVisible(false);
+    this.syncFocus();
+  }
+
+  /** Each step: the screen closes when its cell is no chest or the eye is out of reach. */
+  private checkChestOpen(): void {
+    const c = this.chestOpen;
+    if (!c) return;
+    const p = this.player;
+    const dx = c.x + 0.5 - p.x;
+    const dy = c.y + 0.5 - (p.y + PLAYER_EYE_HEIGHT);
+    const dz = c.z + 0.5 - p.z;
+    const limit = REACH + REACH_TOLERANCE;
+    const far = dx * dx + dy * dy + dz * dz > limit * limit;
+    if (far || this.world.getBlock(c.x, c.y, c.z) !== Block.CHEST) this.closeChest();
+  }
+
+  /** B (and the browser's Back) on the chest screen: a picked slot goes down, else it closes. */
+  private chestBack(): void {
+    if (!this.chestScreen.cancelPick()) this.closeChest();
+  }
+
+  /** The controller on the chest screen: Y closes, Start closes and pauses, B, X quick moves. */
+  private onChestPadFrame(frame: PadFrame, elapsedMs: number): void {
+    const pressed = frame.pressed;
+    if (pressed.includes(PadButton.START)) {
+      this.closeChest();
+      if (this.pauseScreen) this.setPaused(true);
+      return;
+    }
+    if (pressed.includes(PadButton.Y)) {
+      this.closeChest();
+      return;
+    }
+    if (pressed.includes(PadButton.B)) {
+      this.chestBack();
+      if (!this.chestOpen) return;
+    }
+    if (pressed.includes(PadButton.X)) this.chestScreen.quickMoveAt(this.focus.focusedElement);
+    const rest = pressed.filter(
+      (b) => b !== PadButton.B && b !== PadButton.START && b !== PadButton.X,
+    );
+    this.focus.handle(
+      rest.length === pressed.length ? frame : { ...frame, pressed: rest },
+      elapsedMs,
+    );
+  }
+
   /** Mouse mode is played with a captured mouse; without it the pause menu shows. */
   private pauseWithoutPointerLock(): void {
-    if (this.mode !== 'mouse' || this.inventoryOpen || this.paused || !this.meta) return;
+    if (this.mode !== 'mouse' || this.overlayOpen || this.paused || !this.meta) return;
     if (!this.input.pointerLocked && !this.padActive) this.setPaused(true);
   }
 
@@ -1929,6 +2110,16 @@ export class Game {
     this.lastResult = result;
     // A malformed value is refused and reported as it came: it may not be an object.
     if (!result.ok && (typeof action !== 'object' || action === null)) return;
+    if (action.kind === 'openChest') {
+      const pending = this.chestPending;
+      this.chestPending = null;
+      const same =
+        pending !== null &&
+        pending.x === action.x &&
+        pending.y === action.y &&
+        pending.z === action.z;
+      if (result.ok && same) this.openChestScreen(pending);
+    }
     if (action.kind === 'startBreak' || action.kind === 'break') this.breakInFlight = false;
     // A `break` the host found too early (its clock against the screen's): start over.
     if (action.kind === 'break' && !result.ok && result.reason === 'early') {
@@ -1996,7 +2187,7 @@ export class Game {
       this.touch = new TouchControls({
         root: this.root,
         sink: this.input,
-        isActive: () => !this.paused && !this.inventoryOpen && !this.bench,
+        isActive: () => !this.paused && !this.overlayOpen && !this.bench,
       });
     } else if (!touch) {
       this.touch?.dispose();
@@ -2073,8 +2264,8 @@ export class Game {
     if (this.mode === 'touch' || this.benchPhase || this.padActive) return;
     // While a world is still being opened, `startWorld` looks at the lock when it is there.
     if (!this.meta) return;
-    // The inventory sets the mouse free without pausing.
-    if (this.inventoryOpen) return;
+    // The inventory and the chest set the mouse free without pausing.
+    if (this.overlayOpen) return;
     this.setPaused(!this.input.pointerLocked);
   }
 
@@ -2093,8 +2284,9 @@ export class Game {
       this.touchHud?.setVisible(!paused);
     }
     if (paused) {
-      // A menu over the game closes the inventory.
+      // A menu over the game closes the inventory and the chest.
       this.hideInventory();
+      this.hideChest();
       this.touch?.tracker.reset();
       this.input.reset();
       void this.saveNow();
@@ -2234,7 +2426,7 @@ export class Game {
     const roomTime = this.mp.timeOfDay(performance.now());
     if (roomTime !== null) this.time = roomTime;
 
-    if (!this.paused && !this.inventoryOpen && !this.bench) {
+    if (!this.paused && !this.overlayOpen && !this.bench) {
       const look = this.input.consumeLook();
       this.applyLookPixels(look.dx, look.dy);
       if (this.touch) {
@@ -2286,6 +2478,7 @@ export class Game {
     this.simSteps++;
     this.repeatHeldAction();
     this.continueCrafting();
+    this.checkChestOpen();
     if (this.progressShown || this.progressQueue.length > 0) this.advanceProgressNotice();
     // Pose and time of day are part of the world's record.
     this.markMetaDirty();
@@ -2452,11 +2645,8 @@ export class Game {
     );
     // Over the HUD and the open inventory; not over the pause menu or the world menu.
     const playing =
-      (this.inventoryOpen || !this.paused) && (!this.pauseScreen || this.screen === 'play');
-    this.progressNotice.show(
-      playing ? (this.progressShown?.text ?? null) : null,
-      this.inventoryOpen,
-    );
+      (this.overlayOpen || !this.paused) && (!this.pauseScreen || this.screen === 'play');
+    this.progressNotice.show(playing ? (this.progressShown?.text ?? null) : null, this.overlayOpen);
     const smelt = this.smeltView();
     this.inventoryScreen.setSmelting(smelt ? smelt.recipe : null, smelt ? smelt.progress : 0);
   }
@@ -2501,6 +2691,13 @@ export class Game {
     this.updateTarget();
     const t = this.target;
     if (!t) return;
+    // The place input on a chest opens it (Phase 8 part B3a2); building goes elsewhere.
+    if (this.world.getBlock(t.x, t.y, t.z) === Block.CHEST) {
+      if (this.chestPending || this.overlayOpen) return;
+      this.chestPending = { x: t.x, y: t.y, z: t.z };
+      this.session.submit({ kind: 'openChest', x: t.x, y: t.y, z: t.z });
+      return;
+    }
     this.session.submit({
       kind: 'place',
       x: t.x + t.face[0],
@@ -2584,12 +2781,12 @@ export class Game {
 
   /** A world is on screen and played: no menu, no inventory, no performance test. */
   private isPlaying(): boolean {
-    return this.meta !== null && !this.paused && !this.inventoryOpen && this.bench === null;
+    return this.meta !== null && !this.paused && !this.overlayOpen && this.bench === null;
   }
 
   /** Something covers the game that a mouse or finger may use: a menu or the inventory. */
   private screenShown(): boolean {
-    return this.inventoryOpen || (this.pauseScreen !== null && this.screen !== 'play');
+    return this.overlayOpen || (this.pauseScreen !== null && this.screen !== 'play');
   }
 
   private padTarget(): PadTarget {
@@ -2607,6 +2804,10 @@ export class Game {
       if (pressed.includes(PadButton.B) || pressed.includes(PadButton.START)) {
         this.interruptBench('cancel');
       }
+      return;
+    }
+    if (this.chestOpen) {
+      this.onChestPadFrame(frame, elapsedMs);
       return;
     }
     if (this.inventoryOpen) {
@@ -2675,7 +2876,8 @@ export class Game {
   /** The screen the controller's focus is on, or null (play, a run). */
   private focusScreen(): HTMLElement | null {
     if (this.bench) return null;
-    // The inventory also in test mode, which has no menus.
+    // The inventory and the chest also in test mode, which has no menus.
+    if (this.chestOpen) return this.chestScreen.element;
     if (this.inventoryOpen) return this.inventoryScreen.element;
     if (!this.pauseScreen) return null;
     if (this.screen === 'bench') return this.benchScreen?.element ?? null;
@@ -2696,6 +2898,7 @@ export class Game {
    */
   private onBrowserBack(): void {
     if (this.bench) this.interruptBench('cancel');
+    else if (this.chestOpen) this.chestBack();
     else if (this.inventoryOpen) this.inventoryBack();
     else if (this.screen === 'play') {
       if (!this.meta || this.paused) return;
@@ -2740,7 +2943,7 @@ export class Game {
 
   /** The touch controls are invisible under the inventory, during a run and with the pad. */
   private updateTouchCover(): void {
-    this.touchHud?.setCovered(this.inventoryOpen || this.bench !== null || this.padActive);
+    this.touchHud?.setCovered(this.overlayOpen || this.bench !== null || this.padActive);
   }
 
   private onPadDisconnect(): void {
@@ -3110,8 +3313,17 @@ export class Game {
       },
       touch: this.mode === 'touch',
       ui: {
-        screen: this.inventoryOpen ? 'inventory' : this.pauseScreen ? this.screen : 'play',
+        screen: this.chestOpen
+          ? 'chest'
+          : this.inventoryOpen
+            ? 'inventory'
+            : this.pauseScreen
+              ? this.screen
+              : 'play',
         tab: this.inventoryOpen ? this.inventoryScreen.currentTab : null,
+        ...(this.chestOpen
+          ? { chest: { ...this.chestOpen, viewers: this.chestScreen.viewerNames } }
+          : {}),
         ...(this.focus.description !== null ? { focus: this.focus.description } : {}),
         ...this.previewState(),
       },
@@ -3242,7 +3454,7 @@ export class Game {
       setPlayer: (patch) => this.setPlayer(patch),
       look: (dx, dy) => {
         // As the mouse: it turns nothing while the inventory is open.
-        if (!this.inventoryOpen) this.applyLookPixels(dx, dy);
+        if (!this.overlayOpen) this.applyLookPixels(dx, dy);
       },
       getBlock: (x, y, z) => this.world.getBlock(x, y, z),
       getChest: (x, y, z) => {

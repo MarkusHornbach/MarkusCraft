@@ -181,6 +181,11 @@ export const INVENTORY_SLOTS = 36;
 export const STACK_SIZE = 99;
 /** Slots of a chest (Phase 8 part B3a): three rows of nine. */
 export const CHEST_SLOTS = 27;
+/**
+ * Two activations of one slot of the chest screen within this many milliseconds of
+ * simulation time, with nothing picked before the first, move its stack to the other side.
+ */
+export const QUICK_MOVE_MS = 350;
 export const HOTBAR_SLOTS = 9;
 /** A `break` may arrive this much before its time is up (Gathering). */
 export const BREAK_TOLERANCE_MS = 100;

@@ -56,7 +56,12 @@ export interface GameState {
   touch: boolean;
   /** What covers the view: a menu, the inventory, or nothing (`play`). */
   ui: {
-    screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'bench' | 'nettest';
+    screen: 'worlds' | 'settings' | 'pause' | 'play' | 'inventory' | 'chest' | 'bench' | 'nettest';
+    /**
+     * The open chest of the chest screen (Phase 8 part B3a2) and the names its "Also open"
+     * line shows. Left out while the screen is closed, like `focus`.
+     */
+    chest?: { x: number; y: number; z: number; viewers: string[] };
     /** The open page of the inventory screen, or null while it is closed. */
     tab: 'items' | 'crafting' | 'tasks' | 'map' | null;
     /**
