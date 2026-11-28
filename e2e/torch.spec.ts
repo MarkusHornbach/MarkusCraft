@@ -235,12 +235,12 @@ test('Phase 4 AC7.4: a torch between the player and a wall can be aimed at and a
   expect((await getState(page)).target).toMatchObject({ y: PLATFORM_Y, z: pz - 3, id: IRON_BLOCK });
 });
 
-test('Phase 4 AC7.5: the palette shows 17 blocks with the torch and its painted icon; the bar counts torches in Gathering', async ({
+test('Phase 4 AC7.5: the palette shows the torch (18 blocks with the chest) and its painted icon; the bar counts torches in Gathering', async ({
   page,
 }) => {
   await openGame(page);
   await page.keyboard.press('KeyE');
-  await expect(page.locator('.palette-slot')).toHaveCount(17);
+  await expect(page.locator('.palette-slot')).toHaveCount(18);
   const torch = page.locator('.palette-slot[data-item="torch"]');
   await expect(torch).toHaveCount(1);
   await torch.click();

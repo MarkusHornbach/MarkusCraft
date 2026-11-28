@@ -404,3 +404,27 @@ function circlePose(base: { x: number; y: number; z: number }, i: number, t: num
     pitch: 0.1 * i,
   };
 }
+
+describe('stores in rooms (Phase 8B3a AC6.2)', () => {
+  it("a guest's stores count for the host's book; taking out does not subtract", async () => {
+    // Chapters 1 and 2 done: chapter 3, with task 21, is open.
+    const rig = new Rig({
+      mode: 'gathering',
+      progress: { done: [1, 2, 3, 4, 5, 6, 7, 8], counts: [] },
+    });
+    await rig.open();
+    const { gs, chest } = await chestRoom(1, 'gathering', rig);
+    const [g] = gs;
+    give(rig, g, { 9: stone(20) });
+    await rig.run(100);
+    g.client.submit({ kind: 'quickMove', ...chest, slot: 9, fromChest: false, item: Block.STONE });
+    await until(rig, () => g.answers.length >= 1);
+    expect(lastResult(g)?.ok).toBe(true);
+    expect(rig.host.progress.counts).toContainEqual({ task: 21, count: 20 });
+    g.client.submit({ kind: 'quickMove', ...chest, slot: 0, fromChest: true, item: Block.STONE });
+    await until(rig, () => g.answers.length >= 2);
+    expect(lastResult(g)?.ok).toBe(true);
+    expect(rig.host.progress.counts).toContainEqual({ task: 21, count: 20 });
+    expect(rig.world.verifyLight()).toBe(0);
+  });
+});

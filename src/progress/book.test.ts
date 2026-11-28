@@ -10,11 +10,24 @@ const UPGRADES: readonly BookUpgrade[] = [
 ];
 
 describe('book versions (Phase 8B3a 6.4)', () => {
-  it('this build has book 1 and no upgrade rules', () => {
-    expect(BOOK_VERSION).toBe(1);
-    expect(BOOK_UPGRADES).toEqual([]);
-    const book: WorldProgress = { done: [1, 2], counts: [{ task: 3, count: 4 }] };
-    expect(upgradeBook(book, 1)).toEqual({ progress: book, book: 1 });
+  it('Phase 8B3a AC6.3: this build has book 2, whose rule marks task 21 done past tasks 9–12', () => {
+    expect(BOOK_VERSION).toBe(2);
+    expect(BOOK_UPGRADES).toEqual([{ from: 1, ifDone: [9, 10, 11, 12], markDone: [21] }]);
+    // Chapter 3 still open: task 21 stays open.
+    const open: WorldProgress = { done: [1, 2, 9], counts: [{ task: 10, count: 0 }] };
+    expect(upgradeBook(open, 1)).toEqual({ progress: open, book: 2 });
+    // Past chapter 3: task 21 is done, without XP (only the book changes).
+    const past: WorldProgress = {
+      done: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      counts: [{ task: 13, count: 4 }],
+    };
+    expect(upgradeBook(past, 1)).toEqual({
+      progress: { done: [...past.done, 21], counts: [{ task: 13, count: 4 }] },
+      book: 2,
+    });
+    // A book 2 is never upgraded again.
+    const current: WorldProgress = { done: [9, 10, 11, 12], counts: [] };
+    expect(upgradeBook(current, 2).progress).toBe(current);
   });
 
   it('marks the new task done where the chapter was finished, without touching counts', () => {

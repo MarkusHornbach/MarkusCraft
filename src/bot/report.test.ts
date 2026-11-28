@@ -65,7 +65,7 @@ describe('bot report', () => {
 
   it('two minutes per task: every target holds', () => {
     const report = buildReport([run(2), run(2), run(1.5)]);
-    expect(report.total.median).toBeCloseTo(40, 6);
+    expect(report.total.median).toBeCloseTo(42, 6);
     expect(report.tasks[0].max).toBeCloseTo(2, 6);
     expect(report.levels.map((l) => l.label)).toEqual([
       'Level 2',
@@ -77,7 +77,7 @@ describe('bot report', () => {
     ]);
     expect(report.levelGap.median).toBeCloseTo(6, 6);
     expect(report.checks.every((c) => c.ok)).toBe(true);
-    expect(formatReport(report)).toContain('| Total | 40.0 | 40.0 |');
+    expect(formatReport(report)).toContain('| Total | 42.0 | 42.0 |');
   });
 
   it('a slow book and a failed run break the targets', () => {

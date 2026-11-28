@@ -571,7 +571,7 @@ for (const [device, view] of [
 
     // Every recipe has a row at least 48 px high; no text leaves its row.
     const rows = await boxes(page, '.recipe-row');
-    expect(rows).toHaveLength(20);
+    expect(rows).toHaveLength(21);
     for (const row of rows) {
       expect(row.height, row.name).toBeGreaterThanOrEqual(48);
       expect(row.x, row.name).toBeGreaterThanOrEqual(listBox.x);
@@ -661,7 +661,7 @@ for (const [device, view] of [
     await tapCreate(page, 'gathering');
     await page.evaluate(() => {
       // Every recipe unlocked (Phase 8): the torch comes with a task of the book.
-      window.__mc.setProgress({ xp: 480, done: Array.from({ length: 20 }, (_, i) => i + 1) });
+      window.__mc.setProgress({ xp: 480, done: Array.from({ length: 21 }, (_, i) => i + 1) });
       window.__mc.give(257, 1);
       window.__mc.give(256, 1);
     });
@@ -736,7 +736,7 @@ for (const [device, view] of [
     await tapCreate(page, 'gathering');
     // Every recipe unlocked (Phase 8): the walk through the list crafts coal and torches.
     await page.evaluate(() =>
-      window.__mc.setProgress({ xp: 480, done: Array.from({ length: 20 }, (_, i) => i + 1) }),
+      window.__mc.setProgress({ xp: 480, done: Array.from({ length: 21 }, (_, i) => i + 1) }),
     );
     await page.locator('.touch-bag').tap();
     await page.locator('.inventory-tab[data-tab="crafting"]').tap();

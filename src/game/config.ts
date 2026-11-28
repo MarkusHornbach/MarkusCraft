@@ -231,9 +231,10 @@ export const SAVE_FORMAT_VERSION = 6;
 /**
  * Version of the task book (`progress.book` in the save, format 6). A world with a higher
  * book is "newer"; a lower one is upgraded on loading (`upgradeBook`). 1 = the 20 tasks
- * of Phase 8 part A and Fix Adventure 1.
+ * of Phase 8 part A and Fix Adventure 1; 2 = task 21 "Store 32 stone in a chest" in
+ * chapter 3 (Phase 8 part B3a2).
  */
-export const BOOK_VERSION = 1;
+export const BOOK_VERSION = 2;
 /** Guests a world keeps (items and place); beyond this the one seen longest ago goes. */
 export const GUESTS_MAX = 32;
 export const WORLD_NAME_MAX = 24;

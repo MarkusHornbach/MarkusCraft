@@ -243,6 +243,7 @@ test('Phase 3 AC8.4: the Creative screen shows every placeable block once; a blo
     'stone_bricks',
     'iron_block',
     'torch',
+    'chest',
   ]);
   // Every palette slot shows an icon; nothing shows a count.
   await expect(page.locator('.palette-slot canvas')).toHaveCount(names.length);
@@ -433,6 +434,6 @@ test('Phase 3 AC8.7: matches the palette reference (Creative)', async ({ page })
   await page.keyboard.press('Digit5');
   await page.keyboard.press('KeyE');
   await whenIdle(page);
-  await expect(page.locator('.palette-slot')).toHaveCount(17);
+  await expect(page.locator('.palette-slot')).toHaveCount(18);
   await expect(page).toHaveScreenshot('palette.png');
 });

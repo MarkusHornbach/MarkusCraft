@@ -523,7 +523,8 @@ function circlePose(base: { x: number; y: number; z: number }, i: number, t: num
 describe('the traffic of an Adventure room (Phase 8 AC8.6)', () => {
   it('four moving players whose every action changes the book: the host sends less than 20 kB per second', async () => {
     const BRICKS_TASK = 20;
-    const done = Array.from({ length: BRICKS_TASK - 1 }, (_, i) => i + 1);
+    // Every task before it (task 21 of chapter 3 too): the book is in chapter 5.
+    const done = [...Array.from({ length: BRICKS_TASK - 1 }, (_, i) => i + 1), 21];
     const rig = new Rig({ mode: 'gathering', progress: { done, counts: [] } });
     const meter = new TrafficMeter(() => rig.net.nowMs);
     const counted = countedNetwork(

@@ -36,6 +36,7 @@ const PINNED_TASKS: Record<number, [number, string, number]> = {
   18: [5, 'craft', 265],
   19: [5, 'craft', 9],
   20: [5, 'place', 17],
+  21: [3, 'store', 3],
 };
 
 /** recipe id → its unlock. */
@@ -61,6 +62,8 @@ const PINNED_UNLOCKS: Record<number, string> = {
   19: 'L7',
   // Fix Adventure 1: the torch comes with task 11 "Make 16 coal" (was task 12).
   20: 'T11',
+  // Phase 8 part B3a2: the chest comes with task 6 "Mine 64 stone".
+  21: 'T6',
 };
 
 function pinTasks(tasks: typeof TASKS): Record<number, [number, string, number]> {
@@ -88,7 +91,10 @@ describe('progress tables (Phase 8 AC1.1)', () => {
 
   it('pins every task id, chapter, type and target', () => {
     expect(pinTasks(TASKS)).toEqual(PINNED_TASKS);
-    expect(TASKS.map((t) => t.id)).toEqual(TASKS.map((_, i) => i + 1));
+    // Book order: task 21 (Phase 8 part B3a2) follows task 12 at the end of chapter 3.
+    expect(TASKS.map((t) => t.id)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 21, 13, 14, 15, 16, 17, 18, 19, 20,
+    ]);
   });
 
   it('pins the unlock of every recipe id (Fix Adventure 1 AC1.1)', () => {
@@ -103,7 +109,7 @@ describe('progress tables (Phase 8 AC1.1)', () => {
   });
 
   it('a task added at the end passes the pin; a renumbered one fails it', () => {
-    const appended = [...TASKS, { ...TASKS[0], id: 21, chapter: 5, label: 'New' }];
+    const appended = [...TASKS, { ...TASKS[0], id: 22, chapter: 5, label: 'New' }];
     expect(covers(appended)).toBe(true);
     const renumbered = TASKS.map((t) =>
       t.id === 2 ? { ...t, id: 3 } : t.id === 3 ? { ...t, id: 2 } : t,

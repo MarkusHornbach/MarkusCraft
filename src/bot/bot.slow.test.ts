@@ -8,7 +8,9 @@ describe('goal bot (Phase 8 AC6.2)', () => {
     const run = runBot(1337, { version: 2, options: { terrain: 'balanced', trees: 'few' } });
     expect(run.error).toBeNull();
     expect(run.completed).toBe(true);
-    expect(run.tasks.map((t) => t.id).sort((a, b) => a - b)).toEqual(TASKS.map((t) => t.id));
+    expect(run.tasks.map((t) => t.id).sort((a, b) => a - b)).toEqual(
+      TASKS.map((t) => t.id).sort((a, b) => a - b),
+    );
     expect(run.allUnlocked).toBe(true);
     expect(run.levelUps.map((l) => l.level)).toEqual([2, 3, 4, 5, 6, 7]);
     expect(run.lightErrors).toBe(0);

@@ -83,8 +83,9 @@ describe('item table (Phase 3 AC6.4)', () => {
       });
     }
     expect(BLOCK_ITEMS).toEqual(BLOCKS.filter((b) => isPlaceable(b.id)).map((b) => b.id));
-    // Part B3a1: the chest is an item but not in the Creative palette yet.
-    expect(PALETTE_ITEMS).toEqual(BLOCK_ITEMS.filter((id) => id !== Block.CHEST));
+    // Part B3a2: the chest joins the Creative palette, last in id order.
+    expect(PALETTE_ITEMS).toEqual(BLOCK_ITEMS);
+    expect(PALETTE_ITEMS.at(-1)).toBe(Block.CHEST);
     expect(isItem(Block.CHEST)).toBe(true);
     expect(isItem(Block.AIR)).toBe(false);
     expect(isItem(Block.WATER)).toBe(false);

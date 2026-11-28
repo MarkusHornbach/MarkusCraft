@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_VOLUME, INVENTORY_SLOTS, SAVE_FORMAT_VERSION } from '../game/config';
+import { BOOK_VERSION, CHUNK_VOLUME, INVENTORY_SLOTS, SAVE_FORMAT_VERSION } from '../game/config';
 import { isItem } from '../items/items';
 import { sampleMeta } from '../testing/sampleWorld';
 import { mulberry32, randInt } from '../util/rng';
@@ -296,7 +296,7 @@ function migrated(text: string): string {
     formatVersion: SAVE_FORMAT_VERSION,
     player: { ...(old.player as object), xp: 0, found: [], crafted: [], track: 0 },
     guests: [],
-    progress: { done: [], counts: [], book: 1 },
+    progress: { done: [], counts: [], book: BOOK_VERSION },
   });
 }
 

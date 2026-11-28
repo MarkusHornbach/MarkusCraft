@@ -19,6 +19,7 @@ import { RECIPES, type Recipe, STATION_BLOCKS, stationsNear } from '../items/rec
 import { isLightSource } from '../progress/check';
 import {
   type ProgressOutcome,
+  countOf,
   featureUnlocked,
   levelOf,
   openChapter,
@@ -196,8 +197,11 @@ export class Bot {
     const reader = {
       // The bot knows the world: chunks appear as it looks at them.
       getBlock: (x: number, y: number, z: number): number => this.block([x, y, z]),
-      // Only the session sets blocks (the pipeline rule): it gets the world's own method.
+      // Only the session sets blocks and states (the pipeline rule): it gets the world's
+      // own methods.
       setBlock: world.setBlock.bind(world),
+      getState: world.getState.bind(world),
+      setState: world.setState.bind(world),
     };
     this.session = new LocalSession(
       { world: reader, mode: 'gathering', pose: () => this.pose, nowMs: () => this.clockMs },
@@ -786,6 +790,29 @@ export class Bot {
     this.placeAt(this.placeCell(block), item);
   }
 
+  /**
+   * Stores `n` of an item in a chest (Phase 8 part B3a2): makes a chest, places it next to
+   * itself, opens it, quick moves every stack of the item in, closes it, then breaks it
+   * again (the contents come back with it). One `actionRepeatMs` per move.
+   */
+  storeOne(item: number, n: number): void {
+    this.obtain(Block.CHEST, 1);
+    this.obtain(item, n);
+    const cell = this.placeCell(Block.CHEST);
+    this.placeAt(cell, Block.CHEST);
+    const [x, y, z] = cell;
+    this.submit({ kind: 'openChest', x, y, z });
+    this.clockMs += BOT_TIME.actionRepeatMs;
+    const slots = this.session.record.slots;
+    for (let slot = 0; slot < slots.length; slot++) {
+      if (slots[slot]?.item !== item) continue;
+      this.submit({ kind: 'quickMove', x, y, z, slot, fromChest: false, item });
+      this.clockMs += BOT_TIME.actionRepeatMs;
+    }
+    this.submit({ kind: 'closeChest' });
+    this.breakBlock(cell);
+  }
+
   /** A staircase down until the feet are at `y` or below. */
   digTo(y: number): void {
     for (let guard = 0; this.cell[1] > y; guard++) {
@@ -874,6 +901,9 @@ export class Bot {
           break;
         case 'reachAbove':
           this.climbTo(task.target);
+          break;
+        case 'store':
+          this.storeOne(task.target, task.count - countOf(this.session.progress, task));
           break;
       }
     }
