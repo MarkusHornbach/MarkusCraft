@@ -76,6 +76,22 @@ task 8: 0 / 64; ores 0 / 0, 0 / 0, 0 / 3). Radar and places checks agree in all 
 `checkTables`: XP after the chapters 50, 125, 260, 405, 545 on the plan's starting tables
 (was 235, 380, 520 from chapter 3 on: task 21's 20 XP and the chest's first craft, 5).
 
+## References
+
+New: `chest-screen`, `chest-screen-touch`, `pad-chest-screen`, `chest-block`. Regenerated
+because they show the chest or task 21: `palette` (the chest as the 18th block),
+`tasks-tab` and `tasks-tab-touch` (chapter 3 with a fifth row). Regenerating every
+reference of the six specs that show these screens changed only one more, `touch-controls`
+(0.3 % of pixels, leaf noise, nothing visible); it was kept as it was. All were looked at.
+
+## Browser specs run in this container
+
+The new specs (`chestScreen`, `chestTouch`, `chestPad`, `mpChestScreen`) and the older ones
+the counts and the book touch: `inventoryScreen`, `torch`, `crafting`, `progress`,
+`progressTouch`, `taskTracker`, `touchLayout`, `gamepadInventory`, `radar`, `radarMap`,
+`radarPlaces`, `radarTouch`, `light`, `interaction`, `chest`, `gathering`, `inventory`,
+`padSoak`, `save` (138 + 70 runs, all passing after the count fixes). CI runs the rest.
+
 ## Decisions and deviations
 
 - **Steps 1–3 are one commit.** Task 21 without the bot skill fails the bot's slow tests,
