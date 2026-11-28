@@ -46,8 +46,9 @@ sent to joining guests. **Rules:** a state lives only in a cell whose block has 
 `World.setBlock` to a block of another kind removes the cell's state in the same call;
 `World.setState` refuses a loaded cell of another kind; a loaded state on such a cell is
 dropped when its chunk is generated and counted (`droppedStates`, F3). A chest without a
-stored state reads as `initialState(block, x, y, z, source)`, the hook for derived
-contents (generated loot, later), today an empty chest. Once touched (placed, an item
+stored state reads as `initialState(block, x, y, z, source)`: the derived loot where the
+generator puts a loot chest (`source.lootAt`, generator 4, Phase 8 part B3b), else an empty
+chest. Once touched (placed, an item
 moved) a chest is stored explicitly, also when empty, so derived contents never come back.
 `setState(` is called only by the sessions (`pipeline.test.ts`); state never touches
 light. A new kind (the furnace) needs a new save format version (`src/save/CLAUDE.md`).
@@ -88,7 +89,7 @@ gives the chunk manager only what is left of `CHUNK_BUDGET_MS` (Phase 4 part E).
 
 ## Generator version
 
-Generators 1–3 (caves, mine shafts), their checksums, spawn, `oreHost` and the cave
+Generators 1–4 (caves, mine shafts, loot chests), their checksums, spawn, `oreHost` and the cave
 budgets: `src/world/generation/CLAUDE.md`.
 
 Hot paths here (meshing, generation) avoid per-block allocations; use typed arrays. Before

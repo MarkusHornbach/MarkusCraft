@@ -29,10 +29,10 @@ light against the slow reference after each of 2 000 random edits. The three pas
   part A) make the test world generator 2 with these options; a missing one takes its
   default (Balanced, Few), an invalid value is ignored. Without both the test world is
   generator 1, so `?test=1&seed=1337` keeps the terrain of every older spec and reference.
-- `gen=2|3` (with `test=1`, Phase 8 part B2a) picks the test world's generator; with
-  `terrain` and `trees` or their defaults. `gen=3` alone is generator 3, balanced, few
-  trees (caves and mine shafts); without `gen` the rule above holds. In specs:
-  `openGame(page, { gen: 3 })`.
+- `gen=2|3|4` (with `test=1`, Phase 8 parts B2a, B3b) picks the test world's generator;
+  with `terrain` and `trees` or their defaults. `gen=3` alone is generator 3, balanced, few
+  trees (caves and mine shafts), `gen=4` the same with loot chests; without `gen` the rule
+  above holds. In specs: `openGame(page, { gen: 3 })`.
 - `progress=all|fresh` (with `test=1`, Phase 8 part A): the task book of an Adventure test
   world (`mode=gathering`). Default `all`: every task done and the player at the maximum
   level, so older specs that craft keep working; `fresh` starts the book. Worlds made by
@@ -113,9 +113,8 @@ kinds, 8 each), legend (texts), draws }`; `ui.tab` may be `map`; `settings.radar
 - Phase 8 part B2b (places): in `gen=3` worlds `entries`, `beyond` and `map.legend` also
   hold the kinds `shaft` and `cave` (2 per kind on the circle, 4 on the map);
   `settings.radarSize` (0–2). `openTouchAdventure(page, settings)` stores settings first
-  (its world is generator 3). References `radar-places` (PC circle, `gen=3`) and
-  `map-tab-places` (640 × 360, the whole screen) in `e2e/radarPlaces.spec.ts`; the room
-  check in `e2e/mpCaves.spec.ts`.
+  (its world is the menu's, generator 4 since B3b). Reference `radar-places` (PC circle,
+  `gen=3`) in `e2e/radarPlaces.spec.ts`; the room check in `e2e/mpCaves.spec.ts`.
 
 - Phase 8 part B3a1 (chests, no screen yet): `give(20, n)` gives chests; `submit` takes
   `chestMove`, `quickMove`, `takeAll`, `openChest`, `closeChest`; `getChest(x, y, z)` gives
@@ -132,6 +131,17 @@ viewers }` (the names of the "Also open" line; left out while closed, like `focu
   `e2e/chestPad.spec.ts` (controller), `e2e/mpChestScreen.spec.ts` (a room), with the set-up
   helpers in `e2e/chests.ts`. References `chest-screen`, `chest-screen-touch`,
   `pad-chest-screen` and `chest-block` (in `e2e/chest.spec.ts`).
+- Phase 8 part B3b (loot): `lootSites()` gives a generator 4 world's spawn shaft chest
+  (`spawn: { chest, stand }`, `stand` a free chamber cell diagonal to it) and the nearest
+  grid shaft's chest within 256 (`grid`), or null for older generators; `getChest` reads
+  an untouched loot chest's derived contents. `getState().world.chests` and the F3 row
+  "Chests" count stored states only: an untouched loot chest is not counted.
+  `terrainChecksum(cx, cz)` hashes the 3 × 3 chunks around chunk (cx, cz) (the V4
+  checksums around the spawn chest). The Map tab and circle of generator 4 hold the kind
+  `chest`. `faceCell` and `spawnLoot` (`e2e/chests.ts`) stand at a cell aiming at another.
+  Specs: `e2e/loot.spec.ts` (references `loot-chest`), `e2e/chestHint.spec.ts` (mouse,
+  touch, pad; `chest-hint`), `e2e/mpLoot.spec.ts` (a room, a late guest, the guest's
+  radar); `e2e/radarPlaces.spec.ts` shows the menu world, now generator 4 (`map-tab-loot`).
 
 ## Controller
 

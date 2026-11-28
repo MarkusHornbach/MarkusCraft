@@ -5,7 +5,8 @@
 // walk checks of entrances and the spawn shaft.
 // Run: npx vite-node scripts/progressRun.ts [--quick] [--gen 2|3] [--loot]
 // (quick: seed 1337 balanced only; --gen: an older generator, for comparisons; --loot: the
-// loot run (Phase 8 part B3b) besides the plain run on the same worlds, and their limits)
+// loot run (Phase 8 part B3b) besides the plain run and a control run (the same trips,
+// nothing taken) on the same worlds, and the limits)
 import { type BotRun, runBot } from '../src/bot/Bot';
 import { type CaveCheck, checkCaves, formatCaveChecks } from '../src/bot/caveWalks';
 import {
@@ -37,6 +38,7 @@ const shapes = quick ? (['balanced'] as const) : TERRAIN_SHAPES;
 console.log(`Generator ${version}${loot ? ', plain and loot runs' : ''}`);
 const runs: BotRun[] = [];
 const lootRuns: BotRun[] = [];
+const controlRuns: BotRun[] = [];
 const caves: CaveCheck[] = [];
 const places: SpawnPlaces[] = [];
 const line = (kind: string, seed: number, terrain: string, run: BotRun, took: string): string =>
@@ -57,6 +59,12 @@ for (const seed of seeds) {
         line('loot ', seed, terrain, looted, ((performance.now() - start) / 1000).toFixed(1)),
       );
       lootRuns.push(looted);
+      start = performance.now();
+      const control = runBot(seed, gen, { loot: true, take: false });
+      console.log(
+        line('trips ', seed, terrain, control, ((performance.now() - start) / 1000).toFixed(1)),
+      );
+      controlRuns.push(control);
     }
     const terrainSource = getTerrain(seed, gen);
     if (terrainSource instanceof TerrainV3) {
@@ -85,6 +93,10 @@ if (loot) {
   console.log(formatReport(buildReport(lootRuns)));
   console.log('');
   console.log('Loot run, d' + formatDarkBreaks(darkBreakRows(lootRuns), lootRuns.length).slice(1));
+  console.log('');
+  // The limits hold against the control (the items' effect); against the plain run the
+  // trips' own tunnels count too (docs/phase-8b3b-report.md).
+  console.log(compareLoot(controlRuns, lootRuns, 'the same trips taking nothing').markdown);
   console.log('');
   console.log(compareLoot(runs, lootRuns).markdown);
 }

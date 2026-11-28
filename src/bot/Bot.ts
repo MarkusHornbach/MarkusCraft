@@ -106,6 +106,11 @@ export const LOOT_TRIP_CHAPTER = 4;
 export interface BotOptions {
   /** The loot run: fetch the spawn chest before task 1 and a far one at chapter 4. */
   loot?: boolean;
+  /**
+   * With `loot`: false makes the same trips without taking anything (the control run: the
+   * trips' tunnels change later walks, which is no effect of the items).
+   */
+  take?: boolean;
 }
 
 /** A nearest place: in range (`dy` known) or beyond it (`dy` null), relative to the feet. */
@@ -446,8 +451,9 @@ export class Bot {
   }
 
   /**
-   * A loot trip (`--loot`): walks and digs to the chest like to any target, empties it and
-   * records the time as its own row; the next task's time starts after it.
+   * A loot trip (`--loot`): walks and digs to the chest like to any target, empties it,
+   * goes back to where it started and records the time as its own row; the next task's
+   * time starts after it.
    */
   private lootTrip(label: string, chest: Cell | null): void {
     const start = this.clockMs;
@@ -455,13 +461,17 @@ export class Bot {
       this.trips.push({ label, ms: 0, distance: null, items: [] });
       return;
     }
-    const [px, , pz] = this.cell;
+    const from = this.cell;
+    const [px, , pz] = from;
     const distance = Math.hypot(chest[0] - px, chest[2] - pz);
     // The standing cell in the chamber next to the chest corner.
     const stand: Cell = [chest[0] + 1, chest[1], chest[2] - 1];
     this.goTo(stand, () => this.withinReach(chest) && this.open(chest));
     if (!this.withinReach(chest) || !this.open(chest)) this.fail(`${label}: chest out of reach`);
-    const items = this.block(chest) === Block.CHEST ? this.emptyChest(chest, false) : [];
+    const take = this.options.take !== false && this.block(chest) === Block.CHEST;
+    const items = take ? this.emptyChest(chest, false) : [];
+    // A fetch: back to where the trip started, so the tasks go on from the same place.
+    this.goTo(from);
     this.trips.push({ label, ms: this.clockMs - start, distance, items });
     this.lastDoneMs = this.clockMs;
   }

@@ -312,8 +312,15 @@ export interface LootComparison {
   markdown: string;
 }
 
-/** The loot run against the plain run on the same worlds: limits, trips, accidental loots. */
-export function compareLoot(plain: readonly BotRun[], loot: readonly BotRun[]): LootComparison {
+/**
+ * The loot run against a run without loot on the same worlds (the plain run, or the control
+ * run with the same trips and nothing taken): limits, trips, accidental loots.
+ */
+export function compareLoot(
+  plain: readonly BotRun[],
+  loot: readonly BotRun[],
+  against = 'the plain run',
+): LootComparison {
   const a = buildReport(plain);
   const b = buildReport(loot);
   const f = (n: number): string => n.toFixed(1);
@@ -352,7 +359,7 @@ export function compareLoot(plain: readonly BotRun[], loot: readonly BotRun[]): 
     ok: complete,
   });
   for (const report of [a, b]) {
-    const label = report === a ? 'plain' : 'loot';
+    const label = report === a ? 'without loot' : 'loot';
     checks.push({
       text: `${label} run: total ${f(report.total.median)} min within ${TARGETS.totalMin}–${TARGETS.totalMax}`,
       ok: report.total.median >= TARGETS.totalMin && report.total.median <= TARGETS.totalMax,
@@ -368,13 +375,13 @@ export function compareLoot(plain: readonly BotRun[], loot: readonly BotRun[]): 
   const accidental = (runs: readonly BotRun[]): string =>
     `${runs.reduce((n, r) => n + r.accidentalLoots, 0)} in ${runs.filter((r) => r.accidentalLoots > 0).length} runs`;
   const markdown = [
-    `Loot run against the plain run (${plain.length} worlds each; trips left out)`,
+    `Loot run against ${against} (${plain.length} worlds each; trips left out)`,
     '',
-    '| Chapter | Plain (min) | Loot (min) | Shorter by |',
+    '| Chapter | Without (min) | Loot (min) | Shorter by |',
     '| --- | ---: | ---: | ---: |',
     ...rows,
     '',
-    '| Task (coal and iron chain) | Plain | Loot | Shorter by |',
+    '| Task (coal and iron chain) | Without | Loot | Shorter by |',
     '| --- | ---: | ---: | ---: |',
     ...taskRows,
     '',
@@ -382,7 +389,7 @@ export function compareLoot(plain: readonly BotRun[], loot: readonly BotRun[]): 
     '| --- | ---: | ---: | ---: | ---: |',
     ...tripRows,
     '',
-    `Accidental loots (a chest in the bot's way): plain ${accidental(plain)}, loot ${accidental(loot)}`,
+    `Accidental loots (a chest in the bot's way): without ${accidental(plain)}, loot ${accidental(loot)}`,
     '',
     ...checks.map((c) => `- [${c.ok ? 'x' : ' '}] ${c.text}`),
   ].join('\n');

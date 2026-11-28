@@ -1,5 +1,6 @@
 // Test API on `window.__mc`: lets headless tests observe and drive the game deterministically.
 import type { CaveSites } from '../world/generation/terrainV3';
+import type { LootSites } from '../world/generation/terrainV4';
 import type { ActionResult } from '../actions/apply';
 import type { GameMode, ItemStack } from '../actions/playerRecord';
 import type { BenchResult } from '../bench/benchReport';
@@ -318,6 +319,11 @@ export interface TestApi {
    * B2a), or null for an older generator.
    */
   caveSites(): CaveSites | null;
+  /**
+   * The spawn shaft's chest with a standing cell next to it, and the nearest grid shaft's
+   * chest, of a generator 4 world (Phase 8 part B3b); null for an older generator.
+   */
+  lootSites(): LootSites | null;
   /** Sky light and block light (0–15) of a cell, or null in a chunk that is not lit. */
   getLight(x: number, y: number, z: number): { sky: number; block: number } | null;
   /**

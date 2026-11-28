@@ -3,7 +3,17 @@ import type { ItemStack } from '../actions/playerRecord';
 import { HOTBAR_SLOTS } from '../game/config';
 import { getItemDef, itemLabel } from '../items/items';
 import { createItemIcon } from './itemIcon';
+import { drawGlyph } from './padGlyphs';
 import { TaskTracker } from './TaskTracker';
+
+/** How the crosshair hint on a chest says "open" (Phase 8 part B3b): by the input in use. */
+export type ChestHintInput = 'mouse' | 'touch' | 'pad';
+
+export const CHEST_HINT_TEXT: Readonly<Record<ChestHintInput, string>> = {
+  mouse: 'Right click: Open',
+  touch: 'Place: Open',
+  pad: 'Open',
+};
 
 /** How long the selected block's name stays visible after a change. */
 const LABEL_VISIBLE_MS = 1600;
@@ -18,6 +28,10 @@ export class Hud {
   private readonly breakFill: HTMLElement;
   private readonly notice: HTMLElement;
   private readonly message: HTMLElement;
+  private readonly chestHint: HTMLElement;
+  private readonly chestHintText: HTMLElement;
+  private chestHintGlyph: HTMLCanvasElement | null = null;
+  private chestHintShown: ChestHintInput | null = null;
   /** Multiplayer notices ("Anna joined"), stacked at the top left. */
   private readonly netNotices: HTMLElement;
   /** The top-left column: the task tracker, then the multiplayer notices below it. */
@@ -62,6 +76,13 @@ export class Hud {
     this.message.className = 'hud-message';
     this.message.setAttribute('role', 'status');
     this.element.appendChild(this.message);
+
+    // How to open the chest under the crosshair (Phase 8 part B3b); never while breaking.
+    this.chestHint = document.createElement('div');
+    this.chestHint.className = 'chest-hint';
+    this.chestHintText = document.createElement('span');
+    this.chestHint.appendChild(this.chestHintText);
+    this.element.appendChild(this.chestHint);
 
     // What was just picked up ("+1 Stone"), above the bar.
     this.notice = document.createElement('div');
@@ -184,6 +205,22 @@ export class Hud {
   setTracker(task: { id: number; label: string; count: string } | null): void {
     this.tracker.show(task);
     this.corner.classList.toggle('tracking', task !== null);
+  }
+
+  /** The chest hint under the crosshair for an input; null hides it. */
+  setChestHint(input: ChestHintInput | null): void {
+    if (input === this.chestHintShown) return;
+    this.chestHintShown = input;
+    this.chestHint.classList.toggle('visible', input !== null);
+    if (input === null) return;
+    this.chestHint.dataset.input = input;
+    this.chestHintText.textContent = CHEST_HINT_TEXT[input];
+    if (input === 'pad') {
+      this.chestHintGlyph ??= drawGlyph('LT', 16);
+      this.chestHint.insertBefore(this.chestHintGlyph, this.chestHintText);
+    } else {
+      this.chestHintGlyph?.remove();
+    }
   }
 
   /** The hint under the crosshair; null hides it. */

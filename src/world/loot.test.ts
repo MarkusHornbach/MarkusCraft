@@ -1,7 +1,8 @@
 // Loot tables, the item rule, determinism and the frozen loot checksum (Phase 8 part B3b, AC2.1, AC2.2).
 import { describe, expect, it } from 'vitest';
 import { CHEST_SLOTS, STACK_SIZE } from '../game/config';
-import { getItemDef, isItem, toolOf } from '../items/items';
+import { Item, getItemDef, isItem, toolOf } from '../items/items';
+import { RECIPES } from '../items/recipes';
 import { NATURAL_BLOCKS } from '../progress/tables';
 import { lootChecksum1337 } from '../testing/lootChecksum';
 import { LOOT_CHECKSUM_1337_V4 } from '../testing/terrainChecksum';
@@ -70,6 +71,18 @@ describe('loot tables', () => {
         if (s) rich.set(s.item, (rich.get(s.item) ?? 0) + 1);
     }
     expect(rich.get(Block.IRON_BLOCK) ?? 0).toBeLessThan(rich.get(Block.TORCH) ?? 0);
+  });
+
+  it('Phase 8B3b the starter chest never holds every stick the first pickaxes need (level 3 stays reachable)', () => {
+    // Chapters 1 and 2 give exactly level 3 with the first crafts that cannot be avoided;
+    // with every stick from loot the stick's first craft (5 XP) would be skipped.
+    const sticksNeeded = [Item.WOODEN_PICKAXE, Item.STONE_PICKAXE].reduce((sum, tool) => {
+      const recipe = RECIPES.find((r) => r.result.item === tool);
+      return sum + (recipe?.ingredients.find((i) => i.item === Item.STICK)?.count ?? 0);
+    }, 0);
+    const sticks = LOOT_TABLES.starter.entries.find((e) => e.item === Item.STICK);
+    expect(sticks?.max ?? 0).toBeLessThan(sticksNeeded);
+    // Planks are made for task 2 and coal for task 11 anyway; torches for task 13.
   });
 
   it('Phase 8B3b AC2.1 the same seed and cell always give the same contents', () => {

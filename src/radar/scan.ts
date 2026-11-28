@@ -320,7 +320,7 @@ function scanPlaces(
 /**
  * The chest probe of a world: the cell's block (a loaded chunk's, else its edit; no edit
  * means the generated chest is there) is a chest, and its state (stored, else the derived
- * loot) holds an item. Guests hold the whole world's edits and states, so they agree.
+ * loot, never empty) holds an item. Guests hold the whole world's edits and states, so they agree.
  */
 export function worldChestProbe(world: World): ChestProbe {
   return (x, y, z) => {
@@ -335,8 +335,9 @@ export function worldChestProbe(world: World): ChestProbe {
       if (edit !== undefined) block = edit;
     }
     if (block !== Block.CHEST) return false;
-    const state = world.stateFor(Block.CHEST, x, y, z);
-    return state !== null && !isEmptyState(state);
+    // Without a stored state a listed chest holds its derived loot, which is never empty.
+    const stored = world.storedState(x, y, z);
+    return stored === null || stored.kind !== 'chest' || !isEmptyState(stored);
   };
 }
 

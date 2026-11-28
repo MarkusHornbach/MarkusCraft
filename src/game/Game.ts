@@ -36,7 +36,7 @@ import { FocusManager } from '../ui/FocusManager';
 import type { PadHint } from '../ui/PadHints';
 import { glyphSheet } from '../ui/padGlyphs';
 import { figureSheet } from '../ui/figureIcons';
-import { Hud } from '../ui/Hud';
+import { type ChestHintInput, Hud } from '../ui/Hud';
 import { ChestScreen } from '../ui/ChestScreen';
 import { InventoryScreen } from '../ui/InventoryScreen';
 import { type InputMode, PauseScreen, SAVE_FAILED_TEXT } from '../ui/PauseScreen';
@@ -74,6 +74,7 @@ import { advanceTime, wrapTime } from '../world/dayNight';
 import { findSpawn, type SpawnPoint } from '../world/generation/spawn';
 import { getTerrain, terrainChecksumAt } from '../world/generation/terrain';
 import { TerrainV3, caveSites } from '../world/generation/terrainV3';
+import { TerrainV4, lootSites } from '../world/generation/terrainV4';
 import {
   type WorldGen,
   type WorldOptions,
@@ -1839,6 +1840,8 @@ export class Game {
   /** The session set block states (a chest's slots): their chunks are saved. */
   private onStatesChanged(changes: readonly StateChange[]): void {
     for (const { x, z } of changes) this.markChunkDirty(x, z);
+    // An emptied loot chest leaves the radar (Phase 8 part B3b).
+    this.radar.noteStates(changes);
     const c = this.chestOpen;
     if (c && changes.some((s) => s.x === c.x && s.y === c.y && s.z === c.z)) this.showChestSlots();
   }
@@ -2631,6 +2634,7 @@ export class Game {
     const stage = view ? Math.min(CRACK_STAGES - 1, Math.floor(view.progress * CRACK_STAGES)) : 0;
     this.renderer.setBreakOverlay(view, stage);
     this.hud.setBreakProgress(view ? view.progress : null);
+    this.hud.setChestHint(this.chestHintInput(view !== null));
     const now = this.nowMs();
     const pickup = this.pickup && now <= this.pickup.untilMs ? this.pickup : null;
     const padNotice = this.padNotice && now <= this.padNotice.untilMs ? this.padNotice : null;
@@ -2655,6 +2659,17 @@ export class Game {
     this.progressNotice.show(playing ? (this.progressShown?.text ?? null) : null, this.overlayOpen);
     const smelt = this.smeltView();
     this.inventoryScreen.setSmelting(smelt ? smelt.recipe : null, smelt ? smelt.progress : 0);
+  }
+
+  /**
+   * The crosshair hint on a chest within reach (Phase 8 part B3b): by the input in use, in
+   * both modes, never while a break is in progress. The target is the one already raycast.
+   */
+  private chestHintInput(breaking: boolean): ChestHintInput | null {
+    const t = this.target;
+    if (!t || t.id !== Block.CHEST || breaking || this.input.isHeld('break')) return null;
+    if (this.padActive) return 'pad';
+    return this.mode === 'touch' ? 'touch' : 'mouse';
   }
 
   /**
@@ -3475,6 +3490,10 @@ export class Game {
       caveSites: () => {
         const terrain = getTerrain(this.world.seed, this.world.gen);
         return terrain instanceof TerrainV3 ? caveSites(terrain) : null;
+      },
+      lootSites: () => {
+        const terrain = getTerrain(this.world.seed, this.world.gen);
+        return terrain instanceof TerrainV4 ? lootSites(terrain) : null;
       },
       getLight: (x, y, z) => this.lightAt(x, y, z),
       verifyLight: () => this.world.verifyLight(),

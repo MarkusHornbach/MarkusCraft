@@ -157,7 +157,8 @@ describe('radar scan cost with chests', () => {
     const gen: WorldGen = { version: 4, options: { terrain: 'balanced', trees: 'few' } };
     let without = { warm: Infinity, cold: Infinity };
     let withChests = { warm: Infinity, cold: Infinity };
-    for (let round = 0; round < (TIMING_ENFORCED ? 2 : 1); round++) {
+    // Four rounds: the two sides differ by little and a busy machine shifts one of them.
+    for (let round = 0; round < (TIMING_ENFORCED ? 4 : 1); round++) {
       const a = scanTimes(gen, true, false);
       const b = scanTimes(gen, true, true);
       without = { warm: Math.min(without.warm, a.warm), cold: Math.min(without.cold, a.cold) };

@@ -23,8 +23,8 @@ answer asynchronously. `applyAction` is pure and never mutates its inputs;
 `actions/Session.ts`, `net/HostSession.ts` (the host applies an action),
 `net/ClientSession.ts` (a guest applies the host's blocks) and once in `Game.ts` (the
 test API tool), if `.setState(` is called outside the three sessions (Phase 8 part B3a) or a
-chest state is built from slots outside `src/actions/`, `blockState.ts` and the guest that
-applies the host's slots, if a slot-changing inventory function is called outside `src/actions/`
+chest state is built from slots outside `src/actions/`, `blockState.ts`, `world/loot.ts`
+and the guest that applies the host's slots, if a slot-changing inventory function is called outside `src/actions/`
 (one call in `Game.ts` for `give`), or if `replaceRecord` is called outside the two test
 tools. Phase 8: it also fails if `stepProgress` is called outside `actions/Session.ts` and
 `net/HostSession.ts`, `replaceProgress` outside the test tool `setProgress`, or a record's

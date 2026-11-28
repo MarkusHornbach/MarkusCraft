@@ -51,3 +51,36 @@ export function count(
 ): number {
   return slots.reduce((n, s) => n + (s?.item === item ? s.count : 0), 0);
 }
+
+interface Cell {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * Stands in a cell (feet at its floor) with the crosshair on the centre of a chest cell
+ * (Phase 8 part B3b: the loot chest of a generator 4 shaft).
+ */
+export async function faceCell(page: Page, stand: Cell, target: Cell): Promise<void> {
+  const eye = { x: stand.x + 0.5, y: stand.y + 1.62, z: stand.z + 0.5 };
+  const dx = target.x + 0.5 - eye.x;
+  const dy = target.y + 0.5 - eye.y;
+  const dz = target.z + 0.5 - eye.z;
+  await setPlayer(page, {
+    x: eye.x,
+    y: stand.y,
+    z: eye.z,
+    yaw: Math.atan2(-dx, -dz),
+    pitch: Math.atan2(dy, Math.hypot(dx, dz)),
+  });
+  await step(page, 2);
+  await whenIdle(page);
+}
+
+/** The loot sites of the open generator 4 world; fails without a spawn shaft. */
+export async function spawnLoot(page: Page): Promise<{ chest: Cell; stand: Cell }> {
+  const sites = await page.evaluate(() => window.__mc.lootSites());
+  if (!sites?.spawn) throw new Error('no spawn shaft chest');
+  return sites.spawn;
+}

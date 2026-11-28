@@ -5,7 +5,7 @@ import type { ChestState } from '../blockState';
 import { lootOf } from '../loot';
 import { type Shaft, shaftChestCell } from './shafts';
 import type { Place } from './terrain';
-import { TerrainV3 } from './terrainV3';
+import { type SiteCell, TerrainV3 } from './terrainV3';
 
 const LAYER = CHUNK_SIZE * CHUNK_SIZE;
 
@@ -61,4 +61,34 @@ export function spawnChestChunk(terrain: TerrainV4): { cx: number; cz: number } 
   if (!s) return null;
   const c = shaftChestCell(s);
   return { cx: Math.floor(c.x / CHUNK_SIZE), cz: Math.floor(c.z / CHUNK_SIZE) };
+}
+
+/** Where a test finds the loot chests of a generator 4 world (the test API's `lootSites`). */
+export interface LootSites {
+  /** The spawn shaft's chest and a standing cell next to it in the chamber; null: no shaft. */
+  spawn: { chest: SiteCell; stand: SiteCell } | null;
+  /** The chest of the grid shaft nearest the spawn within 256 blocks, or null. */
+  grid: SiteCell | null;
+}
+
+/** The spawn shaft's chest and the nearest grid shaft's chest (Phase 8 part B3b). */
+export function lootSites(terrain: TerrainV4): LootSites {
+  const own = terrain.shafts.spawnShaft();
+  const spawn = terrain.spawnPoint();
+  const r = 256;
+  let grid: SiteCell | null = null;
+  let best = Infinity;
+  for (const s of terrain.shafts.shaftsIn(spawn.x - r, spawn.z - r, spawn.x + r, spawn.z + r)) {
+    if (s.spawn) continue;
+    const c = shaftChestCell(s);
+    const d = Math.hypot(c.x - spawn.x, c.z - spawn.z);
+    if (d <= r && d < best) {
+      best = d;
+      grid = c;
+    }
+  }
+  if (!own) return { spawn: null, grid };
+  const chest = shaftChestCell(own);
+  // The chamber cell diagonal to the chest corner: free, on the stone bricks.
+  return { spawn: { chest, stand: { x: chest.x + 1, y: chest.y, z: chest.z - 1 } }, grid };
 }

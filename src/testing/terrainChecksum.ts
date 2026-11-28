@@ -73,4 +73,4 @@ export const TERRAIN_CHECKSUMS_1337_V4: Readonly<Record<string, number>> = {
  * of the origin, then the spawn chest of each preset. Frozen: a change to the loot tables
  * or their draw is a new generator version.
  */
-export const LOOT_CHECKSUM_1337_V4 = 2380617216;
+export const LOOT_CHECKSUM_1337_V4 = 3564137858;

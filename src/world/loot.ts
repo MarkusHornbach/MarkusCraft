@@ -37,7 +37,9 @@ export const LOOT_TABLES: Readonly<Record<LootTableName, LootTable>> = {
     entries: [
       { item: Block.TORCH, min: 4, max: 8, weight: 1 },
       { item: Item.COAL, min: 2, max: 6, weight: 1 },
-      { item: Item.STICK, min: 4, max: 8, weight: 1 },
+      // At most 3: the wooden and the stone pickaxe need 4, so a first craft of sticks
+      // (5 XP) stays unavoidable; without it chapters 1–2 end below level 3 (the furnace).
+      { item: Item.STICK, min: 1, max: 3, weight: 1 },
       { item: Block.PLANKS, min: 8, max: 16, weight: 1 },
     ],
   },
