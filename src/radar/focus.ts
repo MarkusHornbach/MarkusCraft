@@ -23,14 +23,31 @@ export function radarFocus(tracked: Task | null): RadarKind | null {
  * The kinds the circle shows: the focus (an ore kind) or every ore kind, then the place
  * kinds where the world has places.
  */
-export function circleKinds(focus: RadarKind | null, hasPlaces: boolean): readonly RadarKind[] {
+export function circleKinds(
+  focus: RadarKind | null,
+  hasPlaces: boolean,
+  hasChests = false,
+): readonly RadarKind[] {
   const ores = focus ? [focus] : ORE_RADAR_KINDS;
-  return hasPlaces ? [...ores, ...PLACE_RADAR_KINDS] : ores;
+  return hasPlaces ? [...ores, ...placeKinds(hasChests)] : ores;
 }
 
-/** The kinds the Map tab and its legend show: every ore kind, and the places if any. */
-export function mapKinds(hasPlaces: boolean): readonly RadarKind[] {
-  return hasPlaces ? RADAR_KINDS : ORE_RADAR_KINDS;
+/**
+ * The kinds the Map tab and its legend show: every ore kind, and the places if any (the
+ * chest only where the generator puts loot chests, version 4).
+ */
+export function mapKinds(hasPlaces: boolean, hasChests = false): readonly RadarKind[] {
+  if (!hasPlaces) return ORE_RADAR_KINDS;
+  return hasChests ? RADAR_KINDS : WITHOUT_CHESTS;
+}
+
+const WITHOUT_CHESTS: readonly RadarKind[] = RADAR_KINDS.filter((k) => k.key !== 'chest');
+const PLACES_WITHOUT_CHESTS: readonly RadarKind[] = PLACE_RADAR_KINDS.filter(
+  (k) => k.key !== 'chest',
+);
+
+function placeKinds(hasChests: boolean): readonly RadarKind[] {
+  return hasChests ? PLACE_RADAR_KINDS : PLACES_WITHOUT_CHESTS;
 }
 
 /**

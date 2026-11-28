@@ -18,7 +18,7 @@ import { openTouchAdventure, radarOf } from './radar';
 import { TOUCH_DEVICE } from './touch';
 
 const circle = '.radar-circle';
-const PLACE = /^(shaft|cave)$/;
+const PLACE = /^(shaft|cave|chest)$/;
 
 async function openMap(page: Page): Promise<void> {
   await page.keyboard.press('KeyE');
@@ -149,20 +149,23 @@ test('Phase 8B2b: "Radar circle size": Medium by default, Small and Large on the
 test.describe('touch', () => {
   test.use(TOUCH_DEVICE);
 
-  test('Phase 8B2b AC6.2 AC6.3: 640 × 360: four legend rows beside a full-height map, no scrolling; reference', async ({
+  test('Phase 8B2b AC6.2 AC6.3 Phase 8B3b AC5.1 AC5.4: 640 × 360: five legend rows (Chest too) beside a full-height map, no scrolling; reference', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 640, height: 360 });
-    // The menu makes a generator 3 world.
+    // The menu makes a generator 4 world (B3b): its legend has a Chest row.
     await openTouchAdventure(page);
     await page.locator('.touch-bag').tap();
     await page.locator('.inventory-tab[data-tab="map"]').tap();
     await expect.poll(async () => (await getState(page)).ui.tab).toBe('map');
     await page.waitForFunction(() => (window.__mc.getState().map?.draws ?? 0) > 0);
-    await expect.poll(async () => (await legendOf(page)).length).toBe(4);
+    await expect.poll(async () => (await legendOf(page)).length).toBe(5);
     const legend = await legendOf(page);
     expect(legend[2]).toMatch(/^Shaft · /);
     expect(legend[3]).toMatch(/^Cave · /);
+    expect(legend[4]).toMatch(/^Chest · (\d+ blocks? · |none within 192)/);
+    const map = (await getState(page)).map;
+    expect(map?.entries.some((e) => e.kind === 'chest')).toBe(true);
     const layout = await page.evaluate(() => {
       const box = (sel: string) => {
         const node = document.querySelector<HTMLElement>(sel);
@@ -203,7 +206,7 @@ test.describe('touch', () => {
       expect(b.bottom).toBeLessThanOrEqual(layout.legend.top + 1);
     }
     await hideWorld(page);
-    await expect(page).toHaveScreenshot('map-tab-places.png', { maxDiffPixelRatio: 0.05 });
+    await expect(page).toHaveScreenshot('map-tab-loot.png', { maxDiffPixelRatio: 0.05 });
   });
 
   test('Phase 8B2b: on touch Large never covers a button: 640 × 360 fits the room, 1280 × 720 is 168 px', async ({

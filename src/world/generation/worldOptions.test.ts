@@ -64,7 +64,8 @@ describe('world options', () => {
     expect(isKnownGeneratorVersion(1)).toBe(true);
     expect(isKnownGeneratorVersion(2)).toBe(true);
     expect(isKnownGeneratorVersion(3)).toBe(true);
-    expect(isKnownGeneratorVersion(4)).toBe(false);
+    expect(isKnownGeneratorVersion(4)).toBe(true);
+    expect(isKnownGeneratorVersion(5)).toBe(false);
     const options = { terrain: 'flat', trees: 'many' } as const;
     expect(worldGenOf(1, null)).toEqual(CLASSIC_GEN);
     expect(worldGenOf(1, options)).toBeNull();
@@ -72,7 +73,8 @@ describe('world options', () => {
     expect(worldGenOf(2, null)).toBeNull();
     expect(worldGenOf(3, options)).toEqual({ version: 3, options });
     expect(worldGenOf(3, null)).toBeNull();
-    expect(worldGenOf(4, options)).toBeNull();
+    expect(worldGenOf(4, options)).toEqual({ version: 4, options });
+    expect(worldGenOf(5, options)).toBeNull();
     expect(optionsOf(CLASSIC_GEN)).toBeNull();
     expect(optionsOf({ version: 2, options })).toEqual(options);
     expect(sameWorldGen(CLASSIC_GEN, { version: 1 })).toBe(true);

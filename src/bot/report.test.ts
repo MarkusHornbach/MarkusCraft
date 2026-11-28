@@ -53,6 +53,8 @@ function run(minutes: number, completed = true): BotRun {
       },
     ],
     places: [],
+    accidentalLoots: 0,
+    trips: [],
   };
 }
 

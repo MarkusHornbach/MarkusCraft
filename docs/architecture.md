@@ -113,3 +113,50 @@ per shard, `game-N.json` / `mp-N.json`, the merged `merged.json` and `summary.md
   `docs-1-plan.md` and `docs-1-report.md` (Docs round 1), `device-tests.md` (the open
   tests on real devices, filled out by the owner) and `device-tests-done.md`,
   `architecture.md` (this file), `testing.md` (the test API).
+
+## Network overlay and traffic
+
+Moved from `src/net/CLAUDE.md` (Phase 6 part E, "Measure and harden").
+
+The F3 overlay has five network rows, shown only in a room (`netRows`,
+`Multiplayer.debugInfo`): role, status, code and players; the round trip (a guest's own; on
+the host what each guest reports in `ping.rtt`); the link of each connection from
+`getStats()` every 2 s (`linkKind`: "direct", "via STUN", "relay"); the signaling state;
+messages and bytes per second in and out over the last 2 s, counted by a `TrafficMeter`
+around the room's network (`countedNetwork`). `traffic.ts` and the stats code are in the
+lazy session chunk. Relayed poses are cut to millimetres and 1e-4 rad (`compactPose`) and
+leave out flags that are false: with four moving players the host sends about 13 kB/s
+(AC14.6, limit 20). The scenario `players`: `src/bench/CLAUDE.md`.
+
+## Radar on screen
+
+Moved from `src/radar/CLAUDE.md` (Phase 8 parts B1, B2b, B3b).
+
+The circle (`RadarCircle`, in the HUD, so it hides with it): heading-up, a cube-root
+distance scale (near veins spread out; the rim is 48), coal a dark dot with a light rim,
+iron a tan diamond, a shaft a light brown hollow square, a cave a grey downward triangle, a
+chest a filled amber square with a dark band;
+hint labels upright, nearest first, one that would cover another is left out; `beyond`
+arrows on the rim. Size: the setting "Radar circle size" (`settings.radarSize`, 0–2,
+default 1 Medium): PC 112 / 168 / 224 px, top-right 12 px; touch 88 / 128 / 168 px below
+the bag button, never larger than the room down to 4 px above the highest right-hand
+button (`Game.touchCircleRoom`; never below Small); symbols and labels grow with √(size /
+Small). The bench keeps Small. Shown in Adventure while playing, unlocked, with the setting
+"Radar circle" on, or in the bench scenario `radar`. The Map tab (`MapTab`): north-up,
+linear, rings at 16/32/48, a background of the loaded chunks' top blocks (leaves included,
+shaded by height, cached per chunk while the tab is open, redone on `onBlocks` or a
+reloaded chunk), the player arrow, up to 8 veins and 4 places per kind and one legend row
+per kind shown ("Shaft · 24 blocks · far", "Cave · none within 192"). On the Map tab the
+panel fills the screen (12 px margin); the canvas is the largest square leaving the legend
+200 px; symbols and labels grow with the square (up to 2.2 ×). On screens up to 480 px high
+the header (tabs in two rows, Close) moves beside the map above the legend, so the square
+is as high as the screen (640 × 360: 348 px). F3 row "Radar".
+
+## Reading older docs
+
+Multiplayer was "Phase 4" in the Phase 3 documents and "Phase 2, Part B" in
+`docs/phase-2-plan.md` (now Phase 6; never implement 2B); Phase 3 part D (Web Workers) is
+now Phase 4 part C (never implement 3D); personalization was Phase 5; "Part D" and
+"AC11.x" in the reports of 6B and 6C mean Part E and AC14.x (Part D, the figure, was
+inserted later); Polish 1 and 2 name their criteria "Polish 1 AC1.1", "Polish 2 AC1.1"
+and their device tests' origins "P1", "P2".

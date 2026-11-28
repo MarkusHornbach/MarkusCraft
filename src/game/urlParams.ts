@@ -105,9 +105,9 @@ function lookParam(text: string | null): number | null {
 }
 
 /**
- * `terrain=` and `trees=` (Phase 7 part A) and `gen=2|3` (Phase 8 part B2a); invalid
- * values are ignored. Without `gen`, `terrain` or `trees` give generator 2; `gen=3` alone
- * gives generator 3 with the default options; nothing gives generator 1.
+ * `terrain=` and `trees=` (Phase 7 part A) and `gen=2|3|4` (Phase 8 parts B2a, B3b);
+ * invalid values are ignored. Without `gen`, `terrain` or `trees` give generator 2; `gen=3`
+ * or `gen=4` alone gives that generator with the default options; nothing gives generator 1.
  */
 function testGenParam(
   terrainText: string | null,
@@ -116,7 +116,7 @@ function testGenParam(
 ): WorldGen {
   const terrain = isTerrainShape(terrainText) ? terrainText : null;
   const trees = isTreeDensity(treesText) ? treesText : null;
-  const version = genText === '2' ? 2 : genText === '3' ? 3 : null;
+  const version = genText === '2' ? 2 : genText === '3' ? 3 : genText === '4' ? 4 : null;
   if (terrain === null && trees === null && version === null) return CLASSIC_GEN;
   return {
     version: version ?? 2,

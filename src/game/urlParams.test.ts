@@ -88,7 +88,12 @@ describe('parseParams', () => {
       version: 2,
       options: { terrain: 'balanced', trees: 'few' },
     });
-    expect(parseParams('?test=1&gen=4', random).testGen).toEqual({ version: 1 });
+    // Phase 8B3b AC1.1: gen=4 gives generator 4; an unknown version is ignored.
+    expect(parseParams('?test=1&gen=4', random).testGen).toEqual({
+      version: 4,
+      options: { terrain: 'balanced', trees: 'few' },
+    });
+    expect(parseParams('?test=1&gen=5', random).testGen).toEqual({ version: 1 });
     expect(parseParams('?test=1&gen=1&terrain=flat', random).testGen).toEqual({
       version: 2,
       options: { terrain: 'flat', trees: 'few' },

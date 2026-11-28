@@ -67,9 +67,10 @@ export function buildReport(runs: readonly BotRun[]): BotReport {
       ),
     ),
   );
+  // The loot run's trips are rows of their own, never part of the total.
   const total = row(
     'Total',
-    done.map((r) => playerMinutes(r.totalMs)),
+    done.map((r) => playerMinutes(r.totalMs - tripMs(r))),
   );
   const levelNumbers = [...new Set(done.flatMap((r) => r.levelUps.map((l) => l.level)))].sort(
     (a, b) => a - b,
@@ -288,4 +289,109 @@ export function formatPlaces(runs: readonly BotRun[], spawns: readonly SpawnPlac
     );
   }
   return lines.join('\n');
+}
+
+/** Bot time of a run's loot trips (Phase 8 part B3b). */
+export function tripMs(run: BotRun): number {
+  return run.trips.reduce((sum, t) => sum + t.ms, 0);
+}
+
+/**
+ * Limits of the loot run against the plain run (Phase 8 part B3b, plan 6.7), in estimated
+ * player minutes of the medians, trips left out.
+ */
+export const LOOT_LIMITS = {
+  totalShorter: 1.5,
+  chapterShorter: 1.0,
+  chainTasks: [11, 12, 16, 17] as readonly number[],
+  chainWithin: 0.3,
+} as const;
+
+export interface LootComparison {
+  checks: { text: string; ok: boolean }[];
+  markdown: string;
+}
+
+/**
+ * The loot run against a run without loot on the same worlds (the plain run, or the control
+ * run with the same trips and nothing taken): limits, trips, accidental loots.
+ */
+export function compareLoot(
+  plain: readonly BotRun[],
+  loot: readonly BotRun[],
+  against = 'the plain run',
+): LootComparison {
+  const a = buildReport(plain);
+  const b = buildReport(loot);
+  const f = (n: number): string => n.toFixed(1);
+  const checks: { text: string; ok: boolean }[] = [];
+  const totalSaved = a.total.median - b.total.median;
+  checks.push({
+    text: `total ${f(totalSaved)} min shorter ≤ ${LOOT_LIMITS.totalShorter}`,
+    ok: totalSaved <= LOOT_LIMITS.totalShorter,
+  });
+  const rows: string[] = [];
+  a.chapters.forEach((c, i) => {
+    const saved = c.median - b.chapters[i].median;
+    rows.push(`| ${c.label} | ${f(c.median)} | ${f(b.chapters[i].median)} | ${f(saved)} |`);
+    checks.push({
+      text: `chapter "${c.label}" ${f(saved)} min shorter ≤ ${LOOT_LIMITS.chapterShorter}`,
+      ok: saved <= LOOT_LIMITS.chapterShorter,
+    });
+  });
+  rows.push(`| Total | ${f(a.total.median)} | ${f(b.total.median)} | ${f(totalSaved)} |`);
+  const taskRows: string[] = [];
+  for (const id of LOOT_LIMITS.chainTasks) {
+    const i = TASKS.findIndex((t) => t.id === id);
+    if (i < 0) continue;
+    const diff = a.tasks[i].median - b.tasks[i].median;
+    taskRows.push(
+      `| ${a.tasks[i].label} | ${f(a.tasks[i].median)} | ${f(b.tasks[i].median)} | ${f(diff)} |`,
+    );
+    checks.push({
+      text: `task "${a.tasks[i].label}" within ${LOOT_LIMITS.chainWithin} min (${f(diff)})`,
+      ok: Math.abs(diff) <= LOOT_LIMITS.chainWithin,
+    });
+  }
+  const complete = [...plain, ...loot].every((r) => r.completed && r.lightErrors === 0);
+  checks.push({
+    text: `all ${plain.length + loot.length} runs complete, light errors 0`,
+    ok: complete,
+  });
+  for (const report of [a, b]) {
+    const label = report === a ? 'without loot' : 'loot';
+    checks.push({
+      text: `${label} run: total ${f(report.total.median)} min within ${TARGETS.totalMin}–${TARGETS.totalMax}`,
+      ok: report.total.median >= TARGETS.totalMin && report.total.median <= TARGETS.totalMax,
+    });
+  }
+  const tripRows = ['Loot trip 1', 'Loot trip 2'].map((label) => {
+    const trips = loot.flatMap((r) => r.trips.filter((t) => t.label === label));
+    const found = trips.filter((t) => t.distance !== null);
+    const minutes = found.map((t) => playerMinutes(t.ms));
+    const distances = found.map((t) => t.distance ?? 0);
+    return `| ${label} | ${found.length} of ${trips.length} | ${f(median(minutes))} | ${f(minutes.length > 0 ? Math.max(...minutes) : 0)} | ${f(median(distances))} |`;
+  });
+  const accidental = (runs: readonly BotRun[]): string =>
+    `${runs.reduce((n, r) => n + r.accidentalLoots, 0)} in ${runs.filter((r) => r.accidentalLoots > 0).length} runs`;
+  const markdown = [
+    `Loot run against ${against} (${plain.length} worlds each; trips left out)`,
+    '',
+    '| Chapter | Without (min) | Loot (min) | Shorter by |',
+    '| --- | ---: | ---: | ---: |',
+    ...rows,
+    '',
+    '| Task (coal and iron chain) | Without | Loot | Shorter by |',
+    '| --- | ---: | ---: | ---: |',
+    ...taskRows,
+    '',
+    '| Trip | Chest found | Median (min) | Max (min) | Median distance |',
+    '| --- | ---: | ---: | ---: | ---: |',
+    ...tripRows,
+    '',
+    `Accidental loots (a chest in the bot's way): without ${accidental(plain)}, loot ${accidental(loot)}`,
+    '',
+    ...checks.map((c) => `- [${c.ok ? 'x' : ' '}] ${c.text}`),
+  ].join('\n');
+  return { checks, markdown };
 }

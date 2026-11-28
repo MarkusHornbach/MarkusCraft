@@ -32,7 +32,9 @@ import { PlaceIndex } from '../radar/places';
 import { scanRadar, worldProbe } from '../radar/scan';
 import { VeinIndex } from '../radar/veins';
 import { BLOCK_SOLID, Block, isSupport } from '../world/blocks';
+import { shaftChestCell } from '../world/generation/shafts';
 import { findSpawn } from '../world/generation/spawn';
+import { TerrainV4 } from '../world/generation/terrainV4';
 import { type Place, getTerrain } from '../world/generation/terrain';
 import type { WorldGen } from '../world/generation/worldOptions';
 import { blockOf, skyOf } from '../world/light/lightRules';
@@ -79,6 +81,36 @@ export interface BotRun {
   radar: RadarCheck[];
   /** At the start of task 16 (generator 3): the nearest place per kind (Phase 8 part B2b). */
   places: PlaceCheck[];
+  /** Loot chests emptied because they were in the bot's way (Phase 8 part B3b). */
+  accidentalLoots: number;
+  /** The loot run's trips (`--loot`): when, how long, what they brought. */
+  trips: LootTrip[];
+}
+
+/** One trip of the loot run to a loot chest (Phase 8 part B3b). */
+export interface LootTrip {
+  label: string;
+  /** Bot time of the trip; never part of a task's time. */
+  ms: number;
+  /** Horizontal distance from where the trip started to the chest; null: none found. */
+  distance: number | null;
+  /** The items taken. */
+  items: { item: number; count: number }[];
+}
+
+/** The loot run's second trip goes to the nearest other loot chest within this distance. */
+export const LOOT_TRIP_RADIUS = 192;
+/** The chapter at whose start the second trip is made. */
+export const LOOT_TRIP_CHAPTER = 4;
+
+export interface BotOptions {
+  /** The loot run: fetch the spawn chest before task 1 and a far one at chapter 4. */
+  loot?: boolean;
+  /**
+   * With `loot`: false makes the same trips without taking anything (the control run: the
+   * trips' tunnels change later walks, which is no effect of the items).
+   */
+  take?: boolean;
 }
 
 /** A nearest place: in range (`dy` known) or beyond it (`dy` null), relative to the feet. */
@@ -172,12 +204,15 @@ export class Bot {
   private readonly dark = new Map<string, DarkBreaks>();
   readonly radarChecks: RadarCheck[] = [];
   readonly placeChecks: PlaceCheck[] = [];
+  accidentalLoots = 0;
+  readonly trips: LootTrip[] = [];
   private readonly veins: VeinIndex;
   private readonly places: PlaceIndex;
 
   constructor(
     readonly seed: number,
     readonly gen: WorldGen,
+    readonly options: BotOptions = {},
   ) {
     this.world = new World(seed, gen);
     this.veins = new VeinIndex(seed, gen);
@@ -382,12 +417,89 @@ export class Bot {
     if (drop) this.makeRoom(drop.item, drop.count);
     const above = this.block([cell[0], cell[1] + 1, cell[2]]);
     if (above === Block.TORCH) this.makeRoom(Block.TORCH);
+    if (block === Block.CHEST && this.isLootCell(cell)) this.emptyChest(cell, true);
     this.noteDarkBreak(cell, block);
     const [x, y, z] = cell;
     this.submit({ kind: 'startBreak', x, y, z });
     this.clockMs += breakTimeMs(block, held) ?? 0;
     this.submit({ kind: 'break', x, y, z });
     this.broken++;
+  }
+
+  /** Whether a generator 4 shaft puts its loot chest into the cell. */
+  private isLootCell([x, y, z]: Cell): boolean {
+    return getTerrain(this.seed, this.gen).lootAt?.(x, y, z) != null;
+  }
+
+  /**
+   * Opens a chest within reach, takes everything (junk thrown away first so that it fits)
+   * and closes it. Returns what it took. `accidental`: it was in the way (counted).
+   */
+  private emptyChest(cell: Cell, accidental: boolean): { item: number; count: number }[] {
+    const [x, y, z] = cell;
+    const state = this.world.getState(x, y, z);
+    const stacks = (state?.slots ?? []).filter((s): s is NonNullable<typeof s> => s !== null);
+    if (stacks.length === 0) return [];
+    if (accidental) this.accidentalLoots++;
+    this.submit({ kind: 'openChest', x, y, z });
+    this.clockMs += BOT_TIME.actionRepeatMs;
+    for (const stack of stacks) this.makeRoom(stack.item, stack.count);
+    this.submit({ kind: 'takeAll', x, y, z });
+    this.clockMs += BOT_TIME.actionRepeatMs;
+    this.submit({ kind: 'closeChest' });
+    return stacks.map((s) => ({ item: s.item, count: s.count }));
+  }
+
+  /**
+   * A loot trip (`--loot`): walks and digs to the chest like to any target, empties it,
+   * goes back to where it started and records the time as its own row; the next task's
+   * time starts after it.
+   */
+  private lootTrip(label: string, chest: Cell | null): void {
+    const start = this.clockMs;
+    if (!chest) {
+      this.trips.push({ label, ms: 0, distance: null, items: [] });
+      return;
+    }
+    const from = this.cell;
+    const [px, , pz] = from;
+    const distance = Math.hypot(chest[0] - px, chest[2] - pz);
+    // The standing cell in the chamber next to the chest corner.
+    const stand: Cell = [chest[0] + 1, chest[1], chest[2] - 1];
+    this.goTo(stand, () => this.withinReach(chest) && this.open(chest));
+    if (!this.withinReach(chest) || !this.open(chest)) this.fail(`${label}: chest out of reach`);
+    const take = this.options.take !== false && this.block(chest) === Block.CHEST;
+    const items = take ? this.emptyChest(chest, false) : [];
+    // A fetch: back to where the trip started, so the tasks go on from the same place.
+    this.goTo(from);
+    this.trips.push({ label, ms: this.clockMs - start, distance, items });
+    this.lastDoneMs = this.clockMs;
+  }
+
+  /** The spawn shaft's chest, or the nearest other loot chest within `LOOT_TRIP_RADIUS`. */
+  private lootChest(spawnShaft: boolean): Cell | null {
+    const terrain = getTerrain(this.seed, this.gen);
+    if (!(terrain instanceof TerrainV4)) return null;
+    if (spawnShaft) {
+      const s = terrain.shafts.spawnShaft();
+      if (!s) return null;
+      const c = shaftChestCell(s);
+      return [c.x, c.y, c.z];
+    }
+    const [px, , pz] = this.cell;
+    const r = LOOT_TRIP_RADIUS;
+    let best: Cell | null = null;
+    let bestD = Infinity;
+    for (const s of terrain.shafts.shaftsIn(px - r, pz - r, px + r, pz + r)) {
+      if (s.spawn) continue;
+      const c = shaftChestCell(s);
+      const d = Math.hypot(c.x - px, c.z - pz);
+      if (d <= r && d < bestD) {
+        best = [c.x, c.y, c.z];
+        bestD = d;
+      }
+    }
+    return best;
   }
 
   /** Whether a light source is unlocked for the bot's player. */
@@ -912,9 +1024,16 @@ export class Bot {
 
   /** Plays the open chapter's tasks in table order until the book is complete. */
   play(): void {
+    const loot = this.options.loot === true;
+    if (loot) this.lootTrip('Loot trip 1', this.lootChest(true));
+    let secondTrip = false;
     for (let guard = 0; guard < 100; guard++) {
       const chapter = openChapter(this.session.progress);
       if (!chapter) return;
+      if (loot && !secondTrip && chapter.id === LOOT_TRIP_CHAPTER) {
+        secondTrip = true;
+        this.lootTrip('Loot trip 2', this.lootChest(false));
+      }
       const task = TASKS.find((t) => t.chapter === chapter.id && !this.taskDone(t));
       if (!task) return;
       this.currentTask = task.id;
@@ -988,7 +1107,8 @@ export class Bot {
     const far = RADAR_PLACE_FAR_RADIUS;
     const all: Place[] = [];
     terrain.placesIn?.(fx - far, fz - far, fx + far, fz + far, all);
-    for (const kind of PLACE_RADAR_KINDS) {
+    const kinds = PLACE_RADAR_KINDS.filter((k) => k.key !== 'chest' || this.places.hasChests);
+    for (const kind of kinds) {
       const scan = scanRadar({
         index: this.veins,
         x: fx,
@@ -1070,8 +1190,8 @@ export class Bot {
 }
 
 /** One run of the bot on a world (plan 5.10). Never throws: a failure is in `error`. */
-export function runBot(seed: number, gen: WorldGen): BotRun {
-  const bot = new Bot(seed, gen);
+export function runBot(seed: number, gen: WorldGen, options: BotOptions = {}): BotRun {
+  const bot = new Bot(seed, gen, options);
   let error: string | null = null;
   try {
     bot.play();
@@ -1095,6 +1215,8 @@ export function runBot(seed: number, gen: WorldGen): BotRun {
     radarUnlocked: featureUnlocked('radar', bot.session.record, bot.session.progress),
     radar: bot.radarChecks,
     places: bot.placeChecks,
+    accidentalLoots: bot.accidentalLoots,
+    trips: bot.trips,
   };
 }
 

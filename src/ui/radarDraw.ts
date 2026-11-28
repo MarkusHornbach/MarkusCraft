@@ -6,8 +6,9 @@ export function css(colour: number): string {
 }
 
 /**
- * A kind's symbol centred at (x, y): a dot, a diamond, a hollow square (shaft) or a
- * downward triangle (cave), each with a rim, so the shape alone tells them apart.
+ * A kind's symbol centred at (x, y): a dot, a diamond, a hollow square (shaft), a
+ * downward triangle (cave) or a filled square with a dark band (chest), each with a rim, so
+ * the shape alone tells them apart.
  */
 export function drawSymbol(
   ctx: CanvasRenderingContext2D,
@@ -28,6 +29,19 @@ export function drawSymbol(
     ctx.lineWidth = w;
     ctx.strokeStyle = css(kind.colour);
     ctx.stroke();
+    return;
+  }
+  if (kind.shape === 'chest') {
+    // Filled with a dark band across the middle (a lid line): never hollow like a shaft.
+    const d = r * 1.05;
+    ctx.rect(x - d, y - d, 2 * d, 2 * d);
+    ctx.fillStyle = css(kind.colour);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = css(kind.rim);
+    ctx.stroke();
+    ctx.fillStyle = css(kind.rim);
+    ctx.fillRect(x - d, y - Math.max(1, d * 0.22), 2 * d, Math.max(2, d * 0.44));
     return;
   }
   if (kind.shape === 'dot') {

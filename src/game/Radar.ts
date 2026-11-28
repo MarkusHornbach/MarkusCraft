@@ -14,6 +14,7 @@ import type { RadarKind } from '../radar/kinds';
 import { PlaceIndex } from '../radar/places';
 import {
   scanRadar,
+  worldChestProbe,
   worldProbe,
   type RadarBeyond,
   type RadarEntry,
@@ -103,6 +104,18 @@ export class Radar {
 
   /** Blocks changed: a scan is due if one lies within the far radius of the feet. */
   noteBlocks(changes: readonly BlockChange[]): void {
+    this.noteCells(changes);
+  }
+
+  /**
+   * Chest states changed (Phase 8 part B3b): a scan is due if one lies within the far
+   * radius, since an emptied loot chest leaves the radar.
+   */
+  noteStates(changes: readonly { x: number; z: number }[]): void {
+    this.noteCells(changes);
+  }
+
+  private noteCells(changes: readonly { x: number; z: number }[]): void {
     const reach = RADAR_FAR_RADIUS + 2;
     for (const { x, z } of changes) {
       if (Math.abs(x - this.feet.x) <= reach && Math.abs(z - this.feet.z) <= reach) {
@@ -209,6 +222,7 @@ export class Radar {
       places: this.places,
       placesPerKind: RADAR_MAP_PLACES,
       placeFarRadius: RADAR_PLACE_FAR_RADIUS,
+      chests: worldChestProbe(s.world),
     });
     this.scanMs = performance.now() - start;
     this.scans.done(s.step);
@@ -219,7 +233,7 @@ export class Radar {
   }
 
   private drawCircle(scan: RadarScan, s: RadarStep): void {
-    const kinds = circleKinds(s.focus, this.hasPlaces);
+    const kinds = circleKinds(s.focus, this.hasPlaces, this.hasChests);
     const shown = circleScan(scan, kinds);
     const spots = this.circle.draw(shown, s.yaw, kinds);
     this.circleEntries = shown.entries.map((e, i) => ({ ...e, screen: spots[i] }));
@@ -231,9 +245,14 @@ export class Radar {
     return this.places?.hasPlaces ?? false;
   }
 
+  /** The world's generator puts loot chests (version 4). */
+  get hasChests(): boolean {
+    return this.places?.hasChests ?? false;
+  }
+
   /** The kinds of the scan, the Map tab and the F3 row. */
   kinds(): readonly RadarKind[] {
-    return mapKinds(this.hasPlaces);
+    return mapKinds(this.hasPlaces, this.hasChests);
   }
 
   /** The last full scan (the Map tab's), or null. */

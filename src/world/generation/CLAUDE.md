@@ -1,29 +1,31 @@
-# src/world/generation/ — terrain generators (versions 1–3)
+# src/world/generation/ — terrain generators (versions 1–4)
 
 Pure core (root `CLAUDE.md`, "Architecture invariants"); tested in Node. Plans:
-`docs/phase-7a-plan.md` (version 2), `docs/phase-8b2-plan.md` (version 3).
+`docs/phase-7a-plan.md` (version 2), `docs/phase-8b2-plan.md` (version 3),
+`docs/phase-8b3b-plan.md` (version 4).
 
 ## Files
 
 `worldOptions.ts` (options, `WorldGen`, labels, validation), `terrain.ts` (version 1;
 `TerrainSource`, dispatch, checksum), `terrainV2.ts` (shapes, forests), `terrainV3.ts`
-(caves, `caveSites`), `caves.ts` (tunnels, chambers, ravines, carve mask), `shafts.ts`
+(caves, `caveSites`), `terrainV4.ts` (loot chests, `lootSites`), `caves.ts` (tunnels, chambers, ravines, carve mask), `shafts.ts`
 (mine shafts), `terrainRules.ts`, `ores.ts` (veins, clay), `trees.ts`, `spawn.ts`,
 `columnCache.ts`. Test helpers: `src/testing/caveMeasure.ts`, `src/testing/caveViews.ts`.
 
 ## Generator version
 
-Every world stores its generator: `WorldGen` is `{ version: 1 }` or `{ version: 2 | 3,
+Every world stores its generator: `WorldGen` is `{ version: 1 }` or `{ version: 2 | 3 | 4,
 options: { terrain, trees } }` (the strings are append-only, pinned by
-`worldOptions.test.ts`). `GENERATOR_VERSION` (3) is what the "New world" form gives (both
-modes; the world list adds "· Caves", F3 "Generator 3 · balanced · few"); the automatic
-world of `?test=1` and the bench (`BENCH_GENERATOR_VERSION`) stay version 1; `gen=3` makes
-a generator 3 test world. `generateChunk`, `terrainChecksum` and `getTerrain` (cached per
+`worldOptions.test.ts`). `GENERATOR_VERSION` (4) is what the "New world" form gives (both
+modes; the world list adds "· Caves" for 3, "· Caves · Loot" for 4, F3 "Generator 4 ·
+balanced · few"); the automatic world of `?test=1` and the bench
+(`BENCH_GENERATOR_VERSION`) stay version 1, the bench scenario `caves` version 3; `gen=3`
+and `gen=4` make test worlds of those versions. `generateChunk`, `terrainChecksum` and `getTerrain` (cached per
 seed and generator) dispatch on the version. An old version produces the same blocks for
 ever: a change to generation adds a version. `TERRAIN_CHECKSUM_1337_V1` and the twelve
-`TERRAIN_CHECKSUMS_1337_V2` and `_V3` (`src/testing/terrainChecksum.ts`) never change;
-checked in Node and in the browser. Generator 3 is frozen since Phase 8 part B2a: a fix
-is a generator 4.
+`TERRAIN_CHECKSUMS_1337_V2`, `_V3` and `_V4` (`src/testing/terrainChecksum.ts`) never change;
+checked in Node and in the browser. Generator 3 is frozen since Phase 8 part B2a, generator
+4 (blocks and loot) with the merge of B3b: a fix is a generator 5.
 
 **Version 2** (`TerrainV2`) uses version 1's noise tables (`deriveSeed` 1–3) and rules
 after the heights. Shapes (`SHAPE_CURVES`): `hilly` is version 1's curve; `balanced` and
@@ -67,6 +69,22 @@ chance; version 1's spacing rule and tree shape follow. Its chunk runs in phases
   the spawn) whose grass also wants no carved cell within 2 columns and 8 below. `isGrass`
   is false on carved and shaft columns; no tree or leaf over a carved column or in a shaft
   footprint. `heightAt` stays the noise height; `World.surfaceY` reads the blocks.
+
+**Version 4** (`TerrainV4 extends TerrainV3`, Phase 8 part B3b): generator 3 plus
+`Block.CHEST` in the **chest cell** of every shaft, `shaftChestCell(s)` = (x − 3, floor,
+z + 3), the chamber corner without a torch, written after the trees (nothing reaches the
+chamber). Nothing else changes: the identity test (`terrainV4.slow.test.ts`) compares every
+chunk within 3 of the spawn shaft and two grid shafts with generator 3 for the twelve
+presets (only the chest cells differ). `TERRAIN_CHECKSUMS_1337_V4` hash the 3 × 3 chunks
+around the spawn chest's chunk (`terrainChecksumAt`, `spawnChestChunk`; the origin's may
+equal V3's). `placesIn` adds a `chest` per shaft. **Loot** (`src/world/loot.ts`): contents
+are never generated or stored; `lootAt(x, y, z)` derives them for a chest cell
+(`lootOf(seed, x, y, z, table)`, `mulberry32` of `hash2(seed ^ SALT_LOOT, x, z)` mixed
+with y): the spawn shaft's `starter` table (3–4 stacks), the other shafts' `rich` table
+(4–6), drawn without repeats by weight into hashed free slots. `initialState` reads it
+(`src/world/CLAUDE.md`). Never tools or natural blocks, and the starter sticks stay below
+the 4 the first pickaxes need (`loot.test.ts`). `LOOT_CHECKSUM_1337_V4` pins the tables
+and the draw: a change to either is a new generator.
 
 **For the radar**: `veinCells` is the radar's copy of the vein walk; `oreHost` says where
 generation leaves stone before the ores (version 3 adds: not carved, not a shaft cell);

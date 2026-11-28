@@ -72,14 +72,14 @@ test('Phase 3 AC6.5: the form offers Gathering (preselected) and Creative; the m
     return Object.fromEntries(rows) as Record<string, string>;
   };
   expect(await modes()).toEqual({
-    Gatherer: 'Adventure · Balanced · Few trees · Caves',
-    Builder: 'Creative · Balanced · Few trees · Caves',
+    Gatherer: 'Adventure · Balanced · Few trees · Caves · Loot',
+    Builder: 'Creative · Balanced · Few trees · Caves · Loot',
   });
   await page.reload();
   await page.locator('.world-list-view').waitFor();
   expect(await modes()).toEqual({
-    Gatherer: 'Adventure · Balanced · Few trees · Caves',
-    Builder: 'Creative · Balanced · Few trees · Caves',
+    Gatherer: 'Adventure · Balanced · Few trees · Caves · Loot',
+    Builder: 'Creative · Balanced · Few trees · Caves · Loot',
   });
   // The form opens with Gathering again, whatever was chosen last.
   await page.locator('.world-new-button').click();

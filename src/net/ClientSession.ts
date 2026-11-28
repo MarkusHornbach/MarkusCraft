@@ -27,6 +27,7 @@ import {
   type WorldStates,
   emptyChest,
 } from '../world/blockState';
+import { Block } from '../world/blocks';
 import { wrapTime } from '../world/dayNight';
 import { type WorldGen, worldGenOf } from '../world/generation/worldOptions';
 import { BreakClock } from './breakTiming';
@@ -80,6 +81,8 @@ export type EndReason = 'closed' | 'lost' | 'left';
 export interface GuestWorld {
   setBlock(x: number, y: number, z: number, id: number): boolean;
   storedState?(x: number, y: number, z: number): BlockState | null;
+  /** The stored state, else the derived one of a block (loot, Phase 8 part B3b). */
+  stateFor?(block: number, x: number, y: number, z: number): BlockState | null;
   setState?(x: number, y: number, z: number, state: BlockState | null): boolean;
 }
 
@@ -517,7 +520,12 @@ export class ClientSession implements Session {
 
   /** The chest in a cell with the host's changed slots (count 0 empties a slot). */
   private patchedChest(x: number, y: number, z: number, changed: readonly number[]): BlockState {
-    const base = this.world?.storedState?.(x, y, z) ?? emptyChest();
+    // The host diffed against the same base: stored, else derived (the guest's terrain is
+    // the host's, so both derive the same loot).
+    const base =
+      this.world?.stateFor?.(Block.CHEST, x, y, z) ??
+      this.world?.storedState?.(x, y, z) ??
+      emptyChest();
     const slots: (StateStack | null)[] = base.slots.slice();
     for (let i = 0; i < changed.length; i += 3) {
       const count = changed[i + 2];

@@ -1,4 +1,4 @@
-# src/radar/ — the radar (Phase 8 parts B1 and B2b)
+# src/radar/ — the radar (Phase 8 parts B1, B2b and B3b)
 
 Pure core like `src/progress/` (no `three`, DOM, `Math.random`, `Date.now`; in the ESLint
 purity rules and the coverage scope). Adventure worlds only, from task 8 "Climb to height
@@ -17,8 +17,9 @@ purity rules and the coverage scope). Adventure worlds only, from task 8 "Climb 
   `src/ui/RadarCircle.ts`, `src/ui/MapTab.ts`, `src/ui/radarDraw.ts` (symbols, hints,
   arrows drawn by code)
 - Tests: `agreement.slow.test.ts` (AC1.1), `scan.test.ts`, `focus.test.ts`,
-  `schedule.test.ts`, `scanCost.solo.test.ts` (AC1.7, B2b AC5.4); B2b: `places.test.ts`,
-  `placesAgreement.slow.test.ts` (AC5.1), `scanPlaces.test.ts` (AC5.2)
+  `schedule.test.ts`, `scanCost.solo.test.ts` (AC1.7, B2b AC5.4, B3b AC5.3); B2b:
+  `places.test.ts`, `placesAgreement.slow.test.ts` (AC5.1, B3b AC5.3), `scanPlaces.test.ts`
+  (AC5.2, B3b AC5.1)
 
 ## Data source and the world correction
 
@@ -45,8 +46,18 @@ versions 1 and 2) lists the places whose cell lies in an area, worked out like g
 without blocks: a shaft's cell is its log column at the collar's height (`top`), an
 entrance's the lowest carved cell of its start column (open to the sky). `PlaceIndex(seed,
 gen)` caches them per `PLACE_REGION` (64) square, at most `PLACE_INDEX_REGIONS` (256).
-Places are permanent: no probe, no world correction (a mined frame still marks its shaft);
-a guest's places equal the host's. Ravines are not places. The agreement test proves every
+Places are permanent: no world correction (a mined frame still marks its shaft); a guest's
+places equal the host's. Ravines are not places.
+
+**Chests** (Phase 8 part B3b, generator 4): `placesIn` adds one `chest` per shaft (its chest
+cell); `PlaceIndex.hasChests` is true where the generator has `lootAt`, and only then do
+`mapKinds` and `circleKinds` add the kind (generators 1–3 list what they did). Symbol: a
+filled amber square with a dark band (`radarDraw.ts`). A listed chest counts only while
+`ChestProbe` says so (`worldChestProbe`: the cell is a chest, by a loaded chunk's block or
+else its edit, none meaning the generated chest, and its state, stored or derived, holds
+an item), so an emptied or broken one leaves the radar for good; guests hold all edits and
+states and agree. A change of chest states within the far radius + 2 (`Radar.noteStates`,
+from `onStates`) makes a scan due. The agreement test proves every
 listed place exists in the blocks and every shaft and tunnel opening near the spawn and the
 spawn shaft belongs to a listed place.
 
@@ -80,29 +91,13 @@ while neither shows. Standing still draws and scans nothing.
 
 ## On screen
 
-The circle (`RadarCircle`, in the HUD, so it hides with it): heading-up, a cube-root
-distance scale (near veins spread out; the rim is 48), coal a dark dot with a light rim,
-iron a tan diamond, a shaft a light brown hollow square, a cave a grey downward triangle;
-hint labels upright, nearest first, one that would cover another is left out; `beyond`
-arrows on the rim. Size: the setting "Radar circle size" (`settings.radarSize`, 0–2,
-default 1 Medium): PC 112 / 168 / 224 px, top-right 12 px; touch 88 / 128 / 168 px below
-the bag button, never larger than the room down to 4 px above the highest right-hand
-button (`Game.touchCircleRoom`; never below Small); symbols and labels grow with √(size /
-Small). The bench keeps Small. Shown in Adventure while playing, unlocked, with the setting
-"Radar circle" on, or in the bench scenario `radar`. The Map tab (`MapTab`): north-up,
-linear, rings at 16/32/48, a background of the loaded chunks' top blocks (leaves included,
-shaded by height, cached per chunk while the tab is open, redone on `onBlocks` or a
-reloaded chunk), the player arrow, up to 8 veins and 4 places per kind and one legend row
-per kind shown ("Shaft · 24 blocks · far", "Cave · none within 192"). On the Map tab the
-panel fills the screen (12 px margin); the canvas is the largest square leaving the legend
-200 px; symbols and labels grow with the square (up to 2.2 ×). On screens up to 480 px high
-the header (tabs in two rows, Close) moves beside the map above the legend, so the square
-is as high as the screen (640 × 360: 348 px). F3 row "Radar".
+The circle, its sizes, the symbols and the Map tab's layout: `docs/architecture.md`, "Radar
+on screen".
 
 ## Extension points
 
 - A new ore kind: one row in `ORE_KINDS` and one in `RADAR_KINDS`.
 - A generator with caves (or any other change to where stone lies) adds its test to its
   own `oreHost`; the radar does not change.
-- Another place kind (chests, B3): a `Place` kind from `placesIn` and a `place` row in
-  `RADAR_KINDS` with its own shape.
+- Another place kind: a `Place` kind from `placesIn` and a `place` row in `RADAR_KINDS`
+  with its own shape; one the world can remove gets a probe like `ChestProbe`.

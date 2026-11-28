@@ -13,7 +13,12 @@ import {
   submit,
   surfaceY,
 } from './game';
-import { TERRAIN_CHECKSUMS_1337_V3 } from '../src/testing/terrainChecksum';
+import {
+  TERRAIN_CHECKSUMS_1337_V3,
+  TERRAIN_CHECKSUMS_1337_V4,
+} from '../src/testing/terrainChecksum';
+import { getTerrain, terrainChecksum } from '../src/world/generation/terrain';
+import { type TerrainV4, spawnChestChunk } from '../src/world/generation/terrainV4';
 import { ravineView, shaftView, tunnelView } from '../src/testing/caveViews';
 import { Block } from '../src/world/blocks';
 
@@ -45,16 +50,18 @@ test('Phase 8B2a AC4.2: gen=3 opens a generator 3 world with the Node checksum',
   expect(await page.evaluate(() => window.__mc.caveSites())).toBeNull();
 });
 
-test('Phase 8B2a AC4.1: the New world form gives generator 3 in both modes', async ({ page }) => {
+test('Phase 8B2a AC4.1 Phase 8B3b AC1.1: the New world form gives generator 4 in both modes', async ({
+  page,
+}) => {
   await openMenu(page);
   await createWorld(page, { name: 'Builder', mode: 'creative' });
   await page.keyboard.press('F3');
-  await expect(page.locator('[data-debug="generator"]')).toHaveText('Generator 3 · balanced · few');
+  await expect(page.locator('[data-debug="generator"]')).toHaveText('Generator 4 · balanced · few');
   await page.keyboard.press('F3');
   await pauseWithMouse(page);
   await backToWorlds(page);
   await createWorld(page, { name: 'Gatherer', mode: 'gathering' });
-  expect((await getState(page)).world?.generatorVersion).toBe(3);
+  expect((await getState(page)).world?.generatorVersion).toBe(4);
   await pauseWithMouse(page);
   await backToWorlds(page);
   const modes = await page
@@ -68,9 +75,32 @@ test('Phase 8B2a AC4.1: the New world form gives generator 3 in both modes', asy
       ),
     );
   expect(modes).toEqual({
-    Builder: 'Creative · Balanced · Few trees · Caves',
-    Gatherer: 'Adventure · Balanced · Few trees · Caves',
+    Builder: 'Creative · Balanced · Few trees · Caves · Loot',
+    Gatherer: 'Adventure · Balanced · Few trees · Caves · Loot',
   });
+});
+
+test('Phase 8B3b AC1.3: gen=4 opens a generator 4 world with the Node checksums', async ({
+  page,
+}) => {
+  for (const [terrain, trees] of [
+    ['balanced', 'few'],
+    ['hilly', 'none'],
+  ] as const) {
+    await openGame(page, { gen: 4, terrain, trees });
+    const { world } = await getState(page);
+    expect(world).toMatchObject({ generatorVersion: 4, options: { terrain, trees } });
+    const terrainV4 = getTerrain(1337, { version: 4, options: { terrain, trees } }) as TerrainV4;
+    const chunk = spawnChestChunk(terrainV4);
+    expect(chunk).not.toBeNull();
+    if (!chunk) continue;
+    expect(
+      await page.evaluate(([cx, cz]) => window.__mc.terrainChecksum(cx, cz), [chunk.cx, chunk.cz]),
+    ).toBe(TERRAIN_CHECKSUMS_1337_V4[`${terrain}/${trees}`]);
+    expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(
+      terrainChecksum(1337, { version: 4, options: { terrain, trees } }),
+    );
+  }
 });
 
 test('Phase 8B2a AC2.3: breaking into a tunnel from the surface keeps the light invariant', async ({

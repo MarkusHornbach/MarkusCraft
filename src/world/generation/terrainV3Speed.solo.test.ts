@@ -1,13 +1,14 @@
-// Generator 3 speed against generator 2 (Phase 8 part B2a, AC2.2). A solo file: the two
+// Generators 3 and 4 speed against generator 2 (Phase 8 part B2a AC2.2, B3b AC1.5). A solo file: the two
 // times differ by little and a busy machine shifts them.
 import { describe, it } from 'vitest';
 import { TIMING_ENFORCED, expectFasterThan } from '../../testing/timing';
 
 /** Rounds of each side; under coverage the limits are not checked, one round runs the code. */
-const ROUNDS = TIMING_ENFORCED ? 12 : 1;
+const ROUNDS = TIMING_ENFORCED ? 20 : 1;
 import { findSpawn } from './spawn';
 import { TerrainV2 } from './terrainV2';
 import { TerrainV3 } from './terrainV3';
+import { TerrainV4 } from './terrainV4';
 
 const OPTIONS = { terrain: 'balanced', trees: 'few' } as const;
 const SEEDS = [1, 42, 1337, 2024];
@@ -47,6 +48,25 @@ describe('generator 3 speed', () => {
       `generation per chunk: generator 2 ${(sum(two) / 4).toFixed(3)} ms, generator 3 ${(sum(three) / 4).toFixed(3)} ms (${(sum(three) / sum(two)).toFixed(2)} ×)`,
     );
     expectFasterThan(sum(three), sum(two) * 1.35);
+  });
+
+  it('Phase 8B3b AC1.5 a chunk of generator 4 takes at most 1.35 × generator 2', () => {
+    // Its own pair of sides, like generator 3's: generator 4 adds one cell write per shaft.
+    const v2 = (seed: number): TerrainV2 => new TerrainV2(seed, OPTIONS);
+    const v4 = (seed: number): TerrainV4 => new TerrainV4(seed, OPTIONS);
+    const two = SEEDS.map(() => Infinity);
+    const four = SEEDS.map(() => Infinity);
+    for (let round = 0; round < ROUNDS; round++) {
+      SEEDS.forEach((seed, i) => {
+        two[i] = Math.min(two[i], run(v2, seed));
+        four[i] = Math.min(four[i], run(v4, seed));
+      });
+    }
+    const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0);
+    console.log(
+      `generation per chunk: generator 2 ${(sum(two) / 4).toFixed(3)} ms, generator 4 ${(sum(four) / 4).toFixed(3)} ms (${(sum(four) / sum(two)).toFixed(2)} ×)`,
+    );
+    expectFasterThan(sum(four), sum(two) * 1.35);
   });
 
   it('Phase 8B2a AC2.2 the first chunk of a world (spawn and spawn shaft) is measured and limited', () => {

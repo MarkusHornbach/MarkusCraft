@@ -5,7 +5,9 @@ Shell (DOM). Screens change the world and items only through actions
 
 ## Files
 
-- `Hud.ts` (bar with counts, break progress, notices), `TaskTracker.ts` (the tracked
+- `Hud.ts` (bar with counts, break progress, notices, the chest hint: "Right click: Open",
+  "Place: Open" or the LT glyph and "Open" under the crosshair on a chest, never while
+  breaking; Phase 8 part B3b), `TaskTracker.ts` (the tracked
   task, part of the HUD), `blockIcon.ts`, `itemIcon.ts`,
   `DebugOverlay.ts`, `settings.ts`, `ui.css`, `activate.ts` (button helpers)
 - `InventoryScreen.ts` (27 slots or the Creative palette, bar, bin, tabs), `ChestScreen.ts`

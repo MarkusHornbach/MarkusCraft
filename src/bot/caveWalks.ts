@@ -2,7 +2,7 @@
 import { DARK_LIGHT } from './Bot';
 import { type Cell, type WalkWorld, isStanding, walkTo } from './walk';
 import type { CaveShape } from '../world/generation/caves';
-import { SHAFT_HALF, type Shaft, shaftTopCell } from '../world/generation/shafts';
+import { SHAFT_HALF, type Shaft, shaftChestCell, shaftTopCell } from '../world/generation/shafts';
 
 /** How far beside an entrance its walk may cross the surface. */
 const SURFACE_MARGIN = 6;
@@ -172,6 +172,36 @@ export function walkShaft(walk: WalkWorld, shaft: Shaft): WalkResult {
   );
   if (!chamber) return { down, up: null };
   const up = walkTo(walk, chamber, (x, y, z) => x === top.x && y === top.y && z === top.z, limits);
+  return { down, up };
+}
+
+/**
+ * Generator 4 (Phase 8 part B3b): from the shaft's top to a standing cell next to its
+ * chest (a 4-neighbour at the chest's height) and back, every standing cell in torch light.
+ */
+export function walkShaftChest(walk: WalkWorld, shaft: Shaft): WalkResult {
+  const top = shaftTopCell(shaft);
+  const chest = shaftChestCell(shaft);
+  const limits = {
+    minX: shaft.x - SHAFT_HALF,
+    maxX: shaft.x + SHAFT_HALF,
+    minZ: shaft.z - SHAFT_HALF,
+    maxZ: shaft.z + SHAFT_HALF,
+    lightAbove: DARK_LIGHT,
+  };
+  let beside: Cell | null = null;
+  const down = walkTo(
+    walk,
+    top,
+    (x, y, z) => {
+      if (y !== chest.y || Math.abs(x - chest.x) + Math.abs(z - chest.z) !== 1) return false;
+      beside = { x, y, z };
+      return true;
+    },
+    limits,
+  );
+  if (!beside) return { down, up: null };
+  const up = walkTo(walk, beside, (x, y, z) => x === top.x && y === top.y && z === top.z, limits);
   return { down, up };
 }
 

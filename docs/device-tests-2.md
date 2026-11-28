@@ -15,7 +15,7 @@ in the header of `docs/device-tests.md`)
   file's "How it is kept up to date" says (ids never reused, ticked tests move to
   "Passed", pointless ones to "Obsolete", results never changed).
 
-Last updated: Phase 8 part B3a2 (CHEST-1 to CHEST-8); 2026-11-28.
+Last updated: Phase 8 part B3b (LOOT-1 to LOOT-7); 2026-11-28.
 
 ---
 
@@ -47,3 +47,35 @@ into the inventory, or is refused if not everything fits. Chapter 3 has a new ta
       in its chapter; one still in chapter 3 gets the new task. _PC._ Result:
 - [ ] **CHEST-8** (8B3a2) Task 21 "Store 32 stone in a chest": is it clear what to do (that
       the place input opens a chest)? _PC, Phone._ Result:
+
+---
+
+## 14. Loot (Phase 8 part B3b)
+
+New worlds use generator 4: generator 3's caves and mine shafts, plus one chest in the
+stone-brick chamber at the bottom of every mine shaft, in the corner opposite the stairs.
+The shaft near the spawn (about 25–30 blocks away) holds a small starter chest (torches,
+coal, a few sticks, planks); every other shaft holds a richer one (torches, coal, iron
+ingots, glass, bricks, stone bricks, rarely an iron block). Once taken, loot never comes
+back. The radar shows a loot chest as an amber square with a dark band ("Chest" in the
+Map tab's legend) while it still holds items. On any chest, a line under the crosshair says
+how to open it. Older worlds keep their generator and have no loot.
+
+- [ ] **LOOT-1** (8B3b) A new Adventure world: find the chest in the shaft near the spawn. Is
+      the starter loot worth the short trip? Is it clear it is a chest? _PC._ Result:
+- [ ] **LOOT-2** (8B3b) After task 8, follow the radar's Chest symbol to a far shaft. Is the
+      rich loot worth the walk? Does the book still feel paced (nothing skipped)? _PC._
+      Result:
+- [ ] **LOOT-3** (8B3b) On the circle and the map, can you tell Chest from Shaft at a
+      glance? Does the chest disappear after "Take all" and stay when one stack is left?
+      _PC, Phone._ Result:
+- [ ] **LOOT-4** (8B3b) A room: both open the same untouched loot chest and the guest takes
+      one stack. Do both see the same rest? Does a third player who joins later see it too?
+      _PC + Phone._ Result:
+- [ ] **LOOT-5** (8B3b) The hint under the crosshair on a chest ("Right click: Open",
+      "Place: Open", the LT glyph): is it readable, does it help, is it in the way? _PC,
+      Phone, controller._ Result:
+- [ ] **LOOT-6** (8B3b) An emptied loot chest stays empty after leaving and reopening the
+      world. _PC._ Result:
+- [ ] **LOOT-7** (8B3b) An old world (generator 3) opens unchanged, without loot chests. A new
+      one shows "· Caves · Loot" in the world list. _PC._ Result:

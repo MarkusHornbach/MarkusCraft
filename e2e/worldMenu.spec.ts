@@ -12,12 +12,9 @@ import {
   whenIdle,
 } from './game';
 import { TOUCH_DEVICE, withoutFullscreen } from './touch';
-import {
-  TERRAIN_CHECKSUM_1337_V1,
-  TERRAIN_CHECKSUMS_1337_V3,
-} from '../src/testing/terrainChecksum';
+import { TERRAIN_CHECKSUM_1337_V1 } from '../src/testing/terrainChecksum';
 import { findSpawn } from '../src/world/generation/spawn';
-import { getTerrain } from '../src/world/generation/terrain';
+import { getTerrain, terrainChecksum } from '../src/world/generation/terrain';
 
 // Several worlds are created per test, each under slow software rendering.
 test.describe.configure({ timeout: 180_000 });
@@ -82,7 +79,7 @@ test('a first visit creates a world; after a reload it is listed and continues (
   const created = await getState(page);
   expect(created.world).toMatchObject({
     name: 'My world',
-    generatorVersion: 3,
+    generatorVersion: 4,
     options: { terrain: 'balanced', trees: 'few' },
   });
   expect(created.mode).toBe('creative');
@@ -98,7 +95,7 @@ test('a first visit creates a world; after a reload it is listed and continues (
   await expect(rows(page).first()).toHaveClass(/selected/);
   await expect(page.locator('.world-row-name')).toHaveText('My world');
   await expect(page.locator('.world-row-mode')).toHaveText(
-    'Creative · Balanced · Few trees · Caves',
+    'Creative · Balanced · Few trees · Caves · Loot',
   );
   await expect(page.locator('.world-row-date')).toHaveText(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
   await expect(page.locator('.world-play-button')).toHaveText('Click to play');
@@ -749,11 +746,11 @@ test('Phase 7 AC5.1: a flat world with many trees reloads with its options, terr
   await createWorld(page, { name: 'Flatland', seed: '1337', terrain: 'flat', trees: 'many' });
   const created = await getState(page);
   const options = { terrain: 'flat', trees: 'many' } as const;
-  expect(created.world).toMatchObject({ name: 'Flatland', generatorVersion: 3, options });
-  const checksum = TERRAIN_CHECKSUMS_1337_V3['flat/many'];
+  expect(created.world).toMatchObject({ name: 'Flatland', generatorVersion: 4, options });
+  const checksum = terrainChecksum(1337, { version: 4, options });
   expect(await page.evaluate(() => window.__mc.terrainChecksum())).toBe(checksum);
-  // The world starts at the spawn of its own generator (new worlds get generator 3).
-  const spawn = findSpawn(getTerrain(1337, { version: 3, options }));
+  // The world starts at the spawn of its own generator (new worlds get generator 4).
+  const spawn = findSpawn(getTerrain(1337, { version: 4, options }));
   expect(created.player.x).toBe(spawn.x + 0.5);
   expect(created.player.z).toBe(spawn.z + 0.5);
 
@@ -762,7 +759,9 @@ test('Phase 7 AC5.1: a flat world with many trees reloads with its options, terr
   await page.reload();
   await page.waitForFunction(() => window.__mc !== undefined);
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.locator('.world-row-mode')).toHaveText('Creative · Flat · Many trees · Caves');
+  await expect(page.locator('.world-row-mode')).toHaveText(
+    'Creative · Flat · Many trees · Caves · Loot',
+  );
   await page.locator('.world-play-button').click();
   await untilPlaying(page);
   const again = await getState(page);

@@ -20,7 +20,7 @@ export interface OpenOptions {
   terrain?: 'flat' | 'balanced' | 'hilly';
   trees?: 'none' | 'few' | 'normal' | 'many';
   /** The test world's generator (`gen=`, Phase 8 part B2a): 2 or 3. */
-  gen?: 2 | 3;
+  gen?: 2 | 3 | 4;
   /** The book of an Adventure test world (Phase 8, `progress=`; the game's default `all`). */
   progress?: 'all' | 'fresh';
 }

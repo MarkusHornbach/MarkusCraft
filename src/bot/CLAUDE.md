@@ -12,8 +12,23 @@ scope). The seed of the bot and balancing tool later parts extend.
 - `walk.ts` (the walk check), `caveWalks.ts` (entrances, ravines, shafts; the report
   section), `caveWalks.slow.test.ts` (Phase 8 part B2a AC3.1–AC3.3)
 - `scripts/progressRun.ts` runs it: `npx vite-node scripts/progressRun.ts` (12 runs: seeds
-  1, 1337, 42, 2024 × flat, balanced, hilly, trees "Few", generator 3; about a minute),
-  `--quick` (seed 1337 balanced only), `--gen 2` (generator 2, for comparisons).
+  1, 1337, 42, 2024 × flat, balanced, hilly, trees "Few", generator 4; about a minute),
+  `--quick` (seed 1337 balanced only), `--gen 2|3` (for comparisons), `--loot` (below).
+- `botLoot.slow.test.ts` (the loot run on generator 4, Phase 8 part B3b)
+
+## Loot (Phase 8 part B3b)
+
+A generated loot chest in the bot's way is opened, emptied with `takeAll` (junk thrown away
+first) and broken; `BotRun.accidentalLoots` counts them. **`--loot`** adds two runs per
+world: the loot run (`{ loot: true }`) fetches the spawn shaft's chest before task 1 and,
+at the start of chapter 4, the nearest other loot chest within 192 (`LOOT_TRIP_RADIUS`),
+walking back to where it started; each trip is its own row (`BotRun.trips`), never part of
+a task or the total. The control run (`take: false`) makes the same trips and takes
+nothing. `compareLoot` checks the limits (medians, trips left out): total at most 1.5
+minutes shorter, no chapter more than 1.0, tasks 11, 12, 16, 17 within 0.3, every run
+complete with light errors 0, totals 30–45. The limits hold against the control (the
+items' effect); against the plain run the trips' own tunnels shorten later walks as well
+(both tables are printed; `docs/phase-8b3b-report.md`).
 
 ## How it plays
 

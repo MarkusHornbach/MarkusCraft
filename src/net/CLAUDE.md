@@ -66,15 +66,8 @@ rate limit; the host applies the name suffix again and tells everyone, the sende
 
 ## Measure and harden (Phase 6 part E)
 
-The F3 overlay has five network rows, shown only in a room (`netRows`,
-`Multiplayer.debugInfo`): role, status, code and players; the round trip (a guest's own; on
-the host what each guest reports in `ping.rtt`); the link of each connection from
-`getStats()` every 2 s (`linkKind`: "direct", "via STUN", "relay"); the signaling state;
-messages and bytes per second in and out over the last 2 s, counted by a `TrafficMeter`
-around the room's network (`countedNetwork`). `traffic.ts` and the stats code are in the
-lazy session chunk. Relayed poses are cut to millimetres and 1e-4 rad (`compactPose`) and
-leave out flags that are false: with four moving players the host sends about 13 kB/s
-(AC14.6, limit 20). The scenario `players`: `src/bench/CLAUDE.md`.
+The network rows of F3 and the traffic numbers: `docs/architecture.md`, "Network overlay and
+traffic".
 
 ## World options (Phase 7 part A)
 
@@ -108,7 +101,8 @@ the edits, a state never split (`splitSnapshot`, `joinStates`); `worldHash(edits
 covers them. The host sets an action's states after its blocks and sends every guest
 `chest { x, y, z, slots }` (only changed slots, count 0 empties) or `{ …, gone: true }`,
 after `blocks`, before `record`s; the guest patches its stored state (or an empty chest),
-`onStates`. `FarReader.getState` reads chests the host has not loaded. **Viewers:** the
+`onStates`. Both diff against `World.stateFor` (stored, else derived): an untouched loot
+chest of generator 4 is the derived loot on both sides (Phase 8 part B3b). `FarReader.getState` reads chests the host has not loaded. **Viewers:** the
 host keeps every player's open chest (`openChest` / `closeChest`, counted for `rate`) and
 sends `viewers { x, y, z, ids }` to each of its viewers when the set changes (open, close,
 leave); a broken chest's viewers get `ids: []` (`onViewers`). `result.notices` takes up to 32. Four moving players, each guest moving twice a second in one chest: 14.4 kB/s from the
