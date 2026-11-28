@@ -4,7 +4,7 @@ import { describe, it } from 'vitest';
 import { TIMING_ENFORCED, expectFasterThan } from '../../testing/timing';
 
 /** Rounds of each side; under coverage the limits are not checked, one round runs the code. */
-const ROUNDS = TIMING_ENFORCED ? 12 : 1;
+const ROUNDS = TIMING_ENFORCED ? 20 : 1;
 import { findSpawn } from './spawn';
 import { TerrainV2 } from './terrainV2';
 import { TerrainV3 } from './terrainV3';

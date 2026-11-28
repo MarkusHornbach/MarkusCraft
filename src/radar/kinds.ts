@@ -1,10 +1,10 @@
 // What the radar shows: one row per kind; ores (a new ore is one row here and one in
-// ORE_KINDS) and places (Phase 8 part B2b: mine shafts, cave entrances).
+// ORE_KINDS) and places (Phase 8 part B2b: mine shafts, cave entrances; B3b: loot chests).
 import { Block } from '../world/blocks';
 import { ORE_KINDS, type OreKind } from '../world/generation/ores';
 
 /** Symbols differ by shape, so colour is never the only difference. */
-export type RadarShape = 'dot' | 'diamond' | 'square' | 'triangle';
+export type RadarShape = 'dot' | 'diamond' | 'square' | 'triangle' | 'chest';
 
 /** Ores come from `VeinIndex`, places from `PlaceIndex`. */
 export type RadarCategory = 'ore' | 'place';
@@ -58,6 +58,17 @@ export const RADAR_KINDS: readonly RadarKind[] = [
     shape: 'triangle',
     colour: 0xd0d4da,
     rim: 0x1c2026,
+  },
+  {
+    // Generator 4's loot chests while they hold items (Phase 8 part B3b): a filled amber
+    // square with a dark band, unlike the shaft's hollow square.
+    key: 'chest',
+    category: 'place',
+    block: -1,
+    label: 'Chest',
+    shape: 'chest',
+    colour: 0xf0a020,
+    rim: 0x2a1600,
   },
 ];
 

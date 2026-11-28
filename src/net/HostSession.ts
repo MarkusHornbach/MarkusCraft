@@ -793,8 +793,9 @@ export class HostSession {
   private applyStates(changes: readonly StateChange[]): void {
     const messages: HostMessage[] = [];
     for (const c of changes) {
-      // What the guests hold now: the stored state, or the initial (empty) one.
-      const before = this.o.world.storedState(c.x, c.y, c.z) ?? emptyChest();
+      // What the guests hold now: the stored state, or the derived one (a generator 4 loot
+      // chest's contents, else an empty chest), which every guest derives alike (B3b).
+      const before = this.o.world.stateFor(Block.CHEST, c.x, c.y, c.z) ?? emptyChest();
       this.o.world.setState(c.x, c.y, c.z, c.state);
       messages.push(
         c.state

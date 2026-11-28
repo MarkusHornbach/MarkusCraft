@@ -1,5 +1,5 @@
 // Places in the radar scan (Phase 8B2b AC5.2): nearest per place kind, far radius, the focus
-// rule, and generators 1 and 2 without places.
+// rule, and generators 1 and 2 without places; the Chest kind (Phase 8B3b AC5.1, AC5.2).
 import { describe, expect, it } from 'vitest';
 import {
   RADAR_CIRCLE_PLACES,
@@ -15,7 +15,19 @@ import type { WorldGen } from '../world/generation/worldOptions';
 import { circleKinds, circleScan, mapKinds } from './focus';
 import { ORE_RADAR_KINDS, PLACE_RADAR_KINDS, RADAR_KINDS, radarKindByKey } from './kinds';
 import { PlaceIndex } from './places';
-import { scanRadar, type BlockProbe, type RadarScan, type ScanInput } from './scan';
+import {
+  scanRadar,
+  worldChestProbe,
+  type BlockProbe,
+  type RadarScan,
+  type ScanInput,
+} from './scan';
+import type { ActionResult } from '../actions/apply';
+import { createPlayerRecord, type GameMode } from '../actions/playerRecord';
+import { LocalSession } from '../actions/Session';
+import { shaftChestCell } from '../world/generation/shafts';
+import type { TerrainV4 } from '../world/generation/terrainV4';
+import { World } from '../world/World';
 import { VeinIndex } from './veins';
 
 const GEN3: WorldGen = { version: 3, options: { terrain: 'balanced', trees: 'few' } };
@@ -156,11 +168,18 @@ describe('places in the scan', () => {
     const iron = radarKindByKey('iron');
     if (!iron) throw new Error('no iron kind');
     expect(circleKinds(iron, true).map((k) => k.key)).toEqual(['iron', 'shaft', 'cave']);
+    expect(circleKinds(iron, true, true).map((k) => k.key)).toEqual([
+      'iron',
+      'shaft',
+      'cave',
+      'chest',
+    ]);
     expect(circleKinds(null, true).map((k) => k.key)).toEqual(['coal', 'iron', 'shaft', 'cave']);
     expect(circleKinds(iron, false).map((k) => k.key)).toEqual(['iron']);
     expect(circleKinds(null, false).map((k) => k.key)).toEqual(['coal', 'iron']);
     expect(mapKinds(false)).toEqual(ORE_RADAR_KINDS);
-    expect(mapKinds(true)).toEqual(RADAR_KINDS);
+    expect(mapKinds(true).map((k) => k.key)).toEqual(['coal', 'iron', 'shaft', 'cave']);
+    expect(mapKinds(true, true)).toEqual(RADAR_KINDS);
     const entry = (kind: string, dist: number) => ({
       kind,
       dx: dist,
@@ -184,5 +203,109 @@ describe('places in the scan', () => {
     expect(RADAR_CIRCLE_PLACES).toBe(2);
     expect(shown.beyond).toEqual(scan.beyond);
     expect(circleScan(scan, circleKinds(null, false)).beyond).toEqual([]);
+  });
+});
+
+const GEN4: WorldGen = { version: 4, options: { terrain: 'balanced', trees: 'few' } };
+
+describe('the Chest kind (Phase 8B3b 6.6)', () => {
+  /** A generator 4 world with the chunks around the spawn chest loaded and lit. */
+  function lootWorld(): { world: World; chest: { x: number; y: number; z: number } } {
+    const terrain = getTerrain(1337, GEN4) as TerrainV4;
+    const s = terrain.shafts.spawnShaft();
+    if (!s) throw new Error('no spawn shaft');
+    const chest = shaftChestCell(s);
+    const world = new World(1337, GEN4);
+    const cx = Math.floor(chest.x / 16);
+    const cz = Math.floor(chest.z / 16);
+    for (let dz = -2; dz <= 2; dz++)
+      for (let dx = -2; dx <= 2; dx++) world.generate(cx + dx, cz + dz);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) world.light(cx + dx, cz + dz);
+    return { world, chest };
+  }
+
+  function chestsSeen(world: World, at: { x: number; y: number; z: number }): string[] {
+    const chest = radarKindByKey('chest');
+    if (!chest) throw new Error('no chest kind');
+    const scan = scanRadar({
+      ...input(1337, GEN4, [at.x, at.y, at.z], new PlaceIndex(1337, GEN4)),
+      kinds: [chest],
+      chests: worldChestProbe(world),
+    });
+    return scan.entries.map((e) => `${at.x + e.dx},${at.y + e.dy},${at.z + e.dz}`);
+  }
+
+  function session(world: World, chest: { x: number; y: number; z: number }, mode: GameMode) {
+    const results: ActionResult[] = [];
+    let now = 0;
+    const s = new LocalSession(
+      {
+        world,
+        mode,
+        pose: () => ({ x: chest.x + 1.5, y: chest.y, z: chest.z - 0.5 }),
+        nowMs: () => now,
+      },
+      createPlayerRecord(mode),
+      { onBlocks: () => {}, onPlayer: () => {}, onResult: (_a, r) => results.push(r) },
+    );
+    return { s, results, advance: (ms: number) => (now += ms) };
+  }
+
+  it('Phase 8B3b AC5.1 a loot chest is shown until takeAll empties it, and never again', () => {
+    const { world, chest } = lootWorld();
+    const key = `${chest.x},${chest.y},${chest.z}`;
+    const at = { x: chest.x + 1, y: chest.y, z: chest.z - 1 };
+    expect(chestsSeen(world, at)).toContain(key);
+    // Also while the chunk is not loaded: no edit, so the generated chest is there.
+    const far = new World(1337, GEN4);
+    expect(chestsSeen(far, at)).toContain(key);
+    const { s, results } = session(world, chest, 'gathering');
+    s.submit({ kind: 'takeAll', ...chest });
+    expect(results.at(-1)?.ok).toBe(true);
+    expect(chestsSeen(world, at)).not.toContain(key);
+    // A guest's world (no chunk loaded, the edits and states of the host) hides it too.
+    const guest = new World(1337, GEN4, new Map(world.edits), new Map(world.states));
+    expect(chestsSeen(guest, at)).not.toContain(key);
+    s.submit({ kind: 'openChest', ...chest });
+    s.submit({ kind: 'closeChest' });
+    expect(chestsSeen(world, at)).not.toContain(key);
+    expect(world.verifyLight()).toBe(0);
+  });
+
+  it('Phase 8B3b AC5.1 a broken loot chest is hidden, also after a new chest is placed there', () => {
+    const { world, chest } = lootWorld();
+    const key = `${chest.x},${chest.y},${chest.z}`;
+    const at = { x: chest.x + 1, y: chest.y, z: chest.z - 1 };
+    const { s, results, advance } = session(world, chest, 'gathering');
+    s.submit({ kind: 'startBreak', ...chest });
+    advance(5000);
+    s.submit({ kind: 'break', ...chest });
+    expect(results.at(-1)?.ok).toBe(true);
+    expect(chestsSeen(world, at)).not.toContain(key);
+    const unloaded = new World(1337, GEN4, new Map(world.edits), new Map(world.states));
+    expect(chestsSeen(unloaded, at)).not.toContain(key);
+    // A partly emptied chest still shows: one stack left is loot.
+    const second = lootWorld();
+    const loot = second.world.getState(chest.x, chest.y, chest.z);
+    const filled = loot?.slots.flatMap((st, i) => (st ? [i] : [])) ?? [];
+    const run = session(second.world, chest, 'gathering');
+    for (const slot of filled.slice(1)) {
+      const item = loot?.slots[slot]?.item ?? 0;
+      run.s.submit({ kind: 'quickMove', ...chest, slot, fromChest: true, item });
+    }
+    expect(chestsSeen(second.world, at)).toContain(key);
+    expect(world.verifyLight()).toBe(0);
+  });
+
+  it('Phase 8B3b AC5.2 generator 3 lists no chest; the chest kind is only in generator 4', () => {
+    expect(new PlaceIndex(1337, GEN3).hasChests).toBe(false);
+    expect(new PlaceIndex(1337, GEN4).hasChests).toBe(true);
+    const terrain = getTerrain(1337, GEN3) as TerrainV3;
+    const spawn = terrain.spawnPoint();
+    const scan = scanRadar(
+      input(1337, GEN3, [spawn.x, spawn.y, spawn.z], new PlaceIndex(1337, GEN3)),
+    );
+    expect(scan.entries.some((e) => e.kind === 'chest')).toBe(false);
+    expect(scan.beyond.some((b) => b.kind === 'chest')).toBe(false);
   });
 });

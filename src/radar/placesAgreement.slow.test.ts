@@ -134,3 +134,73 @@ describe('places agreement on generator 3', () => {
     expect(bricks).toBeGreaterThan(1000);
   });
 });
+
+describe('places agreement on generator 4 (Phase 8B3b AC5.3)', () => {
+  it('Phase 8B3b AC5.3 every listed chest is a chest block; every chest block near the spawn and the spawn shaft is listed', () => {
+    let listedChests = 0;
+    let found = 0;
+    for (const seed of [1, 42, 1337, 2024]) {
+      for (const terrain4 of TERRAIN_SHAPES) {
+        for (const trees of TREE_DENSITIES) {
+          const gen: WorldGen = { version: 4, options: { terrain: terrain4, trees } };
+          const label = `seed ${seed} ${terrain4}/${trees}`;
+          const terrain = getTerrain(seed, gen) as TerrainV3;
+          const chunks = new Map<string, Uint8Array>();
+          const chunkOf = (cx: number, cz: number): Uint8Array => {
+            const key = `${cx},${cz}`;
+            let blocks = chunks.get(key);
+            if (!blocks) {
+              blocks = terrain.generateChunk(cx, cz);
+              chunks.set(key, blocks);
+            }
+            return blocks;
+          };
+          const spawn = terrain.spawnPoint();
+          const listed: Place[] = [];
+          terrain.placesIn(spawn.x - 128, spawn.z - 128, spawn.x + 128, spawn.z + 128, listed);
+          const chests = new Set(
+            listed.filter((p) => p.kind === 'chest').map((p) => `${p.x},${p.y},${p.z}`),
+          );
+          expect(chests.size, label).toBeGreaterThan(0);
+          for (const p of listed) {
+            if (p.kind !== 'chest') continue;
+            listedChests++;
+            const cx = Math.floor(p.x / CHUNK_SIZE);
+            const cz = Math.floor(p.z / CHUNK_SIZE);
+            const b = chunkOf(cx, cz)[
+              p.x - cx * CHUNK_SIZE + (p.z - cz * CHUNK_SIZE) * CHUNK_SIZE + p.y * LAYER
+            ];
+            expect(b, `${label} ${p.x},${p.y},${p.z}`).toBe(Block.CHEST);
+          }
+          const own = terrain.shafts.spawnShaft();
+          const centres: [number, number][] = [[spawn.x, spawn.z]];
+          if (own) centres.push([own.x, own.z]);
+          const seen = new Set<string>();
+          for (const [px, pz] of centres) {
+            const cx0 = Math.floor(px / CHUNK_SIZE);
+            const cz0 = Math.floor(pz / CHUNK_SIZE);
+            for (let cz = cz0 - 3; cz <= cz0 + 3; cz++) {
+              for (let cx = cx0 - 3; cx <= cx0 + 3; cx++) {
+                if (seen.has(`${cx},${cz}`)) continue;
+                seen.add(`${cx},${cz}`);
+                const blocks = chunkOf(cx, cz);
+                for (let i = 0; i < blocks.length; i++) {
+                  if (blocks[i] !== Block.CHEST) continue;
+                  found++;
+                  const x = cx * CHUNK_SIZE + (i % CHUNK_SIZE);
+                  const z = cz * CHUNK_SIZE + (Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE);
+                  const y = Math.floor(i / LAYER);
+                  expect(chests.has(`${x},${y},${z}`), `${label} chest at ${x},${y},${z}`).toBe(
+                    true,
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(listedChests).toBeGreaterThan(48);
+    expect(found).toBeGreaterThanOrEqual(48);
+  });
+});

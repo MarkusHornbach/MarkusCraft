@@ -13,9 +13,10 @@ import { getTerrain } from '../world/generation/terrain';
 import { World } from '../world/World';
 import type { WorldGen } from '../world/generation/worldOptions';
 import { TIMING_ENFORCED, expectFasterThan } from '../testing/timing';
-import { ORE_RADAR_KINDS, RADAR_KINDS } from './kinds';
+import { mapKinds } from './focus';
+import { ORE_RADAR_KINDS } from './kinds';
 import { PlaceIndex } from './places';
-import { scanRadar, worldProbe, type ScanInput } from './scan';
+import { scanRadar, worldChestProbe, worldProbe, type ScanInput } from './scan';
 import { VeinIndex } from './veins';
 
 const GEN = { version: 2, options: { terrain: 'balanced', trees: 'few' } } as const;
@@ -69,7 +70,7 @@ describe('radar scan cost', () => {
  * Warm and cold best times of a scan around the spawn of a world of `gen`; with `places`
  * the place kinds too (cold: a new place index as well).
  */
-function scanTimes(gen: WorldGen, places = false): { warm: number; cold: number } {
+function scanTimes(gen: WorldGen, places = false, chests = false): { warm: number; cold: number } {
   const spawn = findSpawn(getTerrain(1337, gen));
   const world = new World(1337, gen);
   const r = Math.ceil(64 / CHUNK_SIZE);
@@ -85,13 +86,14 @@ function scanTimes(gen: WorldGen, places = false): { warm: number; cold: number 
       y: Math.floor(spawn.y),
       z: Math.floor(spawn.z),
       probe: worldProbe(world),
-      kinds: places ? RADAR_KINDS : ORE_RADAR_KINDS,
+      kinds: places ? mapKinds(true, chests) : ORE_RADAR_KINDS,
       perKind: RADAR_CIRCLE_PER_KIND,
       radius: RADAR_RADIUS,
       farRadius: RADAR_FAR_RADIUS,
       places: placeIndex,
       placesPerKind: RADAR_MAP_PLACES,
       placeFarRadius: RADAR_PLACE_FAR_RADIUS,
+      chests: chests ? worldChestProbe(world) : undefined,
     });
     return performance.now() - start;
   };
@@ -147,6 +149,28 @@ describe('radar scan cost with places', () => {
     );
     expectFasterThan(all.cold, ores.cold * 1.2);
     expectFasterThan(all.warm, ores.warm * 1.2);
+  });
+});
+
+describe('radar scan cost with chests', () => {
+  it('Phase 8B3b AC5.3 a generator 4 scan with the Chest kind costs at most 1.2 × the scan without it', () => {
+    const gen: WorldGen = { version: 4, options: { terrain: 'balanced', trees: 'few' } };
+    let without = { warm: Infinity, cold: Infinity };
+    let withChests = { warm: Infinity, cold: Infinity };
+    for (let round = 0; round < (TIMING_ENFORCED ? 2 : 1); round++) {
+      const a = scanTimes(gen, true, false);
+      const b = scanTimes(gen, true, true);
+      without = { warm: Math.min(without.warm, a.warm), cold: Math.min(without.cold, a.cold) };
+      withChests = {
+        warm: Math.min(withChests.warm, b.warm),
+        cold: Math.min(withChests.cold, b.cold),
+      };
+    }
+    console.log(
+      `radar scan generator 4, places → with chests: warm ${without.warm.toFixed(2)} → ${withChests.warm.toFixed(2)} ms, cold ${without.cold.toFixed(2)} → ${withChests.cold.toFixed(2)} ms`,
+    );
+    expectFasterThan(withChests.cold, without.cold * 1.2);
+    expectFasterThan(withChests.warm, without.warm * 1.2);
   });
 });
 

@@ -1,6 +1,9 @@
 // The radar scan: the nearest veins per ore kind around the feet, corrected by the loaded
 // blocks, and the nearest places per place kind (Phase 8 part B2b).
 import { CHUNK_SIZE, RADAR_COARSE_DIST, RADAR_EXACT_DIST, RADAR_LEVEL_DY } from '../game/config';
+import { Block } from '../world/blocks';
+import { isEmptyState } from '../world/blockState';
+import { blockIndex, chunkKey } from '../world/chunk';
 import type { World } from '../world/World';
 import { ORE_CELL, VEIN_REACH } from '../world/generation/ores';
 import type { RadarKind } from './kinds';
@@ -40,6 +43,12 @@ export interface RadarScan {
 /** The block of a loaded chunk, or null where the chunk is not loaded (then the seed counts). */
 export type BlockProbe = (x: number, y: number, z: number) => number | null;
 
+/**
+ * Whether a listed loot chest still counts (Phase 8 part B3b): its cell holds a chest and
+ * the chest is not empty. Without a probe every listed chest counts.
+ */
+export type ChestProbe = (x: number, y: number, z: number) => boolean;
+
 export interface ScanInput {
   index: VeinIndex;
   /** The feet cell (floored). */
@@ -59,6 +68,8 @@ export interface ScanInput {
   /** Places per place kind (default `perKind`) and their far radius (default `farRadius`). */
   placesPerKind?: number;
   placeFarRadius?: number;
+  /** Hides emptied or broken loot chests (the Chest kind). */
+  chests?: ChestProbe;
 }
 
 /** The hint of a vein at 3D distance `dist` and height difference `dy`. */
@@ -257,7 +268,8 @@ export function scanRadar(input: ScanInput): RadarScan {
 /**
  * One place kind: the nearest places whose horizontal distance is at most the radius, by
  * 3D distance from the feet cell (the same order as veins); with none in range, `beyond`
- * for the nearest up to the place far radius. Places are permanent: no probe.
+ * for the nearest up to the place far radius. Places are permanent, except chests, which
+ * count only while the chest probe says so.
  */
 function scanPlaces(
   input: ScanInput,
@@ -274,6 +286,9 @@ function scanPlaces(
   const nearest = new TopList(1);
   places.near(input.x, input.z, farRadius, (place) => {
     if (place.kind !== kind.key) return;
+    if (place.kind === 'chest' && input.chests && !input.chests(place.x, place.y, place.z)) {
+      return;
+    }
     const dx = place.x - input.x;
     const dy = place.y - input.y;
     const dz = place.z - input.z;
@@ -300,6 +315,29 @@ function scanPlaces(
       dist: Math.sqrt(nearest.d2[0]),
     });
   }
+}
+
+/**
+ * The chest probe of a world: the cell's block (a loaded chunk's, else its edit; no edit
+ * means the generated chest is there) is a chest, and its state (stored, else the derived
+ * loot) holds an item. Guests hold the whole world's edits and states, so they agree.
+ */
+export function worldChestProbe(world: World): ChestProbe {
+  return (x, y, z) => {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    let block: number = Block.CHEST;
+    if (world.getChunk(cx, cz)) block = world.getBlock(x, y, z);
+    else {
+      const edit = world.edits
+        .get(chunkKey(cx, cz))
+        ?.get(blockIndex(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE));
+      if (edit !== undefined) block = edit;
+    }
+    if (block !== Block.CHEST) return false;
+    const state = world.stateFor(Block.CHEST, x, y, z);
+    return state !== null && !isEmptyState(state);
+  };
 }
 
 /** The probe of a world: its block where the chunk is loaded, else null (the seed decides). */

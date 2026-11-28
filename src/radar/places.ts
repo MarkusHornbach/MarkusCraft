@@ -1,4 +1,5 @@
-// The places side of the radar (Phase 8 part B2b): mine shafts and cave entrances per region.
+// The places side of the radar (Phase 8 part B2b): mine shafts, cave entrances and (B3b)
+// loot chests per region.
 import { PLACE_INDEX_REGIONS, PLACE_REGION } from '../game/config';
 import { getTerrain, type Place, type TerrainSource } from '../world/generation/terrain';
 import type { WorldGen } from '../world/generation/worldOptions';
@@ -11,8 +12,9 @@ function regionKey(rx: number, rz: number): number {
 
 /**
  * The places of one seed and generator per `PLACE_REGION` square, from the generator's
- * `placesIn`. Places are permanent: a mined frame still marks its shaft, so the world never
- * corrects them. A bounded cache (oldest dropped); it never changes results.
+ * `placesIn`. Places are permanent (a mined frame still marks its shaft); only chests are
+ * checked against the world by the scan's `ChestProbe`. A bounded cache (oldest dropped); it
+ * never changes results.
  */
 export class PlaceIndex {
   readonly seed: number;
@@ -31,6 +33,11 @@ export class PlaceIndex {
   /** False for generators without places (1 and 2): the radar shows no place kind. */
   get hasPlaces(): boolean {
     return this.terrain.placesIn !== undefined;
+  }
+
+  /** True where the generator puts loot chests (version 4): the radar shows the Chest kind. */
+  get hasChests(): boolean {
+    return this.terrain.lootAt !== undefined;
   }
 
   /** The places whose cell lies in region (rx, rz). */
