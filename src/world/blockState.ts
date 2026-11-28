@@ -44,9 +44,9 @@ export function emptyChest(): ChestState {
 }
 
 /**
- * The state of a cell that has none stored: the hook for contents derived from the seed
- * and the position (generated loot, a later part). Today every chest starts empty and
- * `source` is not read. Null for a block without state.
+ * The state of a cell that has none stored: contents derived from the seed and the
+ * position. A chest in a generator 4 shaft's chest cell reads its loot (`source.lootAt`,
+ * Phase 8 part B3b); every other chest starts empty. Null for a block without state.
  */
 export function initialState(
   block: number,
@@ -55,11 +55,8 @@ export function initialState(
   z: number,
   source: TerrainSource | null,
 ): BlockState | null {
-  void x;
-  void y;
-  void z;
-  void source;
-  return stateKindOf(block) === 'chest' ? EMPTY_CHEST : null;
+  if (stateKindOf(block) !== 'chest') return null;
+  return source?.lootAt?.(x, y, z) ?? EMPTY_CHEST;
 }
 
 /** Whether a state holds no items. */

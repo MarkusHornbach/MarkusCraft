@@ -169,7 +169,7 @@ describe('save format', () => {
       ok: false,
       error: 'newer',
     });
-    expect(decodeMeta({ ...good, generatorVersion: 4 })).toEqual({ ok: false, error: 'newer' });
+    expect(decodeMeta({ ...good, generatorVersion: 5 })).toEqual({ ok: false, error: 'newer' });
   });
 
   it('validates chunk records (Phase 3 AC3.2)', () => {
@@ -597,6 +597,6 @@ describe('generator 3 (Phase 8 part B2a)', () => {
     });
     // An older format never had generator 3; a later generator is "newer".
     expect(decodeMeta({ ...record, formatVersion: 2 })).toEqual({ ok: false, error: 'damaged' });
-    expect(decodeMeta({ ...record, generatorVersion: 4 })).toEqual({ ok: false, error: 'newer' });
+    expect(decodeMeta({ ...record, generatorVersion: 5 })).toEqual({ ok: false, error: 'newer' });
   });
 });

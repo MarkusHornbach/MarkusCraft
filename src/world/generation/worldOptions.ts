@@ -16,10 +16,10 @@ export interface WorldOptions {
 }
 
 /**
- * The generator of a world: version 1 has no options, versions 2 and 3 (caves, Phase 8
- * part B2a) take them.
+ * The generator of a world: version 1 has no options, versions 2, 3 (caves, Phase 8 part
+ * B2a) and 4 (loot chests, Phase 8 part B3b) take them.
  */
-export type WorldGen = { version: 1 } | { version: 2 | 3; options: WorldOptions };
+export type WorldGen = { version: 1 } | { version: 2 | 3 | 4; options: WorldOptions };
 
 export const DEFAULT_WORLD_OPTIONS: WorldOptions = { terrain: 'balanced', trees: 'few' };
 export const CLASSIC_GEN: WorldGen = { version: 1 };
@@ -44,8 +44,10 @@ export const TREE_BUTTON_LABELS: Record<TreeDensity, string> = {
 };
 /** How the world list names a generator 1 world. */
 export const CLASSIC_LABEL = 'Classic';
-/** Added to the world list's text of a generator 3 world. */
+/** Added to the world list's text of a generator 3 and 4 world. */
 export const CAVES_LABEL = 'Caves';
+/** Added after "Caves" to the world list's text of a generator 4 world. */
+export const LOOT_LABEL = 'Loot';
 
 export function isTerrainShape(value: unknown): value is TerrainShape {
   return typeof value === 'string' && (TERRAIN_SHAPES as readonly string[]).includes(value);
@@ -81,7 +83,7 @@ export function decodeWorldOptions(value: unknown): OptionsCheck {
 
 /** Generator versions this build can generate. */
 export function isKnownGeneratorVersion(version: number): boolean {
-  return version === 1 || version === 2 || version === 3;
+  return version === 1 || version === 2 || version === 3 || version === 4;
 }
 
 /**
@@ -90,7 +92,9 @@ export function isKnownGeneratorVersion(version: number): boolean {
  */
 export function worldGenOf(version: number, options: WorldOptions | null): WorldGen | null {
   if (version === 1) return options === null ? CLASSIC_GEN : null;
-  if ((version === 2 || version === 3) && options !== null) return { version, options };
+  if ((version === 2 || version === 3 || version === 4) && options !== null) {
+    return { version, options };
+  }
   return null;
 }
 
@@ -112,12 +116,14 @@ export function worldGenKey(gen: WorldGen): string {
 
 /**
  * What the world list shows: "Balanced · Few trees", "Balanced · Few trees · Caves" for
- * version 3, or "Classic" for version 1.
+ * version 3, "… · Caves · Loot" for version 4, or "Classic" for version 1.
  */
 export function describeWorldGen(gen: WorldGen): string {
   if (gen.version === 1) return CLASSIC_LABEL;
   const text = `${TERRAIN_LABELS[gen.options.terrain]} · ${TREE_LABELS[gen.options.trees]}`;
-  return gen.version === 3 ? `${text} · ${CAVES_LABEL}` : text;
+  if (gen.version === 3) return `${text} · ${CAVES_LABEL}`;
+  if (gen.version === 4) return `${text} · ${CAVES_LABEL} · ${LOOT_LABEL}`;
+  return text;
 }
 
 /** The F3 overlay's row: "Generator 2 · balanced · few", or "Generator 1". */

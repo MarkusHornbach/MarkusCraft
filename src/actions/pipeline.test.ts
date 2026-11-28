@@ -166,6 +166,8 @@ const CHEST_BUILT_ALLOWED: Record<string, number> = {
   'src/world/blockState.ts': 1,
   // A guest applies the slots the host reports.
   'src/net/ClientSession.ts': 1,
+  // Generator 4's derived loot (Phase 8 part B3b).
+  'src/world/loot.ts': 1,
 };
 
 describe('single pipeline for block state (Phase 8B3a 6.2, 6.3)', () => {

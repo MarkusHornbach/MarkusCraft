@@ -14,6 +14,7 @@ import { smoothstep } from '../../util/math';
 import { createNoise2D, fbm2D, type Noise2D } from '../../util/noise';
 import { deriveSeed, fnv1a, hash2Float } from '../../util/rng';
 import { Block } from '../blocks';
+import type { ChestState } from '../blockState';
 import { chunkKey } from '../chunk';
 import { ColumnCache } from './columnCache';
 import { CLAY_COLUMN, markClayColumns, placeOres } from './ores';
@@ -31,6 +32,7 @@ import {
 } from './terrainRules';
 import { TerrainV2 } from './terrainV2';
 import { TerrainV3 } from './terrainV3';
+import { TerrainV4 } from './terrainV4';
 import type { SpawnPoint } from './spawn';
 import { CLASSIC_GEN, type WorldGen, isKnownGeneratorVersion, worldGenKey } from './worldOptions';
 
@@ -378,10 +380,16 @@ export class Terrain {
   }
 }
 
-/** A place the radar points at (Phase 8 part B2b): a mine shaft or a cave entrance. */
+/**
+ * A place the radar points at (Phase 8 part B2b): a mine shaft, a cave entrance or (Phase 8
+ * part B3b, generator 4) a shaft's loot chest.
+ */
 export interface Place {
-  kind: 'shaft' | 'cave';
-  /** Shaft: the log column at the collar's height; cave: the mouth's lowest air cell open to the sky. */
+  kind: 'shaft' | 'cave' | 'chest';
+  /**
+   * Shaft: the log column at the collar's height; cave: the mouth's lowest air cell open to
+   * the sky; chest: the chest's cell.
+   */
   x: number;
   y: number;
   z: number;
@@ -414,6 +422,11 @@ export interface TerrainSource {
    * (versions 1 and 2).
    */
   placesIn?(minX: number, minZ: number, maxX: number, maxZ: number, out: Place[]): void;
+  /**
+   * The derived contents of a generated loot chest in cell (x, y, z), or null where the
+   * generator puts none (Phase 8 part B3b; absent before version 4).
+   */
+  lootAt?(x: number, y: number, z: number): ChestState | null;
 }
 
 const terrains = new Map<string, TerrainSource>();
@@ -442,7 +455,9 @@ export function getTerrain(seed: number, gen: WorldGen = CLASSIC_GEN): TerrainSo
         ? new Terrain(seed)
         : gen.version === 2
           ? new TerrainV2(seed, gen.options)
-          : new TerrainV3(seed, gen.options);
+          : gen.version === 3
+            ? new TerrainV3(seed, gen.options)
+            : new TerrainV4(seed, gen.options);
     terrains.set(key, terrain);
   }
   return terrain;
@@ -461,9 +476,16 @@ export function generateChunk(seed: number, cx: number, cz: number, gen: WorldGe
  * devices that compute the same value generate the same terrain for the seed.
  */
 export function terrainChecksum(seed: number, gen: WorldGen): number {
+  return terrainChecksumAt(seed, gen, 0, 0);
+}
+
+/** The same checksum over the 3 × 3 chunks around chunk (cx, cz). */
+export function terrainChecksumAt(seed: number, gen: WorldGen, cx: number, cz: number): number {
   let hash: number | undefined;
-  for (let cz = -1; cz <= 1; cz++) {
-    for (let cx = -1; cx <= 1; cx++) hash = fnv1a(generateChunk(seed, cx, cz, gen), hash);
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      hash = fnv1a(generateChunk(seed, cx + dx, cz + dz, gen), hash);
+    }
   }
   return hash ?? 0;
 }

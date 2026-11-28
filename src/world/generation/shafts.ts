@@ -91,6 +91,14 @@ export function shaftChamberCell(s: Shaft): { x: number; y: number; z: number } 
 }
 
 /**
+ * The chest cell of generator 4 (Phase 8 part B3b): the chamber corner without a torch,
+ * opposite the stair landing, standing on the chamber's stone bricks.
+ */
+export function shaftChestCell(s: Shaft): { x: number; y: number; z: number } {
+  return { x: s.x - 3, y: s.floor, z: s.z + 3 };
+}
+
+/**
  * The block a shaft puts into cell (x, y, z), or -1 where it leaves the generated block.
  * The caller makes sure the column lies in the shaft's footprint.
  */

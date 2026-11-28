@@ -45,3 +45,32 @@ export const TERRAIN_CHECKSUMS_1337_V3: Readonly<Record<string, number>> = {
   'hilly/normal': 4167167292,
   'hilly/many': 1429350040,
 };
+
+/**
+ * Generator 4 (Phase 8 part B3b AC1.3): `terrainChecksumAt(1337, { version: 4, options },
+ * cx, cz)` over the 3 × 3 chunks around the chunk that holds the spawn shaft's chest
+ * (`spawnChestChunk`), for every combination. They must never change, and none equals
+ * generator 3's over the same chunks.
+ */
+export const TERRAIN_CHECKSUMS_1337_V4: Readonly<Record<string, number>> = {
+  'flat/none': 1467969657,
+  'flat/few': 3059417204,
+  'flat/normal': 504657657,
+  'flat/many': 4176848579,
+  'balanced/none': 3023167536,
+  'balanced/few': 3588130753,
+  'balanced/normal': 3511865272,
+  'balanced/many': 2371674030,
+  'hilly/none': 960775768,
+  'hilly/few': 3314468240,
+  'hilly/normal': 2832059690,
+  'hilly/many': 4158460090,
+};
+
+/**
+ * `lootChecksum1337()` (`src/testing/lootChecksum.ts`, Phase 8 part B3b AC2.1): the derived
+ * contents of every loot chest of seed 1337 (balanced, few) whose shaft lies within ±1 024
+ * of the origin, then the spawn chest of each preset. Frozen: a change to the loot tables
+ * or their draw is a new generator version.
+ */
+export const LOOT_CHECKSUM_1337_V4 = 2380617216;

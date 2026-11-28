@@ -308,8 +308,11 @@ export interface TestApi {
   submit(action: unknown): ActionResult | null;
   /** Highest non-air, non-leaf block of a column, or -1 if the column is not loaded. */
   surfaceY(x: number, z: number): number;
-  /** Checksum over the generated terrain around the origin (see `terrainChecksum`). */
-  terrainChecksum(): number;
+  /**
+   * Checksum over the generated terrain around the origin (see `terrainChecksum`), or
+   * around chunk (cx, cz) (`terrainChecksumAt`, Phase 8 part B3b).
+   */
+  terrainChecksum(cx?: number, cz?: number): number;
   /**
    * The spawn shaft, the nearest entrance and ravine of a generator 3 world (Phase 8 part
    * B2a), or null for an older generator.

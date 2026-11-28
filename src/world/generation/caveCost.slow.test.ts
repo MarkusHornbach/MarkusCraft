@@ -25,4 +25,18 @@ describe('cave cost: faces', () => {
     expect(median).toBeLessThanOrEqual(1.5);
     expect(sorted[sorted.length - 1]).toBeLessThanOrEqual(2);
   });
+
+  it('Phase 8B3b AC1.5 faces per chunk of generator 4 equal generator 3 within 1 %', () => {
+    const rows: string[] = [];
+    for (const seed of CAVE_SEEDS) {
+      for (const terrain of CAVE_SHAPES) {
+        const options = { terrain, trees: 'few' } as const;
+        const three = facesPerChunk(seed, { version: 3, options });
+        const four = facesPerChunk(seed, { version: 4, options });
+        rows.push(`${seed} ${terrain}: ${three.toFixed(0)} → ${four.toFixed(0)}`);
+        expect(Math.abs(four / three - 1), `${seed} ${terrain}`).toBeLessThanOrEqual(0.01);
+      }
+    }
+    console.log(`faces per chunk, generator 3 → 4:\n${rows.join('\n')}`);
+  });
 });
