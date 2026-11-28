@@ -2726,6 +2726,11 @@ button.task-row:hover {
   min-width: 72px;
 }
 
+/* With the controller the hint bar says what to do; the line for mouse and fingers goes. */
+.pad-active .chest-hint {
+  display: none;
+}
+
 /* Phones: chest, inventory, bar and header fit 360 px without scrolling (AC5.3). */
 @media (max-height: 480px) {
   .chest-screen {

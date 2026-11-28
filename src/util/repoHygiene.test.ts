@@ -49,6 +49,7 @@ describe('repository hygiene (AC12.4)', () => {
     // `task-tracker` and `task-tracker-touch`. Phase 8 part B2a added `cave-tunnel`,
     // `mine-shaft` and `ravine`. Phase 8 part B2b added `radar-places` and
     // `map-tab-places` and removed `map-tab-touch` (the same picture as `map-tab-places`).
-    expect(assets.length).toBe(56);
+    // Phase 8 part B3a2 added `chest-screen`, `chest-screen-touch` and `pad-chest-screen`.
+    expect(assets.length).toBe(59);
   });
 });

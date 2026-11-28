@@ -2110,15 +2110,11 @@ export class Game {
     this.lastResult = result;
     // A malformed value is refused and reported as it came: it may not be an object.
     if (!result.ok && (typeof action !== 'object' || action === null)) return;
+    // An accepted `openChest` opens the screen, whoever submitted it (the place input, or
+    // the test API).
     if (action.kind === 'openChest') {
-      const pending = this.chestPending;
       this.chestPending = null;
-      const same =
-        pending !== null &&
-        pending.x === action.x &&
-        pending.y === action.y &&
-        pending.z === action.z;
-      if (result.ok && same) this.openChestScreen(pending);
+      if (result.ok) this.openChestScreen({ x: action.x, y: action.y, z: action.z });
     }
     if (action.kind === 'startBreak' || action.kind === 'break') this.breakInFlight = false;
     // A `break` the host found too early (its clock against the screen's): start over.
