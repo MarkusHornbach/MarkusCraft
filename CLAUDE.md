@@ -111,8 +111,9 @@ many rounds, the two sides in turn.
   start at 256 (`Item.COAL`). An unknown stored item id still loads and shows as "Unknown
   item"; a newer build must never make a world "damaged". Block state kinds (the chest's)
   belong to the save format: a new kind needs a new format version.
-- **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 3: caves,
-  with world options); old versions and their checksums never change: `src/world/generation/CLAUDE.md`.
+- **Generator version.** Every world stores its generator (`GENERATOR_VERSION`, now 4: caves
+  and loot chests, with world options); old versions, their checksums and generator 4's
+  loot tables never change: `src/world/generation/CLAUDE.md`.
 - **Saving.** One `WorldMeta` record plus one record per edited chunk (`SAVE_FORMAT_VERSION`,
   now 6, with the task book, the tracked task, block states (chests) and the book version);
   decoding never throws, a format change needs a migration: `src/save/CLAUDE.md`. Block
@@ -314,14 +315,14 @@ hold:
 | 8B2b      | `docs/phase-8b2-plan.md`       | `docs/phase-8b2b-report.md`      | radar places, map and circle size          |
 | 8B3a1     | `docs/phase-8b3a-plan.md`      | `docs/phase-8b3a1-report.md`     | block state, chest, save format 6, rooms   |
 | 8B3a2     | `docs/phase-8b3a-plan.md`      | `docs/phase-8b3a2-report.md`     | chest screen, task 21, book 2, `store`     |
+| 8B3b      | `docs/phase-8b3b-plan.md`      | `docs/phase-8b3b-report.md`      | generator 4, loot, Chest radar kind, bot   |
 
 - **Open:** Phase 4 part C (Web Workers) is built only if a starting prompt asks for it.
   The rest of Phase 7 (custom blocks, textures, characters, names, effects) is not
   planned. Phase 8: A, "Fix Adventure 1", B1 (radar), B2a (generator 3, caves) and B2b (places on
   the radar, a larger map) and B3a (chests as storage, `docs/phase-8b3a-plan.md`: B3a1
-  block state and save format 6, B3a2 the chest screen and task 21) are built; B3b (loot
-  in mine shafts, generator 4, `docs/phase-8b3b-plan.md`) is planned; B3c on and C–E are
-  not planned. At a session's start look
+  block state and save format 6, B3a2 the chest screen and task 21) and B3b (loot in mine
+  shafts, generator 4) are built; B3c on and C–E are not planned. At a session's start look
   for issues labelled `perf-run`; the latest are all green (#37, Web Workers "not
   needed"). Numbers from software WebGL (cloud, CI) are never evidence.
 - **Reading older docs** (old phase names, renumbered criteria): `docs/architecture.md`,

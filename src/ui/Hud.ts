@@ -79,7 +79,7 @@ export class Hud {
 
     // How to open the chest under the crosshair (Phase 8 part B3b); never while breaking.
     this.chestHint = document.createElement('div');
-    this.chestHint.className = 'chest-hint';
+    this.chestHint.className = 'crosshair-hint';
     this.chestHintText = document.createElement('span');
     this.chestHint.appendChild(this.chestHintText);
     this.element.appendChild(this.chestHint);

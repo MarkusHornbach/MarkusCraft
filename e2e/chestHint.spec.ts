@@ -7,7 +7,7 @@ import { DEG, openGame, setPlayer, step, whenIdle } from './game';
 import { BUTTON, Pad, installFakePads } from './gamepad';
 import { TOUCH_DEVICE, openTouchGame } from './touch';
 
-const hint = '.hud .chest-hint';
+const hint = '.hud .crosshair-hint';
 
 async function lookAway(page: Page): Promise<void> {
   await setPlayer(page, { pitch: 20 * DEG });
@@ -79,7 +79,7 @@ test.describe('touch', () => {
     await chestAhead(page);
     await expect(page.locator(hint)).toHaveText('Place: Open');
     await expect(page.locator(hint)).toHaveAttribute('data-input', 'touch');
-    await expect(page.locator('.touch-place')).toHaveText('Place');
+    await expect(page.locator('.touch-place')).toHaveAttribute('aria-label', 'Place');
     await lookAway(page);
     await expect(page.locator(hint)).toBeHidden();
   });
@@ -93,6 +93,10 @@ test('Phase 8B3b AC7.1: controller: the LT glyph with "Open"; gone while breakin
   const pad = new Pad(page);
   await pad.connect();
   await chestAhead(page);
+  // A press makes the pad the active input (the wake-up press of connect does not).
+  await pad.tap(BUTTON.SELECT);
+  await step(page, 1);
+  await whenIdle(page);
   await expect(page.locator(hint)).toHaveAttribute('data-input', 'pad');
   await expect(page.locator(hint)).toHaveText('Open');
   await expect(page.locator(`${hint} canvas[data-glyph="LT"]`)).toBeVisible();

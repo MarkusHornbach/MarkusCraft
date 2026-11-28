@@ -50,7 +50,9 @@ describe('repository hygiene (AC12.4)', () => {
     // `mine-shaft` and `ravine`. Phase 8 part B2b added `radar-places` and
     // `map-tab-places` and removed `map-tab-touch` (the same picture as `map-tab-places`).
     // Phase 8 part B3a2 added `chest-screen`, `chest-screen-touch`, `pad-chest-screen` and
-    // `chest-block`.
-    expect(assets.length).toBe(60);
+    // `chest-block`. Phase 8 part B3b added `loot-chest`, `chest-hint` and `map-tab-loot`
+    // and removed `map-tab-places` (the menu world is generator 4: the same screen with a
+    // Chest row).
+    expect(assets.length).toBe(62);
   });
 });

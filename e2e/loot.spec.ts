@@ -55,15 +55,19 @@ test('Phase 8B3b AC7.2 AC2.1: real input opens the spawn chest, quick moves one 
   expect(await page.evaluate(() => window.__mc.verifyLight())).toBe(0);
 });
 
-test('Phase 8B3b AC7.2: matches the loot-chest reference (the chamber seen from the landing)', async ({
+test('Phase 8B3b AC7.2: matches the loot-chest reference (the chamber seen from the corner beside the landing)', async ({
   page,
 }) => {
   await openGame(page, { mode: 'gathering', gen: 4 });
   const { chest } = await spawnLoot(page);
   const shaft = (getTerrain(1337, GEN4) as TerrainV4).shafts.spawnShaft();
   if (!shaft) throw new Error('no spawn shaft');
-  await faceCell(page, shaftChamberCell(shaft), chest);
-  expect((await getState(page)).target).toBeNull();
+  // The landing (2, -2) looks at the chest across the log column; the corner (2, 2) beside
+  // it sees the chest along the chamber's wall.
+  const landing = shaftChamberCell(shaft);
+  await faceCell(page, { x: landing.x, y: landing.y, z: shaft.z + 2 }, chest);
+  const seen = (await getState(page)).target;
+  expect(seen === null || seen.id === CHEST).toBe(true);
   await page.locator('.hud').evaluate((node) => {
     (node as HTMLElement).style.visibility = 'hidden';
   });

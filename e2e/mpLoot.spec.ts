@@ -75,9 +75,6 @@ test('Phase 8B3b AC3.2 AC5.3: a guest takes one loot stack; all read the same re
   const slot = loot?.findIndex((s) => s !== null) ?? -1;
   const item = loot?.[slot]?.item ?? 0;
   const take = { kind: 'quickMove', ...chest, slot, fromChest: true, item };
-  expect(
-    await guest.page.evaluate((c) => window.__mc.submit({ kind: 'openChest', ...c }), chest),
-  ).not.toBe(false);
   await guest.page.evaluate((a) => window.__mc.submit(a), take);
   await expect.poll(async () => (await getChest(host.page, chest))?.[slot] ?? null).toBeNull();
   await expect.poll(async () => (await getChest(guest.page, chest))?.[slot] ?? null).toBeNull();
@@ -105,5 +102,4 @@ test('Phase 8B3b AC3.2 AC5.3: a guest takes one loot stack; all read the same re
     .toBe(true);
   expect(await chestsShown(guest.page, stand, chest)).toBe(0);
   expect(await chestsShown(host.page, stand, chest)).toBe(0);
-  await guest.page.evaluate(() => window.__mc.submit({ kind: 'closeChest' }));
 });

@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { TASKS } from '../progress/tables';
 import { runBot } from './Bot';
 
+// Seed 1337 balanced has no rich chest within 192 blocks at the start of chapter 4 (its
+// trip 2 finds none); flat has one 82 blocks away.
 describe('goal bot loot run on generator 4', () => {
-  it('Phase 8B3b AC6.2 finishes the book with --loot (seed 1337 balanced/few)', () => {
+  it('Phase 8B3b AC6.2 finishes the book with --loot (seed 1337 flat/few: both trips find a chest)', () => {
     const run = runBot(
       1337,
-      { version: 4, options: { terrain: 'balanced', trees: 'few' } },
+      { version: 4, options: { terrain: 'flat', trees: 'few' } },
       { loot: true },
     );
     expect(run.error).toBeNull();

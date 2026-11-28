@@ -30,28 +30,42 @@ function run(make: (seed: number) => TerrainV2, seed: number): number {
 }
 
 describe('generator 3 speed', () => {
-  it('Phase 8B2a AC2.2 Phase 8B3b AC1.5 a chunk of generators 3 and 4 takes at most 1.35 × generator 2', () => {
+  it('Phase 8B2a AC2.2 a chunk of generator 3 takes at most 1.35 × generator 2', () => {
     // Fresh generators each round (no warm caches beyond the spawn), the two sides in turn;
     // the best round of each counts, summed over four seeds.
     const v2 = (seed: number): TerrainV2 => new TerrainV2(seed, OPTIONS);
     const v3 = (seed: number): TerrainV3 => new TerrainV3(seed, OPTIONS);
-    const v4 = (seed: number): TerrainV4 => new TerrainV4(seed, OPTIONS);
     const two = SEEDS.map(() => Infinity);
     const three = SEEDS.map(() => Infinity);
-    const four = SEEDS.map(() => Infinity);
     for (let round = 0; round < ROUNDS; round++) {
       SEEDS.forEach((seed, i) => {
         two[i] = Math.min(two[i], run(v2, seed));
         three[i] = Math.min(three[i], run(v3, seed));
+      });
+    }
+    const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0);
+    console.log(
+      `generation per chunk: generator 2 ${(sum(two) / 4).toFixed(3)} ms, generator 3 ${(sum(three) / 4).toFixed(3)} ms (${(sum(three) / sum(two)).toFixed(2)} ×)`,
+    );
+    expectFasterThan(sum(three), sum(two) * 1.35);
+  });
+
+  it('Phase 8B3b AC1.5 a chunk of generator 4 takes at most 1.35 × generator 2', () => {
+    // Its own pair of sides, like generator 3's: generator 4 adds one cell write per shaft.
+    const v2 = (seed: number): TerrainV2 => new TerrainV2(seed, OPTIONS);
+    const v4 = (seed: number): TerrainV4 => new TerrainV4(seed, OPTIONS);
+    const two = SEEDS.map(() => Infinity);
+    const four = SEEDS.map(() => Infinity);
+    for (let round = 0; round < ROUNDS; round++) {
+      SEEDS.forEach((seed, i) => {
+        two[i] = Math.min(two[i], run(v2, seed));
         four[i] = Math.min(four[i], run(v4, seed));
       });
     }
     const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0);
     console.log(
-      `generation per chunk: generator 2 ${(sum(two) / 4).toFixed(3)} ms, generator 3 ${(sum(three) / 4).toFixed(3)} ms (${(sum(three) / sum(two)).toFixed(2)} ×), generator 4 ${(sum(four) / 4).toFixed(3)} ms (${(sum(four) / sum(two)).toFixed(2)} ×)`,
+      `generation per chunk: generator 2 ${(sum(two) / 4).toFixed(3)} ms, generator 4 ${(sum(four) / 4).toFixed(3)} ms (${(sum(four) / sum(two)).toFixed(2)} ×)`,
     );
-    expectFasterThan(sum(three), sum(two) * 1.35);
-    // Phase 8B3b AC1.5: generator 4 adds one cell write per shaft.
     expectFasterThan(sum(four), sum(two) * 1.35);
   });
 

@@ -176,7 +176,7 @@ canvas {
 
 /* How to open the chest under the crosshair (Phase 8 part B3b): where the break bar shows,
    which it never shows with. */
-.chest-hint {
+.crosshair-hint {
   position: absolute;
   left: 50%;
   top: calc(50% + 15px);
@@ -195,7 +195,7 @@ canvas {
   pointer-events: none;
 }
 
-.chest-hint.visible {
+.crosshair-hint.visible {
   display: flex;
 }
 
