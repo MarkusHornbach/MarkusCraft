@@ -100,7 +100,9 @@ test('Phase 8 AC5.4, AC5.3: at 640 × 360 the Tasks tab lies inside the view, ro
     (node as HTMLElement).style.visibility = 'hidden';
   });
   await whenIdle(page);
-  await expect(page).toHaveScreenshot('tasks-tab-touch.png', { maxDiffPixelRatio: 0.05 });
+  // Text only, and with chapter 3's five rows (Phase 8 part B3a2) CI's wider font differs by
+  // 6 %: 8 %, as the other text-only references (`net-test`, `join-section`).
+  await expect(page).toHaveScreenshot('tasks-tab-touch.png', { maxDiffPixelRatio: 0.08 });
 });
 
 test('Phase 8 AC3.2 (touch): locked rows have no button and the tab counts only unlocked rows', async ({

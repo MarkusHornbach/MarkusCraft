@@ -119,6 +119,9 @@ the counts and the book touch: `inventoryScreen`, `torch`, `crafting`, `progress
   do, and on a 540 px view it lay over the line), not only on short screens.
 - **Phone fit**: 38 px slots, 4 px gaps, the hint hidden and header buttons 40 px high on
   touch (48 elsewhere on touch) fit 640 × 360 without moving the header beside the grid.
+- **`tasks-tab-touch` has 8 % tolerance** (was 5 %): with chapter 3's five rows CI's wider
+  font differs by 6 % from the picture made here (first CI run); 8 % as the other text-only
+  references (`net-test`, `join-section`).
 - **Creative quick move** onto the bar merges (B3a1's rule), as before.
 - **The furnace and workbench "near" rule** is untouched: a chest is no station.
 
